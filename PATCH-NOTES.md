@@ -69,7 +69,7 @@ Goblin Swarm and Ember Imps already had theirs. Sunken Deep's units are still pl
 ## 31 October 2026 – Balance
 
 - **Slime Wizard:** splash 6 m → **5 m**, health 700 → **620**.
-- **Flame Wizard:** health 2000 → **1700**.
+- **Flame Wizard:** health 2000 → **1700**, damage 12 → **11** per hit.
 - **Truespear:** health 2000 → **1800**, range 25 m → **23 m**.
 - **Frost Wizard:** now has **4 armor**.
 - **Spiders:** 5 → **6** spiders per squad.
