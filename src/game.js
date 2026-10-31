@@ -948,7 +948,7 @@ const Game = (() => {
   }
   // the viewer is removing this mushroom tile this round (it still stands until the fight)
   const removingShroom = (m, viewer, deploying, col, row) => !!m && deploying && (m.map && m.map.removed || []).some(x => x.col === col && x.row === row && x.side === viewer && x.round === m.round);
-  const enemyHolds = (m, side, col, row) => !!m && (m.armies[1 - side].some(s => { const p = seenAt(m, s); return !hiddenFromFoe(m, s) && p.col === col && p.row === row && s.round < m.round; }) ||
+  const enemyHolds = (m, side, col, row) => !!m && (foeSeen(m, 1 - side).some(s => { const p = seenAt(m, s); return p.col === col && p.row === row; }) ||
     (m.round > 1 && m.towers && m.towers[1 - side] && m.towers[1 - side].col === col && m.towers[1 - side].row === row));
   // the edge tiles of your zone that are the enemy's flank are reserved for them for the whole match
   const reserved = (side, col, row) => isFlank(1 - side, col, row);
@@ -991,7 +991,17 @@ const Game = (() => {
   const isRider = (sq) => !!sq && sq.in != null;
   // what the opponent can't see on the board: riders, and a squad that stepped out of a carrier this round (it is
   // still inside as far as they know)
-  const hiddenFromFoe = (m, s) => isRider(s) || !!(s.from && s.movedRound === m.round && s.from.in != null);
+  // (outRound: it stepped out of a carrier sold this round, so the opponent still thinks it rides inside)
+  const hiddenFromFoe = (m, s) => isRider(s) || !!(s.from && s.movedRound === m.round && s.from.in != null) || s.outRound === m.round;
+  // Selling is hidden from the opponent until the fight: a squad from an earlier round sold this round stays on their
+  // screen as it was (m.sold[side]: copies of it, kept only for the round they were sold in)
+  const soldNow = (m, side) => ((m && m.sold && m.sold[side]) || []).filter(q => q.soldRound === m.round);
+  function noteSold(m, side, sq) {
+    if (!m.sold) m.sold = [[], []];
+    m.sold[side] = soldNow(m, side).filter(q => q.id !== sq.id).concat({ ...sq, soldRound: m.round });
+  }
+  // the squads of side as the other side sees them while deploying: those from earlier rounds, those sold this round too
+  const foeSeen = (m, side) => m.armies[side].filter(s => s.round < m.round && !hiddenFromFoe(m, s)).concat(soldNow(m, side).filter(s => !hiddenFromFoe(m, s)));
   const isCarrier = (m, ui) => !!(m && m.units[ui] && m.units[ui].carrier);
   const riderOf = (m, side, sq) => sq ? m.armies[side].find(s => s.in === sq.id) || null : null;
   const carrierOf = (m, side, sq) => isRider(sq) ? m.armies[side].find(s => s.id === sq.in) || null : null;
@@ -1592,7 +1602,9 @@ const Game = (() => {
     const i = m.armies[side].findIndex(s => s.id === sqId && s.round < m.round);
     if (i < 0) return 0;
     const [sq] = m.armies[side].splice(i, 1);
+    for (const r of m.armies[side]) if (r.in === sq.id) r.outRound = m.round; // the opponent doesn't see it step out
     syncRiders(m, side); // a sold carrier's rider steps out onto the tile
+    noteSold(m, side, sq); // the opponent still sees it until the fight
     const v = sellValue(m, sq);
     m.gold[side] += v;
     return v;
@@ -2053,9 +2065,9 @@ const Game = (() => {
   function seenBy(m, viewer) {
     const fo = 1 - viewer, v = { ...m }, now = m.round;
     const two = (a, x) => { const o = Array.isArray(a) ? a.slice() : [null, null]; o[fo] = x; return o; };
-    v.armies = two(m.armies, m.armies[fo].filter(s => s.round < now && !hiddenFromFoe(m, s)).map(s => {
+    v.armies = two(m.armies, foeSeen(m, fo).map(s => {
       const p = seenAt(m, s), q = { ...s, col: p.col, row: p.row, level: seenLevel(m, s) };
-      delete q.from; delete q.movedRound;
+      delete q.from; delete q.movedRound; delete q.soldRound;
       if (!seenAwake(m, s)) delete q.awaken;
       if (q.charmGiven === now) { delete q.charm; delete q.charmGiven; }
       return q;
@@ -3058,7 +3070,7 @@ const Game = (() => {
     setBuildings, BUILDINGS: () => BUILDINGS, buildingInfo, BUILDING_SQUAD, isBuildingSkill, buildingIdOf, buildingsOf, buildingOf, buildingAt, buildingShown, buildingSpotOk,
     canBuyBuilding, buyBuilding, buildingSkills, buildingSkillInfo, bskillOf, bskillCost, canBuyBuildingSkill, buyBuildingSkill, undoBuildingSkill,
     buildingXpNeeded, buildingLevelCost, buildingReady, levelBuilding, undoLevelBuilding, constructBuff, buildingBodies, canBuySkill, buySkill, undoSkill, sellValue, sell,
-    isRider, freeOut, hiddenFromFoe, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
+    isRider, freeOut, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
     TOWER, TOWER_TYPES, OUTPOST, TOWER_PICK_ROUND, towerType, towerChoices, needsTowerPick, setTowerType, settleTowerPicks, TOWER_SKILL, towerSkillOf, towerSkillVisible, towerPicked, canBuyTowerSkill, buyTowerSkill, undoTowerSkill, towerSkillCost, towerSkill2Of, towerSkill2Visible, towerSkill2Cost, canBuyTowerSkill2, buyTowerSkill2, undoTowerSkill2, towerSkill2On, AIRSHIP, MOAT, BWALL, BWALL_SQ, EDGES, bwallsOf, bwallOn, edgeOf, bwallWorld, bwallsLeft, bwallShown, bwallSpotOk, placeBwall, unplaceBwall, ensureBwalls, bwallUnit, INVEST, MAGE_GENERALS, mageGenPrice, MAGE, mageGenInfo, mageGenOf, mageTpOf, isExtraGen, mageGenCost, canBuyMageGen, buyMageGen, undoMageGen, mageTowerUnit, generalUnit, LOAN, loanNow, investNow, bankBusy, investNow, bankBusy, canTakeLoan, takeLoan, undoLoan, towerRounds, troundInfo, troundOn, troundCost, canBuyTround, buyTround, undoTround, SLIME_UNITS, slimeTowerUnit, slimeSkillDefs, TOWER_MID, towerColOk, towerAt, needsTower, placeTower, ensureTower,
     FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, isOff, enemyHolds, inNoMans, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
     STANDARD_PACK, ICE, ALTAR, GOLEM, isIce, hailRound, altarRound, stormShift, stormRows, hailTiles, altarCost, altarRefund, altarCount, pushRoom, altarBought, addAltar, buyAltar, undoAltar, snowgres, snowgreUnit,

@@ -4,6 +4,13 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 31 October 2026 – Selling stays secret until the fight
+
+- **Fix:** you could see the moment your opponent sold a squad while you were both deploying: it vanished from their side of the board. Now a squad they sell stays on your screen, as it was, until the fight starts, just like their new squads stay hidden. This works both ways in live matches, for spectators and against the AI.
+- A squad that steps out of a sold horse also stays hidden until the fight.
+
+---
+
 ## 31 October 2026 – New unit pictures
 
 Every tier 1 unit now has its own picture on the board, in the shop and in the encyclopedia, instead of a plain shape:

@@ -1,0 +1,24 @@
+// Headless check: a squad sold while deploying stays on the opponent's screen until the fight (2026-10-31)
+const assert = require('assert');
+const Game = require('../../src/game.js');
+const roster = require('../../src/default-roster.json');
+const demo = require('../../src/demo-units.json');
+const units = roster.units.map(u => ({ ...u, cost: u.cost / 100, skillDefs: (u.skills || []).map(id => (roster.skills || []).find(s => s.id === id) || null) }));
+const ui = (n) => units.findIndex(u => u.name === n);
+const m = Game.createMatch(units, demo.matrix, 7);
+m.round = 3; m.gold = [1000, 1000];
+const horse = { id: m.nextId[0]++, unit: ui('Just a horse'), col: 2, row: 12, level: 0, xp: 0, round: 2, cost: 1 };
+const rider = { id: m.nextId[0]++, unit: ui('Brute'), col: 2, row: 12, level: 0, xp: 0, round: 2, cost: 1, in: horse.id };
+const brute = { id: m.nextId[0]++, unit: ui('Brute'), col: 5, row: 12, level: 0, xp: 0, round: 2, cost: 1 };
+m.armies[0].push(horse, rider, brute);
+const ids = (a) => a.map(q => q.id).sort((x, y) => x - y);
+assert.deepStrictEqual(ids(Game.foeSeen(m, 0)), [horse.id, brute.id]);
+assert.ok(Game.sell(m, 0, brute.id) > 0, 'sell the brute');
+assert.ok(Game.sell(m, 0, horse.id) > 0, 'sell the horse');
+assert.ok(!m.armies[0].some(q => q.id === brute.id || q.id === horse.id), 'gone from the army');
+assert.ok(rider.in == null, 'the rider stepped out');
+assert.deepStrictEqual(ids(Game.foeSeen(m, 0)), [horse.id, brute.id], 'the opponent still sees both, and not the rider');
+assert.deepStrictEqual(ids(Game.seenBy(m, 1).armies[0]), [horse.id, brute.id], 'seenBy too');
+m.round = 4;
+assert.deepStrictEqual(ids(Game.foeSeen(m, 0)), [rider.id], 'next round: the sale shows, the rider too');
+console.log('sell-hidden ok');

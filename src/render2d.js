@@ -932,7 +932,8 @@ const Render2D = (cv, view, opts = {}) => {
     }
     // the opponent's squads from this round stay hidden until the fight
     // a squad they moved this round still shows on its old tile
-    for (const sq of m.armies[foe()]) if ((sq.round < m.round || phase !== 'deploy') && !Game.hiddenFromFoe(m, sq)) {
+    // and one they sold this round still shows until the fight
+    for (const sq of phase === 'deploy' ? Game.foeSeen(m, foe()) : m.armies[foe()].filter(q => !Game.hiddenFromFoe(m, q))) {
       const p = phase === 'deploy' ? Game.seenAt(m, sq) : sq;
       const look = Game.shownUnit(m, me, foe(), sq.unit); // a disguised unit shows as what it pretends to be
       drawSquad(phase === 'deploy' ? { ...sq, unit: look, col: p.col, row: p.row, level: Game.seenLevel(m, sq) } : { ...sq, unit: look }, foe(), false); // a level-up bought this round stays hidden
@@ -963,8 +964,8 @@ const Render2D = (cv, view, opts = {}) => {
     if (phase === 'deploy') drawBwalls();
     drawBuildings();
     // Overwatch: a squad standing in one of its side's buildings is drawn over the building (theirs as far as you can see it)
-    for (const side of [me, foe()]) for (const sq of m.armies[side]) {
-      if (Game.isRider(sq) || (side !== me && ((phase === 'deploy' && sq.round >= m.round) || Game.hiddenFromFoe(m, sq)))) continue;
+    for (const side of [me, foe()]) for (const sq of side !== me && phase === 'deploy' ? Game.foeSeen(m, side) : m.armies[side]) {
+      if (Game.isRider(sq) || (side !== me && Game.hiddenFromFoe(m, sq))) continue;
       const p = side === me ? (drag && drag.moved && drag.id === sq.id ? drag.over : sq) : phase === 'deploy' ? Game.seenAt(m, sq) : sq;
       if (!Game.garrisonAt(m, side, p.col, p.row)) continue;
       drawSquad({ ...sq, col: p.col, row: p.row, ...(side !== me ? { unit: Game.shownUnit(m, me, side, sq.unit), level: Game.seenLevel(m, sq) } : {}) }, side, side === me && phase === 'deploy' && (sq.round === m.round || sq.movedRound === m.round));

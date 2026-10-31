@@ -3592,7 +3592,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const freeTile = !Game.occupied(m, me, t.col, t.row);
     if (Game.altarRound(m) && selected === null && freeTile && Math.abs(t.col - (Game.COLS - 1) / 2) < 1 && Math.abs(t.row - (Game.ROWS - 1) / 2) < 1) { openAltarSheet(); return; }
     if (Game.hailRound(m) && selected === null && freeTile && Game.hailTiles(m).some(h => h.col === t.col && h.row === t.row)) { openMapSheet(); return; }
-    if ((shroomShown(m, t.col, t.row) || myRemovalNow(t.col, t.row)) && selected === null && !Game.occupied(m, me, t.col, t.row) && !m.armies[foe()].some(s => { const p = Game.seenAt(m, s); return p.col === t.col && p.row === t.row && s.round < m.round; })) { openMapSheet(t); return; }
+    if ((shroomShown(m, t.col, t.row) || myRemovalNow(t.col, t.row)) && selected === null && !Game.occupied(m, me, t.col, t.row) && !Game.foeSeen(m, foe()).some(s => { const p = Game.seenAt(m, s); return p.col === t.col && p.row === t.row; })) { openMapSheet(t); return; }
     const own = Game.squadAt(m, me, t.col, t.row);
     // a unit selected in the shop goes inside your horse (or other carrier) with room
     if (own && selected !== null && editable() && Game.boardable(m, me, t.col, t.row, selected)) {
@@ -3608,7 +3608,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       else openSheet(own.unit, own, me); // one placed this round is taken back with the X on its top right corner
       return;
     }
-    const enemy = m.armies[foe()].find(s => { const p = Game.seenAt(m, s); return !Game.hiddenFromFoe(m, s) && Game.blockOf(m, s.unit, p.col, p.row).some(([c, r]) => c === t.col && r === t.row) && s.round < m.round; });
+    const enemy = Game.foeSeen(m, foe()).find(s => { const p = Game.seenAt(m, s); return Game.blockOf(m, s.unit, p.col, p.row).some(([c, r]) => c === t.col && r === t.row); }); // one they sold this round too: they still see it
     if (enemy) { rangeOf = { side: foe(), id: enemy.id }; openSheet(Game.shownUnit(m, me, foe(), enemy.unit), { ...enemy, unit: Game.shownUnit(m, me, foe(), enemy.unit) }, foe()); return; } // a disguise shows as what it pretends to be
     if (selected !== null && editable() && !Game.canPlaceAt(m, me, t.col, t.row, selected)) sfx('nope');
     if (selected !== null && editable() && Game.canPlaceAt(m, me, t.col, t.row, selected)) {
@@ -3735,7 +3735,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     for (const side of [me, foe()]) if (towerVisible(side) && Game.towerAt(m, side, t.col, t.row)) return towerRing(side);
     const own = Game.squadAt(m, me, t.col, t.row);
     if (own) return squadRing(me, Game.isRider(own) ? Game.carrierOf(m, me, own) || own : own);
-    const en = m.armies[foe()].find(s => { const p = Game.seenAt(m, s); return !Game.hiddenFromFoe(m, s) && !Game.isRider(s) && p.col === t.col && p.row === t.row && s.round < m.round; });
+    const en = Game.foeSeen(m, foe()).find(s => { const p = Game.seenAt(m, s); return !Game.isRider(s) && p.col === t.col && p.row === t.row; });
     return en ? squadRing(foe(), en) : null;
   }
   // the ring of what was tapped: the squad last tapped while deploying (rangeOf), the body tapped in a fight (inspect)
@@ -3743,7 +3743,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (!m) return null;
     if (phase === 'battle' && bt) return inspect && !(inspect.hidden && inspect.side !== me) ? bodyRing(inspect) : null;
     if (phase !== 'deploy' || !rangeOf) return null;
-    return squadRing(rangeOf.side, m.armies[rangeOf.side].find(s => s.id === rangeOf.id));
+    return squadRing(rangeOf.side, (rangeOf.side === me ? m.armies[me] : Game.foeSeen(m, rangeOf.side)).find(s => s.id === rangeOf.id));
   }
   // ---------- intent: where a squad means to go (its movement target, not whom it attacks) ----------
   // While deploying: Game.intentPreview, for the squad last tapped (rangeOf, yours), the one you drag to another tile, or
@@ -5077,7 +5077,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function syncState() {
     const s = snapshot(m);
     if (phase === 'deploy') {
-      s.armies[0] = s.armies[0].filter(q => q.round < m.round && !Game.hiddenFromFoe(m, q)).map(q => { // a squad moved this round shows on its old tile
+      s.armies[0] = Game.foeSeen(s, 0).map(q => { // a squad sold this round still shows; a squad moved this round shows on its old tile
+        delete q.soldRound; delete q.outRound;
         if (q.from && q.movedRound === m.round) { q.col = q.from.col; q.row = q.from.row; }
         delete q.from; delete q.movedRound; delete q.luckMove;
         if (q.charmGiven === m.round) { delete q.charm; delete q.charmGiven; } // Matteo's first stack, given this round
@@ -5092,6 +5093,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         if (s.slots) s.slots = [{}, s.slots[1]]; // and so do Otto's spins
         if (s.buff) s.buff = [[], s.buff[1]];
       }
+      if (s.sold) s.sold[0] = []; // (they are in s.armies[0] now)
       if (m.round === Game.TOWER_PICK_ROUND && s.towers && s.towers[0]) delete s.towers[0].type; // and the host's tower pick
       if (s.bribe) s.bribe[0] = Game.bribeList(s, 0).filter(r => r !== m.round); // bribes paid this round too
       if (s.elfOwn && s.elfOwn[0] && s.elfOwn[0].round === m.round) s.elfOwn[0] = null; // and an elf tower bought this round
@@ -5176,6 +5178,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (!c || c.in != null || !Game.isCarrier(m, c.unit) || Game.isCarrier(m, q.unit) || c.col !== q.col || c.row !== q.row || full.has(c.id)) return false;
       full.add(c.id); return true;
     });
+    // squads from earlier rounds no longer there were sold this round: this screen still shows them until the fight,
+    // and a rider that stepped out of a sold carrier stays hidden
+    const kept = new Set(m.armies[1].map(q => q.id)), soldIds = new Set();
+    for (const [id, h] of had) if (h.round < m.round && !kept.has(id)) { soldIds.add(id); Game.noteSold(m, 1, h); }
+    for (const q of m.armies[1]) { const h = had.get(q.id); if (h && q.in == null && (h.outRound === m.round || (h.in != null && soldIds.has(h.in)))) q.outRound = m.round; }
     // the guest's Glut (the Obelisk) and its evolving: both come from the fights played here
     for (const q of m.armies[1]) { const h = had.get(q.id); if (h && h.glut > 0 && h.unit === q.unit) q.glut = h.glut; if (h && h.evolved > 0 && h.unit === q.unit) q.evolved = h.evolved; }
     // the guest's charisma (Matteo): stacks come from the fights played here; the guest only gives the first stack
@@ -5871,11 +5878,13 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function specState() {
     const s = syncState();
     if (phase === 'deploy' && s.armies) {
-      s.armies[1] = s.armies[1].filter(q => q.round < m.round && !Game.hiddenFromFoe(m, q)).map(q => {
+      s.armies[1] = Game.foeSeen(s, 1).map(q => { // sold this round: still shown
+        delete q.soldRound; delete q.outRound;
         if (q.from && q.movedRound === m.round) { q.col = q.from.col; q.row = q.from.row; }
         delete q.from; delete q.movedRound; delete q.luckMove; return q;
       });
       for (const ui in (s.tech && s.tech[1]) || {}) s.tech[1][ui] = s.tech[1][ui].map(r => r === m.round ? 0 : r);
+      s.sold = [[], []];
       if (m.round === 1) { if (s.chars) s.chars[1] = null; if (s.buff) s.buff[1] = []; s.packages = [[], []]; s.pack = [null, null]; }
       if (m.round === Game.TOWER_PICK_ROUND && s.towers && s.towers[1]) delete s.towers[1].type;
     }
