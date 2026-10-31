@@ -113,3 +113,34 @@ for (const n of [6, 8, 11]) {
   const f = Tour.current(t).matches[0]; Tour.report(t, f.id, 'a', [1, 0], 3, 'auto', 0); const c1 = Object.keys(f.codeGame);
   assert(Tour.replay(t, f.id, r) && !f.games.length && Tour.gameOf(f, f.code) === 0 && c1.every(c => Tour.gameOf(f, c) < 0 || c === f.code), 'replay starts the series over; old codes stop counting');
 }
+// the organizer changes pairings: swap two players, move someone into a bye, bring in a player from outside the cut
+{
+  const t = Tour.create('X', 'Cup', { format: 'swiss', swissRounds: 1, cut: 4 });
+  for (let k = 0; k < 7; k++) Tour.join(t, 'p' + k, 'P' + k);
+  Tour.advance(t, r);
+  let rd = Tour.current(t);
+  const [m1, m2] = rd.matches, bye = rd.matches.find(mt => mt.b == null);
+  const c1 = m1.code, a1 = m1.a, b2 = m2.b;
+  assert(Tour.swapSlots(t, { m: m1.id, k: 'a' }, { m: m2.id, k: 'b' }) && m1.a === b2 && m2.b === a1, 'swap two players between matches');
+  assert(m1.code !== c1, 'changed matches get new codes');
+  const byeP = bye.a, x = m1.b;
+  assert(Tour.swapSlots(t, { m: bye.id, k: 'a' }, { m: m1.id, k: 'b' }) && bye.a === x && bye.b == null && m1.b === byeP, 'give the bye to someone else');
+  assert(Tour.swapSlots(t, { m: bye.id, k: 'b' }, { m: m2.id, k: 'a' }), 'move a player into the bye seat');
+  rd = Tour.current(t);
+  assert(rd.matches.every(mt => mt.a != null) && rd.matches.filter(mt => mt.b == null).length === 1 && rd.matches.flatMap(mt => [mt.a, mt.b]).filter(Boolean).length === 7, 'still everyone once, one bye: ' + rd.matches.map(mt => mt.a + '-' + mt.b).join(' '));
+  Tour.report(t, rd.matches.find(mt => mt.b != null).id, 'a', [5, 0], 3, 'org');
+  const done = rd.matches.find(mt => mt.result);
+  assert(!Tour.swapSlots(t, { m: done.id, k: 'a' }, { m: rd.matches.find(mt => !mt.result && mt.b != null).id, k: 'a' }), 'a match with a result is locked');
+  for (const mt of rd.matches) if (mt.b != null && !mt.result) Tour.report(t, mt.id, 'a', [5, 0], 3, 'org');
+  Tour.advance(t, r);
+  const po = Tour.current(t), inCut = new Set(po.matches.flatMap(mt => [mt.a, mt.b])), out = t.players.find(p => !inCut.has(p.id));
+  const sf = po.matches[0], before = sf.a;
+  assert(po.stage === 'playoff' && Tour.swapSlots(t, { p: out.id }, { m: sf.id, k: 'a' }) && sf.a === out.id, 'bring a player from outside the cut into the playoffs');
+  assert(!po.matches.some(mt => mt.a === before || mt.b === before), 'the replaced player is out');
+  const sf2 = po.matches[1], w = sf2.b;
+  assert(Tour.swapSlots(t, { m: sf.id, k: 'b' }, { m: sf2.id, k: 'b' }), 'swap across the semifinals');
+  for (const mt of po.matches) Tour.report(t, mt.id, 'b', [0, 5], 3, 'org');
+  Tour.advance(t, r);
+  const fin = Tour.current(t).matches[0];
+  assert(fin.a === po.matches[0].b && fin.b === po.matches[1].b, 'the final follows the changed bracket');
+}

@@ -275,6 +275,39 @@
     nextCode(t, f.match);
     return true;
   }
+  // The organizer changes who plays who in the current round, before those matches are played: two slots trade places.
+  // A slot is { m: match id, k: 'a' | 'b' } (k 'b' of a bye is the empty seat), or { p: player id } for a player who
+  // isn't in this round (a playoff: someone outside the cut comes in, the one they replace goes out). Matches with a
+  // result or a game played are locked. Changed matches get new codes, so a lobby already open for the old pairing
+  // doesn't count. Returns true when something changed.
+  function slotOk(t, r, s) {
+    if (!s) return false;
+    if (s.p != null) return !!player(t, s.p) && !player(t, s.p).dropped && !r.matches.some(mt => mt.a === s.p || mt.b === s.p);
+    const mt = r.matches.find(x => x.id === s.m);
+    return !!mt && (s.k === 'a' || s.k === 'b') && !mt.result && !((mt.games || []).length);
+  }
+  const editable = (t, mt) => { const r = current(t); return !!r && t.status === 'running' && r.matches.includes(mt) && !mt.result && !((mt.games || []).length); };
+  function swapSlots(t, s1, s2) {
+    const r = current(t);
+    if (!r || t.status !== 'running' || !slotOk(t, r, s1) || !slotOk(t, r, s2)) return false;
+    if (s1.p != null && s2.p != null) return false;
+    const get = (s) => s.p != null ? s.p : r.matches.find(x => x.id === s.m)[s.k];
+    const set = (s, v) => { if (s.p == null) r.matches.find(x => x.id === s.m)[s.k] = v; };
+    const v1 = get(s1), v2 = get(s2);
+    if (v1 === v2) return false;
+    if ((s1.p != null && v2 == null) || (s2.p != null && v1 == null)) return false; // an outsider can only take a player's place
+    set(s1, v2); set(s2, v1);
+    for (const s of [s1, s2]) if (s.p == null) {
+      const mt = r.matches.find(x => x.id === s.m);
+      if (mt.a == null && mt.b != null) { mt.a = mt.b; mt.b = null; } // a bye is always (player, empty)
+      if (mt.b == null) { mt.host = 'a'; delete mt.bo; delete mt.games; delete mt.codeGame; }
+      else if (r.stage === 'playoff' && bestOf(t) > 1 && !mt.bo) { mt.bo = bestOf(t); mt.games = []; mt.codeGame = {}; }
+      delete mt.conflict;
+      if (mt.bo > 1) { mt.games = []; nextCode(t, mt); } else mt.code = freshCode(t);
+    }
+    r.matches = r.matches.filter(mt => mt.a != null); // two byes swapped together would leave an empty match
+    return true;
+  }
   function swapHost(t, matchId) { const f = findMatch(t, matchId); if (!f || f.match.b == null || f.match.result) return false; f.match.host = other(f.match.host || 'a'); return true; }
   // the organizer takes back a round nobody has a result in yet (to fix the field and pair again)
   function undoRound(t) {
@@ -311,7 +344,7 @@
     return st.slice().sort((x, y) => ((y.id === t.champion) - (x.id === t.champion)) || ((reach.get(y.id) ?? -1) - (reach.get(x.id) ?? -1)) || (pos.get(x.id) - pos.get(y.id)));
   }
 
-  const api = { CODE_CHARS, POINTS, BOT_NAMES, addBot, isBot, bestOf, winsNeeded, score, gameOf, undoGame, rng, newCode, cleanName, suggestRounds, suggestCut, create, join, rename, remove, player, nameOf, active, swissRounds, cutSize,
+  const api = { CODE_CHARS, POINTS, BOT_NAMES, swapSlots, editable, addBot, isBot, bestOf, winsNeeded, score, gameOf, undoGame, rng, newCode, cleanName, suggestRounds, suggestCut, create, join, rename, remove, player, nameOf, active, swissRounds, cutSize,
     standings, pairSwiss, bracketOrder, playoffFirst, nextPlan, advance, report, replay, swapHost, undoRound, roundDone, current, matchOf, findMatch, bracket, placings, outcome, winnerOf, sideOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Tour = api;

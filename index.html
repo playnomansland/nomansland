@@ -526,6 +526,10 @@ html.dock .bar:has(> .task:not([hidden])) > .hint { display: none; }
 /* tournaments */
 .tour { display: grid; gap: 8px; min-width: 0; }
 .tour-tabs { flex-wrap: wrap; }
+.tslot { display: inline-flex; align-items: center; gap: 2px; }
+.tslot[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+.tour-list li.locked { opacity: 0.55; }
+.tslots { flex-wrap: wrap; gap: 6px; }
 .joinrow input.tour-in { width: 14ch; font: 600 16px var(--font-body, sans-serif); letter-spacing: 0; text-transform: none; text-align: left; }
 .tour-list li.prow { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .tour-list li.prow .btnrow { flex-wrap: nowrap; gap: 4px; }
@@ -6983,6 +6987,39 @@ if (typeof module !== 'undefined') module.exports = Game;
     nextCode(t, f.match);
     return true;
   }
+  // The organizer changes who plays who in the current round, before those matches are played: two slots trade places.
+  // A slot is { m: match id, k: 'a' | 'b' } (k 'b' of a bye is the empty seat), or { p: player id } for a player who
+  // isn't in this round (a playoff: someone outside the cut comes in, the one they replace goes out). Matches with a
+  // result or a game played are locked. Changed matches get new codes, so a lobby already open for the old pairing
+  // doesn't count. Returns true when something changed.
+  function slotOk(t, r, s) {
+    if (!s) return false;
+    if (s.p != null) return !!player(t, s.p) && !player(t, s.p).dropped && !r.matches.some(mt => mt.a === s.p || mt.b === s.p);
+    const mt = r.matches.find(x => x.id === s.m);
+    return !!mt && (s.k === 'a' || s.k === 'b') && !mt.result && !((mt.games || []).length);
+  }
+  const editable = (t, mt) => { const r = current(t); return !!r && t.status === 'running' && r.matches.includes(mt) && !mt.result && !((mt.games || []).length); };
+  function swapSlots(t, s1, s2) {
+    const r = current(t);
+    if (!r || t.status !== 'running' || !slotOk(t, r, s1) || !slotOk(t, r, s2)) return false;
+    if (s1.p != null && s2.p != null) return false;
+    const get = (s) => s.p != null ? s.p : r.matches.find(x => x.id === s.m)[s.k];
+    const set = (s, v) => { if (s.p == null) r.matches.find(x => x.id === s.m)[s.k] = v; };
+    const v1 = get(s1), v2 = get(s2);
+    if (v1 === v2) return false;
+    if ((s1.p != null && v2 == null) || (s2.p != null && v1 == null)) return false; // an outsider can only take a player's place
+    set(s1, v2); set(s2, v1);
+    for (const s of [s1, s2]) if (s.p == null) {
+      const mt = r.matches.find(x => x.id === s.m);
+      if (mt.a == null && mt.b != null) { mt.a = mt.b; mt.b = null; } // a bye is always (player, empty)
+      if (mt.b == null) { mt.host = 'a'; delete mt.bo; delete mt.games; delete mt.codeGame; }
+      else if (r.stage === 'playoff' && bestOf(t) > 1 && !mt.bo) { mt.bo = bestOf(t); mt.games = []; mt.codeGame = {}; }
+      delete mt.conflict;
+      if (mt.bo > 1) { mt.games = []; nextCode(t, mt); } else mt.code = freshCode(t);
+    }
+    r.matches = r.matches.filter(mt => mt.a != null); // two byes swapped together would leave an empty match
+    return true;
+  }
   function swapHost(t, matchId) { const f = findMatch(t, matchId); if (!f || f.match.b == null || f.match.result) return false; f.match.host = other(f.match.host || 'a'); return true; }
   // the organizer takes back a round nobody has a result in yet (to fix the field and pair again)
   function undoRound(t) {
@@ -7019,7 +7056,7 @@ if (typeof module !== 'undefined') module.exports = Game;
     return st.slice().sort((x, y) => ((y.id === t.champion) - (x.id === t.champion)) || ((reach.get(y.id) ?? -1) - (reach.get(x.id) ?? -1)) || (pos.get(x.id) - pos.get(y.id)));
   }
 
-  const api = { CODE_CHARS, POINTS, BOT_NAMES, addBot, isBot, bestOf, winsNeeded, score, gameOf, undoGame, rng, newCode, cleanName, suggestRounds, suggestCut, create, join, rename, remove, player, nameOf, active, swissRounds, cutSize,
+  const api = { CODE_CHARS, POINTS, BOT_NAMES, swapSlots, editable, addBot, isBot, bestOf, winsNeeded, score, gameOf, undoGame, rng, newCode, cleanName, suggestRounds, suggestCut, create, join, rename, remove, player, nameOf, active, swissRounds, cutSize,
     standings, pairSwiss, bracketOrder, playoffFirst, nextPlan, advance, report, replay, swapHost, undoRound, roundDone, current, matchOf, findMatch, bracket, placings, outcome, winnerOf, sideOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Tour = api;
@@ -13561,6 +13598,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     } else if (d.t === 'result') {
       const f = Tour.findMatch(tour.t, String(d.match));
       if (!f || (f.match.a !== c.tourId && f.match.b !== c.tourId)) return; // only the two players report
+      if (d.code && Tour.gameOf(f.match, String(d.code)) !== (d.game | 0)) { tourSendTo(c); return; } // a game under an old code (pairings changed, or a replay): doesn't count
       if (Tour.report(tour.t, f.match.id, d.winner, d.hp, d.rounds, 'auto', d.game | 0)) tourChanged();
       else tourSendTo(c); // already known: tell them so they stop sending
     } else if (d.t === 'leave') {
@@ -13593,6 +13631,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       r.map = tour.t.settings.map || (pool.length ? pool[Math.floor(Math.random() * pool.length)].id : 'standard');
     }
     tour.tab = tour.t.status === 'done' ? 'standings' : 'matches';
+    tour.edit = false; tour.editSel = '';
     tourChanged(); tourBots();
   }
   // the match settings from the menu's own pickers (map, look, unit pack, leaders and units left out)
@@ -13674,7 +13713,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const hk = mode === 'ai' ? x.side : tourHostKey(x.match), gk = hk === 'a' ? 'b' : 'a'; // whose is side 0: the host's, or this phone's against a bot
     const winner = winSide === 0 ? hk : winSide === 1 ? gk : 'draw';
     const sideA = hk === 'a' ? 0 : 1;
-    const msg = { t: 'result', match: x.match.id, game: x.game, winner, hp: [m.hp[sideA], m.hp[1 - sideA]], rounds: (m.history || []).length };
+    const msg = { t: 'result', match: x.match.id, game: x.game, code: mode === 'ai' ? tour.botCode : net.code, winner, hp: [m.hp[sideA], m.hp[1 - sideA]], rounds: (m.history || []).length };
     if (tourOrg()) { if (Tour.report(tour.t, msg.match, msg.winner, msg.hp, msg.rounds, 'auto', msg.game)) tourChanged(); return; }
     tour.pending = msg; tourSend(msg);
   }
@@ -13684,6 +13723,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const x = tourMine();
     if (!x || x.bye || x.match.result) return;
     tour.menu = false;
+    tour.playing = x.match.code; // see tourRedraw: a lobby for a match that gets re-paired goes back
     if (Tour.isBot(tour.t, x.match[x.side === 'a' ? 'b' : 'a'])) { // against a bot: an AI match on this phone, with the tournament's settings
       leaveNet();
       mode = 'ai'; me = 0; matchKind = 'standard'; bt = null;
@@ -13770,6 +13810,20 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       tourBots(); // a series: the next game
     };
     setTimeout(step, 600);
+  }
+
+  // the game on this phone was moved by the organizer: drop it (a host's saved game too) and say so
+  function tourMoved() {
+    tour.playing = ''; tour.botMatch = ''; tour.botCode = '';
+    if (mode === 'host') clearHost();
+    leaveNet(); cancelAnimationFrame(raf);
+    m = null; bt = null; battlePre = null; deadline = 0; phase = 'start'; mode = 'ai';
+    closeSheet(true); hud(); setNet(''); $('clock').textContent = '';
+    overlay(`<div class="card"><span class="eyebrow">${esc(tour.t ? tour.t.name : 'Tournament')}</span><h2>Match moved</h2>
+      <p class="big">The organizer changed the pairings or restarted this match, so this game doesn’t count.</p>
+      <button class="btn primary" id="tour-moved-ok">See your match</button></div>`);
+    $('panel').innerHTML = '';
+    $('tour-moved-ok').addEventListener('click', () => { tour.menu = false; showStart(); });
   }
 
   // ends this device's part: keep (true) leaves the saved tournament for a later resume (a new one replaces it anyway).
@@ -13988,6 +14042,13 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // redraw the tournament screen when it's showing (never over a match), and the start screen's tournament button
   function tourRedraw() {
     if (phase === 'lobby' && tourLive() && mode === 'host') { drawTourLobby(tourLive()); return; }
+    // waiting in a lobby for a match the organizer has just re-paired: back to the tournament screen (with the new match)
+    if (tour.playing && (mode === 'host' || mode === 'guest') && phase === 'lobby' && !m && !tourLive()) { tour.playing = ''; showStart(); return; }
+    // in the middle of a game the organizer has just moved (new pairings or a replay): it no longer counts
+    if (tour.playing && (mode === 'host' || mode === 'guest' || mode === 'ai') && m && !m.over && phase !== 'start' && !tourLive()) {
+      const x = tourMine(), code = tour.playing;
+      if (!x || Tour.gameOf(x.match, code) < 0) { tourMoved(); return; }
+    }
     if (mode === 'spec' && tour.spec && phase !== 'battle') { // the match being watched is over (or on to its next game)
       const f = tour.t && Tour.findMatch(tour.t, tour.spec.id);
       if (f && (f.match.result || Tour.gameOf(f.match, net.code) < 0) && !(m && m.over)) {
@@ -14128,7 +14189,15 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (k === 'matches') {
       const r = Tour.current(t);
       if (!r) return '<span class="hint">No matches yet.</span>';
+      const editing = org && tour.edit && t.status === 'running' && r.matches.some(mt => Tour.editable(t, mt));
+      // changing pairings: each player of a match not played yet is a button; tap one, then the one to trade places with
+      const slot = (key, html) => `<button class="btn small tslot" data-slot="${key}" aria-pressed="${tour.editSel === key}">${html}</button>`;
       const rows = r.matches.map(mt => {
+        if (editing) {
+          const free = Tour.editable(t, mt);
+          return `<li class="${free ? '' : 'locked'}"><span>${free ? slot(mt.id + ':a', pname(mt.a)) : pname(mt.a)} <small>vs</small> ${free ? slot(mt.id + ':b', mt.b == null ? '<i>Bye</i>' : pname(mt.b)) : pname(mt.b)}</span>
+            <small>${free ? (mt.b == null ? 'bye' : 'not started') : 'locked: ' + tourResultText(mt)}</small></li>`;
+        }
         const ctl = org && mt.b != null && mt.bo > 1 ? `<span class="btnrow tour-ctl">
           ${mt.result ? '' : `<button class="btn small" data-res="${mt.id}:a">Game to ${esc(Tour.nameOf(t, mt.a))}</button><button class="btn small" data-res="${mt.id}:b">Game to ${esc(Tour.nameOf(t, mt.b))}</button>`}
           ${mt.games.length ? `<button class="btn small" data-undogame="${mt.id}">Undo last game</button>` : ''}<button class="btn small" data-replay="${mt.id}">Restart series</button>${mt.result ? '' : `<button class="btn small" data-swap="${mt.id}">Swap host</button>`}</span>`
@@ -14140,9 +14209,16 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
           <small>${mt.b != null ? `host: ${esc(Tour.nameOf(t, mt[tourHostKey(mt)]))} · ` : ''}${tourResultText(mt)}</small>${ctl}</li>`;
       }).join('');
       const done = Tour.roundDone(r), last = Tour.nextPlan(t);
+      if (editing) {
+        const inRound = new Set(r.matches.flatMap(mt => [mt.a, mt.b]));
+        const outside = r.stage === 'playoff' ? Tour.active(t).filter(p => !inRound.has(p.id)) : [];
+        return `<div class="bar"><span class="hint"><b>Change pairings</b> · ${esc(tourRoundName(r))}. Tap a player, then the one they trade places with. Only matches nobody has played yet; changed matches get new codes, so start them after you're done.</span><button class="btn primary small" id="tour-edit">Done</button></div>
+          <ul class="tour-list">${rows}</ul>
+          ${outside.length ? `<span class="hint">Not in the playoffs: tap one, then a player in the bracket, to put them in instead.</span><span class="btnrow tslots">${outside.map(p => slot('p:' + p.id, pname(p.id))).join('')}</span>` : ''}`;
+      }
       return `<span class="hint">${esc(tourRoundName(r))} · ${esc(mapName(r.map))}</span><ul class="tour-list">${rows}</ul>
         ${org && t.status === 'running' ? `<div class="bar"><span class="hint">${done ? (last.done ? 'All matches are done.' : 'All matches are done.') : r.stage === 'playoff' && r.matches.some(mt => mt.result && mt.result.winner === 'draw') ? 'A playoff draw needs a replay or a winner.' : 'Waiting for results.'}</span>
-          <span class="btnrow">${r.matches.some(mt => mt.b != null && mt.result) ? '' : '<button class="btn small" id="tour-undo">Undo pairings</button>'}<button class="btn primary small" id="tour-next" ${done ? '' : 'disabled'}>${done && last.done ? 'Finish tournament' : 'Next round'}</button></span></div>` : ''}
+          <span class="btnrow">${r.matches.some(mt => Tour.editable(t, mt)) ? '<button class="btn small" id="tour-edit">Change pairings</button>' : ''}${r.matches.some(mt => mt.b != null && mt.result) ? '' : '<button class="btn small" id="tour-undo">Undo pairings</button>'}<button class="btn primary small" id="tour-next" ${done ? '' : 'disabled'}>${done && last.done ? 'Finish tournament' : 'Next round'}</button></span></div>` : ''}
         ${t.rounds.length > 1 ? `<details class="tour-old"><summary>Earlier rounds</summary>${t.rounds.slice(0, -1).reverse().map(x => `<span class="hint">${esc(tourRoundName(x))} · ${esc(mapName(x.map))}</span><ul class="tour-list">${x.matches.map(mt => `<li><span>${pname(mt.a)} <small>vs</small> ${pname(mt.b)}</span><small>${tourResultText(mt)}</small></li>`).join('')}</ul>`).join('')}</details>` : ''}`;
     }
     if (k === 'standings') {
@@ -14153,7 +14229,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (k === 'bracket') {
       const d = tourBracketData(t);
       if (!d) return `<span class="hint">${t.settings.format === 'elim' ? 'The bracket is drawn when the tournament starts.' : 'No playoffs in this tournament.'}</span>`;
-      return `${d.projected ? `<span class="hint">Projected: if the Swiss rounds ended now, the top ${Tour.cutSize(t)} by the standings would play this bracket.</span>` : ''}${tourBracketSvg(t, d)}`;
+      const cr = Tour.current(t), canEdit = org && !d.projected && cr && cr.stage === 'playoff' && cr.matches.some(mt => Tour.editable(t, mt));
+      return `${d.projected ? `<span class="hint">Projected: if the Swiss rounds ended now, the top ${Tour.cutSize(t)} by the standings would play this bracket.${org ? ' Once the playoffs start you can change who plays who.' : ''}</span>` : ''}${canEdit ? '<div class="bar"><span class="hint">Want different matchups?</span><button class="btn small" id="tour-edit-bracket">Change who plays who</button></div>' : ''}${tourBracketSvg(t, d)}`;
     }
     if (k === 'rules') return `<ul class="tour-rules">${tourRules().map(x => `<li>${x}</li>`).join('')}</ul>`;
     if (k === 'settings') {
@@ -14229,6 +14306,16 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     on('[data-replay]', (b) => { if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Sure?'; return; } if (Tour.replay(t, b.dataset.replay, Math.random)) tourChanged(); });
     on('[data-undogame]', (b) => { if (Tour.undoGame(t, b.dataset.undogame)) tourChanged(); });
     on('[data-swap]', (b) => { if (Tour.swapHost(t, b.dataset.swap)) tourChanged(); });
+    if ($('tour-edit')) $('tour-edit').addEventListener('click', () => { tour.edit = !tour.edit; tour.editSel = ''; showTour(); });
+    if ($('tour-edit-bracket')) $('tour-edit-bracket').addEventListener('click', () => { tour.edit = true; tour.editSel = ''; tour.tab = 'matches'; showTour(); });
+    on('[data-slot]', (b) => {
+      const key = b.dataset.slot, toSlot = (k) => k.startsWith('p:') ? { p: k.slice(2) } : { m: k.slice(0, k.lastIndexOf(':')), k: k.slice(k.lastIndexOf(':') + 1) };
+      if (!tour.editSel) { tour.editSel = key; showTour(); return; }
+      if (tour.editSel === key) { tour.editSel = ''; showTour(); return; }
+      const ok = Tour.swapSlots(t, toSlot(tour.editSel), toSlot(key));
+      tour.editSel = ok ? '' : key;
+      if (ok) { tourChanged(); tourBots(); } else showTour();
+    });
     on('[data-tset]', (b) => {
       const k = b.dataset.tset, v = b.dataset.v;
       t.settings[k] = v === 'true' ? true : v === 'false' ? false : /^-?\d+$/.test(v) ? +v : v;

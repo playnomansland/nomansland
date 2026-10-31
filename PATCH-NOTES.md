@@ -32,6 +32,8 @@ Goblin Swarm and Ember Imps already had theirs. Sunken Deep's units are still pl
 - **Settings:** format, Swiss rounds, playoff size, map (fixed, or a random one each round that everyone plays), look, Standard pack or All units, which leaders and units are in, **how many leaders to choose from (2 to 5)**, deploy timers (round 1 and later rounds) and the results screen timer.
 - **Same rolls for both** (on by default): both players get the same leaders, starting units and tower choices to pick from.
 - Set or change any result, replay a match, swap who hosts, rename or drop a player, undo a round's pairings.
+- **Change who plays who:** in Matches (or Bracket → Change who plays who), tap **Change pairings**, tap a player, then the player they trade places with. Works in Swiss rounds and in the bracket, can move the bye to someone else, and in the playoffs can bring in a player from outside the cut. Only matches nobody has played yet can change; matches that change get new codes.
+- If a game was already going on a match you move, both players get a **Match moved** screen and are sent to their new match; that game's result never counts.
 - The tournament survives a reload of the organizer's page; everyone reconnects by themselves.
 
 ### Practice vs bots
