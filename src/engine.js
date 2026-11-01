@@ -295,7 +295,7 @@ const Engine = (() => {
     lone:    { label: 'Hunt lone targets', params: [['secs', 'Gives up after (s) without one', 5, 0.5]] },
     windWalk: { label: 'Wind walk', params: [['every', 'Dodges every this many attacks at it (from the first)', 5, 1], ['step', 'Dashes after a dodge (m)', 4, 0.5]] },
     bounce:  { label: 'Bouncing shots', params: [['n', 'Most bounces per shot', 2, 1], ['pct', 'Damage per bounce (% of hit)', 30, 5], ['reach', 'Bounces to an enemy within (m)', 10, 1]] },
-    leafblade: { label: 'Leafblade suit', params: [['hp', 'Health (+%)', 150, 10], ['armor', 'Armor (+)', 4, 1], ['hit', 'Hit size (+%)', 50, 5], ['range', 'Range (becomes, m)', 3, 0.5], ['dash', 'Dashes to enemies within (m)', 8, 1],
+    leafblade: { label: 'Leafblade suit', params: [['hp', 'Health (+%)', 150, 10], ['armor', 'Armor (+)', 4, 1], ['hit', 'Hit size (+%)', 50, 5], ['range', 'Range (becomes, m)', 3, 0.5], ['dash', 'Dashes to enemies within (m)', 8, 1], ['dashCooldown', 'Dash cooldown (s)', 1.5, 0.1],
       ['missiles', 'Missiles per salvo', 2, 1], ['every', 'Salvo every (s)', 10, 1], ['mhit', 'Missile damage', 150, 10], ['msplash', 'Missile blast (m)', 2.5, 0.5], ['mspeed', 'Missile speed (m/s)', 25, 1], ['mrange', 'Missile range (m)', 30, 1], ['cone', 'Blade swipe (degrees each side)', 90, 5]] },
     berserk: { label: 'Berserkers', params: [['radius', 'Roar reach (m)', 8, 1], ['attack', 'Enemy attack speed (−%)', 5, 1], ['speed', 'Ally move speed (+%)', 5, 1], ['max', 'Most per body from roars (%)', 25, 5]] },
     frost:   { label: 'Frost', params: [['every', 'Seconds between stacks', 2.5, 0.5], ['p1', 'Slow at 1 stack (%)', 20, 5], ['p2', 'Slow at 2 stacks (%)', 30, 5], ['p3', 'Slow at 3 stacks (%)', 40, 5], ['keep', 'Stacks melt after (s) without frost', 2, 0.5]] },
@@ -399,7 +399,7 @@ const Engine = (() => {
         return e === 1 ? 'Dodges every attack.' : `Dodge every ${e === 2 ? '2nd' : e === 3 ? '3rd' : `${e}th`} attack.`;
       }
       case 'bounce': return `Shots bounce ${+P('n') === 1 ? 'once' : `${n('n')} times`} for ${n('pct')}%.`;
-      case 'leafblade': return `Becomes a leaf-mech: blade swipes, homing missiles. +${n('hp')}% health, +${n('armor')} armor.`;
+      case 'leafblade': return `Becomes a leaf-mech: blade swipes, homing missiles. +${n('hp')}% health, +${n('armor')} armor. Dash cooldown ${n('dashCooldown')} s.`;
       case 'berserk': return `Can’t be slowed or pushed. Roar: enemies near it attack ${n('attack')}% slower.`;
       case 'lone': return 'Hunts lone enemies.';
       case 'frost': return `Hits stack Frost: up to ${n('p3')}% slower.`;
@@ -527,7 +527,7 @@ const Engine = (() => {
           u.hp = u.hp * (1 + P('hp') / 100); u.bonusArmor = (u.bonusArmor || 0) + P('armor'); u.hit = u.hit * (1 + P('hit') / 100);
           u.range = Math.max(1, P('range')); u.flame = Math.max(1, Math.min(180, P('cone'))); u.spinBlade = true; u.mech = true; // a blade swipe in front of it (90: a half circle)
           u.projSpeed = 0; u.burst = 1; u.pellets = 1; u.pierce = 0; u.splash = 0; u.windUp = 0; u.minRange = 0;
-          u.dash = Math.max(u.dash || 0, Math.max(0, P('dash')));
+          u.dash = Math.max(u.dash || 0, Math.max(0, P('dash'))); u.dashCooldown = Math.max(0, P('dashCooldown'));
           if (P('missiles') > 0) u.missiles = { n: Math.round(P('missiles')), every: Math.max(1, P('every')), hit: Math.max(0, P('mhit')), splash: Math.max(0, P('msplash')), speed: Math.max(2, P('mspeed')), range: Math.max(1, P('mrange')) };
           break;
         case 'berserk': u.unstoppable = true; u.roar = { radius: Math.max(0, P('radius')), attack: Math.max(0, P('attack')), speed: Math.max(0, P('speed')), max: Math.max(0, P('max')) }; break;
@@ -2026,6 +2026,7 @@ const Engine = (() => {
         const b = order[i];
         if (!b.alive || b.delay > 0) continue;
         b.dashing = false;
+        if (b.dashCooldownT > 0) b.dashCooldownT = Math.max(0, b.dashCooldownT - dt);
         if (b.u.roar && !b.roared) roar(b); // Berserkers roar as they start
         if (b.inside) { // Overwatch: it stays in its building while that stands, and while it sees enemies now and then
           if (b.inside.alive && !watchIdle(b)) { b.x = b.inside.x; b.y = b.inside.y; continue; }
@@ -2146,7 +2147,10 @@ const Engine = (() => {
         // its movement target: whom it goes for once engaged (or a guard's attacker), or whom it stands at in reach
         if (near && (b.engaged || b.avenge || nd <= (g.stopPct > 0 && g.stopPct < 1 && b.engaged ? stopAt(rgN) : rgN))) b.intent = near;
         if (near && nd > (g.stopPct > 0 && g.stopPct < 1 && b.engaged ? stopAt(rgN) : rgN)) {
-          b.dashing = b.u.dash > 0 && b.engaged && nd <= b.u.dash; // dash: the last metres to its target in a flash
+          const wantsDash = b.u.dash > 0 && b.engaged && nd <= b.u.dash;
+          if (!wantsDash) b.dashActive = false;
+          b.dashing = wantsDash && (b.dashActive || (b.dashCooldownT || 0) <= 0);
+          if (b.dashing && !b.dashActive) { b.dashActive = true; b.dashCooldownT = Math.max(0, b.u.dashCooldown || 0); } // per-body cooldown, starts when the dash begins
           const step = (b.dashing ? Math.max(DASH_SPEED, spd(b)) : spd(b)) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[b.side] > 0 ? 1 - towerDown.move / 100 : 1) * dt;
           let mv;
           // March straight ahead until an enemy comes within sight (range + SIGHT, at least MIN_SIGHT, in any
@@ -2196,6 +2200,8 @@ const Engine = (() => {
             b.setUp = false;
             if (b.windTarget) { b.windTarget = null; stats[b.side].windLost++; }
           }
+        } else {
+          b.dashActive = false;
         }
       }
       if (stepsOut) for (const a of sides[first]) { a.x += a.mvX; a.y += a.mvY; } // the first side's steps (on top of any knockback since)
