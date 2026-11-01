@@ -59,14 +59,18 @@ const Lab = require('../balance-lab.js');
   const Engine = require('../../src/engine.js');
   const originalMatrix = Engine.matrix;
   let matrixCalled = false;
-  Engine.matrix = (units) => {
+  let instrumentationOptions;
+  Engine.matrix = (units, settings, onProgress, options) => {
     matrixCalled = true;
+    instrumentationOptions = options;
+    onProgress({ type: 'matchup-complete', completed: 1, total: 1, unitAName: 'A', unitBName: 'B', steps: 12, elapsedMs: 4 });
     return units.map((_, i) => units.map((__, j) => i === j ? null : { score: 0 }));
   };
   try {
     const prepared = Lab.prepareRoster();
     assert.ok(prepared.units.length > 0, 'loads the live roster');
     assert.strictEqual(matrixCalled, true, 'builds the engine matchup matrix');
+    assert.deepStrictEqual(instrumentationOptions, { progressEvery: 100 }, 'enables opt-in matchup instrumentation');
     assert.strictEqual(prepared.matrix.length, prepared.units.length);
     assert.strictEqual(prepared.matrix[0].length, prepared.units.length);
   } finally {
