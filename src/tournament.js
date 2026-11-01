@@ -178,11 +178,16 @@
       } else seeds = standings(t).filter(r => !r.dropped).slice(0, n).map(r => r.id);
       return { stage: 'playoff', pairs: playoffFirst(seeds) };
     }
-    const last = po[po.length - 1], win = last.matches.map(winnerOf);
+    const last = po[po.length - 1], advancing = last.matches.filter(mt => mt.placement !== 'third');
+    const win = advancing.map(winnerOf);
     if (win.length <= 1) return { done: true, champion: win[0] || null };
     const pairs = [];
     for (let k = 0; k < win.length; k += 2) pairs.push(win[k + 1] === undefined ? [win[k], null] : [win[k], win[k + 1]]);
-    return { stage: 'playoff', pairs };
+    // Once both semifinals are complete, the two losers play for third place alongside the final.
+    const semis = advancing.filter(mt => mt.b != null);
+    const thirdPlace = semis.length === 2 && semis.every(mt => mt.result && mt.result.winner !== 'draw')
+      ? semis.map(mt => mt[mt.result.winner === 'a' ? 'b' : 'a']) : null;
+    return { stage: 'playoff', pairs, thirdPlace };
   }
 
   // Starts the next round (or ends the tournament). rnd: a random function for the match codes (Math.random by default)
@@ -201,6 +206,13 @@
       const bo = plan.stage === 'playoff' ? bestOf(t) : 1;
       if (bo > 1 && b != null) { mt.bo = bo; mt.games = []; mt.codeGame = { [code]: 0 }; } // a series: best of bo games, each with its own code
       if (b != null && hosted(t, b) < hosted(t, a)) mt.host = 'b'; // take turns hosting
+      round.matches.push(mt);
+    }
+    if (plan.thirdPlace && plan.thirdPlace.every(id => id != null)) {
+      let code; do code = newCode(r); while (used.has(code)); used.add(code);
+      const [a, b] = plan.thirdPlace;
+      const mt = { id: 'm' + round.n + '-third', a, b, code, host: 'a', result: null, placement: 'third' };
+      if (hosted(t, b) < hosted(t, a)) mt.host = 'b';
       round.matches.push(mt);
     }
     t.rounds.push(round);
@@ -249,13 +261,32 @@
     const k = g.by === 'org' ? mt.games.length : (game | 0);
     if (k < mt.games.length) { // a game already in: the other phone's report of it
       if (mt.games[k].winner === winner || mt.games[k].by === 'org') return false;
-      mt.conflict = true; return true;
+      mt.conflict = true; mt.conflictGame = k; return true;
     }
     if (mt.result || k > mt.games.length) return false; // the series is over, or a game not started yet
     mt.games.push(g); delete mt.conflict;
     const [wa, wb] = score(mt), need = winsNeeded(mt);
     if (wa >= need || wb >= need) mt.result = { winner: wa >= need ? 'a' : 'b', hp: g.hp, rounds: mt.games.reduce((n, x) => n + x.rounds, 0), score: [wa, wb], by: g.by };
     else nextCode(t, mt);
+    return true;
+  }
+  // The organizer resolves two phones disagreeing about an already reported game in a series.
+  // Recalculate the series; if the correction re-opens a series that was previously complete, issue a fresh code.
+  function resolveGame(t, matchId, winner) {
+    const f = findMatch(t, matchId), mt = f && f.match;
+    const k = mt && mt.conflictGame;
+    if (!mt || !(mt.bo > 1) || !mt.conflict || !Number.isInteger(k) || !mt.games || !mt.games[k] || !['a', 'b', 'draw'].includes(winner)) return false;
+    const hadResult = !!mt.result;
+    mt.games[k] = { ...mt.games[k], winner, by: 'org' };
+    delete mt.conflict; delete mt.conflictGame;
+    const [wa, wb] = score(mt), need = winsNeeded(mt);
+    if (wa >= need || wb >= need) {
+      const last = mt.games[mt.games.length - 1];
+      mt.result = { winner: wa >= need ? 'a' : 'b', hp: last.hp, rounds: mt.games.reduce((n, x) => n + x.rounds, 0), score: [wa, wb], by: 'org' };
+    } else {
+      mt.result = null;
+      if (hadResult) nextCode(t, mt);
+    }
     return true;
   }
   // the organizer clears a match to have it played again: a new code, no result (a series starts over)
@@ -339,13 +370,25 @@
   // the order the players finished in, once it's done: the champion, the runner-up, then by how far they got, then standings
   function placings(t) {
     const st = standings(t), pos = new Map(st.map((r, k) => [r.id, k]));
+    const place = new Map();
+    if (t.champion) place.set(t.champion, 1);
+    const po = t.rounds.filter(r => r.stage === 'playoff'), last = po[po.length - 1];
+    if (last) {
+      const final = last.matches.find(mt => mt.placement !== 'third' && mt.b != null && mt.result && mt.result.winner !== 'draw');
+      if (final) place.set(final[final.result.winner === 'a' ? 'b' : 'a'], 2);
+      const bronze = last.matches.find(mt => mt.placement === 'third' && mt.result && mt.result.winner !== 'draw');
+      if (bronze) {
+        place.set(bronze[bronze.result.winner], 3);
+        place.set(bronze[bronze.result.winner === 'a' ? 'b' : 'a'], 4);
+      }
+    }
     const reach = new Map(); // playoff rounds survived
     t.rounds.filter(r => r.stage === 'playoff').forEach((r, k) => r.matches.forEach(mt => { for (const id of [mt.a, mt.b]) if (id != null) reach.set(id, k + (winnerOf(mt) === id ? 1 : 0)); }));
-    return st.slice().sort((x, y) => ((y.id === t.champion) - (x.id === t.champion)) || ((reach.get(y.id) ?? -1) - (reach.get(x.id) ?? -1)) || (pos.get(x.id) - pos.get(y.id)));
+    return st.slice().sort((x, y) => ((place.get(x.id) ?? Infinity) - (place.get(y.id) ?? Infinity)) || ((reach.get(y.id) ?? -1) - (reach.get(x.id) ?? -1)) || (pos.get(x.id) - pos.get(y.id)));
   }
 
   const api = { CODE_CHARS, POINTS, BOT_NAMES, swapSlots, editable, addBot, isBot, bestOf, winsNeeded, score, gameOf, undoGame, rng, newCode, cleanName, suggestRounds, suggestCut, create, join, rename, remove, player, nameOf, active, swissRounds, cutSize,
-    standings, pairSwiss, bracketOrder, playoffFirst, nextPlan, advance, report, replay, swapHost, undoRound, roundDone, current, matchOf, findMatch, bracket, placings, outcome, winnerOf, sideOf };
+    standings, pairSwiss, bracketOrder, playoffFirst, nextPlan, advance, report, resolveGame, replay, swapHost, undoRound, roundDone, current, matchOf, findMatch, bracket, placings, outcome, winnerOf, sideOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Tour = api;
 })(typeof window !== 'undefined' ? window : globalThis);
