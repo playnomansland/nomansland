@@ -172,6 +172,32 @@ for (const n of [6, 8, 11]) {
   const places = Tour.placings(t).map(x => x.id);
   assert(places.slice(0, 4).join() === [final.a, final.b, bronze.b, bronze.a].join(), 'final standings rank 1st through 4th correctly');
 }
+
+{
+  const t = Tour.create('FINALBO', 'Finals best-of cup', { format: 'elim', bestOf: 3, finalBestOf: 5 });
+  for (let k = 0; k < 4; k++) Tour.join(t, 'p' + k, 'P' + k);
+  Tour.advance(t, r);
+  const semis = Tour.current(t).matches;
+  assert(semis.every(mt => mt.bo === 3), 'standard best-of applies to semifinal matches');
+  for (const mt of semis) {
+    Tour.report(t, mt.id, 'a', [10, 0], 5, 'auto', 0);
+    Tour.report(t, mt.id, 'a', [10, 0], 5, 'auto', 1);
+  }
+  Tour.advance(t, r);
+  const finalRound = Tour.current(t);
+  const final = finalRound.matches.find(mt => mt.placement !== 'third');
+  const bronze = finalRound.matches.find(mt => mt.placement === 'third');
+  assert(final.bo === 5 && Tour.winsNeeded(final) === 3, 'final uses its separate Bo5 setting');
+  assert(bronze.bo === 3 && Tour.winsNeeded(bronze) === 2, 'third-place match keeps the standard Bo3 setting');
+}
+{
+  const t = Tour.create('FINALINHERIT', 'Inherited finals cup', { format: 'elim', bestOf: 7, finalBestOf: 0 });
+  Tour.join(t, 'a', 'A'); Tour.join(t, 'b', 'B'); Tour.advance(t, r);
+  assert(Tour.current(t).matches[0].bo === 7 && Tour.finalBestOf(t) === 7, 'final can inherit the standard best-of setting');
+  t.settings.finalBestOf = 1;
+  assert(Tour.finalBestOf(t) === 1, 'final can explicitly override the standard with Bo1');
+}
+
 {
   const t = Tour.create('TWO', 'Two-player cup', { format: 'elim' });
   Tour.join(t, 'a', 'A'); Tour.join(t, 'b', 'B'); Tour.advance(t, r);
