@@ -48,7 +48,8 @@ function prepareRoster() {
   const totalMatchups = units.length * (units.length - 1) / 2;
   console.log('Building live-engine matchup matrix for ' + units.length + ' units (' + totalMatchups + ' unique battles).');
   const matchupTimings = [];
-  let lastHeartbeatAt = Date.now();
+  const matrixStartedAt = Date.now();
+  let lastHeartbeatAt = matrixStartedAt;
   const matrix = Engine.matrix(units, settings, progress => {
     if (progress.type === 'matchup-heartbeat') {
       const now = Date.now();
@@ -73,14 +74,21 @@ function prepareRoster() {
       lastHeartbeatAt = Date.now();
     }
   }, { progressEvery: 100 });
+  const matrixElapsedMs = Date.now() - matrixStartedAt;
   const totalElapsedMs = matchupTimings.reduce((sum, item) => sum + item.elapsedMs, 0);
   const slowest = matchupTimings.slice().sort((a, b) => b.elapsedMs - a.elapsedMs).slice(0, 10);
-  console.log('Matchup matrix ready in ' + (totalElapsedMs / 1000).toFixed(1) + 's of matchup time.');
+  console.log('Matchup matrix ready in ' + (matrixElapsedMs / 1000).toFixed(1) + 's wall time (' + (totalElapsedMs / 1000).toFixed(1) + 's summed matchup time).');
   console.log('Slowest matchups:');
   for (const item of slowest) {
     console.log('  ' + item.matchup + ': ' + item.elapsedMs + 'ms / ' + item.steps + ' steps');
   }
-  return { units, matrix, settings };
+  return { units, matrix, settings, profiling: {
+    unitCount: units.length,
+    uniqueMatchups: totalMatchups,
+    matrixElapsedMs,
+    summedMatchupMs: totalElapsedMs,
+    matchups: matchupTimings
+  } };
 }
 
 function stepBattle(battle, maxSteps = 5000) {
