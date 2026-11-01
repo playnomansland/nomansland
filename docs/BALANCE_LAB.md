@@ -20,6 +20,7 @@ node tools/balance-lab.js --matches 100 --seed 700000 --max-rounds 30 --out tool
 - `--seed`: first deterministic match seed; each match increments it (default: 700000).
 - `--max-rounds`: safety limit for matches that do not finish (default: 30).
 - `--map`: map id (default: `standard`).
+- `--mirror`: give both sides identical package/leader/tower offers and mirrored Zoe tiles, useful for controlled symmetry checks. Default: off, matching ordinary non-mirrored matches.
 - `--out`: optional path for the full JSON report. No report file is written unless requested.
 
 Both sides use the current `Game.aiDeploy` implementation. Each match uses the normal match creation, deployment, battle setup, engine stepping and round resolution functions. The runner records the seed, winner/completion, rounds, remaining HP/gold, per-round damage, battle duration and squad-level damage/survival.
