@@ -203,7 +203,7 @@
     for (const [a, b] of plan.pairs) {
       let code; do code = newCode(r); while (used.has(code)); used.add(code);
       const mt = { id: 'm' + round.n + '-' + (round.matches.length + 1), a, b, code, host: 'a', result: null };
-      const bo = plan.stage === 'playoff' ? bestOf(t) : 1;
+      const bo = plan.stage === 'playoff' ? (plan.pairs.length === 1 ? finalBestOf(t) : bestOf(t)) : 1;
       if (bo > 1 && b != null) { mt.bo = bo; mt.games = []; mt.codeGame = { [code]: 0 }; } // a series: best of bo games, each with its own code
       if (b != null && hosted(t, b) < hosted(t, a)) mt.host = 'b'; // take turns hosting
       round.matches.push(mt);
@@ -221,8 +221,9 @@
     return true;
   }
 
-  // the playoffs' series length: 1 (one game), 3, 5 or 7
+  // Standard playoff series length. Finals can inherit this or override it independently.
   const bestOf = (t) => [3, 5, 7].includes(t.settings.bestOf | 0) ? t.settings.bestOf | 0 : 1;
+  const finalBestOf = (t) => [3, 5, 7].includes(t.settings.finalBestOf | 0) ? t.settings.finalBestOf | 0 : bestOf(t);
   const winsNeeded = (mt) => Math.floor((mt.bo || 1) / 2) + 1;
   // games won so far in a series: [a's, b's] (a single game: its result)
   const score = (mt) => {
@@ -389,7 +390,7 @@
     return st.slice().sort((x, y) => ((place.get(x.id) ?? Infinity) - (place.get(y.id) ?? Infinity)) || ((reach.get(y.id) ?? -1) - (reach.get(x.id) ?? -1)) || (pos.get(x.id) - pos.get(y.id)));
   }
 
-  const api = { CODE_CHARS, POINTS, BOT_NAMES, swapSlots, editable, addBot, isBot, bestOf, winsNeeded, score, gameOf, undoGame, rng, newCode, cleanName, suggestRounds, suggestCut, create, join, rename, remove, player, nameOf, active, swissRounds, cutSize,
+  const api = { CODE_CHARS, POINTS, BOT_NAMES, swapSlots, editable, addBot, isBot, bestOf, finalBestOf, winsNeeded, score, gameOf, undoGame, rng, newCode, cleanName, suggestRounds, suggestCut, create, join, rename, remove, player, nameOf, active, swissRounds, cutSize,
     standings, pairSwiss, bracketOrder, playoffFirst, nextPlan, advance, report, resolveGame, replay, swapHost, undoRound, roundDone, current, matchOf, findMatch, bracket, placings, outcome, winnerOf, sideOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Tour = api;
