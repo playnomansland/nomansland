@@ -1,14 +1,6 @@
 name: Balance Lab validation
 
 on:
-  push:
-    branches:
-      - feature/balance-lab-simulation-runner
-    paths:
-      - "src/**"
-      - "tools/balance-lab.js"
-      - "tools/tests/balance-lab.js"
-      - ".github/workflows/balance-lab-validation.yml"
   pull_request:
     paths:
       - "src/**"
