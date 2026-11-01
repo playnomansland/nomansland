@@ -49,6 +49,22 @@ function prepareRoster() {
   return { units, matrix, settings };
 }
 
+function stepBattle(battle, maxSteps = 5000) {
+  if (!Number.isInteger(maxSteps) || maxSteps < 1) {
+    throw new Error('maxSteps must be a positive integer');
+  }
+  let steps = 0;
+  let running = true;
+  while (running && steps < maxSteps) {
+    running = battle.step();
+    steps++;
+  }
+  if (running) {
+    throw new Error('Battle exceeded the ' + maxSteps + '-step safety limit; refusing to resolve a truncated battle');
+  }
+  return { result: battle.result(), steps };
+}
+
 function simulateMatch(prepared, seed, options = {}) {
   const { units, matrix } = prepared;
   const m = Game.createMatch(units, matrix, seed >>> 0, options.map || DEFAULTS.map, null, null,
@@ -61,9 +77,9 @@ function simulateMatch(prepared, seed, options = {}) {
     Game.aiDeploy(m, 0);
     Game.aiDeploy(m, 1);
     const battle = Game.startBattle(m);
-    let steps = 0;
-    while (battle.step() && steps < 5000) steps++;
-    const battleResult = battle.result();
+    const stepped = stepBattle(battle, options.maxBattleSteps || 5000);
+    const steps = stepped.steps;
+    const battleResult = stepped.result;
     const roundResult = Game.resolve(m, battleResult);
     battleCount++;
     roundLog.push({
@@ -180,4 +196,4 @@ if (require.main === module) {
   catch (error) { console.error(error.stack || error); process.exitCode = 1; }
 }
 
-module.exports = { DEFAULTS, parseArgs, prepareRoster, simulateMatch, summarize, runBatch };
+module.exports = { DEFAULTS, parseArgs, prepareRoster, stepBattle, simulateMatch, summarize, runBatch };
