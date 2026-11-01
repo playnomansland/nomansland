@@ -223,7 +223,7 @@
 
   // Standard playoff series length. Finals can inherit this or override it independently.
   const bestOf = (t) => [3, 5, 7].includes(t.settings.bestOf | 0) ? t.settings.bestOf | 0 : 1;
-  const finalBestOf = (t) => [3, 5, 7].includes(t.settings.finalBestOf | 0) ? t.settings.finalBestOf | 0 : bestOf(t);
+  const finalBestOf = (t) => [1, 3, 5, 7].includes(t.settings.finalBestOf | 0) ? t.settings.finalBestOf | 0 : bestOf(t);
   const winsNeeded = (mt) => Math.floor((mt.bo || 1) / 2) + 1;
   // games won so far in a series: [a's, b's] (a single game: its result)
   const score = (mt) => {
