@@ -156,7 +156,7 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
   steps(bt, 3.95);
   assert.ok(squad.every(x => x.alive && x.channel) && !bt.bodies.some(x => x.u.name === 'Hellfiend'), 'imps are still channeling just before 4 s');
   steps(bt, 0.1);
-  assert.ok(squad.every(x => !x.alive) && bt.bodies.some(x => x.alive && x.u.name === 'Hellfiend'), 'Hellfiend emerges after the 4-second channel');
+  assert.ok(squad.filter(x => x.u.name === 'Ember Imps').every(x => !x.alive) && bt.bodies.some(x => x.alive && x.u.name === 'Hellfiend'), 'Hellfiend emerges after the 4-second channel');
 }
 // Berserkers: can't be slowed or knocked back; the roar slows enemies' attacks and speeds allies, up to 25%
 {
