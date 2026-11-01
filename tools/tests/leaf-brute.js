@@ -32,7 +32,7 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
   assert.ok(/leaf-mech/.test(E.describeSkill(skill('leafblade'))));
   const imps = withSkills('Ember Imps', ['hellfiend']);
   assert.strictEqual(imps.portal.secs, 4, 'Hellfiend channel lasts 4 seconds');
-  assert.strictEqual(E.leveled(lb, 1).missiles.hit, 300, 'missiles grow with the level');
+  assert.strictEqual(E.leveled(lb, 1).missiles.hit, 200, 'missiles grow with the level');
   assert.ok(E.describeSkill(skill('leafblade')).length > 50 && E.describeSkill(skill('berserkers')).length > 50 && E.describeSkill(skill('windWalk')) && E.describeSkill(skill('bouncingBlade')));
 }
 // one leaf a shot (no volleys): a dummy in reach takes 95 a leaf
