@@ -49,7 +49,7 @@ for (const n of [6, 8, 11]) {
   Tour.report(t, m1.id, 'a', [9, 0], 5, 'org');
   assert(!m1.conflict && m1.result.by === 'org', 'organizer settles it');
   assert(!Tour.report(t, m1.id, 'b', [0, 9], 5, 'auto') && m1.result.winner === 'a', 'phones cannot overwrite the organizer');
-  assert(Tour.advance(t, r) && Tour.current(t).matches.length === 1, 'final');
+  assert(Tour.advance(t, r) && Tour.current(t).matches.length === 2 && Tour.current(t).matches.some(mt => mt.placement === 'third'), 'final plus third-place match');
 }
 // names: cleaned, unique, locked after the start
 {
@@ -151,10 +151,9 @@ for (const n of [6, 8, 11]) {
   const mt = Tour.current(t).matches[0];
   Tour.report(t, mt.id, 'a', [10, 0], 4, 'auto', 0);
   Tour.report(t, mt.id, 'a', [10, 0], 4, 'auto', 1);
-  Tour.report(t, mt.id, 'a', [10, 0], 4, 'auto', 2);
   assert(mt.result && mt.result.winner === 'a', 'series initially completes');
-  assert(Tour.report(t, mt.id, 'b', [0, 10], 4, 'auto', 2) && mt.conflict, 'disagreeing deciding-game report is flagged');
-  assert(Tour.resolveGame(t, mt.id, 'b') && !mt.result && Tour.score(mt).join() === '2,1' && Tour.gameOf(mt, mt.code) === 3, 'organizer correction reopens series with fresh game code');
+  assert(Tour.report(t, mt.id, 'b', [0, 10], 4, 'auto', 1) && mt.conflict, 'disagreeing deciding-game report is flagged');
+  assert(Tour.resolveGame(t, mt.id, 'b') && !mt.result && Tour.score(mt).join() === '1,1' && Tour.gameOf(mt, mt.code) === 2, 'organizer correction reopens series with fresh game code');
 }
 {
   const t = Tour.create('BRNZ', 'Bronze cup', { format: 'elim' });
