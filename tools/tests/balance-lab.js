@@ -34,6 +34,26 @@ const Lab = require('../balance-lab.js');
 }
 
 {
+  let calls = 0;
+  const completed = Lab.stepBattle({
+    step() { calls++; return calls < 3; },
+    result() { return { winner: 0 }; }
+  }, 3);
+  assert.strictEqual(completed.steps, 3, 'counts every engine step, including the final one');
+  assert.deepStrictEqual(completed.result, { winner: 0 });
+  assert.strictEqual(calls, 3);
+
+  let cappedCalls = 0;
+  assert.throws(() => Lab.stepBattle({
+    step() { cappedCalls++; return true; },
+    result() { throw new Error('must not read a truncated result'); }
+  }, 3), /exceeded the 3-step safety limit/);
+  assert.strictEqual(cappedCalls, 3);
+  assert.throws(() => Lab.stepBattle({ step() { return false; } }, 0), /positive integer/);
+  console.log('ok  battle step counting and truncation safety');
+}
+
+{
   const prepared = Lab.prepareRoster();
   assert.ok(prepared.units.length > 0, 'loads the live roster');
   assert.strictEqual(prepared.matrix.length, prepared.units.length, 'builds the engine matchup matrix');
