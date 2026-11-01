@@ -2753,9 +2753,11 @@ const Engine = (() => {
       objective: () => obj && { n: obj.n.slice(), lead: obj.lead, hold: obj.hold, secs: obj.secs, won: obj.won } };
   }
 
-  function matrix(units, g) {
+  function matrix(units, g, onProgress) {
     const n = units.length;
     const m = [];
+    let completed = 0;
+    const total = n * (n - 1) / 2;
     for (let i = 0; i < n; i++) {
       m.push([]);
       for (let j = 0; j < n; j++) {
@@ -2765,6 +2767,8 @@ const Engine = (() => {
           m[i].push({ ...r, score: -r.score, winner: r.winner === -1 ? -1 : 1 - r.winner, frac: [r.frac[1], r.frac[0]], mirrored: true });
         } else {
           m[i].push(battle(units[i], units[j], g));
+          completed++;
+          if (typeof onProgress === 'function') onProgress({ completed, total, unitA: i, unitB: j });
         }
       }
     }
