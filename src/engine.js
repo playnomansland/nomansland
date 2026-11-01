@@ -702,8 +702,10 @@ const Engine = (() => {
     const frames = [];
     let steps = 0;
     const progressEvery = Number.isInteger(opts.progressEvery) && opts.progressEvery > 0 ? opts.progressEvery : 0;
-    while (bt.step()) {
+    while (true) {
+      const running = bt.step();
       steps++;
+      if (!running) break;
       if (opts.record) frames.push(bt.frame());
       if (progressEvery && typeof opts.onProgress === 'function' && steps % progressEvery === 0) {
         opts.onProgress({ steps, time: bt.time() });
