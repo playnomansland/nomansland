@@ -4,6 +4,13 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 1 November 2026 – Leafblade and Hellfiend balance
+
+- **Leaf Wizard – Leafblade:** homing missile damage reduced from 150 to 100 per missile. Dash now has a 1.5-second cooldown per body between dash starts.
+- **Ember Imps – Summon hellfiend:** portal channel increased from 3 to 4 seconds, giving opponents more time to defeat the imps before the Hellfiend emerges.
+
+---
+
 ## 31 October 2026 – Selling stays secret until the fight
 
 - **Fix:** you could see the moment your opponent sold a squad while you were both deploying: it vanished from their side of the board. Now a squad they sell stays on your screen, as it was, until the fight starts, just like their new squads stay hidden. This works both ways in live matches, for spectators and against the AI.

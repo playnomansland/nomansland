@@ -27,10 +27,12 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
   const pb = withSkills('Leaf Wizard', ['petalburst']); assert.ok(near(pb.aps, 2.4) && near(pb.range, lw.range / 2), 'Petalburst: +100% attack speed, -50% range');
   const bb = withSkills('Leaf Wizard', ['bouncingBlade']); assert.deepStrictEqual(bb.bounce, { n: 2, pct: 30, reach: 10 });
   const lb = withSkills('Leaf Wizard', ['petalburst', 'leafblade']);
-  assert.ok(lb.mech && lb.spinBlade && lb.flame === 90 && lb.range === 3 && lb.projSpeed === 0 && lb.dash === 8 && near(lb.aps, 2.4), 'Leafblade: a 180° swipe in melee that dashes, Petalburst still speeds it up');
-  assert.deepStrictEqual(lb.missiles, { n: 2, every: 10, hit: 150, splash: 2.5, speed: 25, range: 30 });
+  assert.ok(lb.mech && lb.spinBlade && lb.flame === 90 && lb.range === 3 && lb.projSpeed === 0 && lb.dash === 8 && lb.dashCooldown === 1.5 && near(lb.aps, 2.4), 'Leafblade: a 180° swipe in melee that dashes, Petalburst still speeds it up');
+  assert.deepStrictEqual(lb.missiles, { n: 2, every: 10, hit: 100, splash: 2.5, speed: 25, range: 30 });
   assert.ok(/leaf-mech/.test(E.describeSkill(skill('leafblade'))));
-  assert.strictEqual(E.leveled(lb, 1).missiles.hit, 300, 'missiles grow with the level');
+  const imps = withSkills('Ember Imps', ['hellfiend']);
+  assert.strictEqual(imps.portal.secs, 4, 'Hellfiend channel lasts 4 seconds');
+  assert.strictEqual(E.leveled(lb, 1).missiles.hit, 200, 'missiles grow with the level');
   assert.ok(E.describeSkill(skill('leafblade')).length > 50 && E.describeSkill(skill('berserkers')).length > 50 && E.describeSkill(skill('windWalk')) && E.describeSkill(skill('bouncingBlade')));
 }
 // one leaf a shot (no volleys): a dummy in reach takes 95 a leaf
@@ -127,6 +129,34 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
   let again = 0;
   for (let k = 0; k < 220; k++) { bt.step(); again = Math.max(again, fired()); }
   assert.strictEqual(again, 2, 'a second salvo after 10 s');
+}
+// Leafblade dash cooldown: leaving and re-entering dash range cannot restart it before 1.5 s
+{
+  const lb = body({ ...withSkills('Leaf Wizard', ['bouncingBlade', 'leafblade']), speed: 0, missiles: null }, 0, 0, 0, 90);
+  const foe = body(dummy(1e9), 1, 0, 7, 91);
+  const bt = E.createBattle([lb], [foe], G);
+  const starts = [];
+  for (let k = 0; k < 70; k++) {
+    if (k === 0 || k === 2 || k === 4 || k === 36) foe.y = lb.y + 7;
+    if (k === 1 || k === 3 || k === 35) foe.y = lb.y + 20;
+    const wasActive = !!lb.dashActive;
+    bt.step();
+    if (lb.dashActive && !wasActive) starts.push(bt.time());
+  }
+  assert.strictEqual(starts.length, 3, `three dash starts after cooldown: ${starts}`);
+  assert.ok(near(starts[1] - starts[0], 1.5, 1e-6) && near(starts[2] - starts[1], 1.5, 1e-6), `dash starts are 1.5 s apart: ${starts}`);
+}
+// Hellfiend: imps remain channeled through 4 seconds and emerge only after the channel
+{
+  const imps = withSkills('Ember Imps', ['spitfire', 'flare', 'hellfiend']);
+  const squad = E.buildSquad(imps, 0, 0, -10, 92, 6);
+  const foe = body(dummy(1e9), 1, 0, 20, 93);
+  const bt = E.createBattle(squad, [foe], G);
+  assert.strictEqual(bt.portals()[0].secs, 4, 'portal channel is 4 seconds');
+  steps(bt, 3.95);
+  assert.ok(squad.every(x => x.alive && x.channel) && !bt.bodies.some(x => x.u.name === 'Hellfiend'), 'imps are still channeling just before 4 s');
+  steps(bt, 0.1);
+  assert.ok(squad.filter(x => x.u.name === 'Ember Imps').every(x => !x.alive) && bt.bodies.some(x => x.alive && x.u.name === 'Hellfiend'), 'Hellfiend emerges after the 4-second channel');
 }
 // Berserkers: can't be slowed or knocked back; the roar slows enemies' attacks and speeds allies, up to 25%
 {
