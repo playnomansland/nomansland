@@ -6933,7 +6933,7 @@ if (typeof module !== 'undefined') module.exports = Game;
     for (const [a, b] of plan.pairs) {
       let code; do code = newCode(r); while (used.has(code)); used.add(code);
       const mt = { id: 'm' + round.n + '-' + (round.matches.length + 1), a, b, code, host: 'a', result: null };
-      const bo = plan.stage === 'playoff' ? bestOf(t) : 1;
+      const bo = plan.stage === 'playoff' ? (plan.pairs.length === 1 ? finalBestOf(t) : bestOf(t)) : 1;
       if (bo > 1 && b != null) { mt.bo = bo; mt.games = []; mt.codeGame = { [code]: 0 }; } // a series: best of bo games, each with its own code
       if (b != null && hosted(t, b) < hosted(t, a)) mt.host = 'b'; // take turns hosting
       round.matches.push(mt);
@@ -6951,8 +6951,9 @@ if (typeof module !== 'undefined') module.exports = Game;
     return true;
   }
 
-  // the playoffs' series length: 1 (one game), 3, 5 or 7
+  // Standard playoff series length. Finals can inherit this or override it independently.
   const bestOf = (t) => [3, 5, 7].includes(t.settings.bestOf | 0) ? t.settings.bestOf | 0 : 1;
+  const finalBestOf = (t) => [1, 3, 5, 7].includes(t.settings.finalBestOf | 0) ? t.settings.finalBestOf | 0 : bestOf(t);
   const winsNeeded = (mt) => Math.floor((mt.bo || 1) / 2) + 1;
   // games won so far in a series: [a's, b's] (a single game: its result)
   const score = (mt) => {
@@ -7119,7 +7120,7 @@ if (typeof module !== 'undefined') module.exports = Game;
     return st.slice().sort((x, y) => ((place.get(x.id) ?? Infinity) - (place.get(y.id) ?? Infinity)) || ((reach.get(y.id) ?? -1) - (reach.get(x.id) ?? -1)) || (pos.get(x.id) - pos.get(y.id)));
   }
 
-  const api = { CODE_CHARS, POINTS, BOT_NAMES, swapSlots, editable, addBot, isBot, bestOf, winsNeeded, score, gameOf, undoGame, rng, newCode, cleanName, suggestRounds, suggestCut, create, join, rename, remove, player, nameOf, active, swissRounds, cutSize,
+  const api = { CODE_CHARS, POINTS, BOT_NAMES, swapSlots, editable, addBot, isBot, bestOf, finalBestOf, winsNeeded, score, gameOf, undoGame, rng, newCode, cleanName, suggestRounds, suggestCut, create, join, rename, remove, player, nameOf, active, swissRounds, cutSize,
     standings, pairSwiss, bracketOrder, playoffFirst, nextPlan, advance, report, resolveGame, replay, swapHost, undoRound, roundDone, current, matchOf, findMatch, bracket, placings, outcome, winnerOf, sideOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Tour = api;
@@ -13583,7 +13584,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // =====================================================================
   const TOUR_PREFIX = 'phonebellum-t1-';
   const TOUR_ORG = 'phonebellum.tour.org.v1', TOUR_ME = 'phonebellum.tour.me.v1';
-  const TOUR_DEFAULTS = { format: 'swiss', swissRounds: 0, cut: -1, bestOf: 1, map: '', skin: '', packOptions: 3, mirror: true, deploy1: 90, deploy: 90, next: 20, pack: 'standard', offUnits: [], offChars: [], offTowers: [] };
+  const TOUR_DEFAULTS = { format: 'swiss', swissRounds: 0, cut: -1, bestOf: 1, finalBestOf: 0, map: '', skin: '', packOptions: 3, mirror: true, deploy1: 90, deploy: 90, next: 20, pack: 'standard', offUnits: [], offChars: [], offTowers: [] };
   const tour = { role: null, code: '', peer: null, conns: new Set(), conn: null, connected: false, t: null, online: [], myId: '', myName: '', alive: false, timer: 0, tries: 0, menu: false, tab: '', pending: null, dirty: false, problem: '' };
   const tourId = () => Array.from({ length: 10 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
   const tourOrg = () => tour.role === 'org';
@@ -14319,7 +14320,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       return `${lobby ? `<div class="bar"><span class="hint">Name</span><span class="joinrow"><input class="tour-in" id="tour-tname" maxlength="18" value="${esc(t.name)}" aria-label="Tournament name"><button class="btn small" id="tour-tname-ok">Save</button></span></div>
         ${segOf('format', [['swiss', 'Swiss + playoffs'], ['elim', 'Knockout']], 'Format')}
         ${s.format === 'swiss' ? segOf('swissRounds', [[0, `Auto (${Tour.suggestRounds(n)})`], [2, 2], [3, 3], [4, 4], [5, 5]], 'Swiss rounds') + segOf('cut', [[-1, `Auto (${Tour.suggestCut(n) ? 'top ' + Tour.suggestCut(n) : 'none'})`], [0, 'None'], [2, 'Top 2'], [4, 'Top 4'], [8, 'Top 8']], 'Playoffs') : ''}` : '<span class="hint">Format and players are set once it has started. The rest counts from the next match on.</span>'}
-        ${s.format === 'elim' || Tour.cutSize(t) >= 2 ? segOf('bestOf', [[1, 'Bo1'], [3, 'Bo3'], [5, 'Bo5'], [7, 'Bo7']], s.format === 'elim' ? 'Knockout matches: best of' : 'Playoff matches: best of') : ''}
+        ${s.format === 'elim' || Tour.cutSize(t) >= 2 ? segOf('bestOf', [[1, 'Bo1'], [3, 'Bo3'], [5, 'Bo5'], [7, 'Bo7']], s.format === 'elim' ? 'Non-final knockout matches: best of' : 'Non-final playoff matches: best of') + segOf('finalBestOf', [[0, 'Same as standard'], [1, 'Bo1'], [3, 'Bo3'], [5, 'Bo5'], [7, 'Bo7']], 'Final: best of') : ''}
         ${segOf('packOptions', [[2, 2], [3, 3], [4, 4], [5, 5]], 'Leader choices')}
         ${segOf('mirror', [[true, 'Same for both'], [false, 'Own rolls']], 'Leaders, units, towers')}
         ${segOf('deploy1', [[60, '60 s'], [90, '90 s'], [120, '120 s'], [150, '150 s']], 'Deploy timer, round 1')}
@@ -14347,7 +14348,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       `Map: ${s.map ? esc(mapName(s.map)) : 'a random one each round, the same in every match'}.`,
       `${esc(pack)}. Pick from ${s.packOptions} leaders${s.mirror ? ', and both players get the same leaders, starting units and tower choices' : ''}.`,
       `Deploy timer: ${s.deploy1} s in round 1, then ${s.deploy} s.`,
-      ...(s.bestOf > 1 && (s.format === 'elim' || Tour.cutSize(t) >= 2) ? [`${s.format === 'elim' ? 'Every match' : 'Playoff matches'}: best of ${s.bestOf} games (first to ${Math.floor(s.bestOf / 2) + 1}). Each game is its own match; a drawn game doesn't count.`] : []),
+      ...(s.bestOf > 1 && (s.format === 'elim' || Tour.cutSize(t) >= 2) ? [`Non-final ${s.format === 'elim' ? 'knockout' : 'playoff'} matches: best of ${s.bestOf} games (first to ${Math.floor(s.bestOf / 2) + 1}). Each game is its own match; a drawn game doesn't count.`] : []),
+      ...(s.finalBestOf > 0 && (s.format === 'elim' || Tour.cutSize(t) >= 2) ? [`Final: best of ${s.finalBestOf} games (first to ${Math.floor(s.finalBestOf / 2) + 1}). Each game is its own match; a drawn game doesn't count.`] : []),
       ...(t.rounds.some(r => r.matches.some(mt => mt.placement === 'third')) || (t.settings.format === 'elim' ? t.players.length >= 4 : Tour.cutSize(t) >= 4) ? ['The two semifinal losers play a 3rd-place match alongside the final.'] : []),
       'Not playing right now? Open Matches and tap Watch to spectate a match.',
       'Your match shows on this screen. Tap Start match (if you host) or Join match. The result is sent by itself.',
