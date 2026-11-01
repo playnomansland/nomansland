@@ -700,8 +700,18 @@ const Engine = (() => {
     const side = (x, k) => Array.isArray(x) ? makeArmy(x, k, g) : makeSide(x, k, g);
     const bt = createBattle(side(uA, 0), side(uB, 1), g, opts);
     const frames = [];
-    while (bt.step()) if (opts.record) frames.push(bt.frame());
+    let steps = 0;
+    const progressEvery = Number.isInteger(opts.progressEvery) && opts.progressEvery > 0 ? opts.progressEvery : 0;
+    while (bt.step()) {
+      steps++;
+      if (opts.record) frames.push(bt.frame());
+      if (progressEvery && typeof opts.onProgress === 'function' && steps % progressEvery === 0) {
+        opts.onProgress({ steps, time: bt.time() });
+      }
+    }
+    steps++;
     const r = bt.result();
+    if (progressEvery && typeof opts.onProgress === 'function') opts.onProgress({ steps, time: bt.time(), complete: true });
     if (opts.record) frames.push(bt.frame(true));
     r.frames = frames;
     r.shapes = bt.bodies.map(b => b.u.shape || "circle");
@@ -2753,11 +2763,13 @@ const Engine = (() => {
       objective: () => obj && { n: obj.n.slice(), lead: obj.lead, hold: obj.hold, secs: obj.secs, won: obj.won } };
   }
 
-  function matrix(units, g, onProgress) {
+  function matrix(units, g, onProgress, instrumentation = {}) {
     const n = units.length;
     const m = [];
     let completed = 0;
     const total = n * (n - 1) / 2;
+    const progressEvery = Number.isInteger(instrumentation.progressEvery) && instrumentation.progressEvery > 0
+      ? instrumentation.progressEvery : 0;
     for (let i = 0; i < n; i++) {
       m.push([]);
       for (let j = 0; j < n; j++) {
@@ -2766,9 +2778,26 @@ const Engine = (() => {
           const r = m[j][i];
           m[i].push({ ...r, score: -r.score, winner: r.winner === -1 ? -1 : 1 - r.winner, frac: [r.frac[1], r.frac[0]], mirrored: true });
         } else {
-          m[i].push(battle(units[i], units[j], g));
+          const startedAt = Date.now();
+          let steps = 0;
+          const result = battle(units[i], units[j], g, progressEvery ? {
+            progressEvery,
+            onProgress: progress => {
+              steps = progress.steps;
+              if (typeof onProgress === 'function' && !progress.complete) onProgress({
+                type: 'matchup-heartbeat', completed, total, unitA: i, unitB: j,
+                unitAName: units[i].name || String(i), unitBName: units[j].name || String(j),
+                steps, battleTime: progress.time, elapsedMs: Date.now() - startedAt
+              });
+            }
+          } : {});
+          m[i].push(result);
           completed++;
-          if (typeof onProgress === 'function') onProgress({ completed, total, unitA: i, unitB: j });
+          if (typeof onProgress === 'function') onProgress({
+            type: 'matchup-complete', completed, total, unitA: i, unitB: j,
+            unitAName: units[i].name || String(i), unitBName: units[j].name || String(j),
+            steps, elapsedMs: Date.now() - startedAt
+          });
         }
       }
     }
