@@ -708,7 +708,7 @@
         "level": 1,
         "speed": 4.5,
         "cone": 90,
-        "secs": 3
+        "secs": 4
       },
       "flat": true
     },
@@ -777,7 +777,10 @@
       "type": "leafblade",
       "name": "Leafblade",
       "cost": 300,
-      "params": {},
+      "params": {
+        "dashCooldown": 1.5,
+        "mhit": 100
+      },
       "flat": true
     },
     {
