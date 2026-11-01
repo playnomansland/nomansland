@@ -45,13 +45,41 @@ function prepareRoster() {
     ...roster.settings,
     bounds: { x0: -36, x1: 36, y0: -48, y1: 48 }
   };
-  console.log('Building live-engine matchup matrix for ' + units.length + ' units (' + (units.length * (units.length - 1) / 2) + ' unique battles).');
+  const totalMatchups = units.length * (units.length - 1) / 2;
+  console.log('Building live-engine matchup matrix for ' + units.length + ' units (' + totalMatchups + ' unique battles).');
+  const matchupTimings = [];
+  let lastHeartbeatAt = Date.now();
   const matrix = Engine.matrix(units, settings, progress => {
-    if (progress.completed === progress.total || progress.completed % 10 === 0) {
-      console.log('Matchup matrix: ' + progress.completed + '/' + progress.total + ' (' + Math.round(progress.completed / progress.total * 100) + '%)');
+    if (progress.type === 'matchup-heartbeat') {
+      const now = Date.now();
+      if (now - lastHeartbeatAt >= 5000) {
+        console.log('Matchup still running: ' + progress.unitAName + ' vs ' + progress.unitBName
+          + ' — ' + progress.steps + ' steps, ' + (progress.elapsedMs / 1000).toFixed(1) + 's elapsed.');
+        lastHeartbeatAt = now;
+      }
+      return;
     }
-  });
-  console.log('Matchup matrix ready.');
+    if (progress.type === 'matchup-complete') {
+      matchupTimings.push({
+        matchup: progress.unitAName + ' vs ' + progress.unitBName,
+        steps: progress.steps,
+        elapsedMs: progress.elapsedMs
+      });
+      if (progress.completed === progress.total || progress.completed % 10 === 0) {
+        console.log('Matchup matrix: ' + progress.completed + '/' + progress.total + ' ('
+          + Math.round(progress.completed / progress.total * 100) + '%), last matchup '
+          + progress.elapsedMs + 'ms / ' + progress.steps + ' steps.');
+      }
+      lastHeartbeatAt = Date.now();
+    }
+  }, { progressEvery: 100 });
+  const totalElapsedMs = matchupTimings.reduce((sum, item) => sum + item.elapsedMs, 0);
+  const slowest = matchupTimings.slice().sort((a, b) => b.elapsedMs - a.elapsedMs).slice(0, 10);
+  console.log('Matchup matrix ready in ' + (totalElapsedMs / 1000).toFixed(1) + 's of matchup time.');
+  console.log('Slowest matchups:');
+  for (const item of slowest) {
+    console.log('  ' + item.matchup + ': ' + item.elapsedMs + 'ms / ' + item.steps + ' steps');
+  }
   return { units, matrix, settings };
 }
 
