@@ -45,7 +45,13 @@ function prepareRoster() {
     ...roster.settings,
     bounds: { x0: -36, x1: 36, y0: -48, y1: 48 }
   };
-  const matrix = Engine.matrix(units, settings);
+  console.log('Building live-engine matchup matrix for ' + units.length + ' units (' + (units.length * (units.length - 1) / 2) + ' unique battles).');
+  const matrix = Engine.matrix(units, settings, progress => {
+    if (progress.completed === progress.total || progress.completed % 10 === 0) {
+      console.log('Matchup matrix: ' + progress.completed + '/' + progress.total + ' (' + Math.round(progress.completed / progress.total * 100) + '%)');
+    }
+  });
+  console.log('Matchup matrix ready.');
   return { units, matrix, settings };
 }
 
