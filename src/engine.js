@@ -709,7 +709,6 @@ const Engine = (() => {
         opts.onProgress({ steps, time: bt.time() });
       }
     }
-    steps++;
     const r = bt.result();
     if (progressEvery && typeof opts.onProgress === 'function') opts.onProgress({ steps, time: bt.time(), complete: true });
     if (opts.record) frames.push(bt.frame(true));
