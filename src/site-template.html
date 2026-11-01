@@ -6219,13 +6219,13 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
             <small>${free ? (mt.b == null ? 'bye' : 'not started') : 'locked: ' + tourResultText(mt)}</small></li>`;
         }
         const ctl = org && mt.b != null && mt.bo > 1 ? `<span class="btnrow tour-ctl">
-          ${mt.result ? '' : `<button class="btn small" data-res="${mt.id}:a">Game to ${esc(Tour.nameOf(t, mt.a))}</button><button class="btn small" data-res="${mt.id}:b">Game to ${esc(Tour.nameOf(t, mt.b))}</button>`}
+          ${mt.conflict ? `<button class="btn small" data-res="${mt.id}:a">Resolve game to ${esc(Tour.nameOf(t, mt.a))}</button><button class="btn small" data-res="${mt.id}:b">Resolve game to ${esc(Tour.nameOf(t, mt.b))}</button><button class="btn small" data-res="${mt.id}:draw">Resolve as draw</button>` : mt.result ? '' : `<button class="btn small" data-res="${mt.id}:a">Game to ${esc(Tour.nameOf(t, mt.a))}</button><button class="btn small" data-res="${mt.id}:b">Game to ${esc(Tour.nameOf(t, mt.b))}</button>`}
           ${mt.games.length ? `<button class="btn small" data-undogame="${mt.id}">Undo last game</button>` : ''}<button class="btn small" data-replay="${mt.id}">Restart series</button>${mt.result ? '' : `<button class="btn small" data-swap="${mt.id}">Swap host</button>`}</span>`
           : org && mt.b != null ? `<span class="btnrow tour-ctl">
           <button class="btn small" data-res="${mt.id}:a">${esc(Tour.nameOf(t, mt.a))} won</button><button class="btn small" data-res="${mt.id}:b">${esc(Tour.nameOf(t, mt.b))} won</button>${r.stage === 'playoff' ? '' : `<button class="btn small" data-res="${mt.id}:draw">Draw</button>`}
           <button class="btn small" data-replay="${mt.id}">Replay</button>${mt.result ? '' : `<button class="btn small" data-swap="${mt.id}">Swap host</button>`}</span>` : '';
         const watch = mt.b != null && !mt.result && mt.a !== tour.myId && mt.b !== tour.myId && !Tour.isBot(t, mt.a) && !Tour.isBot(t, mt.b) ? `<button class="btn small" data-watch="${mt.id}">Watch</button>` : '';
-        return `<li class="${mt.conflict ? 'warn' : ''}"><span>${pname(mt.a)} <small>vs</small> ${pname(mt.b)} ${watch}</span>
+        return `<li class="${mt.conflict ? 'warn' : ''}"><span>${mt.placement === 'third' ? '<b>3rd place:</b> ' : ''}${pname(mt.a)} <small>vs</small> ${pname(mt.b)} ${watch}</span>
           <small>${mt.b != null ? `host: ${esc(Tour.nameOf(t, mt[tourHostKey(mt)]))} · ` : ''}${tourResultText(mt)}</small>${ctl}</li>`;
       }).join('');
       const done = Tour.roundDone(r), last = Tour.nextPlan(t);
@@ -6288,6 +6288,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       `${esc(pack)}. Pick from ${s.packOptions} leaders${s.mirror ? ', and both players get the same leaders, starting units and tower choices' : ''}.`,
       `Deploy timer: ${s.deploy1} s in round 1, then ${s.deploy} s.`,
       ...(s.bestOf > 1 && (s.format === 'elim' || Tour.cutSize(t) >= 2) ? [`${s.format === 'elim' ? 'Every match' : 'Playoff matches'}: best of ${s.bestOf} games (first to ${Math.floor(s.bestOf / 2) + 1}). Each game is its own match; a drawn game doesn't count.`] : []),
+      ...(t.rounds.some(r => r.matches.some(mt => mt.placement === 'third')) || (t.settings.format === 'elim' ? t.players.length >= 4 : Tour.cutSize(t) >= 4) ? ['The two semifinal losers play a 3rd-place match alongside the final.'] : []),
       'Not playing right now? Open Matches and tap Watch to spectate a match.',
       'Your match shows on this screen. Tap Start match (if you host) or Join match. The result is sent by itself.',
     ];
@@ -6321,7 +6322,10 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     on('[data-res]', (b) => {
       const [id, w] = b.dataset.res.split(':'), f = Tour.findMatch(t, id); if (!f) return;
       const old = f.match.result && f.match.result.hp;
-      if (Tour.report(t, id, w, old || [0, 0], (f.match.result && f.match.result.rounds) || 0, 'org')) tourChanged();
+      const changed = f.match.bo > 1 && f.match.conflict
+        ? Tour.resolveGame(t, id, w)
+        : Tour.report(t, id, w, old || [0, 0], (f.match.result && f.match.result.rounds) || 0, 'org');
+      if (changed) tourChanged();
     });
     on('[data-replay]', (b) => { if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Sure?'; return; } if (Tour.replay(t, b.dataset.replay, Math.random)) tourChanged(); });
     on('[data-undogame]', (b) => { if (Tour.undoGame(t, b.dataset.undogame)) tourChanged(); });
