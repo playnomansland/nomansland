@@ -54,11 +54,25 @@ const Lab = require('../balance-lab.js');
 }
 
 {
-  const prepared = Lab.prepareRoster();
-  assert.ok(prepared.units.length > 0, 'loads the live roster');
-  assert.strictEqual(prepared.matrix.length, prepared.units.length, 'builds the engine matchup matrix');
-  assert.strictEqual(prepared.matrix[0].length, prepared.units.length);
-  console.log('ok  live roster preparation and engine matchup matrix');
+  // Exercise roster preparation without running the engine's expensive all-vs-all
+  // matchup simulations. The real matrix is exercised once by the CI smoke test.
+  const Engine = require('../../src/engine.js');
+  const originalMatrix = Engine.matrix;
+  let matrixCalled = false;
+  Engine.matrix = (units) => {
+    matrixCalled = true;
+    return units.map((_, i) => units.map((__, j) => i === j ? null : { score: 0 }));
+  };
+  try {
+    const prepared = Lab.prepareRoster();
+    assert.ok(prepared.units.length > 0, 'loads the live roster');
+    assert.strictEqual(matrixCalled, true, 'builds the engine matchup matrix');
+    assert.strictEqual(prepared.matrix.length, prepared.units.length);
+    assert.strictEqual(prepared.matrix[0].length, prepared.units.length);
+  } finally {
+    Engine.matrix = originalMatrix;
+  }
+  console.log('ok  live roster preparation and matchup matrix wiring');
 }
 
 console.log('Balance Lab tests passed.');
