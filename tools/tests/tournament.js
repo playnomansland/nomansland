@@ -144,3 +144,38 @@ for (const n of [6, 8, 11]) {
   const fin = Tour.current(t).matches[0];
   assert(fin.a === po.matches[0].b && fin.b === po.matches[1].b, 'the final follows the changed bracket');
 }
+
+{
+  const t = Tour.create('FIX', 'Conflict cup', { format: 'elim', bestOf: 3 });
+  Tour.join(t, 'a', 'A'); Tour.join(t, 'b', 'B'); Tour.advance(t, r);
+  const mt = Tour.current(t).matches[0];
+  Tour.report(t, mt.id, 'a', [10, 0], 4, 'auto', 0);
+  Tour.report(t, mt.id, 'a', [10, 0], 4, 'auto', 1);
+  Tour.report(t, mt.id, 'a', [10, 0], 4, 'auto', 2);
+  assert(mt.result && mt.result.winner === 'a', 'series initially completes');
+  assert(Tour.report(t, mt.id, 'b', [0, 10], 4, 'auto', 2) && mt.conflict, 'disagreeing deciding-game report is flagged');
+  assert(Tour.resolveGame(t, mt.id, 'b') && !mt.result && Tour.score(mt).join() === '2,1' && Tour.gameOf(mt, mt.code) === 3, 'organizer correction reopens series with fresh game code');
+}
+{
+  const t = Tour.create('BRNZ', 'Bronze cup', { format: 'elim' });
+  for (let k = 0; k < 4; k++) Tour.join(t, 'p' + k, 'P' + k);
+  Tour.advance(t, r);
+  const semis = Tour.current(t).matches;
+  Tour.report(t, semis[0].id, 'a', [10, 0], 5, 'auto');
+  Tour.report(t, semis[1].id, 'b', [0, 10], 5, 'auto');
+  assert(Tour.advance(t, r), 'semifinals advance');
+  const finalRound = Tour.current(t), bronze = finalRound.matches.find(mt => mt.placement === 'third');
+  assert(finalRound.matches.length === 2 && bronze && bronze.a === semis[0].b && bronze.b === semis[1].a, 'automatic third-place match pairs semifinal losers');
+  const final = finalRound.matches.find(mt => mt.placement !== 'third');
+  Tour.report(t, final.id, 'a', [10, 0], 5, 'auto');
+  Tour.report(t, bronze.id, 'b', [0, 10], 5, 'auto');
+  assert(Tour.advance(t, r) && t.status === 'done' && t.champion === final.a, 'final and bronze results finish tournament');
+  const places = Tour.placings(t).map(x => x.id);
+  assert(places.slice(0, 4).join() === [final.a, final.b, bronze.b, bronze.a].join(), 'final standings rank 1st through 4th correctly');
+}
+{
+  const t = Tour.create('TWO', 'Two-player cup', { format: 'elim' });
+  Tour.join(t, 'a', 'A'); Tour.join(t, 'b', 'B'); Tour.advance(t, r);
+  Tour.report(t, Tour.current(t).matches[0].id, 'a', [10, 0], 5, 'auto');
+  assert(Tour.advance(t, r) && t.status === 'done' && t.rounds.length === 1, 'two-player knockout has no unnecessary third-place match');
+}
