@@ -212,6 +212,8 @@
       let code; do code = newCode(r); while (used.has(code)); used.add(code);
       const [a, b] = plan.thirdPlace;
       const mt = { id: 'm' + round.n + '-third', a, b, code, host: 'a', result: null, placement: 'third' };
+      const bo = bestOf(t);
+      if (bo > 1) { mt.bo = bo; mt.games = []; mt.codeGame = { [code]: 0 }; }
       if (hosted(t, b) < hosted(t, a)) mt.host = 'b';
       round.matches.push(mt);
     }
