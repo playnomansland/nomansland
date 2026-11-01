@@ -27,9 +27,11 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
   const pb = withSkills('Leaf Wizard', ['petalburst']); assert.ok(near(pb.aps, 2.4) && near(pb.range, lw.range / 2), 'Petalburst: +100% attack speed, -50% range');
   const bb = withSkills('Leaf Wizard', ['bouncingBlade']); assert.deepStrictEqual(bb.bounce, { n: 2, pct: 30, reach: 10 });
   const lb = withSkills('Leaf Wizard', ['petalburst', 'leafblade']);
-  assert.ok(lb.mech && lb.spinBlade && lb.flame === 90 && lb.range === 3 && lb.projSpeed === 0 && lb.dash === 8 && near(lb.aps, 2.4), 'Leafblade: a 180° swipe in melee that dashes, Petalburst still speeds it up');
-  assert.deepStrictEqual(lb.missiles, { n: 2, every: 10, hit: 150, splash: 2.5, speed: 25, range: 30 });
+  assert.ok(lb.mech && lb.spinBlade && lb.flame === 90 && lb.range === 3 && lb.projSpeed === 0 && lb.dash === 8 && lb.dashCooldown === 1.5 && near(lb.aps, 2.4), 'Leafblade: a 180° swipe in melee that dashes, Petalburst still speeds it up');
+  assert.deepStrictEqual(lb.missiles, { n: 2, every: 10, hit: 100, splash: 2.5, speed: 25, range: 30 });
   assert.ok(/leaf-mech/.test(E.describeSkill(skill('leafblade'))));
+  const imps = withSkills('Ember Imps', ['hellfiend']);
+  assert.strictEqual(imps.portal.secs, 4, 'Hellfiend channel lasts 4 seconds');
   assert.strictEqual(E.leveled(lb, 1).missiles.hit, 300, 'missiles grow with the level');
   assert.ok(E.describeSkill(skill('leafblade')).length > 50 && E.describeSkill(skill('berserkers')).length > 50 && E.describeSkill(skill('windWalk')) && E.describeSkill(skill('bouncingBlade')));
 }
