@@ -13,13 +13,15 @@ const roster = require('../src/default-roster.json');
 const DEFAULTS = Object.freeze({ matches: 10, seed: 700000, maxRounds: 30, map: 'standard' });
 
 function parseArgs(argv) {
-  const out = { ...DEFAULTS, out: null };
+  const out = { ...DEFAULTS, out: null, mirror: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--matches') out.matches = Number(argv[++i]);
     else if (a === '--seed') out.seed = Number(argv[++i]);
     else if (a === '--max-rounds') out.maxRounds = Number(argv[++i]);
     else if (a === '--map') out.map = String(argv[++i]);
+    else if (a === '--mirror') out.mirror = true;
+    else if (a === '--no-mirror') out.mirror = false;
     else if (a === '--out') out.out = String(argv[++i]);
     else if (a === '--help' || a === '-h') out.help = true;
     else throw new Error('Unknown argument: ' + a);
@@ -150,7 +152,7 @@ function runBatch(options = {}) {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
     source: { engine: 'src/engine.js', game: 'src/game.js', roster: 'src/default-roster.json' },
-    config: { matches: config.matches, seed: config.seed >>> 0, maxRounds: config.maxRounds, map: config.map, ai: 'current Game.aiDeploy' },
+    config: { matches: config.matches, seed: config.seed >>> 0, maxRounds: config.maxRounds, map: config.map, mirror: !!config.mirror, ai: 'current Game.aiDeploy' },
     summary: summarize(results, prepared.units),
     matches: results
   };
@@ -159,7 +161,7 @@ function runBatch(options = {}) {
 function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) {
-    console.log('Usage: node tools/balance-lab.js [--matches 10] [--seed 700000] [--max-rounds 30] [--map standard] [--out report.json]');
+    console.log('Usage: node tools/balance-lab.js [--matches 10] [--seed 700000] [--max-rounds 30] [--map standard] [--mirror] [--out report.json]');
     return;
   }
   const report = runBatch(options);
