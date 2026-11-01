@@ -266,7 +266,7 @@
       mt.conflict = true; mt.conflictGame = k; return true;
     }
     if (mt.result || k > mt.games.length) return false; // the series is over, or a game not started yet
-    mt.games.push(g); delete mt.conflict;
+    mt.games.push(g); delete mt.conflict; delete mt.conflictGame;
     const [wa, wb] = score(mt), need = winsNeeded(mt);
     if (wa >= need || wb >= need) mt.result = { winner: wa >= need ? 'a' : 'b', hp: g.hp, rounds: mt.games.reduce((n, x) => n + x.rounds, 0), score: [wa, wb], by: g.by };
     else nextCode(t, mt);
@@ -295,7 +295,7 @@
   function replay(t, matchId, rnd) {
     const f = findMatch(t, matchId);
     if (!f || f.match.b == null || f.round !== current(t)) return false;
-    f.match.result = null; delete f.match.conflict;
+    f.match.result = null; delete f.match.conflict; delete f.match.conflictGame;
     if (f.match.bo > 1) { f.match.games = []; nextCode(t, f.match, rnd); }
     else f.match.code = freshCode(t, rnd);
     return true;
@@ -304,7 +304,7 @@
   function undoGame(t, matchId) {
     const f = findMatch(t, matchId);
     if (!f || !(f.match.bo > 1) || !(f.match.games || []).length || f.round !== current(t)) return false;
-    f.match.games.pop(); f.match.result = null; delete f.match.conflict;
+    f.match.games.pop(); f.match.result = null; delete f.match.conflict; delete f.match.conflictGame;
     nextCode(t, f.match);
     return true;
   }
