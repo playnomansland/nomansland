@@ -684,7 +684,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
   const foe = () => 1 - me;
   let m = null;             // match state (on the guest: a copy kept in step by the host)
   let phase = 'start';      // start | lobby | draft | deploy | battle | result | end
-  try { if (/[?&]test\b/.test(location.search)) window.__pb = () => ({ m, me, board3d, board, bt, phase, liveSpeed: liveSpeed.slice(), playSpeed: playSpeed(), away }); } catch (e) {} // read-only peek for UI tests
+  try { if (/[?&]test\b/.test(location.search)) window.__pb = () => ({ m, me, board3d, board, bt, phase, liveSpeed: liveSpeed.slice(), playSpeed: playSpeed(), away, timeUp, ready: ready.slice(), expireDeploy: () => { deadline = now() - 400; tick(); } }); } catch (e) {} // read-only peek and countdown trigger for UI tests
   try { if (/[?&]test\b/.test(location.search)) window.__pbRedraw = () => { if (phase === 'deploy') panelDeploy(); render(); }; } catch (e) {} // UI tests that set up a board state: draw it
   let selected = null;      // unit index chosen in the shop
   let rangeOf = null;       // { side, id }: the squad last tapped on the board; its range shows as a dotted ring
@@ -1489,6 +1489,13 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
         const left = deadline - t;
         if (el) { el.textContent = fmtClock(left); el.classList.toggle('low', left <= 5000); }
         $('clock').textContent = left > 0 ? `${fmtClock(left)} to deploy` : 'Time’s up';
+        // Lock both players at the same effective deadline. The guest's local deadline is offset by 300 ms
+        // to account for message transit; the host must lock at that same point, not keep editing until -500.
+        // The host still waits until -500 before a fallback fight, giving the guest's final side packet time to arrive.
+        if (mode === 'host' && left <= -300 && !timeUp) {
+          commitPick(); timeUp = true; ready[0] = true; selected = null; closeSheet(); sendStatus(); panelDeploy(); render();
+          if (ready[1] && net.connected) { runFight(); return; }
+        }
         if (mode !== 'guest' && mode !== 'spec' && left <= (mode === 'host' ? -500 : 0)) runFight();
         else if (mode === 'guest' && left <= 0 && !timeUp) { commitPick(); timeUp = true; selected = null; closeSheet(); sendSide(); panelDeploy(); render(); }
       } else if (el) { el.textContent = heldMs || (mode === 'guest' && net.connected && m && m.round === Game.TOWER_PICK_ROUND) ? 'picking towers' : solo() ? '' : 'paused'; el.classList.remove('low'); }
