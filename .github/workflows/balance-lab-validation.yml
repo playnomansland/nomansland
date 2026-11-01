@@ -1,0 +1,39 @@
+name: Balance Lab validation
+
+on:
+  push:
+    branches:
+      - feature/balance-lab-simulation-runner
+    paths:
+      - "src/**"
+      - "tools/balance-lab.js"
+      - "tools/tests/balance-lab.js"
+      - ".github/workflows/balance-lab-validation.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "tools/balance-lab.js"
+      - "tools/tests/balance-lab.js"
+      - ".github/workflows/balance-lab-validation.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run Balance Lab tests
+        run: node tools/tests/balance-lab.js
+      - name: Run simulation smoke test
+        run: node tools/balance-lab.js --matches 2 --seed 700000 --out balance-lab-smoke.json
+      - name: Upload smoke-test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: balance-lab-smoke-report
+          path: balance-lab-smoke.json
+          if-no-files-found: error
