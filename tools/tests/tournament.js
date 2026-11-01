@@ -194,6 +194,8 @@ for (const n of [6, 8, 11]) {
   const t = Tour.create('FINALINHERIT', 'Inherited finals cup', { format: 'elim', bestOf: 7, finalBestOf: 0 });
   Tour.join(t, 'a', 'A'); Tour.join(t, 'b', 'B'); Tour.advance(t, r);
   assert(Tour.current(t).matches[0].bo === 7 && Tour.finalBestOf(t) === 7, 'final can inherit the standard best-of setting');
+  t.settings.finalBestOf = 1;
+  assert(Tour.finalBestOf(t) === 1, 'final can explicitly override the standard with Bo1');
 }
 
 {
