@@ -11,7 +11,7 @@ const PORT = process.env.PB_PORT || 8766, PEER = process.env.PB_PEER_PORT || 900
   let fails = 0;
   const check = (ok, what) => { console.log(ok ? 'ok  ' : 'FAIL', what); if (!ok) fails++; };
   const mk = async (n) => { const p = await (await ctx2d(b, { viewport: { width: 390, height: 844 } })).newPage(); p.on('pageerror', e => { console.log(`[${n}] PAGE ERROR`, e.message); fails++; }); return p; };
-  const st = (p) => p.evaluate(() => { const s = window.__pb(); return { phase: s.phase, t: s.bt ? s.bt.time() : null, over: s.bt ? s.bt.isOver() : null, live: s.liveSpeed, speed: s.playSpeed }; });
+  const st = (p) => p.evaluate(() => { const s = window.__pb(); return { phase: s.phase, t: s.bt ? s.bt.time() : null, over: s.bt ? s.bt.isOver() : null, live: s.liveSpeed, speed: s.playSpeed, timeUp: s.timeUp, ready: s.ready }; });
   // the page goes into the background and comes back (as a phone or a tab switch does it)
   const setHidden = (p, hidden) => p.evaluate((h) => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => h });
@@ -96,6 +96,15 @@ const PORT = process.env.PB_PORT || 8766, PEER = process.env.PB_PEER_PORT || 900
   await guest.click('#next'); await host.click('#next');
   for (const pg of [host, guest]) await pg.waitForFunction(() => window.__pb().phase === 'deploy' && window.__pb().m.round === 2, null, { timeout: 8000 });
   check(true, 'live: round 2 starts on both');
+  // At timeout both sides must lock before the host's network-grace fallback starts the fight.
+  await host.evaluate(() => window.__pb().expireDeploy());
+  h = await st(host);
+  check(h.phase === 'deploy' && h.timeUp && h.ready[0], 'live timeout: host locks at the shared deadline');
+  await guest.evaluate(() => window.__pb().expireDeploy());
+  g = await st(guest);
+  check(g.phase === 'deploy' && g.timeUp, 'live timeout: guest locks at the same effective deadline');
+  for (const pg of [host, guest]) await pg.waitForFunction(() => window.__pb().phase === 'battle', null, { timeout: 8000 });
+  check(true, 'live timeout: host receives the guest final state before starting the fight');
   await b.close();
   console.log(fails ? `${fails} failed` : 'all passed');
   process.exit(fails ? 1 : 0);
