@@ -1,0 +1,46 @@
+name: Balance Lab forensic CPU profiles
+
+on:
+  push:
+    branches:
+      - feature/balance-lab-simulation-runner
+    paths:
+      - "tools/forensic-profile.js"
+      - ".github/workflows/balance-lab-forensic.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Capture isolated V8 CPU profiles
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/forensic
+          while IFS='|' read -r a b; do
+            safe="${a// /_}__${b// /_}"
+            echo "Profiling: $a vs $b"
+            node --cpu-prof --cpu-prof-dir=reports/forensic --cpu-prof-name="${safe}.cpuprofile" tools/forensic-profile.js --a "$a" --b "$b" > "reports/forensic/${safe}.json"
+          done <<'PAIRS'
+          Goblin Swarm|Skeleton Archers
+          Goblin Swarm|Slimeshots
+          Skeleton Archers|Slimeshots
+          Skeleton Archers|Ent
+          Goblin Swarm|Spiders
+          Truespear|Assassin
+          PAIRS
+      - name: Upload raw CPU profiles and matchup metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: balance-lab-forensic-cpu-profiles
+          path: reports/forensic/
+          if-no-files-found: error
+          retention-days: 30
