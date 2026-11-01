@@ -11,6 +11,8 @@ const Lab = require('../balance-lab.js');
   );
   assert.throws(() => Lab.parseArgs(['--matches', '0']), /--matches/);
   assert.throws(() => Lab.parseArgs(['--seed', '-1']), /--seed/);
+  assert.strictEqual(Lab.parseArgs(['--mirror']).mirror, true);
+  assert.strictEqual(Lab.parseArgs(['--mirror', '--no-mirror']).mirror, false);
   console.log('ok  CLI argument parsing and validation');
 }
 
