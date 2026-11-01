@@ -14349,7 +14349,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       `${esc(pack)}. Pick from ${s.packOptions} leaders${s.mirror ? ', and both players get the same leaders, starting units and tower choices' : ''}.`,
       `Deploy timer: ${s.deploy1} s in round 1, then ${s.deploy} s.`,
       ...(s.bestOf > 1 && (s.format === 'elim' || Tour.cutSize(t) >= 2) ? [`Non-final ${s.format === 'elim' ? 'knockout' : 'playoff'} matches: best of ${s.bestOf} games (first to ${Math.floor(s.bestOf / 2) + 1}). Each game is its own match; a drawn game doesn't count.`] : []),
-      ...(s.finalBestOf > 0 && (s.format === 'elim' || Tour.cutSize(t) >= 2) ? [`Final: best of ${s.finalBestOf} games (first to ${Math.floor(s.finalBestOf / 2) + 1}). Each game is its own match; a drawn game doesn't count.`] : []),
+      ...((s.format === 'elim' || Tour.cutSize(t) >= 2) ? [`Final: best of ${Tour.finalBestOf(t)} games (first to ${Math.floor(Tour.finalBestOf(t) / 2) + 1}). Each game is its own match; a drawn game doesn't count.`] : []),
       ...(t.rounds.some(r => r.matches.some(mt => mt.placement === 'third')) || (t.settings.format === 'elim' ? t.players.length >= 4 : Tour.cutSize(t) >= 4) ? ['The two semifinal losers play a 3rd-place match alongside the final.'] : []),
       'Not playing right now? Open Matches and tap Watch to spectate a match.',
       'Your match shows on this screen. Tap Start match (if you host) or Join match. The result is sent by itself.',
