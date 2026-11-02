@@ -9,6 +9,7 @@
 const assert = require('assert');
 const { startServer, open, sleep, waitFor, closed } = require('./harness.js');
 
+setTimeout(() => { console.error('test timed out'); process.exit(1); }, 5 * 60 * 1000).unref(); // a test never hangs CI
 (async () => {
   const srv = await startServer(8798);
   const tourUrl = (code) => `${srv.ws}/tour/${code}`;

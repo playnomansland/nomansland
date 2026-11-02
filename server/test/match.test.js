@@ -22,6 +22,7 @@ const copy = (o) => JSON.parse(JSON.stringify(o));
 const local = (view) => Ref.withUnits(copy(view), units, matrix);
 const newCode = () => 'M' + Math.random().toString(36).slice(2, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'Q');
 
+setTimeout(() => { console.error('test timed out'); process.exit(1); }, 5 * 60 * 1000).unref(); // a test never hangs CI
 (async () => {
   const srv = await startServer(8797);
   const step = (x) => process.env.VERBOSE && console.log(x);

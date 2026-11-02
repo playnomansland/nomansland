@@ -33,6 +33,7 @@ async function waitFor(fn, ms = 3000) {
 }
 const closed = (ws) => new Promise((r) => { if (ws.readyState === 3) r(ws.closeCode); ws.onclose = (e) => r(e.code); });
 
+setTimeout(() => { console.error('test timed out'); process.exit(1); }, 5 * 60 * 1000).unref(); // a test never hangs CI
 (async () => {
   const step = (x) => process.env.VERBOSE && console.log(x);
   const dev = process.env.SERVER_UP ? { kill() {} } : spawn('npx', ['wrangler', 'dev', '--port', String(PORT), '--ip', '127.0.0.1'], {
@@ -94,7 +95,7 @@ const closed = (ws) => new Promise((r) => { if (ws.readyState === 3) r(ws.closeC
     step('refused ok');
     // flooding closes the connection
     const f = await open('FLOOD');
-    for (let i = 0; i < 100; i++) f.send('{"t":"x"}');
+    for (let i = 0; i < 200; i++) f.send('{"t":"x"}'); // over the match room's limit (LIMITS.matchRatePerWindow)
     assert.strictEqual(await closed(f), 1008);
 
     step('flood ok');
