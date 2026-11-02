@@ -17,6 +17,11 @@ class_name = "Room"
 name = "TOUR"
 class_name = "TourRoom"
 
+# Match history (step 4): one HistoryRoom ('all') with its own SQLite keeps every round of every server match.
+[[durable_objects.bindings]]
+name = "HISTORY"
+class_name = "HistoryRoom"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
@@ -24,6 +29,10 @@ new_sqlite_classes = ["Room"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["TourRoom"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["HistoryRoom"]
 
 [observability]
 enabled = true

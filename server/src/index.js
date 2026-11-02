@@ -7,10 +7,13 @@
 //   GET /room/<CODE>       -> WebSocket into the match Room for that code: the referee of a live match (step 3)
 //   GET /room/<CODE>?t=<T> -> the same for a match of tournament T
 //   GET /tour/<CODE>       -> WebSocket into the tournament for that code (TourRoom: the server keeps the tournament)
+//   GET /history?limit=&before= -> saved rounds of server matches, newest first, paged (HistoryRoom, step 4)
+//   GET /history/<MATCH>   -> one match's rounds (<ROOM>-<seed>, or a bare room code for that room's newest match)
 import { json } from './limits.js';
 import { VERSION } from './version.js';
 export { Room } from './room.js';
 export { TourRoom } from './tour.js';
+export { HistoryRoom } from './history.js';
 
 const CODE_RE = /^[A-Z0-9]{4,8}$/;
 
@@ -33,6 +36,19 @@ export default {
     }
     if (url.pathname === '/health') return json({ ok: true, version: VERSION }, 200, cors);
     if (url.pathname === '/selftest') return env.ROOM.getByName('selftest').fetch(new Request('https://room/selftest'));
+
+    const h = url.pathname.match(/^\/history(?:\/([^/]+))?\/?$/);
+    if (h) {
+      // Browsers send Origin on these cross-site reads, so only the game's own pages can read from a visitor's browser.
+      // Like the rooms' check, a first filter: the History object also limits reads per IP.
+      if (!allowedOrigin(request, env)) return json({ error: 'origin' }, 403);
+      const q = new URLSearchParams();
+      if (h[1]) q.set('id', h[1].toUpperCase().replace(/-(.*)$/, (_, s) => '-' + s.toLowerCase()));
+      for (const k of ['limit', 'before']) if (url.searchParams.has(k)) q.set(k, url.searchParams.get(k).slice(0, 12));
+      const headers = new Headers({ 'x-origin': request.headers.get('Origin'), 'x-ip': request.headers.get('CF-Connecting-IP') || '' });
+      try { return await env.HISTORY.getByName('all').fetch(new Request('https://history/?' + q, { headers })); }
+      catch (e) { console.warn('history read', e && e.message); return json({ error: 'history unavailable' }, 503, cors); }
+    }
 
     const m = url.pathname.match(/^\/(room|tour)\/([^/]+)$/);
     if (m) {

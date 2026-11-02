@@ -4,6 +4,15 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 2 November 2026 – Match history on the server
+
+- **Every online match is saved by the server.** Each round of every match on the game server (friends' matches and tournament matches) is saved by the server itself: map, look, leaders, both armies with levels and tiles, skills, towers, who won, damage and health. Tournament matches also keep the gamertags.
+- **Match history** on the start screen now reads from the server, newest first, with **Load more** for older battles. The **Phone-to-phone** tab shows the old list for phone-to-phone matches, and it is also shown if the server can't be reached.
+- Saving never gets in the way of a match: it happens after the fight is sent, and if it fails the match just goes on.
+- Rounds are kept for a year. The old Google Sheet is kept as an archive.
+
+---
+
 ## 2 November 2026 – Our own game server: tournaments and live matches
 
 No Mans Land now has its own game server. Tournaments and live matches against friends run on it.
@@ -24,7 +33,7 @@ No Mans Land now has its own game server. Tournaments and live matches against f
 ### Phone to phone still works
 - The old phone-to-phone matches stay as a backup: **Factions** matches, your own **Counter Lab units**, old `join=` links, and the **Phone to phone instead** button in the lobby. If the server can't be reached at all, a new match goes phone to phone by itself. Organizers can switch a tournament's matches to phone to phone in its settings (**Matches run on**).
 - vs AI, solo and the Counter Lab work without the server, as before.
-- Next: accounts with "Sign in with Google" (and Apple), match history on the server, and later ranked play once there are enough players for short queues.
+- Next: accounts with "Sign in with Google" (and Apple), and later ranked play once there are enough players for short queues.
 
 ---
 

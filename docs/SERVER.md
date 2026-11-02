@@ -15,8 +15,17 @@ Started 2026-11-02. The website stays on GitHub Pages; the server only handles o
 1. Setup (live since 2026-11-02 at https://nml-server.nomansland.workers.dev): `/health`, `/selftest` (one bot round on the server), `/room/<CODE>` WebSocket rooms that relay messages, with the limits below.
 2. Tournaments on the server (live since 2026-11-02): `TourRoom` (`server/src/tour.js`) keeps each tournament in its own storage and runs `Tour.apply` for the organizer. Organizer and players each get a secret key; ids are public, keys never are. Bot-vs-bot matches are played by the server. Tournaments are deleted when ended or after 14 days untouched. Matches themselves are still phone-to-phone (step 3). Old tournament history is not carried over.
 3. Server as referee (live since 2026-11-02): `Room` (`server/src/room.js`) keeps each live match; the rules are `src/referee.js` (shared with the page and node tests). Phones send actions (`{ t: 'act', seq, fn, a }`: a Game function from `Referee.ACTIONS` and its arguments), never their gold or army. The Room runs them through the same Game functions (which check gold, tiles and unlocks), on that player's side only, only while deploying and before Ready, and acks each with a fingerprint of that side. It runs the deploy clock (alarms), the fight and the round flow, and sends each phone only its view (`Referee.view`). A friend's match: the phone that makes it is side 0 (`hello { create }`), the friend side 1, each with a secret key for reconnects. A tournament match (`/room/<CODE>?t=<T>`): `TourRoom.matchFor` checks the player's tournament key and says the side; the Room reports the result with `TourRoom.serverResult` (Durable Object RPC), and phones' own reports are ignored. Matches are deleted after a day untouched. PeerJS stays as a fallback (Factions, Counter Lab units, a tournament's `net: 'peer'` setting, and when the server can't be reached) until a tournament has run on the server.
-4. Match history in the server's database instead of the Google Sheet (the Sheet is exported and kept).
+4. Match history on the server (built 2026-11-02): the server saves every round of every server match itself; the phones no longer post server matches to the Google Sheet (the Sheet is exported and kept as an archive). Details below.
 5. Accounts (below). 6. Ranked (below).
+
+## Match history (step 4)
+
+- Where: one `HistoryRoom` Durable Object (`server/src/history.js`, named `all`) with its own SQLite table `rounds`. Chosen over D1 for now: it needs no new database, dashboard step or token rights (the deploy token's Workers rights cover it), and it is the same kind of storage as the Rooms. Accounts (step 5) can still go to D1; if history ever needs SQL joins with accounts, it moves there with a one-off copy.
+- When: the Room saves a round right after the fight message has gone out to the phones (`Room.record`, called from `broadcastFight`; a forfeit gets a row too). It is a Durable Object RPC call the match never waits for, and any error is logged (`history not saved`) and swallowed: a failing or slow store can't stop or slow a match. `server/test/history.test.js` checks this with a store that always fails (`HISTORY_FAIL_ROOMS`, a test-only setting that production never sets).
+- What, per round: room code, tournament code and match id (tournament matches), the match id `<ROOM>-<seed>` (a room's rematch is a new match), round, map, look, both leaders, each army (unit, level, tile), skills bought, tower types, winner, timeout, seconds, damage, health after, match over and match winner, time, and for a forfeit which side gave up. Gamertags only for tournament matches. The pre-fight snapshot and the fight summary are kept gzipped (about 1-3 KB a round; dropped if over 64 KB) so replays can be added later.
+- Reading: `GET /history?limit=&before=` (newest first, `limit` 1-100, default 40; `before` is the `next` id from the page before) and `GET /history/<match>` (one match, oldest round first; a bare room code gives that room's newest match). Same origin check as the rooms, and at most 60 reads a minute per IP. The page's Match history sheet reads it (Online matches tab); the Phone-to-phone tab and the fallback when the server can't be reached read the Sheet.
+- Phone-to-phone (PeerJS) matches still post to the Sheet from the host's phone for now: the server never sees them, and they are the fallback until the server has carried a tournament. They stop when PeerJS goes.
+- Retention: rounds are kept for 1 year (`KEEP_DAYS`), then deleted by a daily alarm. No personal data beyond tournament gamertags; no IP addresses are stored (the read limit keeps them in memory only for a minute).
 
 ## Security: built in from the start
 
@@ -35,7 +44,7 @@ Added when the player count calls for it (no redesign needed):
 - Per-IP rate limits on new rooms and sign-ups (Cloudflare rate limiting rules, Turnstile bot check on sign-up).
 - Gamertag filter and a report button; admin actions (ban, rename, settle a disputed result) only through the server with an audit log.
 - Error alerts, usage and spending alerts, a status page.
-- Daily database export (Durable Object SQLite also has 30-day point-in-time recovery).
+- Daily database export (Durable Object SQLite also has 30-day point-in-time recovery; the History object is one database, so one export covers all match history).
 
 ## Accounts (step 5)
 

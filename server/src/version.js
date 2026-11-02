@@ -1,1 +1,1 @@
-export const VERSION = 'step3-2026-11-02';
+export const VERSION = 'step4-2026-11-02';

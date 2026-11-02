@@ -10685,7 +10685,7 @@ const Render2D = (cv, view, opts = {}) => {
     overlay(`<div class="card">
       <h2>No Mans Land</h2>
       <p class="big">Build an army. Watch it fight. Last one standing wins.</p>
-      <span class="btnrow">${newcomer ? '' : '<button class="btn small" id="tutorial">Tutorial</button>'}<button class="btn small" id="how">How to play</button><button class="btn small" id="ency-open">Encyclopedia</button><button class="btn small" id="music-open">Sound</button>${HISTORY_URL ? `<button class="btn small" id="hist-open">Match history</button>` : ''}</span>
+      <span class="btnrow">${newcomer ? '' : '<button class="btn small" id="tutorial">Tutorial</button>'}<button class="btn small" id="how">How to play</button><button class="btn small" id="ency-open">Encyclopedia</button><button class="btn small" id="music-open">Sound</button><button class="btn small" id="hist-open">Match history</button></span>
       ${playerHtml()}
     </div>`);
     wirePlayer();
@@ -11069,11 +11069,12 @@ const Render2D = (cv, view, opts = {}) => {
   }
 
   // ---------- match history ----------
-  // Two-player matches only: the host's phone posts each round, once, to a Google Sheet web app
-  // (tools/match-history.gs, deployed from the sheet). Empty URL: nothing is saved and the Match history button is hidden.
+  // Server matches (mode 'net'): the server saves every round itself (server step 4, GET /history on the game server).
+  // Phone-to-phone (PeerJS) matches: the host's phone still posts each round, once, to the Google Sheet web app
+  // (tools/match-history.gs). The Match history sheet reads the server; the Sheet list is a second tab and the fallback.
   const HISTORY_URL = 'https://script.google.com/macros/s/AKfycbzEXvAprmkKnWLvx0RhqIwjW90EAuL4GSeeRN1vvN5kz6VxZEJQ9Xx_vcwSbDBNi3rI/exec';
   function saveHistory(pre, sum) {
-    if (!HISTORY_URL || !(mode === 'host' || (mode === 'net' && me === 0))) return;
+    if (!HISTORY_URL || mode !== 'host') return;
     const p = withUnits(pre), charName = (sd) => { const c = Game.charInfo(Game.charOf(p, sd)); return c ? c.name : ''; };
     const army = (sd) => armyOf(p, sd).map(q => `${q.unit} L${q.level}`).join(', ');
     const row = {
@@ -11086,23 +11087,75 @@ const Render2D = (cv, view, opts = {}) => {
     // text/plain keeps it a simple request (no CORS preflight, which Apps Script doesn't answer)
     try { fetch(HISTORY_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(row) }).catch(() => {}); } catch (e) {}
   }
-  async function openHistorySheet() {
+  const histTime = (iso) => { const when = new Date(iso); return isNaN(when) ? '' : when.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+  // one saved round from the server
+  function histServerItem(r) {
+    let who = [0, 1].map(sd => (r.names && r.names[sd]) || (r.leaders && r.leaders[sd]) || (sd ? 'Side 2' : 'Side 1'));
+    if (who[0] === who[1]) who = [who[0] + ' (side 1)', who[1] + ' (side 2)']; // a mirror match: same leader on both sides
+    const name = (w) => w === 0 || w === 1 ? who[w] : 'Draw';
+    const army = (sd) => (r.armies && r.armies[sd] || []).map(q => `${q.unit} L${q.level}`).join(', ') || '–';
+    const how = r.forfeit === 0 || r.forfeit === 1 ? `${esc(who[r.forfeit])} forfeited` : `${r.winner === -1 ? 'draw' : esc(name(r.winner)) + ' won'}${r.timeout ? ' on time' : ''}`;
+    const end = r.over ? ` · match over, ${r.matchWinner === -1 || r.matchWinner == null ? 'draw' : esc(name(r.matchWinner)) + ' won'}` : '';
+    return `<li>${esc(who[0])} vs ${esc(who[1])} · round ${esc(r.round)}: ${how}
+      <span>${esc(histTime(r.time))} · match ${esc(r.room)}${r.tour ? ' (tournament ' + esc(r.tour) + ')' : ''}${r.map ? ' · ' + esc(r.map) : ''}${r.forfeit == null ? ` · damage ${esc(r.dmg[0])}/${esc(r.dmg[1])} · health ${esc(r.hp[0])}/${esc(r.hp[1])}` : ''}${end}</span>
+      ${r.forfeit == null ? `<span>${esc(army(0))} vs ${esc(army(1))}</span>` : ''}</li>`;
+  }
+  // one row of the old Sheet (phone-to-phone matches)
+  function histSheetItem(r) {
+    const who = (w) => w === 'host' ? (r.hostChar || 'Host') : w === 'guest' ? (r.guestChar || 'Guest') : 'Draw';
+    return `<li>${esc(r.hostChar || 'Host')} vs ${esc(r.guestChar || 'Guest')} · round ${esc(r.round)}: ${r.winner === 'draw' ? 'draw' : esc(who(r.winner)) + ' won'}${r.timeout ? ' on time' : ''}
+      <span>${esc(histTime(r.time))} · match ${esc(r.code)}${r.map ? ' · ' + esc(r.map) : ''} · damage ${esc(r.dmgHost)}/${esc(r.dmgGuest)}${r.over === true || r.over === 'TRUE' ? ` · match over, ${r.matchWinner === 'draw' ? 'draw' : esc(who(r.matchWinner)) + ' won'}` : ''}</span>
+      <span>${esc(r.hostArmy || '–')} vs ${esc(r.guestArmy || '–')}</span></li>`;
+  }
+  const hist = { tab: 'server', next: null, busy: false };
+  function openHistorySheet() {
     $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Match history</h3><button class="btn small" id="close">Close</button></div>
-      <p class="hint" id="hist-msg" aria-live="polite" style="margin:0">Loading…</p><ul class="hist" id="hist"></ul>`;
+      <div class="btnrow" role="tablist"><button class="btn small" id="hist-srv" role="tab">Online matches</button>${HISTORY_URL ? '<button class="btn small" id="hist-p2p" role="tab">Phone-to-phone</button>' : ''}</div>
+      <p class="hint" id="hist-msg" aria-live="polite" style="margin:0">Loading…</p><ul class="hist" id="hist"></ul>
+      <button class="btn small" id="hist-more" hidden>Load more</button>`;
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', closeSheet);
+    $('hist-srv').addEventListener('click', () => histLoad('server'));
+    if ($('hist-p2p')) $('hist-p2p').addEventListener('click', () => histLoad('sheet'));
+    $('hist-more').addEventListener('click', () => histLoad('server', true));
+    histLoad('server');
+  }
+  async function histLoad(tab, more, fallback) {
+    if (!$('hist') || (hist.busy && more)) return;
+    hist.tab = tab; hist.busy = true;
+    const tabs = { server: $('hist-srv'), sheet: $('hist-p2p') };
+    for (const k in tabs) if (tabs[k]) { tabs[k].classList.toggle('primary', k === tab); tabs[k].setAttribute('aria-selected', k === tab ? 'true' : 'false'); }
+    if (!more) { $('hist').innerHTML = ''; $('hist-msg').textContent = 'Loading…'; hist.next = null; }
+    $('hist-more').hidden = true;
+    if (tab === 'server') {
+      let data = null;
+      try {
+        const res = await fetch(`${SERVER_URL}/history?limit=40${more && hist.next ? '&before=' + hist.next : ''}`);
+        data = res.ok ? await res.json() : null;
+      } catch (e) { data = null; }
+      hist.busy = false;
+      if (!$('hist') || hist.tab !== 'server') return;
+      if (!data) {
+        if (more) { $('hist-msg').textContent = 'Couldn’t load more. Try again.'; $('hist-more').hidden = false; return; }
+        if (HISTORY_URL) { $('hist-msg').textContent = 'Couldn’t reach the game server. Showing phone-to-phone matches instead.'; histLoad('sheet', false, true); }
+        else $('hist-msg').textContent = 'Couldn’t load the history. Check your connection and try again.';
+        return;
+      }
+      hist.next = data.next;
+      $('hist').insertAdjacentHTML('beforeend', data.rows.map(histServerItem).join(''));
+      const n = $('hist').children.length;
+      $('hist-msg').textContent = n ? `The latest ${n === 1 ? 'battle' : n + ' battles'} from online matches.` : 'No battles saved yet. Play an online match against a friend.';
+      $('hist-more').hidden = !data.next;
+      return;
+    }
     let rows;
     try { rows = (await (await fetch(HISTORY_URL + '?n=40')).json()).rows || []; } catch (e) { rows = null; }
-    if (!$('hist')) return;
-    if (!rows) { $('hist-msg').textContent = 'Couldn’t load the history. Check your connection and try again.'; return; }
-    $('hist-msg').textContent = rows.length ? `The latest ${rows.length === 1 ? 'battle' : rows.length + ' battles'} from two-player matches.` : 'No battles saved yet. Play a match against a friend.';
-    $('hist').innerHTML = rows.map(r => {
-      const who = (w) => w === 'host' ? (r.hostChar || 'Host') : w === 'guest' ? (r.guestChar || 'Guest') : 'Draw';
-      const when = new Date(r.time), t = isNaN(when) ? '' : when.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-      return `<li>${esc(r.hostChar || 'Host')} vs ${esc(r.guestChar || 'Guest')} · round ${esc(r.round)}: ${r.winner === 'draw' ? 'draw' : esc(who(r.winner)) + ' won'}${r.timeout ? ' on time' : ''}
-        <span>${esc(t)} · match ${esc(r.code)}${r.map ? ' · ' + esc(r.map) : ''} · damage ${esc(r.dmgHost)}/${esc(r.dmgGuest)}${r.over === true || r.over === 'TRUE' ? ` · match over, ${r.matchWinner === 'draw' ? 'draw' : esc(who(r.matchWinner)) + ' won'}` : ''}</span>
-        <span>${esc(r.hostArmy || '–')} vs ${esc(r.guestArmy || '–')}</span></li>`;
-    }).join('');
+    hist.busy = false;
+    if (!$('hist') || hist.tab !== 'sheet') return;
+    const note = fallback ? 'Couldn’t reach the game server. ' : '';
+    if (!rows) { $('hist-msg').textContent = note + 'Couldn’t load the history. Check your connection and try again.'; return; }
+    $('hist-msg').textContent = note + (rows.length ? `The latest ${rows.length === 1 ? 'battle' : rows.length + ' battles'} from phone-to-phone matches.` : 'No phone-to-phone battles saved yet.');
+    $('hist').innerHTML = rows.map(histSheetItem).join('');
   }
 
   // ---------- flow: vs Claude ----------
@@ -14120,7 +14173,6 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       net.pending = [];
       m = withUnits(d.post); lastSummary = d.summary;
       nextReady = [false, false]; rematch = [false, false];
-      if (me === 0) saveHistory(d.pre, d.summary);
       if (m.over) srvForget();
       playBattle(d.pre);
       return;

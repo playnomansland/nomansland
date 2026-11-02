@@ -20,6 +20,7 @@ import Game from '../../src/game.js';
 import Ref from '../../src/referee.js';
 import { LIMITS, json, readMessage, secret } from './limits.js';
 import { builtin } from './units.js';
+import { roundRow, forfeitRow } from './history.js';
 import { VERSION } from './version.js';
 
 const KEEP_MS = 24 * 3600 * 1000; // a match nobody touched for a day is deleted
@@ -99,6 +100,33 @@ export class Room extends DurableObject {
     const text = JSON.stringify({ t: 'fight', pre: f.pre, post: f.post, summary: f.summary, fights: this.R.fights });
     for (const s of this.sockets()) { this.send(s, text); this.sent.delete(s); }
     this.push(); // the result screen's state (nextReady, rematch) right after
+    this.record(f);
+  }
+
+  // ----- match history (step 4) -----
+  // Saves the round to the History object once the fight has gone out. Never awaited by the match and never throws:
+  // if saving fails it is logged and the match goes on.
+  historyInfo() {
+    const t = this.meta && this.meta.tour, R = this.R;
+    const room = t ? t.room : (this.code || (this.meta && this.meta.code) || '');
+    return { room, tour: t ? t.code : null, match: t ? t.match : null, matchId: `${room}-${((R && R.seed) >>> 0).toString(36)}`, names: t ? t.names : null };
+  }
+  record(f, forfeitSide) {
+    if (!this.env.HISTORY) return;
+    const R = this.R;
+    const run = (async () => {
+      await null; // after the current message is handled
+      const info = this.historyInfo();
+      if (!info.room) return;
+      let row, replay = null;
+      if (f) {
+        const { units, matrix } = this.units();
+        row = roundRow(Ref.withUnits(f.pre, units, matrix), f.summary, f.post, info);
+        replay = { pre: f.pre, summary: f.summary };
+      } else row = forfeitRow(Ref.withUnits(Ref.snapshot(R.m), null, null), forfeitSide, info);
+      await this.env.HISTORY.getByName('all').add(row, replay);
+    })().catch((e) => console.warn('history not saved', e && e.message));
+    try { this.ctx.waitUntil(run); } catch {}
   }
 
   // ----- messages -----
@@ -106,6 +134,8 @@ export class Room extends DurableObject {
     const d = readMessage(ws, message, this.rate, LIMITS.matchRatePerWindow);
     if (!d) return;
     const a = this.att(ws);
+    if (!this.code && a.code) this.code = a.code;
+    if (this.meta && !this.meta.code && a.code) this.meta.code = a.code; // kept for match history (saved with the next save)
     if (d.t === 'ping') return this.send(ws, { t: 'pong' });
     if (d.t === 'hello') return this.hello(ws, a, d);
     if (a.role !== 'p') { if (d.t === 'sync') this.send(ws, this.syncMsg(ws)); return; } // watchers only listen
@@ -160,6 +190,7 @@ export class Room extends DurableObject {
         await this.save();
         const text = JSON.stringify({ t: 'forfeit', side });
         for (const s of this.sockets()) this.send(s, text);
+        this.record(null, side);
         await this.ended();
         return;
       }
@@ -196,7 +227,7 @@ export class Room extends DurableObject {
         else if (!keys[0]) { this.send(ws, { t: 'nomatch' }); return; } // nobody made this match here (maybe a phone-to-phone one)
         else if (!keys[1]) side = 1;
         else { this.send(ws, { t: 'full' }); return; } // two players already: Watch instead
-        if (!this.meta) this.meta = { tour: null, keys: ['', ''] };
+        if (!this.meta) this.meta = { tour: null, keys: ['', ''], code: a.code || '' };
         this.meta.keys[side] = secret();
       }
       key = this.meta.keys[side];

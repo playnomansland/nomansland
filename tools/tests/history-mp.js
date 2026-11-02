@@ -1,4 +1,6 @@
-// Match history: the host posts one row per round of a two-player match; the start screen lists the rows.
+// Match history of phone-to-phone (PeerJS) matches: the host posts one row per round to the Sheet; the start screen's
+// Phone-to-phone tab lists the rows (server matches: server-history-ui.js). The viewer has no local game server here,
+// so its Match history falls back to the Sheet.
 // Writes hist-test.html (index.html with HISTORY_URL pointed at a fake sheet the test answers itself) next to
 // index.html for the run, and removes it afterwards.
 const { chromium } = require('playwright-core');

@@ -9,9 +9,9 @@ async function waitFor(fn, ms = 4000) {
   throw new Error('timed out');
 }
 
-async function startServer(port) {
+async function startServer(port, extra = []) {
   const base = `http://127.0.0.1:${port}`;
-  const dev = process.env.SERVER_UP ? { kill() {} } : spawn('npx', ['wrangler', 'dev', '--port', String(port), '--ip', '127.0.0.1'], {
+  const dev = process.env.SERVER_UP ? { kill() {} } : spawn('npx', ['wrangler', 'dev', '--port', String(port), '--ip', '127.0.0.1', ...extra], {
     cwd: path.join(__dirname, '..'), stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, CI: '1', WRANGLER_SEND_METRICS: 'false', WRANGLER_SEND_ERROR_REPORTS: 'false' },
   });
