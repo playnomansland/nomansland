@@ -72,6 +72,9 @@ export class Room extends DurableObject {
   here(gone) { return [0, 1].map((sd) => this.players(sd, gone).length > 0); }
   units() { return builtin(); }
   async save() {
+    // a finished ranked game is counted before anything is stored: the room may sleep (and reload from storage)
+    // between games, so a win counted only in memory would be lost (the bug of 2026-11-02: 1-0, then 0-1)
+    this.tally();
     await this.ctx.storage.put({ meta: this.meta, R: this.R ? Ref.save(this.R) : null, active: Date.now() });
     const due = this.R ? Ref.due(this.R, Date.now()) : 0;
     await this.ctx.storage.setAlarm(due || Date.now() + KEEP_MS);

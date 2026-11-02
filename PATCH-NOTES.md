@@ -4,6 +4,13 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 2 November 2026 – Ranked fixes
+
+- **Fix:** the ranked series score could reset between games (win game 1, lose game 2, and it said 0–1 instead of 1–1). The server now counts each game before it saves the match, so the score survives the pause between games.
+- During a ranked match the **series score** (for example "Bo3 · 1–0") sits above the round number at the top of the screen. It changes once the fight has played out, so it never gives away the result early.
+
+---
+
 ## 2 November 2026 – Music player
 
 - Hover **Now playing** and it lights up; tap it to open the **playlist**. Tap any song there (or in Settings) to play it.

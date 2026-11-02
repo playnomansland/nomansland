@@ -689,6 +689,8 @@ html.pc .corner button span { display: inline; }
 .side .lbl .ptitle { font-size: 8px; padding: 1px 6px 1px 8px; gap: 4px; letter-spacing: 0.18em; }
 .side .lbl .ptitle i { width: 4px; height: 4px; }
 .side .lbl { align-items: flex-start; }
+
+.series-chip { display: block; margin: 0 auto 2px; width: max-content; padding: 1px 8px; border: 1px solid var(--gold); border-radius: 999px; color: var(--gold); font: 700 11px var(--font-data); letter-spacing: 0.06em; background: rgba(230, 184, 74, 0.1); }
 </style>
 <script>
 // PC or phone: a fine pointer that can hover (a mouse) and room for the board and controls side by side
@@ -702,7 +704,7 @@ html.pc .corner button span { display: inline; }
 <div class="app">
   <div class="hud" aria-label="Match status">
     <div class="side you"><div class="lbl"><span id="you-name">You</span><span class="streak" id="streak-you" hidden></span><span class="num" id="hp-you">50</span></div><div class="hp"><i id="hpbar-you" style="width:100%"></i></div></div>
-    <div class="round"><b class="num" id="round">1</b><div class="round-sub"><span id="phase">Deploy</span><button class="cog" id="stats" aria-label="Damage last round" aria-expanded="false"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4 5h9v3H4zM4 10.5h15v3H4zM4 16h6v3H4z"/></svg></button><button class="cog" id="cog" aria-label="Settings"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.4-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.7a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.4 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.7h4l.4-2.7a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button></div></div>
+    <div class="round"><span class="series-chip" id="series-chip" hidden></span><b class="num" id="round">1</b><div class="round-sub"><span id="phase">Deploy</span><button class="cog" id="stats" aria-label="Damage last round" aria-expanded="false"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4 5h9v3H4zM4 10.5h15v3H4zM4 16h6v3H4z"/></svg></button><button class="cog" id="cog" aria-label="Settings"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.4-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.7a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.4 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.7h4l.4-2.7a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button></div></div>
     <div class="side foe"><div class="lbl"><span id="foe-name">Enemy</span><span class="streak" id="streak-foe" hidden></span><span class="num" id="hp-foe">50</span></div><div class="hp"><i id="hpbar-foe" style="width:100%"></i></div></div>
   </div>
   <div class="net" id="net" hidden aria-live="polite"><i></i><span id="net-text"></span></div>
@@ -10211,6 +10213,10 @@ Floors.floor = (() => {
     const hudName = (tag, title) => `<span class="hud-tag">${esc(tag)}</span>${titleHtml(title)}`;
     const fh = theirs ? hudName(foeName(), theirs.title) : esc(foeName());
     const yh = mine ? hudName(mine.tag, mine.title) : esc(mode === 'spec' && tour.spec ? tour.spec.host : 'You'); // spectating: the host's side is at the bottom
+    // a ranked series: the score in games, from this player's side, above the round number
+    const rk = mode === 'net' && net.ranked && m ? net.ranked : null, chip = $('series-chip');
+    chip.hidden = !rk;
+    if (rk && phase !== 'battle') chip.textContent = `Bo${rk.best} · ${rk.wins[me]}–${rk.wins[foe()]}${rk.ties ? ` · ${rk.ties} draw${rk.ties > 1 ? 's' : ''}` : ''}`;
     if ($('foe-name').innerHTML !== fh) $('foe-name').innerHTML = fh;
     if ($('you-name').innerHTML !== yh) $('you-name').innerHTML = yh;
     document.querySelector('.hud').hidden = phase === 'start' || phase === 'lobby' || phase === 'draft'; // no match yet: nothing to show
