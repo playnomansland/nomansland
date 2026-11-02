@@ -9,7 +9,7 @@ const { spawn } = require('child_process');
 const assert = require('assert');
 const path = require('path');
 const Game = require('../../src/game.js');
-const demo = require('../../src/demo-units.json');
+const { units, matrix } = require('../src/prepare-units.cjs')(require('../../src/engine.js'), require('../../src/demo-units.json'));
 
 const PORT = 8799;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -52,7 +52,7 @@ const closed = (ws) => new Promise((r) => { if (ws.readyState === 3) r(ws.closeC
     assert.strictEqual(h.ok, true);
 
     // same round in node and on the server
-    const m = Game.createMatch(demo.units, demo.matrix, 7, 'standard');
+    const m = Game.createMatch(units, matrix, 7, 'standard');
     Game.aiDeploy(m, 0); Game.aiDeploy(m, 1);
     const sim = Game.startBattle(m); while (sim.step()) {}
     const want = Game.resolve(m, sim.result());

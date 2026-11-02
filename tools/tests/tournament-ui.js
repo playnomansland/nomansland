@@ -3,11 +3,11 @@
 // the tournament's settings (4 leader choices, the same packages for both, 60 s deploy, gamertags in the HUD).
 // Forfeits end the matches, the results reach the organizer by themselves, the organizer pairs round 2, reloads the
 // page (the hub comes back, players reconnect), sets a result by hand, and so on to a champion.
-// Needs: python3 -m http.server 8766 (repo root) and node tools/peer-server.js (port 9000).
+// Needs: python3 -m http.server 8766 (repo root), node tools/peer-server.js (port 9000) and the game server (cd server && npx wrangler dev --port 8798).
 const { chromium } = require('playwright-core');
 const ctx2d = require('./board2d');
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-const BASE = 'http://127.0.0.1:8766/?peerhost=127.0.0.1&peerport=9000&test';
+const BASE = 'http://127.0.0.1:8766/?peerhost=127.0.0.1&peerport=9000&server=http://127.0.0.1:8798&test';
 let fails = 0;
 const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') + msg); if (!c) fails++; };
 (async () => {
@@ -37,7 +37,7 @@ const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') + msg); if (!c) fai
   await org.click('[data-tset="deploy1"][data-v="60"]');
   await org.click('[data-map="forest"]');
   await sleep(300);
-  const st = await org.evaluate(() => JSON.parse(localStorage.getItem('phonebellum.tour.org.v1')).t.settings);
+  const st = await org.evaluate(() => window.__tour().settings);
   ok(st.packOptions === 4 && st.deploy1 === 60 && st.map === 'forest', `settings saved: ${st.packOptions} leaders, ${st.deploy1} s, map ${st.map}`);
   await ps[0].click('[data-ttab="rules"]');
   await ps[0].waitForFunction(() => /4 leaders/.test(document.querySelector('.tour-rules').textContent), null, { timeout: 5000 });
@@ -67,8 +67,8 @@ const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') + msg); if (!c) fai
   // the guests forfeit: the hosts win
   for (let k = 0; k < all.length; k++) if (roles[k] === 'guest') { const p = all[k]; await p.click('#cog'); await p.click('#to-menu'); await p.click('#forfeit-yes'); }
   for (let k = 0; k < all.length; k++) if (roles[k] === 'host') await all[k].waitForFunction(() => document.getElementById('phase').textContent === 'Match over', null, { timeout: 10000 });
-  await org.waitForFunction(() => { const t = JSON.parse(localStorage.getItem('phonebellum.tour.org.v1')).t; return t.rounds[0].matches.every(mt => mt.result); }, null, { timeout: 10000 });
-  const r1 = await org.evaluate(() => JSON.parse(localStorage.getItem('phonebellum.tour.org.v1')).t.rounds[0].matches.map(mt => [mt.result.winner, mt.host]));
+  await org.waitForFunction(() => { const t = window.__tour(); return t.rounds[0].matches.every(mt => mt.result); }, null, { timeout: 10000 });
+  const r1 = await org.evaluate(() => window.__tour().rounds[0].matches.map(mt => [mt.result.winner, mt.host]));
   ok(r1.every(([w, h]) => w === h), 'results reported by themselves, the hosts won: ' + JSON.stringify(r1));
   // back to the tournament
   for (const p of all) { if (await p.isVisible('#again')) await p.click('#again'); else if (await p.isVisible('#menu')) await p.click('#menu'); }
@@ -76,8 +76,8 @@ const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') + msg); if (!c) fai
   if (await org.isVisible('[data-ttab="matches"]')) await org.click('[data-ttab="matches"]');
   await org.waitForSelector('#tour-next:not([disabled])', { timeout: 10000 }).catch(async (e) => { console.log('org screen:', await text(org, '#overlay'), '|', await text(org, '#panel')); throw e; });
   await org.click('#tour-next');
-  await org.waitForFunction(() => JSON.parse(localStorage.getItem('phonebellum.tour.org.v1')).t.rounds.length === 2);
-  const r2 = await org.evaluate(() => { const t = JSON.parse(localStorage.getItem('phonebellum.tour.org.v1')).t; return t.rounds[1].matches.map(mt => [mt.a, mt.b].map(id => t.players.find(p => p.id === id).name).join(' v ')); });
+  await org.waitForFunction(() => window.__tour().rounds.length === 2);
+  const r2 = await org.evaluate(() => { const t = window.__tour(); return t.rounds[1].matches.map(mt => [mt.a, mt.b].map(id => t.players.find(p => p.id === id).name).join(' v ')); });
   ok(r2.length === 2, 'round 2 paired: ' + r2.join(', '));
   // the organizer reloads: the hub comes back and the players see it again
   await org.reload(); await sleep(1500);
@@ -96,14 +96,14 @@ const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') + msg); if (!c) fai
   // 4 players: 2 Swiss rounds, then top 2 play the final
   let guard = 0;
   while (guard++ < 6) {
-    const done = await org.evaluate(() => JSON.parse(localStorage.getItem('phonebellum.tour.org.v1')).t.status === 'done');
+    const done = await org.evaluate(() => window.__tour().status === 'done');
     if (done) break;
     await org.click('#tour-next'); await sleep(400);
     if (await org.isVisible('[data-ttab="matches"]')) await org.click('[data-ttab="matches"]');
     const n = await org.locator('[data-res$=":a"]').count();
     for (let k = 0; k < n; k++) { await org.locator('[data-res$=":a"]').nth(k).click(); await sleep(150); }
   }
-  const fin = await org.evaluate(() => { const t = JSON.parse(localStorage.getItem('phonebellum.tour.org.v1')).t; return { status: t.status, champ: (t.players.find(p => p.id === t.champion) || {}).name, rounds: t.rounds.map(r => r.stage) }; });
+  const fin = await org.evaluate(() => { const t = window.__tour(); return { status: t.status, champ: (t.players.find(p => p.id === t.champion) || {}).name, rounds: t.rounds.map(r => r.stage) }; });
   ok(fin.status === 'done' && fin.champ, `tournament over: ${fin.rounds.join(', ')}; champion ${fin.champ}`);
   await ps[2].waitForFunction(() => /🏆/.test(document.getElementById('tour-root').textContent), null, { timeout: 10000 });
   ok(true, 'players see the champion: ' + await text(ps[2], '#tour-root h2'));
@@ -119,7 +119,7 @@ const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') + msg); if (!c) fai
   await org.click('#tour-end'); await org.click('#tour-end');
   await ps[0].waitForFunction(() => /ended/.test(document.getElementById('overlay').textContent), null, { timeout: 10000 });
   ok(true, 'players told it ended: ' + await text(ps[0], '#overlay'));
-  ok(!(await org.evaluate(() => localStorage.getItem('phonebellum.tour.org.v1'))), 'organizer save cleared');
+  ok(!(await org.evaluate(() => localStorage.getItem('phonebellum.tour.org.v2'))), 'organizer save cleared');
   await b.close();
   console.log(fails ? `${fails} FAILED` : 'all passed');
   process.exitCode = fails ? 1 : 0;

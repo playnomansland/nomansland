@@ -4,13 +4,16 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
-## 2 November 2026 – Behind the scenes: our own game server
+## 2 November 2026 – Our own game server, and tournaments run on it
 
-Nothing changes in the game yet. This is the first step towards online play running on our own server instead of phone to phone:
+No Mans Land now has its own game server. Tournaments are the first thing to move there.
 
-- A game server now exists (on Cloudflare). It can already play a full round of the real game and gets exactly the same result as your phone.
-- Next steps: tournaments that keep going even if the organizer's phone closes, then the server acting as referee in live matches so nobody can cheat by changing their game, then accounts with "Sign in with Google" (and Apple). Ranked play comes once there are enough players for short queues.
-- vs AI, solo and the Counter Lab keep working without the server.
+- **Tournaments keep going without the organizer.** The tournament lives on the server, not on the organizer's phone. The organizer can close the page or run out of battery, and everything is still there when they come back. Players stay connected the whole time.
+- **Safer:** every player (and the organizer) gets a private key when they join. Nobody can report a result for someone else's match or use the organizer's buttons.
+- **Practice vs bots:** the server now plays the bot-against-bot matches, so they finish even if your phone goes to sleep.
+- Tournaments are removed from the server when the organizer ends them, or after two weeks without use. Old tournaments from before this update can't be resumed.
+- The matches themselves still connect phone to phone. Next, the server becomes the referee in live matches so nobody can cheat by changing their game, then accounts with "Sign in with Google" (and Apple). Ranked play comes once there are enough players for short queues.
+- vs AI, solo and the Counter Lab work without the server, as before.
 
 ---
 

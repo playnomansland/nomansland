@@ -684,7 +684,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
   const foe = () => 1 - me;
   let m = null;             // match state (on the guest: a copy kept in step by the host)
   let phase = 'start';      // start | lobby | draft | deploy | battle | result | end
-  try { if (/[?&]test\b/.test(location.search)) window.__pb = () => ({ m, me, board3d, board, bt, phase, liveSpeed: liveSpeed.slice(), playSpeed: playSpeed(), away, timeUp, ready: ready.slice(), expireDeploy: () => { deadline = now() - 400; tick(); } }); } catch (e) {} // read-only peek and countdown trigger for UI tests
+  try { if (/[?&]test\b/.test(location.search)) window.__tour = () => tour.t && JSON.parse(JSON.stringify(tour.t)); if (/[?&]test\b/.test(location.search)) window.__pb = () => ({ m, me, board3d, board, bt, phase, liveSpeed: liveSpeed.slice(), playSpeed: playSpeed(), away, timeUp, ready: ready.slice(), expireDeploy: () => { deadline = now() - 400; tick(); } }); } catch (e) {} // read-only peek and countdown trigger for UI tests
   try { if (/[?&]test\b/.test(location.search)) window.__pbRedraw = () => { if (phase === 'deploy') panelDeploy(); render(); }; } catch (e) {} // UI tests that set up a board state: draw it
   let selected = null;      // unit index chosen in the shop
   let rangeOf = null;       // { side, id }: the squad last tapped on the board; its range shows as a dotted ring
@@ -2295,8 +2295,8 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     if ($('vs-claude')) $('vs-claude').addEventListener('click', startClaudeMatch);
     if ($('resume')) $('resume').addEventListener('click', () => resumeHost(resume));
     if ($('tour-back')) $('tour-back').addEventListener('click', () => { tour.menu = false; showStart(); });
-    if ($('tour-new')) $('tour-new').addEventListener('click', tourCreate);
-    if ($('tour-practice')) $('tour-practice').addEventListener('click', tourPractice);
+    if ($('tour-new')) $('tour-new').addEventListener('click', () => tourCreate());
+    if ($('tour-practice')) $('tour-practice').addEventListener('click', () => tourPractice());
     $('load-units').addEventListener('click', openLoader);
     const joinNow = () => {
       const c = $('code-in').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -4933,7 +4933,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   };
   const shareLink = () => {
     const u = new URL(location.href.split('#')[0]);
-    const keep = ['peerhost', 'peerport', 'peerpath', 'peersecure'];
+    const keep = ['peerhost', 'peerport', 'peerpath', 'peersecure', 'server'];
     [...u.searchParams.keys()].forEach(k => { if (!keep.includes(k)) u.searchParams.delete(k); });
     u.searchParams.set('join', net.code);
     return u.toString();
@@ -5516,20 +5516,22 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
 
   // =====================================================================
-  // Tournaments (invite only). The organizer's phone is the hub: it keeps the tournament (Tour, src/tournament.js),
-  // and every player's phone keeps a second PeerJS connection to it, beside the one for their own match. The hub
-  // pairs the players each round and gives every match a code; one of the two hosts it (one tap), the other joins it.
-  // Both phones report the result to the hub when the match is over; the organizer can set or change any result.
+  // Tournaments (invite only). The game server keeps the tournament (Tour, src/tournament.js; server/src/tour.js),
+  // so it goes on when the organizer's phone closes. Every phone keeps one WebSocket to it, beside the PeerJS
+  // connection for its own match. The organizer's phone sends organizer actions (Tour.apply) with its secret key;
+  // each player has their own key. The server pairs the players each round and gives every match a code; one of the
+  // two hosts it (one tap), the other joins it. Both phones report the result when the match is over; the organizer
+  // can set or change any result. Bot-vs-bot matches in a practice tournament are played by the server.
   // =====================================================================
   const TOUR_PREFIX = 'phonebellum-t1-';
-  const TOUR_ORG = 'phonebellum.tour.org.v1', TOUR_ME = 'phonebellum.tour.me.v1';
+  const TOUR_ORG = 'phonebellum.tour.org.v2', TOUR_ME = 'phonebellum.tour.me.v2'; // v2: { code, id, key, ts } (the server keeps the tournament)
+  const TOUR_SERVER = (qs.get('server') || 'https://nml-server.nomansland.workers.dev').replace(/\/$/, '');
   const TOUR_DEFAULTS = { format: 'swiss', swissRounds: 0, cut: -1, bestOf: 1, finalBestOf: 0, map: '', skin: '', packOptions: 3, mirror: true, deploy1: 90, deploy: 90, next: 20, pack: 'standard', offUnits: [], offChars: [], offTowers: [] };
-  const tour = { role: null, code: '', peer: null, conns: new Set(), conn: null, connected: false, t: null, online: [], myId: '', myName: '', alive: false, timer: 0, tries: 0, menu: false, tab: '', pending: null, dirty: false, problem: '' };
-  const tourId = () => Array.from({ length: 10 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+  const tour = { role: null, code: '', ws: null, connected: false, t: null, online: [], myId: '', key: '', myName: '', alive: false, timer: 0, ping: 0, tries: 0, menu: false, tab: '', pending: null, dirty: false, problem: '', create: null };
   const tourOrg = () => tour.role === 'org';
   const tourLink = (watch) => {
     const u = new URL(location.href.split('#')[0]);
-    const keep = ['peerhost', 'peerport', 'peerpath', 'peersecure'];
+    const keep = ['peerhost', 'peerport', 'peerpath', 'peersecure', 'server'];
     [...u.searchParams.keys()].forEach(k => { if (!keep.includes(k)) u.searchParams.delete(k); });
     u.searchParams.set('tour', tour.code);
     if (watch) u.searchParams.set('watch', '1');
@@ -5550,178 +5552,109 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   const tourHostKey = (mt) => mt.host || 'a';
   const tourIsHost = (x) => x && tourHostKey(x.match) === x.side;
 
-  // ----- the hub (organizer) -----
+  // ----- connecting (organizer, players and watchers alike) -----
   // a practice tournament: you and 7 bots, to try it all out
-  function tourPractice() {
-    tourCreate();
-    if (!tourOrg()) return;
-    tour.t.name = 'Practice cup';
-    for (let k = 0; k < 7; k++) Tour.addBot(tour.t);
-    tourChanged();
-  }
-  function tourCreate() {
-    if (!peerAvailable()) { overlayMsg('Couldn’t load the multiplayer code', 'Check your connection and reload the page.'); return; }
-    let name = '';
-    try { name = localStorage.getItem('pb-tour-name') || ''; } catch (e) {}
+  function tourPractice() { tourCreate(7, 'Practice cup'); }
+  function tourCreate(bots, name) {
+    let nm = '';
+    try { nm = localStorage.getItem('pb-tour-name') || ''; } catch (e) {}
     tourLeave(false);
-    tour.role = 'org'; tour.code = Tour.newCode(Math.random, 4); tour.myId = tourId(); tour.menu = false; tour.tab = 'players';
-    tour.t = Tour.create(tour.code, 'NML Tournament', { ...TOUR_DEFAULTS });
-    tourCapture();
-    Tour.join(tour.t, tour.myId, name || 'Organizer');
-    tour.t.org = tour.myId; tour.t.orgPlays = true;
-    tourSave(); tourHub(true); showTour();
+    tour.role = 'org'; tour.code = Tour.newCode(Math.random, 4); tour.myId = ''; tour.key = ''; tour.menu = false; tour.tab = 'players';
+    tour.create = { name: name || 'NML Tournament', orgName: nm || 'Organizer', bots: bots | 0, settings: { ...TOUR_DEFAULTS, ...tourCaptured() } };
+    tour.problem = 'Setting up the tournament…';
+    tourOpen(); showTour();
   }
-  function tourHub(fresh) {
+  function tourOpen() {
     tour.alive = true;
-    const peer = new Peer(TOUR_PREFIX + tour.code, peerOpts());
-    tour.peer = peer;
-    peer.on('open', () => { tour.tries = 0; tour.problem = ''; tourRedraw(); });
-    peer.on('connection', (c) => {
-      c.on('open', () => { if (tour.peer !== peer) { try { c.close(); } catch (e) {} return; } tour.conns.add(c); });
-      c.on('data', (d) => tourHubRecv(c, d));
-      c.on('close', () => { tour.conns.delete(c); tourBroadcast(); tourRedraw(); });
-      c.on('error', (e) => console.warn('tour connection', e));
-    });
-    peer.on('disconnected', () => { if (tour.alive && !peer.destroyed) setTimeout(() => { if (tour.alive && !peer.destroyed && peer.disconnected) peer.reconnect(); }, 1500); });
-    peer.on('error', (err) => {
-      console.warn('tour peer', err.type, err);
-      if (!tour.alive || tour.peer !== peer) return;
-      if (err.type === 'unavailable-id') {
-        // a new tournament: another code. A resumed one: the old page may still hold the code for a moment
-        try { peer.destroy(); } catch (e) {}
-        if (fresh && tour.t && tour.t.status === 'lobby' && tour.t.rounds.length === 0 && tour.tries === 0 && !tour.conns.size) {
-          tour.code = Tour.newCode(Math.random, 4); tour.t.code = tour.code; tourSave(); tourHub(true); tourRedraw(); return;
-        }
-        tour.problem = 'The tournament code is still taken. Retrying…'; tourRedraw();
-        if (tour.tries++ < 60) tour.timer = setTimeout(() => tourHub(false), 3000);
-      } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
-        tour.problem = 'Can’t reach the match server. Retrying…'; tourRedraw();
-        clearTimeout(tour.timer);
-        tour.timer = setTimeout(() => { if (!tour.alive) return; if (peer.destroyed) tourHub(false); else if (peer.disconnected) peer.reconnect(); }, 3000);
-      }
-    });
+    clearTimeout(tour.timer);
+    let ws;
+    try { ws = new WebSocket(`${TOUR_SERVER.replace(/^http/, 'ws')}/tour/${tour.code}`); } catch (e) { tourRetry(3000); return; }
+    tour.ws = ws;
+    ws.onopen = () => {
+      if (tour.ws !== ws) return;
+      tour.connected = true; tour.problem = '';
+      if (tour.create) ws.send(JSON.stringify({ t: 'create', ...tour.create }));
+      else ws.send(JSON.stringify({ t: 'hello', id: tour.myId, key: tour.key, name: tour.myName, watch: tour.role === 'watch' }));
+      if (tour.pending) tourSend(tour.pending); // a result that may not have got there
+      clearInterval(tour.ping); tour.ping = setInterval(() => { if (tour.ws === ws && ws.readyState === 1) ws.send('{"t":"ping"}'); }, 30000);
+      tourRedraw();
+    };
+    ws.onmessage = (e) => { if (tour.ws !== ws) return; let d = null; try { d = JSON.parse(e.data); } catch (er) {} if (d) { tour.tries = 0; tourRecv(d); } };
+    ws.onclose = () => {
+      if (tour.ws !== ws) return;
+      tour.ws = null; tour.connected = false; clearInterval(tour.ping);
+      if (!tour.alive) return;
+      tour.tries++;
+      tour.problem = tour.tries > 2 ? 'Can’t reach the tournament server. Retrying…' : 'Reconnecting…';
+      tourRedraw(); tourRetry(Math.min(10000, 800 * tour.tries));
+    };
   }
-  function tourHubRecv(c, d) {
-    if (!d || typeof d !== 'object' || !tour.t) return;
-    if (d.t === 'hello') {
-      c.tourId = typeof d.id === 'string' ? d.id.slice(0, 24) : ''; c.watch = !!d.watch;
-      if (!c.watch && c.tourId) {
-        const known = Tour.player(tour.t, c.tourId);
-        if (!known && !Tour.join(tour.t, c.tourId, d.name)) { try { c.send({ t: 'closed' }); } catch (e) {} setTimeout(() => { try { c.close(); } catch (e) {} }, 800); return; }
-        if (known && tour.t.status === 'lobby' && d.name) Tour.rename(tour.t, c.tourId, d.name);
-      }
-      tourChanged();
-    } else if (d.t === 'name') {
-      if (tour.t.status === 'lobby' && c.tourId && Tour.rename(tour.t, c.tourId, d.name)) tourChanged();
-    } else if (d.t === 'result') {
-      const f = Tour.findMatch(tour.t, String(d.match));
-      if (!f || (f.match.a !== c.tourId && f.match.b !== c.tourId)) return; // only the two players report
-      if (d.code && Tour.gameOf(f.match, String(d.code)) !== (d.game | 0)) { tourSendTo(c); return; } // a game under an old code (pairings changed, or a replay): doesn't count
-      if (Tour.report(tour.t, f.match.id, d.winner, d.hp, d.rounds, 'auto', d.game | 0)) tourChanged();
-      else tourSendTo(c); // already known: tell them so they stop sending
-    } else if (d.t === 'leave') {
-      if (c.tourId && tour.t.status === 'lobby' && c.tourId !== tour.t.org) { Tour.remove(tour.t, c.tourId); tourChanged(); }
-    }
-  }
-  const tourOnline = () => { const ids = new Set([...tour.conns].filter(c => c.open && c.tourId && !c.watch).map(c => c.tourId)); if (tour.t && tour.t.org) ids.add(tour.t.org); return [...ids]; };
-  const tourMsg = () => ({ t: 'state', tour: tour.t, online: tourOnline() });
-  function tourSendTo(c) { try { if (c.open) c.send(tourMsg()); } catch (e) { console.warn(e); } }
-  function tourBroadcast() { if (!tourOrg()) return; const msg = tourMsg(); for (const c of tour.conns) if (c.open && (c.tourId || c.watch)) { try { c.send(msg); } catch (e) {} } }
-  function tourChanged() { tourSave(); tourBroadcast(); tourRedraw(); }
+  function tourRetry(ms) { clearTimeout(tour.timer); tour.timer = setTimeout(() => { if (tour.alive && !tour.ws) tourOpen(); }, ms); }
+  const tourSend = (msg) => { if (tour.ws && tour.connected) { try { tour.ws.send(JSON.stringify(msg)); } catch (e) { console.warn(e); } } };
+  const tourDo = (op, a) => tourSend({ t: 'org', op, a }); // an organizer action: the server runs it (Tour.apply)
   function tourSave() {
     try {
-      if (tourOrg() && tour.t) localStorage.setItem(TOUR_ORG, JSON.stringify({ t: tour.t, myId: tour.myId, ts: now() }));
-      else if (tour.role === 'player') localStorage.setItem(TOUR_ME, JSON.stringify({ code: tour.code, id: tour.myId, ts: now() }));
+      if (!tour.key) return;
+      if (tourOrg()) localStorage.setItem(TOUR_ORG, JSON.stringify({ code: tour.code, id: tour.myId, key: tour.key, ts: now() }));
+      else if (tour.role === 'player') localStorage.setItem(TOUR_ME, JSON.stringify({ code: tour.code, id: tour.myId, key: tour.key, ts: now() }));
     } catch (e) {}
   }
   function tourResumeOrg(s) {
-    if (!peerAvailable() || !s || !s.t) return;
-    tour.role = 'org'; tour.t = s.t; tour.code = s.t.code; tour.myId = s.myId || s.t.org; tour.menu = false; tour.tab = tour.t.status === 'lobby' ? 'players' : 'matches';
-    tourHub(false);
-    tourBots();
+    if (!s || !s.code || !s.key) return;
+    tour.role = 'org'; tour.code = s.code; tour.myId = s.id; tour.key = s.key; tour.menu = false; tour.tab = 'matches'; tour.create = null;
+    tour.problem = 'Connecting…';
+    tourOpen();
   }
-  // the organizer's tools: starts the next round (with this round's map), sets results, replays, drops
+  // the organizer's tools: starts the next round (the server picks this round's map)
   function tourAdvance() {
-    if (!tourOrg() || !Tour.advance(tour.t, Math.random)) return;
-    const r = Tour.current(tour.t);
-    if (r && !r.map && tour.t.status === 'running') {
-      const pool = Game.MAPS.filter(x => !x.plain);
-      r.map = tour.t.settings.map || (pool.length ? pool[Math.floor(Math.random() * pool.length)].id : 'standard');
-    }
-    tour.tab = tour.t.status === 'done' ? 'standings' : 'matches';
-    tour.edit = false; tour.editSel = '';
-    tourChanged(); tourBots();
+    if (!tourOrg()) return;
+    tourDo('advance');
+    tour.tabNext = 'advance'; tour.edit = false; tour.editSel = ''; // the Matches tab once the new round comes back
   }
   // the match settings from the menu's own pickers (map, look, unit pack, leaders and units left out)
-  function tourCapture() {
-    const s = tour.t.settings;
-    s.map = mapPick || ''; s.skin = skinPick || '';
-    s.pack = packOn() ? 'standard' : 'all';
-    s.offUnits = matchOff().map(i => units[i].name); s.offChars = matchChars().slice(); s.offTowers = packOn() ? SP.offTowers.slice() : [];
+  function tourCaptured() {
+    return { map: mapPick || '', skin: skinPick || '', pack: packOn() ? 'standard' : 'all',
+      offUnits: matchOff().map(i => units[i].name), offChars: matchChars().slice(), offTowers: packOn() ? SP.offTowers.slice() : [] };
   }
+  const tourCapture = () => tourDo('settings', tourCaptured());
 
-  // ----- a player -----
+  // ----- a player (or a watcher) -----
   function tourJoin(code, watch) {
-    if (!peerAvailable()) { overlayMsg('Couldn’t load the multiplayer code', 'Check your connection and reload the page.'); return; }
     let s = null;
     try { s = JSON.parse(localStorage.getItem(TOUR_ME) || 'null'); } catch (e) {}
     tourLeave(true);
-    tour.role = watch ? 'watch' : 'player'; tour.code = code; tour.menu = false; tour.tab = 'standings';
-    tour.myId = watch ? '' : (s && s.code === code && s.id) || tourId();
+    tour.role = watch ? 'watch' : 'player'; tour.code = code; tour.menu = false; tour.tab = 'standings'; tour.create = null;
+    const known = !watch && s && s.code === code;
+    tour.myId = known ? s.id || '' : ''; tour.key = known ? s.key || '' : '';
     try { tour.myName = localStorage.getItem('pb-tour-name') || ''; } catch (e) {}
-    tourSave();
-    tour.alive = true; tour.problem = 'Connecting…';
-    const peer = new Peer(peerOpts());
-    tour.peer = peer;
-    peer.on('open', () => tourConnect());
-    peer.on('disconnected', () => { if (tour.alive && !peer.destroyed) setTimeout(() => { if (tour.alive && !peer.destroyed && peer.disconnected) peer.reconnect(); }, 1500); });
-    peer.on('error', (err) => {
-      console.warn('tour peer', err.type, err);
-      if (!tour.alive || tour.peer !== peer) return;
-      if (err.type === 'peer-unavailable') { tour.problem = tour.tries > 2 ? `Can’t find tournament ${code}. The organizer needs the page open. Retrying…` : 'Connecting…'; tourRedraw(); tourRetry(3000); }
-      else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
-        tour.problem = 'Can’t reach the match server. Retrying…'; tourRedraw();
-        clearTimeout(tour.timer);
-        tour.timer = setTimeout(() => { if (tour.alive && !peer.destroyed && peer.disconnected) peer.reconnect(); tourRetry(500); }, 3000);
-      }
-    });
-    showTour();
-  }
-  function tourRetry(ms) { clearTimeout(tour.timer); tour.timer = setTimeout(() => { if (tour.alive && !tour.connected) tourConnect(); }, ms); }
-  function tourConnect() {
-    const peer = tour.peer;
-    if (!tour.alive || !peer || peer.destroyed || tour.connected) return;
-    if (peer.disconnected) { peer.reconnect(); return; }
-    tour.tries++;
-    const c = peer.connect(TOUR_PREFIX + tour.code, { reliable: true });
-    let opened = false;
-    const giveUp = setTimeout(() => { if (!opened) { try { c.close(); } catch (e) {} tourRetry(500); } }, 9000);
-    c.on('open', () => {
-      opened = true; clearTimeout(giveUp);
-      if (tour.conn && tour.conn !== c) { try { tour.conn.close(); } catch (e) {} }
-      tour.conn = c; tour.connected = true; tour.tries = 0; tour.problem = '';
-      c.send({ t: 'hello', id: tour.myId, name: tour.myName, watch: tour.role === 'watch' });
-      if (tour.pending) c.send(tour.pending); // a result that may not have got there
-      tourRedraw();
-    });
-    c.on('data', (d) => { if (c === tour.conn) tourRecv(d); });
-    c.on('close', () => { clearTimeout(giveUp); if (c === tour.conn) { tour.connected = false; tour.conn = null; tour.problem = 'Lost the tournament. Reconnecting…'; tourRedraw(); tourRetry(1500); } });
-    c.on('error', (e) => console.warn('tour connection', e));
+    tour.problem = 'Connecting…';
+    tourOpen(); showTour();
   }
   function tourRecv(d) {
     if (!d || typeof d !== 'object') return;
+    if (d.t === 'created' || d.t === 'joined') { tour.create = null; tour.myId = String(d.id || ''); tour.key = String(d.key || ''); tourSave(); return; }
+    if (d.t === 'taken') { // the code is in use: another one (only while creating)
+      if (!tour.create) return;
+      const ws = tour.ws; tour.ws = null; tour.connected = false; try { if (ws) ws.close(); } catch (e) {}
+      tour.code = Tour.newCode(Math.random, 4); tourOpen(); return;
+    }
     if (d.t === 'state' && d.tour && Array.isArray(d.tour.players)) {
       tour.t = d.tour; tour.online = Array.isArray(d.online) ? d.online : [];
+      tour.problem = '';
       if (tour.pending) { const f = Tour.findMatch(tour.t, tour.pending.match); if (!f || f.match.result || (f.match.games || []).length > tour.pending.game) tour.pending = null; }
       if (tour.t.status === 'done' && !tour.tabSetDone) { tour.tabSetDone = true; tour.tab = 'standings'; }
+      if (tour.tabNext === 'advance' && tour.t.status !== 'lobby') { tour.tab = tour.t.status === 'done' ? 'standings' : 'matches'; tour.tabNext = ''; }
+      else if (tour.tabNext === 'undo') { tour.tab = tour.t.status === 'lobby' ? 'players' : 'matches'; tour.tabNext = ''; }
+      tourSave();
       tourRedraw();
-    } else if (d.t === 'closed' || d.t === 'kicked' || d.t === 'ended') {
-      const why = d.t === 'closed' ? 'This tournament has already started, so new players can’t join.' : d.t === 'kicked' ? 'The organizer took you out of the tournament.' : 'The organizer ended the tournament.';
+    } else if (['closed', 'kicked', 'ended', 'gone', 'full'].includes(d.t)) {
+      const why = { closed: 'This tournament has already started, so new players can’t join.', kicked: 'The organizer took you out of the tournament.',
+        ended: 'The organizer ended the tournament.', gone: 'This tournament has ended or doesn’t exist.', full: 'This tournament is full.' }[d.t];
+      const wasOrg = tourOrg();
       tourLeave(false);
-      if (phase === 'start') overlayMsg('Tournament', why);
+      if (phase === 'start' && !(wasOrg && d.t === 'ended')) overlayMsg('Tournament', why);
     }
   }
-  const tourSend = (msg) => { if (tour.conn && tour.connected) { try { tour.conn.send(msg); } catch (e) { console.warn(e); } } };
 
   // the result of a tournament match, from either phone (the hub takes the first, and flags two that disagree)
   // winSide: the match side that won (0 = the host), -1 for a draw
@@ -5732,7 +5665,6 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const winner = winSide === 0 ? hk : winSide === 1 ? gk : 'draw';
     const sideA = hk === 'a' ? 0 : 1;
     const msg = { t: 'result', match: x.match.id, game: x.game, code: mode === 'ai' ? tour.botCode : net.code, winner, hp: [m.hp[sideA], m.hp[1 - sideA]], rounds: (m.history || []).length };
-    if (tourOrg()) { if (Tour.report(tour.t, msg.match, msg.winner, msg.hp, msg.rounds, 'auto', msg.game)) tourChanged(); return; }
     tour.pending = msg; tourSend(msg);
   }
 
@@ -5793,43 +5725,6 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       { skin: s.skin || null, offUnits: off, offTowers: s.offTowers || [], mirror: s.mirror !== false, packOptions: s.packOptions || 3 });
   }
 
-  // Bot against bot (on the organizer's phone): the whole match is played out by the AI on both sides, one round at a
-  // time between frames, with the tournament's settings. A playoff draw is played again.
-  const tourSims = new Set();
-  function tourBots() {
-    if (!tourOrg() || !tour.t || tour.t.status !== 'running') return;
-    const r = Tour.current(tour.t);
-    for (const mt of r.matches) if (mt.b != null && !mt.result && !tourSims.has(mt.id) && Tour.isBot(tour.t, mt.a) && Tour.isBot(tour.t, mt.b)) tourSim(r, mt);
-  }
-  function tourSim(r, mt) {
-    tourSims.add(mt.id);
-    // the built-in units, without touching what this phone has loaded (a Counter Lab roster stays)
-    const keep = { units, M, rawSet, customSet };
-    if (customSet) useSet(BUILTIN, false);
-    const sm = tourNewMatch({ round: r, match: mt });
-    if (keep.customSet) { units = keep.units; M = keep.M; rawSet = keep.rawSet; customSet = keep.customSet; }
-    const code = mt.code, game = Tour.gameOf(mt, code);
-    const step = () => {
-      const f = tour.t && Tour.findMatch(tour.t, mt.id);
-      if (!f || f.match.result || f.match.code !== code || !tourOrg()) { tourSims.delete(mt.id); return; }
-      try {
-        for (const sd of [0, 1]) { if (Game.needsPack(sm, sd)) Game.choosePack(sm, sd, Math.floor(Math.random() * sm.packages[sd].length)); Game.aiDeploy(sm, sd); Game.aiLevel(sm, sd); }
-        for (const sd of [0, 1]) { Game.ensureTower(sm, sd); Game.ensurePack(sm, sd); Game.ensureBwalls(sm, sd); }
-        Game.settleTowerPicks(sm);
-        const sim = Game.startBattle(sm); while (sim.step()) {}
-        Game.resolve(sm, sim.result());
-      } catch (e) { console.warn('bot match', e); sm.over = true; sm.winner = Math.random() < 0.5 ? 0 : 1; }
-      if (m) Game.useGrid(m); // the board on screen keeps its own grid
-      if (!sm.over && sm.round < 40) { setTimeout(step, 120); return; }
-      tourSims.delete(mt.id);
-      const w = sm.winner === 0 ? 'a' : sm.winner === 1 ? 'b' : 'draw';
-      if (w === 'draw' && r.stage === 'playoff' && !(f.match.bo > 1)) { Tour.replay(tour.t, mt.id, Math.random); tourChanged(); tourBots(); return; }
-      if (Tour.report(tour.t, mt.id, w, [sm.hp[0], sm.hp[1]], sm.history.length, 'auto', game)) tourChanged();
-      tourBots(); // a series: the next game
-    };
-    setTimeout(step, 600);
-  }
-
   // the game on this phone was moved by the organizer: drop it (a host's saved game too) and say so
   function tourMoved() {
     tour.playing = ''; tour.botMatch = ''; tour.botCode = '';
@@ -5847,12 +5742,12 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // ends this device's part: keep (true) leaves the saved tournament for a later resume (a new one replaces it anyway).
   // The organizer's leaving (not keep) ends it for everyone.
   function tourLeave(keep) {
-    const was = tour.role, conns = [...tour.conns], conn = tour.conn, peer = tour.peer;
-    tour.alive = false; clearTimeout(tour.timer);
-    if (was === 'org' && !keep) for (const c of conns) { try { c.send({ t: 'ended' }); } catch (e) {} }
-    setTimeout(() => { for (const c of conns) { try { c.close(); } catch (e) {} } try { if (conn) conn.close(); } catch (e) {} try { if (peer) peer.destroy(); } catch (e) {} }, was === 'org' && !keep ? 800 : 0);
+    const was = tour.role, ws = tour.ws, connected = tour.connected;
+    tour.alive = false; clearTimeout(tour.timer); clearInterval(tour.ping);
+    if (was === 'org' && !keep && ws && connected) { try { ws.send(JSON.stringify({ t: 'org', op: 'end' })); } catch (e) {} }
+    setTimeout(() => { try { if (ws) ws.close(); } catch (e) {} }, was === 'org' && !keep ? 800 : 0);
     if (!keep) { try { localStorage.removeItem(was === 'org' ? TOUR_ORG : TOUR_ME); } catch (e) {} }
-    Object.assign(tour, { role: null, code: '', peer: null, conns: new Set(), conn: null, connected: false, t: null, online: [], myId: '', alive: false, tries: 0, menu: false, pending: null, problem: '', tabSetDone: false });
+    Object.assign(tour, { role: null, code: '', ws: null, connected: false, t: null, online: [], myId: '', key: '', alive: false, tries: 0, menu: false, pending: null, problem: '', tabSetDone: false, create: null });
     const u = new URLSearchParams(location.search);
     if (u.has('tour') || u.has('watch')) { u.delete('tour'); u.delete('watch'); qs.delete('tour'); qs.delete('watch'); history.replaceState(null, '', location.pathname + (u.toString() ? '?' + u : '')); }
   }
@@ -5864,7 +5759,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     return `Round ${r.n} of ${Tour.swissRounds(tour.t)}`;
   };
   const mapName = (id) => { const mp = Game.MAPS.find(x => x.id === id); return mp ? mp.name : 'Random map'; };
-  const tourOn = (id) => Tour.isBot(tour.t, id) || (tourOrg() ? tourOnline().includes(id) : tour.online.includes(id));
+  const tourOn = (id) => Tour.isBot(tour.t, id) || tour.online.includes(id);
   const dot = (id) => id ? `<i class="tdot ${tourOn(id) ? 'on' : ''}" title="${tourOn(id) ? 'online' : 'offline'}"></i>` : '';
   const pname = (id) => id == null ? '<i>Bye</i>' : `${dot(id)}${Tour.isBot(tour.t, id) ? '🤖 ' : ''}${esc(Tour.nameOf(tour.t, id))}${id === tour.myId ? ' <small>(you)</small>' : ''}`;
   // a series' state: "Best of 5 · 2–1"
@@ -6093,7 +5988,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (!t) {
       overlay(`<div class="card" id="tour-root"><span class="eyebrow">Tournament</span><span class="code">${esc(tour.code)}</span>
         <p class="status wait">${esc(tour.problem || 'Connecting…')}</p><button class="btn" id="tour-leave">Leave</button></div>`);
-      $('panel').innerHTML = '<span class="hint">Keep this page open.</span>';
+      $('panel').innerHTML = '<span class="hint">Connecting to the tournament server.</span>';
       $('tour-leave').addEventListener('click', () => { tourLeave(false); showStart(); });
       return;
     }
@@ -6302,52 +6197,43 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     on('[data-watch]', (b) => tourSpectate(b.dataset.watch));
     if ($('tour-share')) $('tour-share').addEventListener('click', () => navigator.share({ title: t.name, text: `Join ${t.name} in No Mans Land! Pick a gamertag when you're in.`, url: tourLink() }).catch(() => {}));
     if (!tourOrg()) return;
-    on('[data-rename]', (b) => { const p = Tour.player(t, b.dataset.rename); const n = p && prompt('New gamertag', p.name); if (n && Tour.rename(t, p.id, n)) tourChanged(); });
+    // organizer actions go to the server (Tour.apply there); the screen updates when its new state comes back
+    on('[data-rename]', (b) => { const p = Tour.player(t, b.dataset.rename); const n = p && prompt('New gamertag', p.name); if (n) tourDo('rename', { id: p.id, name: n }); });
     on('[data-drop]', (b) => {
       if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Sure?'; return; }
-      const id = b.dataset.drop;
-      for (const c of tour.conns) if (c.tourId === id && t.status === 'lobby') { try { c.send({ t: 'kicked' }); } catch (e) {} }
-      Tour.remove(t, id);
-      tourChanged();
+      tourDo('drop', { id: b.dataset.drop });
     });
     on('[data-orgplays]', (b) => {
-      if (b.dataset.orgplays === '1') { let n = ''; try { n = localStorage.getItem('pb-tour-name') || ''; } catch (e) {} Tour.join(t, t.org, n || 'Organizer'); }
-      else Tour.remove(t, t.org);
-      tourChanged();
+      let n = ''; try { n = localStorage.getItem('pb-tour-name') || ''; } catch (e) {}
+      tourDo('orgPlays', { on: b.dataset.orgplays === '1', name: n || 'Organizer' });
     });
-    if ($('tour-bot')) $('tour-bot').addEventListener('click', () => { if (Tour.addBot(t)) tourChanged(); });
-    if ($('tour-nobots')) $('tour-nobots').addEventListener('click', () => { t.players.filter(p => p.bot).forEach(p => Tour.remove(t, p.id)); tourChanged(); });
+    if ($('tour-bot')) $('tour-bot').addEventListener('click', () => tourDo('addBot'));
+    if ($('tour-nobots')) $('tour-nobots').addEventListener('click', () => tourDo('noBots'));
     if ($('tour-start')) $('tour-start').addEventListener('click', () => { tourCapture(); tourAdvance(); });
     if ($('tour-next')) $('tour-next').addEventListener('click', tourAdvance);
-    if ($('tour-undo')) $('tour-undo').addEventListener('click', () => { if (Tour.undoRound(t)) { tour.tab = t.status === 'lobby' ? 'players' : 'matches'; tourChanged(); } });
-    on('[data-res]', (b) => {
-      const [id, w] = b.dataset.res.split(':'), f = Tour.findMatch(t, id); if (!f) return;
-      const old = f.match.result && f.match.result.hp;
-      const changed = f.match.bo > 1 && f.match.conflict
-        ? Tour.resolveGame(t, id, w)
-        : Tour.report(t, id, w, old || [0, 0], (f.match.result && f.match.result.rounds) || 0, 'org');
-      if (changed) tourChanged();
-    });
-    on('[data-replay]', (b) => { if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Sure?'; return; } if (Tour.replay(t, b.dataset.replay, Math.random)) tourChanged(); });
-    on('[data-undogame]', (b) => { if (Tour.undoGame(t, b.dataset.undogame)) tourChanged(); });
-    on('[data-swap]', (b) => { if (Tour.swapHost(t, b.dataset.swap)) tourChanged(); });
+    if ($('tour-undo')) $('tour-undo').addEventListener('click', () => { tour.tabNext = 'undo'; tourDo('undoRound'); });
+    on('[data-res]', (b) => { const [id, w] = b.dataset.res.split(':'); tourDo('result', { id, w }); });
+    on('[data-replay]', (b) => { if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Sure?'; return; } tourDo('replay', { id: b.dataset.replay }); });
+    on('[data-undogame]', (b) => tourDo('undoGame', { id: b.dataset.undogame }));
+    on('[data-swap]', (b) => tourDo('swapHost', { id: b.dataset.swap }));
     if ($('tour-edit')) $('tour-edit').addEventListener('click', () => { tour.edit = !tour.edit; tour.editSel = ''; showTour(); });
     if ($('tour-edit-bracket')) $('tour-edit-bracket').addEventListener('click', () => { tour.edit = true; tour.editSel = ''; tour.tab = 'matches'; showTour(); });
     on('[data-slot]', (b) => {
       const key = b.dataset.slot, toSlot = (k) => k.startsWith('p:') ? { p: k.slice(2) } : { m: k.slice(0, k.lastIndexOf(':')), k: k.slice(k.lastIndexOf(':') + 1) };
       if (!tour.editSel) { tour.editSel = key; showTour(); return; }
       if (tour.editSel === key) { tour.editSel = ''; showTour(); return; }
-      const ok = Tour.swapSlots(t, toSlot(tour.editSel), toSlot(key));
+      const s1 = toSlot(tour.editSel), s2 = toSlot(key);
+      const ok = Tour.swapSlots(JSON.parse(JSON.stringify(t)), s1, s2); // try it on a copy; the server does it for real
       tour.editSel = ok ? '' : key;
-      if (ok) { tourChanged(); tourBots(); } else showTour();
+      if (ok) tourDo('swapSlots', { s1, s2 });
+      showTour();
     });
     on('[data-tset]', (b) => {
       const k = b.dataset.tset, v = b.dataset.v;
-      t.settings[k] = v === 'true' ? true : v === 'false' ? false : /^-?\d+$/.test(v) ? +v : v;
-      tourChanged();
+      tourDo('settings', { [k]: v === 'true' ? true : v === 'false' ? false : /^-?\d+$/.test(v) ? +v : v });
     });
     if ($('tour-tname-ok')) {
-      const save = () => { const n = Tour.cleanName($('tour-tname').value); if (n) { t.name = n; tourChanged(); } };
+      const save = () => { const n = Tour.cleanName($('tour-tname').value); if (n) tourDo('name', { name: n }); };
       $('tour-tname-ok').addEventListener('click', save);
       $('tour-tname').addEventListener('keydown', (e) => { if (e.key === 'Enter') { $('tour-tname').blur(); save(); } });
     }
@@ -6358,7 +6244,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       const body = P.querySelector('.tour-body');
       body.addEventListener('click', (e) => {
         if (!e.target.closest('[data-map],[data-skin],[data-pack],[data-char],[data-unit],#pick-chars,#pick-units,.pick-menu')) return;
-        setTimeout(() => { tourCapture(); tourSave(); tourBroadcast(); }, 0);
+        setTimeout(tourCapture, 0);
       });
     }
   }
@@ -6396,13 +6282,13 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   window.addEventListener('resize', () => { size(); render(); });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { size(); render(); });
   const joinCode = (qs.get('join') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  { // a tournament: the invite link, or the one this device was in (the organizer's comes back with its hub)
+  { // a tournament: the invite link, or the one this device was in (the organizer's comes back with its key)
     const tc = (qs.get('tour') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     let org = null, mine = null;
     try { org = JSON.parse(localStorage.getItem(TOUR_ORG) || 'null'); mine = JSON.parse(localStorage.getItem(TOUR_ME) || 'null'); } catch (e) {}
     const fresh = (x) => x && now() - (x.ts || 0) < 24 * 3600e3;
-    if (tc.length === 4 && !(fresh(org) && org.t && org.t.code === tc)) tourJoin(tc, qs.has('watch'));
-    else if (fresh(org) && org.t) tourResumeOrg(org);
+    if (tc.length === 4 && !(fresh(org) && org.key && org.code === tc)) tourJoin(tc, qs.has('watch'));
+    else if (fresh(org) && org.key) tourResumeOrg(org);
     else if (fresh(mine) && mine.code) tourJoin(mine.code, false);
     if (joinCode.length === 5) tour.menu = false;
   }

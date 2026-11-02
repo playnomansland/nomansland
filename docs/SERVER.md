@@ -13,7 +13,7 @@ Started 2026-11-02. The website stays on GitHub Pages; the server only handles o
 ## Steps
 
 1. Setup (live since 2026-11-02 at https://nml-server.nomansland.workers.dev): `/health`, `/selftest` (one bot round on the server), `/room/<CODE>` WebSocket rooms that relay messages, with the limits below.
-2. Tournament hub on the server: `tournament.js` runs in the tournament's Room. The organizer's phone is just a screen; tournaments survive reloads. Matches still phone-to-phone for now. Old tournament history is not carried over.
+2. Tournaments on the server (live since 2026-11-02): `TourRoom` (`server/src/tour.js`) keeps each tournament in its own storage and runs `Tour.apply` for the organizer. Organizer and players each get a secret key; ids are public, keys never are. Bot-vs-bot matches are played by the server. Tournaments are deleted when ended or after 14 days untouched. Matches themselves are still phone-to-phone (step 3). Old tournament history is not carried over.
 3. Server as referee: phones send actions ("buy", "place", "move", "level", "skill", "sell", "ready"), never their gold or army. The Room runs them through the Game functions (which already check gold, tiles and unlocks), runs the fight and sends both phones the replay. Hidden info is enforced by only sending each phone what it may see. PeerJS stays as a fallback until a tournament has run on the server.
 4. Match history in the server's database instead of the Google Sheet (the Sheet is exported and kept).
 5. Accounts (below). 6. Ranked (below).
@@ -23,6 +23,7 @@ Started 2026-11-02. The website stays on GitHub Pages; the server only handles o
 The goal is that nothing has to be redesigned if thousands of strangers show up. Only capacity and moderation tools get added then.
 
 - The server decides. From step 3 no result, gold amount or army comes from a phone; a modified client can only send actions the rules allow.
+- Each player and the organizer have their own secret key: nobody can act or report as someone else, and only the organizer's key runs organizer actions, which the server checks against the rules (`Tour.apply`) and a list of allowed settings.
 - Limits per connection: messages over 256 KB, more than 40 messages per 10 s, non-JSON or binary messages close the connection. At most 12 connections per room. Codes are 4-8 letters/digits.
 - Origin check: only the game's own pages (GitHub Pages, local test servers) can open a connection from a browser. Scripts can fake this, so it is a first filter, not the lock; the referee and the limits are the lock.
 - Secrets live in GitHub Actions secrets and Cloudflare, never in the repo. The Cloudflare token is limited to Workers.

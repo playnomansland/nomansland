@@ -7,14 +7,23 @@ compatibility_date = "2026-10-01"
 [vars]
 ALLOWED_ORIGINS = "https://snetendare.github.io,http://localhost:8766,http://127.0.0.1:8766,http://localhost:8787"
 
-# One Room per match or tournament code. SQLite-backed, so it works on the Free plan.
+# One Room per match code. SQLite-backed, so it works on the Free plan.
 [[durable_objects.bindings]]
 name = "ROOM"
 class_name = "Room"
 
+# One TourRoom per tournament code: keeps the tournament, so it lives on when the organizer's phone closes.
+[[durable_objects.bindings]]
+name = "TOUR"
+class_name = "TourRoom"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["TourRoom"]
 
 [observability]
 enabled = true
