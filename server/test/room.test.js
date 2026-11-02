@@ -1,7 +1,7 @@
 // Server step 1 check. Starts the server locally (wrangler dev), then:
 //  - /health answers
 //  - /selftest plays the same round as plain node (same engine = same result on the server)
-//  - two players in a room see each other's messages; a third room code doesn't
+//  - the first two phones in a room become side 0 and side 1 with their own keys; a third is turned away
 //  - a wrong website (Origin) is turned away, a bad code is refused
 //  - flooding and oversized messages get the connection closed
 // Run: cd server && npm test
@@ -62,25 +62,39 @@ const closed = (ws) => new Promise((r) => { if (ws.readyState === 3) r(ws.closeC
     assert.strictEqual((await fetch(`${BASE}/selftest`)).status, 429, 'selftest throttled');
 
     step('selftest ok');
-    // relay between two players
-    const a = await open('ABCD'); const b = await open('ABCD'); const c = await open('WXYZ');
-    await waitFor(() => a.inbox.find((x) => x.t === 'join'));
-    b.send(JSON.stringify({ t: 'hi', n: 1 }));
-    const got = await waitFor(() => a.inbox.find((x) => x.t === 'msg'));
-    assert.deepStrictEqual(got.d, { t: 'hi', n: 1 });
-    await sleep(200);
-    assert.ok(!c.inbox.some((x) => x.t === 'msg'), 'other room hears nothing');
+    // who is who: the first phone is side 0, the second side 1 (each with a key), a third can only watch
+    const rc = 'R' + Math.random().toString(36).slice(2, 7).toUpperCase().replace(/[^A-Z0-9]/g, 'Q'); // a fresh room (wrangler dev keeps old ones)
+    const a = await open(rc); const b = await open(rc); const c = await open(rc);
+    b.send(JSON.stringify({ t: 'hello' }));
+    await waitFor(() => b.inbox.find((x) => x.t === 'nomatch')); // nobody made this match yet
+    a.send(JSON.stringify({ t: 'hello', create: true }));
+    const wa = await waitFor(() => a.inbox.find((x) => x.t === 'welcome'));
+    b.send(JSON.stringify({ t: 'hello' }));
+    const wb = await waitFor(() => b.inbox.find((x) => x.t === 'welcome'));
+    assert.strictEqual(wa.side, 0); assert.strictEqual(wb.side, 1);
+    assert.ok(wa.key && wb.key && wa.key !== wb.key);
+    c.send(JSON.stringify({ t: 'hello' }));
+    await waitFor(() => c.inbox.find((x) => x.t === 'full'));
+    c.send(JSON.stringify({ t: 'hello', create: true }));
+    await waitFor(() => c.inbox.find((x) => x.t === 'taken')); // the code is in use
+    const lobby = await waitFor(() => [...a.inbox].reverse().find((x) => x.t === 'lobby' && x.here[1]));
+    assert.deepStrictEqual(lobby.here, [true, true]);
+    // another room code is another match
+    const d = await open(rc + 'X');
+    d.send(JSON.stringify({ t: 'hello', create: true }));
+    assert.strictEqual((await waitFor(() => d.inbox.find((x) => x.t === 'welcome'))).side, 0);
 
-    step('relay ok');
+    step('sides ok');
     // refused
     assert.strictEqual((await fetch(`${BASE}/room/ab`)).status, 400);
+    assert.strictEqual((await fetch(`${BASE}/room/${rc}?t=x-y`)).status, 400);
     await assert.rejects(open('ab'));
-    await assert.rejects(open('ABCD', 'https://evil.example'));
+    await assert.rejects(open(rc, 'https://evil.example'));
 
     step('refused ok');
     // flooding closes the connection
     const f = await open('FLOOD');
-    for (let i = 0; i < 60; i++) f.send('{"t":"x"}');
+    for (let i = 0; i < 100; i++) f.send('{"t":"x"}');
     assert.strictEqual(await closed(f), 1008);
 
     step('flood ok');
@@ -89,8 +103,8 @@ const closed = (ws) => new Promise((r) => { if (ws.readyState === 3) r(ws.closeC
     g.send(JSON.stringify({ t: 'x', pad: 'x'.repeat(300 * 1024) }));
     assert.strictEqual(await closed(g), 1009);
 
-    for (const s of [a, b, c]) s.close();
-    console.log('server step 1 ok (battle on server matches node; rooms, limits and origin check work)');
+    for (const s of [a, b, c, d]) s.close();
+    console.log('server step 1 ok (battle on server matches node; sides, limits and origin check work)');
   } finally {
     dev.kill('SIGTERM');
   }

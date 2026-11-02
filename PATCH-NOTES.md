@@ -4,16 +4,27 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
-## 2 November 2026 – Our own game server, and tournaments run on it
+## 2 November 2026 – Our own game server: tournaments and live matches
 
-No Mans Land now has its own game server. Tournaments are the first thing to move there.
+No Mans Land now has its own game server. Tournaments and live matches against friends run on it.
 
+### The server is the referee
+- **No more cheating in live matches.** Until now the host's phone ran the match and simply believed what the other phone said about its gold and army. Now the server keeps the match: your phone only says what you do (place, move, sell, level up, buy a skill, unlock, spin...), and the server checks every action against the rules before it counts. A changed game can't give itself gold, units it hasn't unlocked or squads on tiles it may not use.
+- **Secrets stay secret.** The server only sends your phone what you're allowed to see: your opponent's new squads, upgrades, sales, moves and picks stay hidden until the fight, and so do their leader and packages in round 1. Before, the host's phone had everything.
+- **Both players are equal.** Nobody has to be the host who keeps the page open. The server runs the deploy clock and the fight; it waits for a player who drops out (up to 2 minutes), and a reloaded phone goes straight back into the match (the link, or **Back to match** on the menu).
+- **Play a friend** now gives a `play=` link. Your opponent opens it, or types the 5-letter code on the start screen.
+- **Tournament matches** start by themselves once both players are in, and the result goes from the server straight to the tournament, so nobody can report a fake result. Spectators watch through the server too.
+
+### Tournaments live on the server
 - **Tournaments keep going without the organizer.** The tournament lives on the server, not on the organizer's phone. The organizer can close the page or run out of battery, and everything is still there when they come back. Players stay connected the whole time.
 - **Safer:** every player (and the organizer) gets a private key when they join. Nobody can report a result for someone else's match or use the organizer's buttons.
-- **Practice vs bots:** the server now plays the bot-against-bot matches, so they finish even if your phone goes to sleep.
+- **Practice vs bots:** the server plays the bot-against-bot matches, so they finish even if your phone goes to sleep.
 - Tournaments are removed from the server when the organizer ends them, or after two weeks without use. Old tournaments from before this update can't be resumed.
-- The matches themselves still connect phone to phone. Next, the server becomes the referee in live matches so nobody can cheat by changing their game, then accounts with "Sign in with Google" (and Apple). Ranked play comes once there are enough players for short queues.
+
+### Phone to phone still works
+- The old phone-to-phone matches stay as a backup: **Factions** matches, your own **Counter Lab units**, old `join=` links, and the **Phone to phone instead** button in the lobby. If the server can't be reached at all, a new match goes phone to phone by itself. Organizers can switch a tournament's matches to phone to phone in its settings (**Matches run on**).
 - vs AI, solo and the Counter Lab work without the server, as before.
+- Next: accounts with "Sign in with Google" (and Apple), match history on the server, and later ranked play once there are enough players for short queues.
 
 ---
 

@@ -4,7 +4,8 @@
 //   GET /                  -> a short note that the server is running
 //   GET /health            -> { ok, version }
 //   GET /selftest          -> plays one bot-vs-bot round of the real game inside a Durable Object
-//   GET /room/<CODE>       -> WebSocket into the match Room for that code (step 3 makes it the referee)
+//   GET /room/<CODE>       -> WebSocket into the match Room for that code: the referee of a live match (step 3)
+//   GET /room/<CODE>?t=<T> -> the same for a match of tournament T
 //   GET /tour/<CODE>       -> WebSocket into the tournament for that code (TourRoom: the server keeps the tournament)
 import { json } from './limits.js';
 import { VERSION } from './version.js';
@@ -37,13 +38,17 @@ export default {
     if (m) {
       const code = m[2].toUpperCase();
       if (!CODE_RE.test(code)) return json({ error: 'bad code' }, 400);
+      // a tournament match: its own room, apart from a friend's match that happens to have the same code
+      const tour = m[1] === 'room' ? (url.searchParams.get('t') || '').toUpperCase() : '';
+      if (tour && !CODE_RE.test(tour)) return json({ error: 'bad code' }, 400);
       if (request.headers.get('Upgrade') !== 'websocket') return json({ error: 'websocket only' }, 426);
       // Browsers always send Origin, so this keeps other websites from opening connections from a visitor's
       // browser. It is not a lock against scripts (they can fake it); the rooms' own checks handle those.
       if (!allowedOrigin(request, env)) return json({ error: 'origin' }, 403);
       const ns = m[1] === 'room' ? env.ROOM : env.TOUR;
       const headers = new Headers(request.headers); headers.set('x-code', code);
-      return ns.getByName(code).fetch(new Request(request, { headers }));
+      if (tour) headers.set('x-tour', tour);
+      return ns.getByName(tour ? `${tour}.${code}` : code).fetch(new Request(request, { headers }));
     }
 
     return json({ error: 'not found' }, 404);

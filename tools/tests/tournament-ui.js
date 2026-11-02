@@ -58,7 +58,12 @@ const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') + msg); if (!c) fai
   for (const p of all) await p.waitForFunction(() => document.getElementById('phase').textContent === 'Deploy', null, { timeout: 25000 });
   ok(true, 'both matches started by themselves');
   const hostP = all[roles.indexOf('host')];
-  const info = await hostP.evaluate(() => { const { m } = window.__pb(); return { n: m.packages[0].length, same: JSON.stringify(m.packages[0]) === JSON.stringify(m.packages[1]), mirror: m.mirror, map: m.map.id, chars: m.packages[0].map(p => p.char) }; });
+  const info = await hostP.evaluate(() => { const { m } = window.__pb(); return { n: m.packages[0].length, own: JSON.stringify(m.packages[0]), foeHidden: !m.packages[1].length, mirror: m.mirror, map: m.map.id, chars: m.packages[0].map(p => p.char) }; });
+  // (since server step 3 each phone sees only its own packages in round 1; with mirror they are the same)
+  const hostSeed = await hostP.evaluate(() => window.__pb().m.seed);
+  let guestOwn = '';
+  for (const p of all) { const x = await p.evaluate(() => { const { m, me } = window.__pb(); return { seed: m.seed, me, own: JSON.stringify(m.packages[me]) }; }); if (x.seed === hostSeed && x.me === 1) guestOwn = x.own; }
+  info.same = info.own === guestOwn && info.foeHidden;
   ok(info.n === 4 && info.same && info.mirror && info.map === 'forest', `match: ${info.n} packages, same for both ${info.same}, map ${info.map}, leaders ${info.chars.join(', ')}`);
   const clock = await text(hostP, '#clock');
   ok(/^(1:00|0:5\d)\b/.test(clock), 'deploy clock from the tournament: ' + clock);

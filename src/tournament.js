@@ -395,7 +395,8 @@
   // tournament, and only in ways these functions allow. opts: { rnd, maps (ids to pick a round's map from), orgName }.
   // Returns true when something changed.
   const SETTING_KEYS = { format: ['swiss', 'elim'], swissRounds: 'int', cut: 'int', bestOf: [1, 3, 5, 7], finalBestOf: [0, 1, 3, 5, 7], map: 'str', skin: 'str',
-    packOptions: [2, 3, 4, 5], mirror: [true, false], deploy1: 'int', deploy: 'int', next: 'int', pack: ['standard', 'all'], offUnits: 'list', offChars: 'list', offTowers: 'list' };
+    packOptions: [2, 3, 4, 5], mirror: [true, false], deploy1: 'int', deploy: 'int', next: 'int', pack: ['standard', 'all'], offUnits: 'list', offChars: 'list', offTowers: 'list',
+    net: ['server', 'peer'] }; // net: who referees the matches (the game server since 2026-11-02, or the host's phone over PeerJS)
   function cleanSetting(k, v) {
     const rule = SETTING_KEYS[k];
     if (!rule) return undefined;
@@ -451,7 +452,9 @@
     }
   }
 
-  const api = { apply, applySettings, SETTING_KEYS, CODE_CHARS, POINTS, BOT_NAMES, swapSlots, editable, addBot, isBot, bestOf, finalBestOf, winsNeeded, score, gameOf, undoGame, rng, newCode, cleanName, suggestRounds, suggestCut, create, join, rename, remove, player, nameOf, active, swissRounds, cutSize,
+  // who referees human matches: the game server unless the organizer switched back to phone-to-phone (PeerJS)
+  const serverMatches = (t) => !t.settings || t.settings.net !== 'peer';
+  const api = { serverMatches, sideOf, apply, applySettings, SETTING_KEYS, CODE_CHARS, POINTS, BOT_NAMES, swapSlots, editable, addBot, isBot, bestOf, finalBestOf, winsNeeded, score, gameOf, undoGame, rng, newCode, cleanName, suggestRounds, suggestCut, create, join, rename, remove, player, nameOf, active, swissRounds, cutSize,
     standings, pairSwiss, bracketOrder, playoffFirst, nextPlan, advance, report, resolveGame, replay, swapHost, undoRound, roundDone, current, matchOf, findMatch, bracket, placings, outcome, winnerOf, sideOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Tour = api;

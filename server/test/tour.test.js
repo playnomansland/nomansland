@@ -59,9 +59,15 @@ const { startServer, open, sleep, waitFor, closed } = require('./harness.js');
     assert.ok(round.map, 'the round got a map');
     step('organizer actions ok');
 
-    // results: only your own match counts
+    // results: the server referees human matches (step 3), so a phone's report doesn't count ...
     const mine = round.matches.find((mt) => mt.a === j1.id || mt.b === j1.id);
     const other = round.matches.find((mt) => mt !== mine);
+    p1.json({ t: 'result', match: mine.id, game: 0, code: mine.code, winner: mine.a === j1.id ? 'a' : 'b', hp: [40, 0], rounds: 6 });
+    await sleep(300);
+    assert.ok(!p1.last('state').tour.rounds[0].matches.find((mt) => mt.id === mine.id).result, 'a phone can\'t report a server-refereed match');
+    // ... unless the organizer switched back to phone-to-phone matches; then only your own match counts
+    org.json({ t: 'org', op: 'settings', a: { net: 'peer' } });
+    await waitFor(() => { const s = p1.last('state'); return s && s.tour.settings.net === 'peer' ? s : null; });
     p1.json({ t: 'result', match: other.id, game: 0, winner: 'a', hp: [50, 0], rounds: 5 });
     await sleep(300);
     assert.ok(!p1.last('state').tour.rounds[0].matches.find((mt) => mt.id === other.id).result, 'no result for someone else\'s match');

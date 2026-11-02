@@ -499,6 +499,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
 </script>
 <script>
 /*GAME*/
+/*REFEREE*/
 /*TOUR*/
 </script>
 <script>
@@ -963,6 +964,18 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
       const g0 = a[0] && a[0].gold ? a[0].gold[a[1]] : 0;
       const r = fn.apply(this, a);
       if (r && a[1] === me && byHand()) sfx(typeof act === 'function' ? act(a, g0) : act);
+      return r;
+    };
+  }
+  // A match on the game server: every Game call by this player on their own side that worked goes to the server too
+  // (srvAct), where the referee runs the same call (src/referee.js: Referee.ACTIONS lists them). Calls played again on a
+  // fresh view from the server (net.replaying) aren't sent twice.
+  for (const name of Object.keys(Referee.ACTIONS)) {
+    const fn = Game[name];
+    if (typeof fn !== 'function') continue;
+    Game[name] = function (...a) {
+      const r = fn.apply(this, a);
+      if (r && mode === 'net' && !net.replaying && phase === 'deploy' && a[0] === m && a[1] === me) srvAct(name, a.slice(2));
       return r;
     };
   }
@@ -1468,7 +1481,8 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
   function netStatus() {
     if (solo()) { setNet(''); return; }
     if (mode === 'spec') { setNet(net.connected ? `Watching ${tour.spec ? tour.spec.host + ' vs ' + tour.spec.foe : 'a match'}` : 'Connecting to the match…', net.connected ? 'ok' : 'bad'); dock(); return; }
-    if (net.connected) setNet(mode === 'host' ? `Match ${net.code} · opponent connected` : `Match ${net.code} · connected`, 'ok');
+    if (mode === 'net' && net.connected && !net.foeHere && m && !m.over && phase !== 'lobby') setNet('Opponent disconnected. The clock waits for them…', 'bad');
+    else if (net.connected) setNet(mode === 'host' ? `Match ${net.code} · opponent connected` : `Match ${net.code} · connected`, 'ok');
     else if (phase === 'lobby') setNet('');
     else if (phase === 'draft' && mode === 'guest') setNet('Connection lost. Reconnecting…', 'bad');
     else setNet(mode === 'host' ? `Opponent disconnected. Waiting for them to come back…` : 'Connection lost. Reconnecting…', 'bad');
@@ -1496,9 +1510,9 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
           commitPick(); timeUp = true; ready[0] = true; selected = null; closeSheet(); sendStatus(); panelDeploy(); render();
           if (ready[1] && net.connected) { runFight(); return; }
         }
-        if (mode !== 'guest' && mode !== 'spec' && left <= (mode === 'host' ? -500 : 0)) runFight();
-        else if (mode === 'guest' && left <= 0 && !timeUp) { commitPick(); timeUp = true; selected = null; closeSheet(); sendSide(); panelDeploy(); render(); }
-      } else if (el) { el.textContent = heldMs || (mode === 'guest' && net.connected && m && m.round === Game.TOWER_PICK_ROUND) ? 'picking towers' : solo() ? '' : 'paused'; el.classList.remove('low'); }
+        if (mode !== 'guest' && mode !== 'spec' && mode !== 'net' && left <= (mode === 'host' ? -500 : 0)) runFight();
+        else if ((mode === 'guest' || mode === 'net') && left <= 0 && !timeUp) { commitPick(); timeUp = true; selected = null; closeSheet(); sendSide(); panelDeploy(); render(); }
+      } else if (el) { el.textContent = heldMs || ((mode === 'guest' || mode === 'net') && net.connected && m && m.round === Game.TOWER_PICK_ROUND) ? 'picking towers' : solo() ? '' : 'paused'; el.classList.remove('low'); }
     }
     if ((phase === 'result' || phase === 'end') && resultShownAt) {
       const left = resultShownAt + nextSecs() * 1000 - t;
@@ -2013,7 +2027,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
       if (mode === 'claude') status = claudeStatus();
       action = `<button class="btn primary" id="fight" ${m.armies[me].length && !choosingTower() ? '' : 'disabled'}>${deadline ? 'Fight now' : 'Fight'}</button>`;
     } else {
-      const away = mode === 'host' && !net.connected;
+      const away = (mode === 'host' && !net.connected) || (mode === 'net' && !net.foeHere);
       status = away ? 'Opponent is away. The clock is paused.' : ready[foe()] ? 'Opponent is ready.' : mode === 'host' && Game.needsTowerPick(m, 1) ? 'Opponent is picking their tower.' : 'Opponent is deploying.';
       action = `<button class="btn ${ready[me] ? '' : 'primary'}" id="ready" ${timeUp || choosingTower() ? 'disabled' : ''}>${ready[me] ? 'Not ready' : 'Ready'}</button>`;
     }
@@ -2102,30 +2116,15 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
   // ---------- Undo all: this player's side as it stood once the round's picks (package, tower, devtest card) were done ----------
   // Every per-side field of the match ([side 0, side 1] arrays, also inside m.dev) plus this side's entries in the shared
   // lists (altar buys, shroom removals, devtest casts). Only this side is put back, so the opponent's moves stay.
+  // (Referee.sideState / restoreSide in src/referee.js: the game server keeps the same point for a server match)
   var undoSnap = null;
-  const UNDO_SKIP = new Set(['units', 'matrix', 'history', 'round', 'over', 'winner', 'seed', 'off', 'offTowers', 'rules', 'factions', 'map', 'dev', 'altar', 'hp', 'packages']);
-  const UNDO_NULL = new Set(['chars', 'elfOwn', 'mageGen', 'moved', 'towers', 'woke']); // per-side fields that start as null (see game.js)
   const undoKey = () => m ? m.seed + ':' + m.round : '';
-  const perSide = (v) => Array.isArray(v) && v.length === 2;
-  function sideState() {
-    const o = { top: {}, dev: {} };
-    for (const [k, v] of Object.entries(m)) if (!UNDO_SKIP.has(k) && perSide(v)) o.top[k] = v[me];
-    if (m.dev) for (const [k, v] of Object.entries(m.dev)) if (k !== 'casts' && perSide(v)) o.dev[k] = v[me];
-    o.altar = (m.altar || []).filter(x => x.side === me);
-    o.removed = ((m.map && m.map.removed) || []).filter(x => x.side === me);
-    o.casts = ((m.dev && m.dev.casts) || []).filter(x => x.side === me);
-    return JSON.stringify(o);
-  }
+  const sideState = () => JSON.stringify(Referee.sideState(m, me));
   function takeUndoSnap() { if (m && (!undoSnap || undoSnap.key !== undoKey())) undoSnap = { key: undoKey(), state: sideState() }; }
   function undoAll() {
     if (!editable() || !undoSnap || undoSnap.key !== undoKey()) return;
-    const o = JSON.parse(undoSnap.state);
-    const blank = (k, v) => Array.isArray(v) ? [] : typeof v === 'number' ? 0 : UNDO_NULL.has(k) || v == null ? null : {};
-    for (const [k, v] of Object.entries(m)) if (!UNDO_SKIP.has(k) && perSide(v)) v[me] = k in o.top ? o.top[k] : blank(k, v[me]);
-    if (m.dev) for (const [k, v] of Object.entries(m.dev)) if (k !== 'casts' && perSide(v)) v[me] = k in o.dev ? o.dev[k] : blank(k, v[me]);
-    if (m.altar || o.altar.length) m.altar = (m.altar || []).filter(x => x.side !== me).concat(o.altar);
-    if (m.map && (m.map.removed || o.removed.length)) m.map.removed = (m.map.removed || []).filter(x => x.side !== me).concat(o.removed);
-    if (m.dev) m.dev.casts = (m.dev.casts || []).filter(x => x.side !== me).concat(o.casts);
+    Referee.restoreSide(m, me, JSON.parse(undoSnap.state));
+    if (mode === 'net') srvAct('undoAll', []);
     selected = null; moveMode = false; moving = null; charmMode = false; elfPlacing = false; wallPlacing = false; fortPlacing = false; markPicking = false; bPlacing = null; castMode = null; guideMode = null; guideDraft = []; guideDrag = null; rangeOf = null;
     closeSheet(); changed();
   }
@@ -2141,6 +2140,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     ready[me] = !ready[me];
     if (ready[me]) { selected = null; closeSheet(); }
     if (mode === 'guest') sendSide();
+    if (mode === 'net') send({ t: 'ready', v: ready[me], round: m.round });
     if (mode === 'host') { sendStatus(); if (ready[0] && ready[1] && net.connected) { runFight(); return; } }
     panelDeploy(); render();
   }
@@ -2232,6 +2232,10 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     let resume = null;
     try { resume = JSON.parse(localStorage.getItem(HOST_STORE) || 'null'); } catch (e) {}
     if (resume && !(resume.m && now() - resume.ts < 6 * 3600e3)) resume = null;
+    let netBack = null; // a friend's match on the game server this phone was in
+    try { netBack = JSON.parse(localStorage.getItem(NET_STORE) || 'null'); } catch (e) {}
+    if (netBack && !(netBack.code && netBack.key && now() - netBack.ts < 6 * 3600e3)) netBack = null;
+    if (resume && netBack) resume = null;
     const newcomer = !tutDone && !resume; // the tutorial leads the menu until it's been played to the end
     overlay(`<div class="card">
       <h2>No Mans Land</h2>
@@ -2246,6 +2250,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     $('panel').innerHTML = `
       ${tour.role ? `<button class="btn primary" id="tour-back">Back to tournament ${esc(tour.code)}</button>` : ''}
       ${resume ? `<button class="btn primary" id="resume">Resume match ${esc(resume.code)}</button>` : ''}
+      ${netBack ? `<button class="btn primary" id="net-resume">Back to match ${esc(netBack.code)}</button>` : ''}
       ${newcomer ? '<button class="btn primary" id="tutorial">New here? Play the tutorial</button>' : ''}
       <div class="bar">
         <button class="btn ${resume || newcomer ? '' : 'primary'}" id="friend" style="flex:1">Challenge a friend</button>
@@ -2288,12 +2293,13 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
         </div>`)}`;
     $('how').addEventListener('click', openHowTo);
     $('tutorial').addEventListener('click', startTutorial);
-    $('friend').addEventListener('click', hostLobby);
+    $('friend').addEventListener('click', () => { matchKind = 'standard'; hostLobby(); });
     $('go').addEventListener('click', () => { matchKind = 'standard'; startAiMatch(); });
     $('factions-ai').addEventListener('click', () => { matchKind = 'factions'; startAiMatch(); });
     $('devtest-ai').addEventListener('click', () => { matchKind = 'devtest'; startAiMatch(); });
     if ($('vs-claude')) $('vs-claude').addEventListener('click', startClaudeMatch);
     if ($('resume')) $('resume').addEventListener('click', () => resumeHost(resume));
+    if ($('net-resume')) $('net-resume').addEventListener('click', () => srvJoin(netBack.code, { key: netBack.key, side: netBack.side }));
     if ($('tour-back')) $('tour-back').addEventListener('click', () => { tour.menu = false; showStart(); });
     if ($('tour-new')) $('tour-new').addEventListener('click', () => tourCreate());
     if ($('tour-practice')) $('tour-practice').addEventListener('click', () => tourPractice());
@@ -2302,7 +2308,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
       const c = $('code-in').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (c.length === 4) { tourJoin(c); return; } // a tournament
       if (c.length !== 5) { $('join-msg').hidden = false; $('join-msg').textContent = 'Match codes are 5 letters and numbers, tournament codes 4.'; return; }
-      joinMatch(c);
+      if (srvOk()) srvJoin(c, { typed: true }); else joinMatch(c); // the game server first (an older phone-to-phone match: see 'nomatch')
     };
     $('join').addEventListener('click', joinNow);
     $('code-in').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinNow(); });
@@ -2443,7 +2449,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     resultShownAt = now();
     if (m.over) {
       const inTour = !!tourLive();
-      if (inTour) tourReport(m.winner);
+      if (inTour && mode !== 'net') tourReport(m.winner); // a server match: the server reports it
       const win = m.winner === me, loss = m.winner === foe(), looking = endLook && phase === 'end'; // still looking at the board: an update (a rematch asked) keeps it so
       phase = 'end'; hud(); netStatus();
       const wait = !solo() && rematch[me];
@@ -2519,7 +2525,8 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
   function quitToMenu() { if (mode === 'host') clearHost(); closeSheet(true); showStart(); }
   function forfeit() {
     if (!m || phase === 'end') { quitToMenu(); return; }
-    if (tourLive()) tourReport(foe()); // a tournament match: the opponent wins
+    if (tourLive() && mode !== 'net') tourReport(foe()); // a tournament match: the opponent wins (the server reports its own)
+    if (mode === 'net') { send({ t: 'forfeit' }); srvForget(); quitToMenu(); return; } // (a socket sends what it has before it closes)
     if (!solo() && net.connected) {
       send({ t: 'forfeit' });
       // showStart drops the connection: keep it a moment longer so the message gets there
@@ -2533,7 +2540,8 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
   function foeForfeited() {
     if (!m || phase === 'end') return;
     const inTour = !!tourLive();
-    if (inTour) tourReport(me); // before leaveNet: that forgets the match code
+    if (inTour && mode !== 'net') tourReport(me); // before leaveNet: that forgets the match code (the server reports its own)
+    if (mode === 'net') srvForget();
     if (mode === 'host') clearHost();
     leaveNet(); cancelAnimationFrame(raf);
     m.over = true; m.winner = me; phase = 'end'; bt = null; battlePre = null; lastPre = null; deadline = 0; selected = null; resultShownAt = 0;
@@ -2620,7 +2628,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
   // (tools/match-history.gs, deployed from the sheet). Empty URL: nothing is saved and the Match history button is hidden.
   const HISTORY_URL = 'https://script.google.com/macros/s/AKfycbzEXvAprmkKnWLvx0RhqIwjW90EAuL4GSeeRN1vvN5kz6VxZEJQ9Xx_vcwSbDBNi3rI/exec';
   function saveHistory(pre, sum) {
-    if (!HISTORY_URL || mode !== 'host') return;
+    if (!HISTORY_URL || !(mode === 'host' || (mode === 'net' && me === 0))) return;
     const p = withUnits(pre), charName = (sd) => { const c = Game.charInfo(Game.charOf(p, sd)); return c ? c.name : ''; };
     const army = (sd) => armyOf(p, sd).map(q => `${q.unit} L${q.level}`).join(', ');
     const row = {
@@ -3246,7 +3254,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function enterDeploy(ms) {
     phase = 'deploy'; bt = null; watchSq = null; battlePre = null; lastPre = null; fx = []; selected = null; rangeOf = null; timeUp = false; resultShownAt = 0; elfPlacing = false; wallPlacing = false; buildPlacing = null;
     ready = [false, false];
-    heldMs = ms > 0 && mode !== 'guest' && picksPending() ? ms : 0;
+    heldMs = ms > 0 && mode !== 'guest' && mode !== 'net' && picksPending() ? ms : 0;
     deadline = ms > 0 && !heldMs ? now() + ms : 0;
     $('clock').textContent = '';
     closeSheet(); overlay(null); hud(); netStatus(); panelDeploy(); size(); render();
@@ -3264,7 +3272,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // the players whose tower pick holds the clock: this player, and on the host the guest too
   const picksPending = () => !!m && (Game.needsTowerPick(m, me) || (mode === 'host' && Game.needsTowerPick(m, 1)));
   function releaseClock() {
-    if (mode === 'guest' || phase !== 'deploy' || !heldMs || picksPending()) return;
+    if (mode === 'guest' || mode === 'net' || phase !== 'deploy' || !heldMs || picksPending()) return;
     if (mode === 'host' && !net.connected) { pausedLeft = heldMs; heldMs = 0; return; } // starts when they're back
     deadline = now() + heldMs; heldMs = 0;
     if (mode === 'host') { sendSync(); saveHost(); }
@@ -3275,7 +3283,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (phase !== 'result') return;
     if (solo()) { beginAiRound(); return; }
     nextReady[me] = true;
-    if (mode === 'guest') send({ t: 'next', round: lastSummary && lastSummary.round });
+    if (mode === 'guest' || mode === 'net') send({ t: 'next', round: lastSummary && lastSummary.round });
     else { sendStatus(); saveHost(); if (!checkNext()) showResult(lastSummary); return; }
     showResult(lastSummary);
   }
@@ -3283,7 +3291,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function askRematch() {
     if (phase !== 'end' || solo()) return;
     rematch[me] = true;
-    if (mode === 'guest') send({ t: 'rematch' });
+    if (mode === 'guest' || mode === 'net') send({ t: 'rematch' });
     else { sendStatus(); if (checkRematch()) return; }
     showResult(lastSummary);
   }
@@ -3295,7 +3303,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function runFight() {
     if (phase !== 'deploy' || !m) return;
     tutHint = '';
-    if (mode === 'guest' || mode === 'spec') return;
+    if (mode === 'guest' || mode === 'spec' || mode === 'net') return; // the host (or the server) runs it
     commitPick();
     if (mode === 'claude' && claude.busy) { if (!claude.fightWaiting) { claude.fightWaiting = true; selected = null; closeSheet(); panelDeploy(); } return; }
     closeSheet(); selected = null;
@@ -4925,7 +4933,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // Live matches: PeerJS (WebRTC). The host runs the match and decides results;
   // the guest sends its own deployments and plays back the same battle.
   // =====================================================================
-  const net = { peer: null, conn: null, code: '', connected: false, retryTimer: 0, tries: 0, alive: false, specs: new Set() }; // specs: spectators' connections (host)
+  const net = { peer: null, conn: null, code: '', connected: false, retryTimer: 0, tries: 0, alive: false, specs: new Set(), // specs: spectators' connections (host)
+    srv: false, ws: null, ping: 0, key: '', create: false, typed: false, welcomed: false, tourCode: '', watch: false, foeHere: false, seq: 0, pending: [], replaying: false }; // a match on the game server (see srvOpen)
   const peerOpts = () => {
     const o = { debug: 1 };
     if (qs.get('peerhost')) { o.host = qs.get('peerhost'); o.port = +qs.get('peerport') || 9000; o.path = qs.get('peerpath') || '/'; o.secure = qs.get('peersecure') === '1'; }
@@ -4939,7 +4948,10 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     return u.toString();
   };
   const newCode = () => Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
-  const send = (msg) => { if (net.conn && net.connected) { try { net.conn.send(msg); } catch (e) { console.warn(e); } } };
+  const send = (msg) => {
+    if (net.srv) { if (net.ws && net.ws.readyState === 1) { try { net.ws.send(JSON.stringify(msg)); } catch (e) { console.warn(e); } } return; } // a server match
+    if (net.conn && net.connected) { try { net.conn.send(msg); } catch (e) { console.warn(e); } }
+  };
   const peerAvailable = () => typeof Peer === 'function';
 
   function leaveNet() {
@@ -4949,15 +4961,19 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     for (const c of net.specs) { try { c.close(); } catch (e) {} }
     net.specs.clear();
     try { if (net.peer) net.peer.destroy(); } catch (e) {}
+    try { if (net.ws) net.ws.close(); } catch (e) {}
+    clearInterval(net.ping);
     net.peer = null; net.conn = null; net.connected = false; net.code = ''; net.tries = 0;
+    Object.assign(net, { srv: false, ws: null, key: '', create: false, typed: false, welcomed: false, tourCode: '', watch: false, foeHere: false, seq: 0, pending: [], replaying: false });
     liveSpeed = [1, 1]; // a new live match starts at 1x
     // the address bar, not qs: joinMatch puts join= back in it after the first leaveNet
     const u = new URLSearchParams(location.search);
-    if (u.has('join')) { u.delete('join'); qs.delete('join'); history.replaceState(null, '', location.pathname + (u.toString() ? '?' + u : '')); }
+    if (u.has('join') || u.has('play')) { u.delete('join'); u.delete('play'); qs.delete('join'); qs.delete('play'); history.replaceState(null, '', location.pathname + (u.toString() ? '?' + u : '')); }
   }
 
   // ----- host -----
-  function hostLobby() {
+  function hostLobby(peer) {
+    if (peer !== true && srvOk() && !customSet && matchKind !== 'factions') { srvHost(); return; } // on the game server
     if (!peerAvailable()) { overlayMsg('Couldn’t load the multiplayer code', 'Check your connection and reload the page.'); return; }
     leaveNet();
     mode = 'host'; me = 0; m = null; phase = 'lobby';
@@ -5010,12 +5026,13 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
 
   function drawLobby(problem) {
     if (tourLive()) { drawTourLobby(tourLive(), problem); return; } // a tournament match starts by itself
-    const link = shareLink();
-    const here = net.connected;
+    const srv = mode === 'net';
+    const link = srv ? playLink() : shareLink();
+    const here = srv ? net.foeHere : net.connected;
     overlay(`<div class="card">
       <span class="eyebrow">Match code</span>
       <span class="code" aria-label="Match code">${net.code}</span>
-      <p class="status ${here ? '' : 'wait'}" id="lobby-status">${problem ? esc(problem) : here ? 'Your friend is here!' : (net.peer && net.peer.open ? 'Waiting for your friend to open the link' : 'Setting up the match')}</p>
+      <p class="status ${here ? '' : 'wait'}" id="lobby-status">${problem ? esc(problem) : here ? 'Your friend is here!' : ((srv ? net.connected : net.peer && net.peer.open) ? 'Waiting for your friend to open the link' : 'Setting up the match')}</p>
       ${factionsReady() ? `<div class="seg" role="group" aria-label="Gamemode"><button data-kind="standard" aria-pressed="${matchKind !== 'factions'}">Standard</button><button data-kind="factions" aria-pressed="${matchKind === 'factions'}">Factions</button></div>` : ''}
       <button class="btn primary" id="start" ${here ? '' : 'disabled'}>Start match</button>
     </div>`);
@@ -5029,6 +5046,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         </span>
         <button class="btn" id="cancel">Cancel</button>
       </div>
+      ${srv ? '<span class="hint">The game server referees this match. <button class="btn small" id="use-peer">Phone to phone instead</button> (for Factions).</span>' : ''}
       ${packSeg()}
       ${settingsBox(`
         ${mapSeg()}
@@ -5042,12 +5060,14 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     });
     $('cancel').addEventListener('click', () => { clearHost(); showStart(); });
     $('start').addEventListener('click', hostStartMatch);
-    $('overlay').querySelectorAll('[data-kind]').forEach(b => b.addEventListener('click', () => { matchKind = b.dataset.kind; drawLobby(); }));
+    $('overlay').querySelectorAll('[data-kind]').forEach(b => b.addEventListener('click', () => { matchKind = b.dataset.kind; if (srv && matchKind === 'factions') hostLobby(true); else drawLobby(); }));
+    if ($('use-peer')) $('use-peer').addEventListener('click', () => hostLobby(true));
     wireMapSeg(); wireCharSeg(); wirePackSeg(); wireSettings();
   }
   function selectLink() { const r = document.createRange(); r.selectNodeContents($('link')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 
   function hostStartMatch() {
+    if (mode === 'net') { if (net.foeHere && me === 0 && !net.tourCode) send({ t: 'start', settings: srvSettings() }); return; } // the server starts it
     if (!net.connected) return;
     const tx = tourLive();
     if (!tx && matchKind === 'factions' && factionsReady()) { startDraft(); return; }
@@ -5510,6 +5530,197 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     else if (d.t === 'forfeit') foeForfeited();
   }
 
+  // =====================================================================
+  // Live matches on the game server (server step 3, 2026-11-02). The server keeps the match and is the referee
+  // (server/src/room.js, src/referee.js): both phones are equal players (mode 'net', me = the side the server gives),
+  // send each action they take (the Game call, see the wrapper below) and get back only what they may see. A phone
+  // plays its own actions at once on its copy and keeps them as pending until the server has them; a view from the
+  // server replaces the copy and the pending actions are played again on top. Friends' matches on the built-in units
+  // and tournament matches go here; Factions, Counter Lab units and ?peer=1 use PeerJS above (until a tournament has
+  // run on the server, PeerJS stays the fallback).
+  // =====================================================================
+  const SERVER_URL = (qs.get('server') || 'https://nml-server.nomansland.workers.dev').replace(/\/$/, '');
+  const NET_STORE = 'phonebellum.net.v1'; // { code, key, side, ts }: a friend's match on the server, to come back to
+  const srvOk = () => typeof WebSocket === 'function' && !qs.has('peer');
+  const playLink = () => { const u = new URL(shareLink()); u.searchParams.delete('join'); u.searchParams.set('play', net.code); return u.toString(); };
+  function srvSave() { try { if (mode === 'net' && net.key && !net.tourCode) localStorage.setItem(NET_STORE, JSON.stringify({ code: net.code, key: net.key, side: me, ts: now() })); } catch (e) {} }
+  function srvForget() { try { localStorage.removeItem(NET_STORE); } catch (e) {} }
+  // the built-in units for a server match (the server only plays those); the player's own come back after it
+  function srvUnits() {
+    restoreSet();
+    if (customSet && !standardSet) standardSet = { set: rawSet, custom: customSet };
+    useSet(BUILTIN, false);
+  }
+  // a friend's match: this phone makes it (side 0) and picks the settings in the lobby
+  function srvHost() {
+    leaveNet();
+    mode = 'net'; me = 0; m = null; phase = 'lobby'; bt = null; matchKind = 'standard';
+    net.srv = true; net.create = true; net.key = ''; net.tourCode = ''; net.code = newCode();
+    hud(); netStatus(); render();
+    drawLobby();
+    srvOpen();
+  }
+  // join a friend's match (or come back to it with the key); tourCode: a tournament match; watch: spectate
+  function srvJoin(code, o = {}) {
+    leaveNet();
+    if (!o.watch) { mode = 'net'; me = o.side === 0 ? 0 : 1; } else mode = 'spec';
+    m = null; phase = 'lobby'; bt = null; battlePre = null; deadline = 0; lastSummary = null; matchKind = 'standard';
+    net.srv = true; net.create = false; net.key = o.key || ''; net.tourCode = o.tour || ''; net.code = code; net.watch = !!o.watch; net.typed = !!o.typed;
+    if (!o.tour && !o.watch) { const u = new URL(location.href.split('#')[0]); u.searchParams.delete('join'); u.searchParams.set('play', code); history.replaceState(null, '', u.toString()); } // a reload comes back to it
+    hud(); netStatus(); render();
+    if (o.watch) specWaiting('Connecting to the match'); else guestWaiting(o.tour ? 'Connecting to the match' : 'Connecting to match ' + code);
+    srvOpen();
+  }
+  function srvOpen() {
+    net.alive = true;
+    clearTimeout(net.retryTimer);
+    let ws;
+    try { ws = new WebSocket(`${SERVER_URL.replace(/^http/, 'ws')}/room/${net.code}${net.tourCode ? '?t=' + net.tourCode : ''}`); } catch (e) { srvRetry(); return; }
+    net.ws = ws;
+    ws.onopen = () => {
+      if (net.ws !== ws) return;
+      net.connected = true; net.tries = 0;
+      const hello = net.watch ? { watch: true } : net.tourCode ? { id: tour.myId, tkey: tour.key } : net.key ? { key: net.key } : net.create ? { create: true } : {};
+      ws.send(JSON.stringify({ t: 'hello', ...hello }));
+      clearInterval(net.ping); net.ping = setInterval(() => { if (net.ws === ws && ws.readyState === 1) ws.send('{"t":"ping"}'); }, 30000);
+      netStatus();
+    };
+    ws.onmessage = (e) => { if (net.ws !== ws) return; let d = null; try { d = JSON.parse(e.data); } catch (er) {} if (d) srvRecv(d); };
+    ws.onclose = () => {
+      if (net.ws !== ws) return;
+      net.ws = null; net.connected = false; clearInterval(net.ping);
+      if (!net.alive) return;
+      netStatus();
+      if (phase === 'deploy' && mode === 'net') panelDeploy();
+      // the game server can't be reached at all: a new friend's match goes phone to phone (PeerJS) instead
+      if (!net.welcomed && net.tries >= 1 && phase === 'lobby' && !m && !net.tourCode && !net.watch && (net.create || net.typed) && peerAvailable()) {
+        const code = net.code, typed = net.typed; leaveNet();
+        if (typed) joinMatch(code); else hostLobby(true);
+        return;
+      }
+      if (phase === 'lobby' && !m && mode === 'net' && me === 0 && !net.tourCode) drawLobby('Can’t reach the game server. Retrying…');
+      srvRetry();
+    };
+  }
+  function srvRetry() { clearTimeout(net.retryTimer); net.tries++; net.retryTimer = setTimeout(() => { if (net.alive && !net.ws) srvOpen(); }, Math.min(8000, 600 * net.tries)); }
+  // the match settings from this phone's menu (map, look, units, leaders and towers left out)
+  const srvSettings = () => ({ map: mapPick || '', skin: skinPick || '', offUnits: matchOff().map(i => units[i].name), offChars: matchChars().slice(), offTowers: packOn() ? SP.offTowers.slice() : [] });
+  // one of this phone's own actions (a Game call that worked): to the server, and kept until it says it has it
+  function srvAct(fn, a) {
+    net.seq++;
+    net.pending.push({ seq: net.seq, fn, a });
+    send({ t: 'act', seq: net.seq, fn, a });
+  }
+  // this phone's own actions the server hasn't had yet, played again on a fresh view (undoAll: back to the undo point)
+  function srvReplay() {
+    net.replaying = true;
+    try {
+      for (const p of net.pending) {
+        if (p.fn === 'undoAll') { if (undoSnap && undoSnap.key === undoKey()) Referee.restoreSide(m, me, JSON.parse(undoSnap.state)); continue; }
+        try { Game[p.fn](m, me, ...p.a); } catch (e) {}
+      }
+    } finally { net.replaying = false; }
+  }
+  function srvClock(d) {
+    if (phase !== 'deploy') return;
+    if (d.remaining > 0) { if (!timeUp) deadline = now() + d.remaining - 300; heldMs = 0; }
+    else deadline = 0;
+  }
+  function srvLobby() {
+    if (mode === 'spec') { specWaiting('Connected. Waiting for the match to start'); return; }
+    if (net.tourCode) { const x = tourLive(); if (x) drawTourLobby(x); else guestWaiting('Waiting for the match to start'); return; }
+    if (me === 0) drawLobby(); else guestWaiting(net.foeHere ? 'Connected. Waiting for your friend to start the match' : 'Connected');
+  }
+  function srvRecv(d) {
+    if (d.t === 'welcome') {
+      net.welcomed = true;
+      if (d.side >= 0) { me = d.side; net.key = d.key || net.key; net.seq = Math.max(net.seq, d.seq | 0); srvSave(); }
+      net.create = false; netStatus();
+      if (!m && phase === 'lobby') srvLobby();
+      return;
+    }
+    if (d.t === 'taken') { net.code = newCode(); net.create = true; const ws = net.ws; net.ws = null; try { ws.close(); } catch (e) {} drawLobby(); srvOpen(); return; }
+    if (d.t === 'nomatch') { // not a server match: an older phone-to-phone one (PeerJS) with this code
+      const code = net.code; leaveNet();
+      if (peerAvailable()) joinMatch(code); else overlayMsg('No such match', `Nobody is hosting match ${code}.`);
+      return;
+    }
+    if (d.t === 'full' || d.t === 'denied') { const code = net.code; leaveNet(); srvForget(); overlayMsg(d.t === 'full' ? 'Match is full' : 'Not your match', d.t === 'full' ? `Two players are already in match ${code}.` : 'This match is for two other players.'); return; }
+    if (d.t === 'lobby') {
+      net.foeHere = !!(d.here && d.here[1 - me]);
+      if (phase === 'lobby' && !m) srvLobby();
+      netStatus(); return;
+    }
+    if (d.t === 'speed') { if (SPEEDS.includes(d.s)) { liveSpeed[foe()] = d.s; showSpeed(); } return; }
+    if (d.t === 'ack') {
+      net.pending = net.pending.filter(p => p.seq > d.seq);
+      // in step? (the server's fingerprint of this side against this phone's copy; a sync puts it right)
+      if (d.ok && d.h && !net.pending.length && m && phase === 'deploy' && Referee.sideHash(m, me) !== d.h) send({ t: 'sync' });
+      if (!d.ok && byHand()) sfx('nope');
+      return;
+    }
+    if (mode === 'spec') { srvSpec(d); return; }
+    if (d.t === 'status') {
+      if (d.here) net.foeHere = !!d.here[foe()];
+      if (d.ready) { ready[foe()] = !!d.ready[foe()]; if (!timeUp) ready[me] = !!d.ready[me]; }
+      if (d.nextReady) nextReady = d.nextReady.slice();
+      if (d.rematch) rematch = d.rematch.slice();
+      srvClock(d); netStatus();
+      if (phase === 'deploy') panelDeploy();
+      else if ((phase === 'result' || phase === 'end') && lastSummary) showResult(lastSummary);
+      return;
+    }
+    if (d.t === 'fight') {
+      if (!d.pre || !d.post || !d.summary) return;
+      net.pending = [];
+      m = withUnits(d.post); lastSummary = d.summary;
+      nextReady = [false, false]; rematch = [false, false];
+      if (me === 0) saveHistory(d.pre, d.summary);
+      if (m.over) srvForget();
+      playBattle(d.pre);
+      return;
+    }
+    if (d.t === 'forfeit') {
+      if (d.side !== me) foeForfeited();
+      return;
+    }
+    if (d.t === 'sync') {
+      if (d.here) net.foeHere = !!d.here[foe()];
+      if (d.m && !m) { // the first look at this match on this phone: the built-in units
+        srvUnits();
+        if (net.tourCode) tour.playing = net.code;
+      }
+      net.pending = net.pending.filter(p => p.seq > (d.ack | 0));
+      const incoming = withUnits(d.m);
+      if (d.phase === 'deploy') {
+        const same = phase === 'deploy' && m && m.round === incoming.round;
+        m = incoming;
+        srvReplay();
+        if (!same) {
+          lastSummary = d.summary || lastSummary; nextReady = [false, false]; rematch = [false, false];
+          enterDeploy(0);
+          srvSave();
+        }
+        ready = [!!d.ready[0], !!d.ready[1]];
+        srvClock(d);
+        panelDeploy(); render(); hud(); netStatus();
+        return;
+      }
+      // the result screen or the end (after a reconnect)
+      if (d.phase === 'end' && d.forfeit != null) { if (!m || !m.over || phase !== 'end') { m = incoming; if (d.forfeit !== me) foeForfeited(); else { srvForget(); showStart(); } } return; }
+      if (phase === 'battle' && d.summary && lastSummary && d.summary.round === lastSummary.round) return; // still watching it
+      m = incoming; lastSummary = d.summary;
+      nextReady = (d.nextReady || [false, false]).slice(); rematch = (d.rematch || [false, false]).slice();
+      if (lastSummary) { if (phase !== 'result' && phase !== 'end') bt = null; showResult(lastSummary); }
+      render();
+    }
+  }
+  // a spectator of a server match: the same messages as from a PeerJS host
+  function srvSpec(d) {
+    if (d.t === 'sync' && d.m && !m) srvUnits();
+    if (d.t === 'sync' || d.t === 'fight') specRecv(d);
+  }
+
   function overlayMsg(head, text) {
     overlay(`<div class="card"><h2>${esc(head)}</h2><p>${esc(text)}</p><button class="btn primary" id="ok">OK</button></div>`);
     $('ok').addEventListener('click', showStart);
@@ -5526,7 +5737,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   const TOUR_PREFIX = 'phonebellum-t1-';
   const TOUR_ORG = 'phonebellum.tour.org.v2', TOUR_ME = 'phonebellum.tour.me.v2'; // v2: { code, id, key, ts } (the server keeps the tournament)
   const TOUR_SERVER = (qs.get('server') || 'https://nml-server.nomansland.workers.dev').replace(/\/$/, '');
-  const TOUR_DEFAULTS = { format: 'swiss', swissRounds: 0, cut: -1, bestOf: 1, finalBestOf: 0, map: '', skin: '', packOptions: 3, mirror: true, deploy1: 90, deploy: 90, next: 20, pack: 'standard', offUnits: [], offChars: [], offTowers: [] };
+  const TOUR_DEFAULTS = { format: 'swiss', swissRounds: 0, cut: -1, bestOf: 1, finalBestOf: 0, map: '', skin: '', packOptions: 3, mirror: true, deploy1: 90, deploy: 90, next: 20, pack: 'standard', offUnits: [], offChars: [], offTowers: [], net: 'server' };
   const tour = { role: null, code: '', ws: null, connected: false, t: null, online: [], myId: '', key: '', myName: '', alive: false, timer: 0, ping: 0, tries: 0, menu: false, tab: '', pending: null, dirty: false, problem: '', create: null };
   const tourOrg = () => tour.role === 'org';
   const tourLink = (watch) => {
@@ -5544,7 +5755,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (!x || x.bye) return null;
     // the game of the match this code is for (a series has a code per game)
     const g = mode === 'ai' ? (m && tour.botMatch === x.match.id ? Tour.gameOf(x.match, tour.botCode) : -1) // against a bot, on this phone
-      : mode === 'host' || mode === 'guest' ? Tour.gameOf(x.match, net.code) : -1;
+      : mode === 'host' || mode === 'guest' || mode === 'net' ? Tour.gameOf(x.match, net.code) : -1;
     return g >= 0 ? { ...x, game: g } : null;
   }
   const tourSet = () => (tourLive() && tour.t.settings) || null; // the match settings while a tournament match is on
@@ -5683,6 +5894,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       startReport(); beginAiRound();
       return;
     }
+    if (Tour.serverMatches(tour.t)) { srvJoin(x.match.code, { tour: tour.code }); return; } // the game server referees it
     if (tourIsHost(x)) {
       if (!peerAvailable()) { overlayMsg('Couldn’t load the multiplayer code', 'Check your connection and reload the page.'); return; }
       leaveNet();
@@ -5697,17 +5909,17 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // the host's lobby in a tournament: starts by itself once the opponent is here
   let tourStartTimer = 0;
   function drawTourLobby(x, problem) {
-    const foe = Tour.nameOf(tour.t, x.match[x.side === 'a' ? 'b' : 'a']), here = net.connected;
+    const srv = mode === 'net', foe = Tour.nameOf(tour.t, x.match[x.side === 'a' ? 'b' : 'a']), here = srv ? net.foeHere : net.connected;
     overlay(`<div class="card">
       <span class="eyebrow">${esc(tour.t.name)} · ${esc(tourRoundName(x.round))}</span>
       <h2>vs ${esc(foe)}</h2>
-      <p class="status ${here ? '' : 'wait'}" id="lobby-status">${problem ? esc(problem) : here ? `${esc(foe)} is here. Starting…` : (net.peer && net.peer.open ? `Waiting for ${esc(foe)} to tap Join match` : 'Setting up the match')}</p>
+      <p class="status ${here ? '' : 'wait'}" id="lobby-status">${problem ? esc(problem) : here ? `${esc(foe)} is here. Starting…` : ((srv ? net.connected : net.peer && net.peer.open) ? `Waiting for ${esc(foe)} to tap Join match` : 'Setting up the match')}</p>
       <button class="btn" id="tour-cancel">Back to the tournament</button>
     </div>`);
-    $('panel').innerHTML = `<span class="hint">Match code ${esc(net.code)} · you host this one. Keep this page open.</span>`;
+    $('panel').innerHTML = `<span class="hint">Match code ${esc(net.code)} · ${srv ? 'the game server referees it' : 'you host this one'}. Keep this page open.</span>`;
     $('tour-cancel').addEventListener('click', () => { clearTimeout(tourStartTimer); showStart(); });
     clearTimeout(tourStartTimer);
-    if (here) tourStartTimer = setTimeout(() => { if (phase === 'lobby' && net.connected && tourLive()) hostStartMatch(); }, 900);
+    if (here && !srv) tourStartTimer = setTimeout(() => { if (phase === 'lobby' && net.connected && tourLive()) hostStartMatch(); }, 900);
   }
   // a tournament match: the tournament's map, look, units, leaders, package count, mirror rolls (on the built-in units)
   function tourCreateMatch(x) {
@@ -5803,8 +6015,16 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // watch a match of the current round (both players people: bots' matches aren't played over the network)
   function tourSpectate(matchId) {
     const f = tour.t && Tour.findMatch(tour.t, matchId);
-    if (!f || f.match.result || f.match.b == null || !peerAvailable()) return;
+    if (!f || f.match.result || f.match.b == null) return;
     const mt = f.match, hk = tourHostKey(mt);
+    if (Tour.serverMatches(tour.t)) { // a server match: watch it on the server
+      document.documentElement.classList.remove('tourtv');
+      tour.spec = { id: mt.id, host: Tour.nameOf(tour.t, mt[hk]), foe: Tour.nameOf(tour.t, mt[hk === 'a' ? 'b' : 'a']), pending: null, timer: 0 };
+      tour.menu = false;
+      srvJoin(mt.code, { watch: true, tour: tour.code });
+      return;
+    }
+    if (!peerAvailable()) return;
     leaveNet();
     document.documentElement.classList.remove('tourtv');
     mode = 'spec'; me = 0; m = null; phase = 'lobby'; bt = null; battlePre = null; deadline = 0; lastSummary = null;
@@ -5956,11 +6176,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
 
   // redraw the tournament screen when it's showing (never over a match), and the start screen's tournament button
   function tourRedraw() {
-    if (phase === 'lobby' && tourLive() && mode === 'host') { drawTourLobby(tourLive()); return; }
+    if (phase === 'lobby' && tourLive() && (mode === 'host' || mode === 'net')) { drawTourLobby(tourLive()); return; }
     // waiting in a lobby for a match the organizer has just re-paired: back to the tournament screen (with the new match)
-    if (tour.playing && (mode === 'host' || mode === 'guest') && phase === 'lobby' && !m && !tourLive()) { tour.playing = ''; showStart(); return; }
+    if (tour.playing && (mode === 'host' || mode === 'guest' || mode === 'net') && phase === 'lobby' && !m && !tourLive()) { tour.playing = ''; showStart(); return; }
     // in the middle of a game the organizer has just moved (new pairings or a replay): it no longer counts
-    if (tour.playing && (mode === 'host' || mode === 'guest' || mode === 'ai') && m && !m.over && phase !== 'start' && !tourLive()) {
+    if (tour.playing && (mode === 'host' || mode === 'guest' || mode === 'net' || mode === 'ai') && m && !m.over && phase !== 'start' && !tourLive()) {
       const x = tourMine(), code = tour.playing;
       if (!x || Tour.gameOf(x.match, code) < 0) { tourMoved(); return; }
     }
@@ -6160,6 +6380,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         ${segOf('deploy1', [[60, '60 s'], [90, '90 s'], [120, '120 s'], [150, '150 s']], 'Deploy timer, round 1')}
         ${segOf('deploy', [[45, '45 s'], [60, '60 s'], [90, '90 s'], [120, '120 s']], 'Deploy timer, later rounds')}
         ${segOf('next', [[10, '10 s'], [20, '20 s'], [30, '30 s']], 'Results screen')}
+        ${segOf('net', [['server', 'Game server'], ['peer', 'Phone to phone']], 'Matches run on')}
         <span class="hint">Map and look below: Random means a new map each round, the same for every match in it.</span>
         ${mapSeg()}
         ${packSeg()}
@@ -6274,6 +6495,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         else { lastTs = 0; cancelAnimationFrame(raf); raf = requestAnimationFrame(loop); } // lastTs: no catching up on the time away
       }
     }
+    if (!document.hidden && net.alive && net.srv && !net.ws) { srvOpen(); return; } // a server match: back at once
     if (document.hidden || !net.alive || !net.peer) return;
     if (net.peer.disconnected && !net.peer.destroyed) net.peer.reconnect();
     if (mode === 'guest' && !net.connected) retryConnect(300);
@@ -6282,6 +6504,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   window.addEventListener('resize', () => { size(); render(); });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { size(); render(); });
   const joinCode = (qs.get('join') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const playCode = (qs.get('play') || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); // a match on the game server
   { // a tournament: the invite link, or the one this device was in (the organizer's comes back with its key)
     const tc = (qs.get('tour') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     let org = null, mine = null;
@@ -6290,9 +6513,13 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (tc.length === 4 && !(fresh(org) && org.key && org.code === tc)) tourJoin(tc, qs.has('watch'));
     else if (fresh(org) && org.key) tourResumeOrg(org);
     else if (fresh(mine) && mine.code) tourJoin(mine.code, false);
-    if (joinCode.length === 5) tour.menu = false;
+    if (joinCode.length === 5 || playCode.length === 5) tour.menu = false;
   }
-  if (joinCode.length === 5) { showStart(); joinMatch(joinCode); }
+  if (playCode.length === 5) {
+    showStart();
+    let back = null; try { back = JSON.parse(localStorage.getItem(NET_STORE) || 'null'); } catch (e) {}
+    if (back && back.code === playCode && back.key) srvJoin(playCode, { key: back.key, side: back.side }); else srvJoin(playCode);
+  } else if (joinCode.length === 5) { showStart(); joinMatch(joinCode); }
   else showStart();
 })();
 </script>

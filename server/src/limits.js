@@ -5,6 +5,7 @@ export const LIMITS = {
   maxTourSockets: 80,           // a tournament: players + watchers
   maxTourPlayers: 64,
   ratePerWindow: 40,            // messages one connection may send ...
+  matchRatePerWindow: 150,      // ... (in a match: every tap that buys, places or moves is a message)
   rateWindowMs: 10_000,         // ... per 10 seconds; more and it's disconnected
   selftestEveryMs: 10_000,      // the self test runs at most once per 10 s
 };
@@ -14,7 +15,7 @@ export const json = (body, status = 200, extra = {}) => new Response(JSON.string
 });
 
 // Checks one incoming message: size, rate, JSON object. Returns the parsed object, or null after closing the socket.
-export function readMessage(ws, message, rate) {
+export function readMessage(ws, message, rate, perWindow = LIMITS.ratePerWindow) {
   const size = typeof message === 'string' ? message.length : message.byteLength;
   if (size > LIMITS.maxMessageBytes) { ws.close(1009, 'message too big'); return null; }
   const now = Date.now();
@@ -22,7 +23,7 @@ export function readMessage(ws, message, rate) {
   if (now - r.start > LIMITS.rateWindowMs) { r.start = now; r.count = 0; }
   r.count++;
   rate.set(ws, r);
-  if (r.count > LIMITS.ratePerWindow) { ws.close(1008, 'too many messages'); return null; }
+  if (r.count > perWindow) { ws.close(1008, 'too many messages'); return null; }
   if (typeof message !== 'string') { ws.close(1003, 'text only'); return null; }
   let data;
   try { data = JSON.parse(message); } catch { ws.close(1007, 'not json'); return null; }

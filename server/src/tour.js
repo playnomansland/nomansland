@@ -21,6 +21,8 @@ const KEEP_MS = 14 * 24 * 3600 * 1000;   // a tournament nobody touched for 14 d
 const BOT_STEP_MS = 400;                  // pause between simulated bot matches
 const MAPS = Game.MAPS.filter((x) => !x.plain).map((x) => x.id);
 const newId = () => secret(5);            // 10 hex characters, like the page's ids
+// a match's settings where the tournament has none (as the page's TOUR_DEFAULTS)
+const TOUR_MATCH_DEFAULTS = { map: '', skin: '', packOptions: 3, mirror: true, deploy1: 90, deploy: 90, next: 20, offUnits: [], offChars: [], offTowers: [] };
 
 export class TourRoom extends DurableObject {
   constructor(ctx, env) {
@@ -83,6 +85,8 @@ export class TourRoom extends DurableObject {
     } else if (d.t === 'result') {
       const f = Tour.findMatch(t, String(d.match).slice(0, 40));
       if (!a.id || !f || (f.match.a !== a.id && f.match.b !== a.id)) return; // only the two players report
+      // a match the server referees reports itself (Room -> serverResult): a phone's word doesn't count there
+      if (Tour.serverMatches(t) && !Tour.isBot(t, f.match.a) && !Tour.isBot(t, f.match.b)) return this.send(ws, this.stateMsg());
       const game = d.game | 0;
       if (d.code && Tour.gameOf(f.match, String(d.code).slice(0, 12)) !== game) return this.send(ws, this.stateMsg()); // an old code: doesn't count
       const hp = Array.isArray(d.hp) ? d.hp.slice(0, 2).map((x) => Math.max(0, Math.min(1000, x | 0))) : [0, 0];
@@ -149,6 +153,37 @@ export class TourRoom extends DurableObject {
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
     for (const s of socks) { try { s.close(1000, 'ended'); } catch {} }
+  }
+
+  // ----- called by a match Room (server step 3): never by a phone -----
+  // Who a player is in the match with this code: { match, game, side (0 = the match's host), keys (side 0's and
+  // side 1's letter in the match), ids, names, settings } or null (wrong key, not their match, or the code is old).
+  matchFor(id, key, code) {
+    const t = this.t;
+    if (!t || t.status !== 'running' || !id || !this.keys[id] || this.keys[id] !== key || !Tour.serverMatches(t)) return null;
+    const r = Tour.current(t);
+    const mt = r && r.matches.find((x) => (x.a === id || x.b === id) && x.b != null && !x.result && Tour.gameOf(x, code) >= 0);
+    if (!mt || Tour.isBot(t, mt.a) || Tour.isBot(t, mt.b)) return null;
+    const hk = mt.host || 'a', gk = hk === 'a' ? 'b' : 'a';
+    const s = { ...TOUR_MATCH_DEFAULTS, ...t.settings };
+    const mapId = r.map && Game.MAPS.some((x) => x.id === r.map) ? r.map : (s.map || '');
+    return {
+      match: mt.id, game: Tour.gameOf(mt, code), side: Tour.sideOf(mt, id) === hk ? 0 : 1, keys: [hk, gk], ids: [mt[hk], mt[gk]],
+      names: [Tour.nameOf(t, mt[hk]), Tour.nameOf(t, mt[gk])],
+      settings: { map: mapId, skin: s.skin, offUnits: s.offUnits, offChars: s.offChars, offTowers: s.offTowers, packOptions: s.packOptions, mirror: s.mirror !== false, deploy1: s.deploy1, deploy: s.deploy, next: s.next },
+    };
+  }
+  // The result of a match the server refereed. code: the match room's code (a series has one per game).
+  async serverResult(code, winner, hp, rounds) {
+    const t = this.t;
+    if (!t || !['a', 'b', 'draw'].includes(winner)) return false;
+    const r = Tour.current(t);
+    const mt = r && r.matches.find((x) => Tour.gameOf(x, code) >= 0);
+    if (!mt) return false; // the organizer changed the pairings meanwhile: this game doesn't count
+    const h = Array.isArray(hp) ? hp.slice(0, 2).map((x) => Math.max(0, Math.min(1000, x | 0))) : [0, 0];
+    if (!Tour.report(t, mt.id, winner, h, Math.max(0, Math.min(200, rounds | 0)), 'auto', Tour.gameOf(mt, code))) return false;
+    await this.changed();
+    return true;
   }
 
   webSocketClose(ws) { this.rate.delete(ws); this.broadcast(ws); }

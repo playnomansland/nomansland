@@ -22,7 +22,7 @@ async function startServer(port) {
     if (i > 120) throw new Error('server did not start:\n' + log);
     await sleep(500);
   }
-  return { base, ws: base.replace('http', 'ws'), stop: () => dev.kill('SIGTERM') };
+  return { base, ws: base.replace('http', 'ws'), stop: () => dev.kill('SIGTERM'), log: () => log };
 }
 
 // a socket that keeps everything it receives in .inbox; .next(type) waits for the next message of that type
