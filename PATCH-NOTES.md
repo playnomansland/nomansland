@@ -16,7 +16,7 @@ Newest first. Each entry says what changed for players; technical details live i
 ### Units
 - **Ember Imps – Ember Mortar (nerf):** attack speed −20%, range bonus +12 m (was +18 m), and the mortar now **lobs shells at 20 m/s** instead of hitting at once, so fast units can step out of the blast.
 - **Ember Imps – Summon hellfiend (nerf):** the Hellfiend has 30% less health, hit, attack speed and move speed.
-- **Fire Mage (nerf):** range −3 m (20 → 17 m) and health −10% (155 → 139.5).
+- **Flame Wizard (nerf):** range −3 m (15 → 12 m; its flame cone still reaches 1.2× that) and health −10% (1700 → 1530).
 - **Leaf Wizard (nerf):** range −2 m (22 → 20 m) and health −40% (185 → 111).
 - **Wisps (nerf):** attack speed −15% (0.7 → 0.6 attacks a second).
 - **Truespear (nerf):** attack speed −15% (0.9 → 0.77) and health −30% (1800 → 1260).
