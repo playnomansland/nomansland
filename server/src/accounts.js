@@ -19,6 +19,7 @@
 //   /account/tag     { tag } (auth)      -> { player }
 //   /account/signout { all? } (auth)     -> { ok }
 //   /account/delete  (auth)              -> { ok }  (login, sessions and gamertag removed; the id stays as a tombstone)
+//   /account/title   { title } (auth)   -> { player }  (shows one of the player's titles under the gamertag; '' = none)
 //   /account/ranked  { on } (auth, developer only) -> { on }  (switches ranked play on or off for everyone)
 //
 // Ranked play (2026-11-02): a ranked friend's match is a best of 3 refereed by the Room (room.js). When a series is
@@ -50,8 +51,29 @@ const SCHEMA = [
 ];
 let schemaReady = null;
 function ensureSchema(db) {
-  if (!schemaReady) schemaReady = db.batch(SCHEMA.map((s) => db.prepare(s))).catch((e) => { schemaReady = null; throw e; });
+  if (!schemaReady) schemaReady = db.batch(SCHEMA.map((s) => db.prepare(s)))
+    // players.title (2026-11-02): the title picked to show; added to a table that may already exist
+    .then(() => db.prepare('ALTER TABLE players ADD COLUMN title TEXT').run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }))
+    .catch((e) => { schemaReady = null; throw e; });
   return schemaReady;
+}
+
+// ---------- titles (2026-11-02) ----------
+// Shown under a gamertag. Earned, never bought; decided here from the player's row:
+//   day1  "Day 1" (purple): every account made in the first week, up to the end of Sunday 2026-11-08 (Stockholm time)
+//   dev   "DEV" (pink): developer accounts (the server's dev column)
+// The player picks which one shows (players.title); none picked = the newest earned one (DEV before Day 1).
+export const DAY1_END = Date.UTC(2026, 10, 8, 23, 0, 0); // Monday 2026-11-09 00:00 in Stockholm
+export function titlesOf(p) {
+  const out = [];
+  if (p && p.dev) out.push('dev');
+  if (p && p.created < DAY1_END) out.push('day1');
+  return out;
+}
+export function titleShown(p) {
+  const have = titlesOf(p);
+  if (p && p.title === 'none') return '';
+  return p && have.includes(p.title) ? p.title : have[0] || '';
 }
 
 const enc = new TextEncoder();
@@ -161,7 +183,8 @@ export async function sessionPlayer(env, token) {
   await ensureSchema(db);
   const s = await db.prepare(`SELECT s.player, s.expires, p.tag, p.deleted, p.dev FROM sessions s JOIN players p ON p.id = s.player WHERE s.hash = ?`).bind(await sha256(token)).first();
   if (!s || s.expires < Date.now() || s.deleted) return null;
-  return { id: s.player, tag: s.tag || 'Player', dev: !!s.dev };
+  const p = await db.prepare('SELECT created, dev, title FROM players WHERE id = ?').bind(s.player).first();
+  return { id: s.player, tag: s.tag || 'Player', dev: !!s.dev, title: titleShown(p) };
 }
 // Ranked play is on unless a developer switched it off (config 'ranked' = 'off'). No database: off.
 export async function rankedOn(env) {
@@ -189,9 +212,9 @@ export async function leaderboard(env, cors) {
   try {
     await ensureSchema(db);
     const on = await rankedOn(env);
-    const res = await db.prepare(`SELECT p.id, p.tag, r.w, r.t, r.l FROM ranked r JOIN players p ON p.id = r.player WHERE p.deleted IS NULL AND (r.w + r.t + r.l) > 0
+    const res = await db.prepare(`SELECT p.id, p.tag, p.created, p.dev, p.title, r.w, r.t, r.l FROM ranked r JOIN players p ON p.id = r.player WHERE p.deleted IS NULL AND (r.w + r.t + r.l) > 0
       ORDER BY (r.w + 0.5 * r.t) * 1.0 / (r.w + r.t + r.l) DESC, r.w DESC, r.l ASC LIMIT 200`).all();
-    return json({ on, rows: res.results.map((r) => ({ id: r.id, tag: r.tag || 'Player', w: r.w, t: r.t, l: r.l })) }, 200, { ...cors, 'cache-control': 'no-store' });
+    return json({ on, rows: res.results.map((r) => ({ id: r.id, tag: r.tag || 'Player', title: titleShown(r), w: r.w, t: r.t, l: r.l })) }, 200, { ...cors, 'cache-control': 'no-store' });
   } catch (e) {
     console.warn('leaderboard', e && e.message);
     return json({ error: 'leaderboard unavailable' }, 503, cors);
@@ -199,9 +222,9 @@ export async function leaderboard(env, cors) {
 }
 
 async function playerOut(db, id) {
-  const p = await db.prepare('SELECT id, tag, created, dev FROM players WHERE id = ?').bind(id).first();
+  const p = await db.prepare('SELECT id, tag, created, dev, title FROM players WHERE id = ?').bind(id).first();
   const logins = await db.prepare('SELECT provider FROM logins WHERE player = ?').bind(id).all();
-  return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google'), dev: !!p.dev };
+  return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google'), dev: !!p.dev, titles: titlesOf(p), title: titleShown(p) };
 }
 
 // Developer mode: a Google account whose verified email is in the secret DEV_EMAILS (comma separated; a Cloudflare
@@ -219,7 +242,7 @@ export async function handleAccount(request, env, cors) {
   const db = env.ACCOUNTS;
   if (!db) return json({ error: 'accounts off' }, 503, cors);
   const route = new URL(request.url).pathname.replace(/^\/account\/?/, '').replace(/\/$/, '');
-  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked'].includes(route)) return json({ error: 'not found' }, 404, cors);
+  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title'].includes(route)) return json({ error: 'not found' }, 404, cors);
   if (request.method !== 'POST') return json({ error: 'method' }, 405, cors);
 
   let body = {};
@@ -277,6 +300,13 @@ export async function handleAccount(request, env, cors) {
     const me = await auth(db, request);
     if (!me) return json({ error: 'signed out' }, 401, cors);
 
+    if (route === 'title') {
+      const t = typeof body.title === 'string' ? body.title : '';
+      const p = await db.prepare('SELECT created, dev FROM players WHERE id = ?').bind(me.player).first();
+      if (t && !titlesOf(p).includes(t)) return json({ error: 'not your title' }, 400, cors);
+      await db.prepare('UPDATE players SET title = ? WHERE id = ?').bind(t || 'none', me.player).run();
+      return json({ player: await playerOut(db, me.player) }, 200, cors);
+    }
     if (route === 'ranked') {
       // a developer switches ranked play on or off for everyone (the server's own dev flag, never the phone's word)
       const p = await db.prepare('SELECT dev FROM players WHERE id = ?').bind(me.player).first();

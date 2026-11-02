@@ -91,7 +91,7 @@ export class Room extends DurableObject {
   // ----- ranked play -----
   rankedView() {
     const rk = this.meta && this.meta.ranked;
-    return rk ? { tags: rk.tags, wins: rk.wins, ties: rk.ties, games: rk.games, best: BEST_OF, done: rk.done, result: rk.result, forfeit: rk.forfeit } : null;
+    return rk ? { tags: rk.tags, titles: rk.titles || ['', ''], wins: rk.wins, ties: rk.ties, games: rk.games, best: BEST_OF, done: rk.done, result: rk.result, forfeit: rk.forfeit } : null;
   }
   // a game of the series is over (forfeitSide: that side left, which loses the series); counted once per game
   tally(forfeitSide) {
@@ -277,10 +277,10 @@ export class Room extends DurableObject {
         else if (!keys[1]) side = 1;
         else { this.send(ws, { t: 'full' }); return; } // two players already: Watch instead
         if (!this.meta) this.meta = { tour: null, keys: ['', ''], code: a.code || '' };
-        if (side === 0 && wantsRanked) this.meta.ranked = { ids: [who.id, ''], tags: [who.tag, ''], wins: [0, 0], ties: 0, games: 0, done: false, result: null, forfeit: null, counted: null };
+        if (side === 0 && wantsRanked) this.meta.ranked = { ids: [who.id, ''], tags: [who.tag, ''], titles: [who.title || '', ''], wins: [0, 0], ties: 0, games: 0, done: false, result: null, forfeit: null, counted: null };
         if (side === 1 && this.meta.ranked) {
           if (who.id === this.meta.ranked.ids[0]) { this.send(ws, { t: 'denied', why: 'self' }); return; }
-          this.meta.ranked.ids[1] = who.id; this.meta.ranked.tags[1] = who.tag;
+          this.meta.ranked.ids[1] = who.id; this.meta.ranked.tags[1] = who.tag; if (this.meta.ranked.titles) this.meta.ranked.titles[1] = who.title || '';
         }
         this.meta.keys[side] = secret();
       }

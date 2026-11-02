@@ -86,3 +86,7 @@ Built 2026-11-02 (`server/src/accounts.js`, routes in `server/src/index.js`):
 - meta.ranked keeps the series ({ ids, tags, wins, ties, games, done, result, forfeit, counted }); tally() counts each finished game once (by seed). Best of 3: 2 wins, or 3 games (equal wins = a tie). A forfeit loses the series. When decided, recordSeries adds w/t/l to D1 table ranked. Rematch = next game; after a decided series, a new series. welcome, lobby, sync, fight and forfeit carry ranked.
 - D1 tables: ranked (player, w, t, l, updated) and config (k, v; 'ranked' = 'on' | 'off'). POST /account/ranked { on } (developer only, the server's dev column) switches it; /account/me returns rankedOn. GET /leaderboard (origin-checked) -> { on, rows: [{ id, tag, w, t, l }] }, best win share first, deleted accounts left out.
 - Tests: server/test/ranked.test.js (in npm test).
+
+## Titles (2026-11-02)
+
+- accounts.js titlesOf(player): 'dev' (players.dev) and 'day1' (players.created before DAY1_END = 2026-11-09 00:00 Stockholm). players.title (added by ensureSchema with ALTER TABLE) is the pick: an id, 'none', or NULL (= the first earned). Player objects carry titles and title; POST /account/title { title } ('' = none; only an earned title). The leaderboard rows and the ranked series (titles) carry the shown title. Page: TITLES, nameplate(), popup for titles not yet announced on this phone (pb-titles-seen).

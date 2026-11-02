@@ -194,7 +194,11 @@ a { color: var(--you); }
 .hist li { border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; display: grid; gap: 2px; font: 500 14px var(--font-body); }
 .hist li span { font-size: 12px; color: var(--muted); }
 .acct { display: grid; gap: 10px; }
-.acct-google { min-height: 44px; }
+.acct-google { min-height: 44px; display: flex; justify-content: center; align-items: center; border-radius: 999px; position: relative; color-scheme: normal; }
+.acct-google:not(.ready)::before { content: 'Loading Google sign-in…'; position: absolute; inset: 0; display: grid; place-items: center; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; background: rgba(32, 33, 36, 0.6); }
+.acct-google > * { transition: opacity 0.25s ease; }
+.acct-google:not(.ready) > * { opacity: 0; }
+.acct-trust { margin: -4px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
 .acct-dev { color: var(--gold); }
 .volrow { display: flex; align-items: center; gap: 10px; flex: 1; justify-content: flex-end; }
 .volrow input { flex: 1; max-width: 220px; accent-color: var(--gold); }
@@ -606,7 +610,6 @@ html.home .app { visibility: hidden; }
 .welcome-btns .hbtn { width: 100%; }
 .home-card { width: min(100%, 440px); background: rgba(21, 33, 37, 0.92); border: 1px solid var(--line); border-radius: 12px; padding: 18px 16px; display: grid; gap: 12px; text-align: left; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); }
 .home-card h3 { font-size: 20px; }
-.home-card .acct-google { min-height: 44px; }
 .home-msg { margin: 0; min-height: 1.2em; color: var(--gold); font-size: 14px; text-align: center; text-shadow: 0 1px 2px #000; }
 .play-big { font-size: 34px !important; min-width: min(78vw, 300px); min-height: 84px !important; border-radius: 14px !important; letter-spacing: 0.14em !important; }
 .home-more { display: grid; gap: 8px; justify-items: center; width: min(100%, 360px); }
@@ -644,6 +647,29 @@ html.pc .corner button span { display: inline; }
 .lb td.num { font-family: var(--font-data); }
 .series { display: flex; justify-content: center; gap: 10px; align-items: baseline; font-family: var(--font-display); }
 .series b { font-size: 22px; }
+
+/* titles (2026-11-02): a small glowing banner under a gamertag */
+.nameplate { display: inline-grid; justify-items: center; gap: 2px; line-height: 1.15; vertical-align: middle; }
+.nameplate .np-tag { font: 700 15px var(--font-display); letter-spacing: 0.03em; }
+.nameplate.big .np-tag { font-size: 22px; }
+.nameplate.row { justify-items: start; }
+.nameplate.menu-np .np-tag { font-size: 20px; color: #fff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6); }
+.ptitle { --tc: #B67CFF; --tg: rgba(182, 124, 255, 0.5); display: inline-flex; align-items: center; gap: 6px; font: 700 10px var(--font-display); letter-spacing: 0.22em; text-transform: uppercase; color: var(--tc); padding: 2px 9px 2px 11px; border-radius: 999px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--tc) 22%, transparent) 25%, color-mix(in srgb, var(--tc) 22%, transparent) 75%, transparent);
+  text-shadow: 0 0 8px var(--tg), 0 0 2px var(--tg); animation: tglow 2.6s ease-in-out infinite; }
+.ptitle i { width: 5px; height: 5px; background: var(--tc); transform: rotate(45deg); box-shadow: 0 0 6px var(--tg); }
+.ptitle.big { font-size: 22px; gap: 12px; padding: 6px 22px; }
+.ptitle.big i { width: 9px; height: 9px; }
+@keyframes tglow { 50% { text-shadow: 0 0 14px var(--tg), 0 0 4px var(--tg); } }
+.vs-row { display: flex; justify-content: center; align-items: center; gap: 12px; }
+.title-pop { text-align: center; justify-items: center; position: relative; overflow: hidden; }
+.title-pop h3 { font-size: 22px; }
+.tp-list { display: grid; gap: 10px; justify-items: center; padding: 10px 0; animation: tpop 0.6s cubic-bezier(.2, 1.6, .4, 1) both 0.15s; }
+@keyframes tpop { from { transform: scale(0.3); opacity: 0; } to { transform: none; opacity: 1; } }
+.tp-burst { position: absolute; inset: -40%; pointer-events: none; background: repeating-conic-gradient(from 0deg, rgba(230, 184, 74, 0.10) 0 10deg, transparent 10deg 20deg); animation: tspin 14s linear infinite; z-index: -1; }
+@keyframes tspin { to { transform: rotate(360deg); } }
+.title-pop > *:not(.tp-burst) { position: relative; }
+@media (prefers-reduced-motion: reduce) { .ptitle, .tp-burst, .tp-list { animation: none; } }
 </style>
 <script>
 // PC or phone: a fine pointer that can hover (a mouse) and room for the board and controls side by side
@@ -10896,6 +10922,28 @@ Floors.floor = (() => {
     size(); render();
   }
 
+  // ---------- titles (2026-11-02): earned on the server (accounts.js titlesOf), shown under a gamertag ----------
+  // day1: every account made in the first week (to Sunday 2026-11-08); dev: developer accounts. The player picks
+  // which one shows (Profile). A title this phone hasn't announced yet gets the "new Title" popup on the main menu.
+  const TITLES = {
+    day1: { name: 'Day 1', col: '#B67CFF', glow: 'rgba(182, 124, 255, 0.55)' },
+    dev: { name: 'DEV', col: '#FF5FC4', glow: 'rgba(255, 95, 196, 0.55)' },
+  };
+  const titleHtml = (id, big) => TITLES[id] ? `<span class="ptitle${big ? ' big' : ''}" style="--tc:${TITLES[id].col};--tg:${TITLES[id].glow}"><i aria-hidden="true"></i>${esc(TITLES[id].name)}<i aria-hidden="true"></i></span>` : '';
+  // a gamertag with its title under it
+  const nameplate = (tag, title, cls = '') => `<span class="nameplate ${cls}"><span class="np-tag">${esc(tag)}</span>${titleHtml(title)}</span>`;
+  const TITLES_SEEN = 'pb-titles-seen'; // { playerId: [title ids already announced on this phone] }
+  function titlesUnseen() {
+    if (!acct || !acct.titles) return [];
+    let seen = {}; try { seen = JSON.parse(localStorage.getItem(TITLES_SEEN) || '{}') || {}; } catch (e) {}
+    return acct.titles.filter(t => !(seen[acct.id] || []).includes(t));
+  }
+  function titlesSeen() {
+    let seen = {}; try { seen = JSON.parse(localStorage.getItem(TITLES_SEEN) || '{}') || {}; } catch (e) {}
+    seen[acct.id] = acct.titles.slice();
+    try { localStorage.setItem(TITLES_SEEN, JSON.stringify(seen)); } catch (e) {}
+  }
+
   // ---------- home screens (2026-11-02) ----------
   // welcome: the title, Log in (Sign up under it) and Play as guest; signup and login: their own screens; menu: the
   // main menu (PLAY, with a popup for Play vs Friend / Play vs AI and the match settings; Profile and Settings top
@@ -10995,6 +11043,7 @@ Floors.floor = (() => {
             <input class="tour-in" id="su-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Gamertag" placeholder="2–16 letters" value="${esc(home.tag || '')}">`
           : '<p class="hint" style="margin:0">Log in with the Google account you signed up with. You get your gamertag, match history and ranked results back on this device.</p>'}
           <div id="acct-google" class="acct-google"></div>
+          <p class="acct-trust">Sign-in is handled by Google. We never see your password or email.</p>
           ${up ? '<button class="btn" id="su-guest">Sign up as a guest instead</button>' : ''}
           <p class="hint" id="acct-msg" aria-live="polite" style="margin:0;color:var(--gold)">${esc(home.msg)}</p>
           <span class="btnrow"><button class="btn small" id="si-back">Back</button>${up ? '<button class="btn small" id="si-other">I have an account: Log in</button>' : '<button class="btn small" id="si-other">New here? Sign up</button>'}</span>
@@ -11029,11 +11078,12 @@ Floors.floor = (() => {
     el.innerHTML = `<div class="home-top">
         ${titleImg()}
         <div class="corner">
-          <button id="acct-open" aria-label="Profile">${HICON.user}<span>${acct ? esc(acct.tag) : 'Profile'}</span></button>
+          <button id="acct-open" aria-label="Profile">${HICON.user}<span>Profile</span></button>
           <button id="music-open" aria-label="Settings">${HICON.cog}<span>Settings</span></button>
         </div>
       </div>
       <div class="home-mid">
+        ${acct ? nameplate(acct.tag, acct.title, 'menu-np') : ''}
         <button class="hbtn gold play-big" id="play">Play</button>
         <div class="home-more">
           ${inTour ? `<button class="btn primary" id="tour-back">Back to tournament ${esc(tour.code)}</button>` : ''}
@@ -11057,8 +11107,18 @@ Floors.floor = (() => {
           <h3 id="stay-h">Stay logged in?</h3>
           <p class="hint" style="margin:0">Keep ${esc(acct.tag)} logged in on this device, so the game opens straight on the menu next time. You can change this in Settings.</p>
           <div class="pop-modes"><button class="hbtn gold" id="stay-yes">Yes</button><button class="hbtn" id="stay-no">No</button></div>
+        </div></div>`
+        : acct && titlesUnseen().length && !HOME_AUTO ? `<div class="pop-back" id="title-back"><div class="pop title-pop" role="dialog" aria-modal="true" aria-labelledby="title-h">
+          <div class="tp-burst" aria-hidden="true"></div>
+          <span class="eyebrow">${titlesUnseen().length > 1 ? 'New titles' : 'New title'}</span>
+          <h3 id="title-h">You have received a new Title!</h3>
+          <div class="tp-list">${titlesUnseen().map(t => titleHtml(t, true)).join('')}</div>
+          <p class="hint" style="margin:0">${titlesUnseen().map(t => t === 'day1' ? 'Day 1: you were here in the very first week.' : t === 'dev' ? 'DEV: you make this game.' : '').join(' ')} It shows under your name. Change it any time in Profile.</p>
+          <button class="hbtn gold" id="title-ok">Nice!</button>
         </div></div>` : ''}`;
     wirePlayer();
+    if ($('title-ok')) $('title-ok').addEventListener('click', () => { titlesSeen(); drawHome(); });
+    if (acct && !home.refreshed) { home.refreshed = true; acctCall('me', {}, true).then(r => { if (r.status === 200) { acctTake(r); if (phase === 'start' && home.screen === 'menu' && !home.pop) drawHome(); } }); } // titles for accounts made before them
     if ($('stay-yes')) { $('stay-yes').addEventListener('click', () => { setStay(true); drawHome(); }); $('stay-no').addEventListener('click', () => { setStay(false); drawHome(); }); }
     $('play').addEventListener('click', () => { home.pop = true; drawHome(); });
     $('music-open').addEventListener('click', openSoundSheet);
@@ -11200,7 +11260,7 @@ Floors.floor = (() => {
     $('lb-msg').textContent = (j.rows.length ? 'Ranked best-of-3 series. Win share counts a tie as half a win.' : 'No ranked results yet. Play a ranked match against a friend to get on the board.') + (j.on ? '' : ' Ranked is switched off right now.');
     if (!j.rows.length) return;
     $('lb').innerHTML = `<table class="lb"><thead><tr><th>#</th><th>Player</th><th>W</th><th>T</th><th>L</th><th>Win %</th></tr></thead><tbody>
-      ${j.rows.map((r, i) => `<tr class="${acct && r.id === acct.id ? 'me' : ''}"><td class="num">${i + 1}</td><td>${esc(r.tag)}</td><td class="num">${r.w}</td><td class="num">${r.t}</td><td class="num">${r.l}</td><td class="num">${pct(r)}%</td></tr>`).join('')}
+      ${j.rows.map((r, i) => `<tr class="${acct && r.id === acct.id ? 'me' : ''}"><td class="num">${i + 1}</td><td>${nameplate(r.tag, r.title, 'row')}</td><td class="num">${r.w}</td><td class="num">${r.t}</td><td class="num">${r.l}</td><td class="num">${pct(r)}%</td></tr>`).join('')}
       </tbody></table>`;
   }
 
@@ -11338,7 +11398,7 @@ Floors.floor = (() => {
       const rkWin = rk && rk.done && rk.result === me, rkLoss = rk && rk.done && rk.result === foe();
       overlay(`<div class="card">
         ${rk ? `<span class="eyebrow" style="color:var(--gold)">Ranked · game ${rk.games} of up to ${rk.best}</span>
-          <div class="series"><span>${esc(rk.tags[me] || 'You')}</span><b class="num">${rk.wins[me]} – ${rk.wins[foe()]}</b><span>${esc(rk.tags[foe()] || 'Opponent')}</span></div>
+          <div class="series">${nameplate(rk.tags[me] || 'You', (rk.titles || [])[me])}<b class="num">${rk.wins[me]} – ${rk.wins[foe()]}</b>${nameplate(rk.tags[foe()] || 'Opponent', (rk.titles || [])[foe()])}</div>
           ${rk.ties ? `<span class="hint">${rk.ties} drawn</span>` : ''}
           ${rk.done ? `<p class="big" style="margin:0;color:${rkWin ? 'var(--you)' : rkLoss ? 'var(--foe)' : 'var(--ink)'}">${rkWin ? 'You won the series!' : rkLoss ? 'You lost the series.' : 'The series is a tie.'} It’s on the leaderboard.</p>` : ''}` : ''}
         <span class="eyebrow">After ${m.history.length} rounds</span>
@@ -11640,7 +11700,7 @@ Floors.floor = (() => {
   function acctTake(r) {
     if (typeof r.rankedOn === 'boolean' && typeof home !== 'undefined') home.rankedOn = r.rankedOn;
     if (!r.player) return;
-    acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, dev: !!r.player.dev, session: r.session || acct.session, ts: now() });
+    acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, dev: !!r.player.dev, titles: Array.isArray(r.player.titles) ? r.player.titles.filter(t => TITLES[t]) : [], title: TITLES[r.player.title] ? r.player.title : '', session: r.session || acct.session, ts: now() });
   }
   function acctFail(r) {
     if (r.status === 503 && r.error === 'accounts off') { acctUi.off = true; return 'Accounts aren’t switched on yet on the game server.'; }
@@ -11700,12 +11760,19 @@ Floors.floor = (() => {
   function acctGoogleButton(text = 'signin_with') {
     const box = $('acct-google');
     if (!box || !GOOGLE_CLIENT_ID || acctUi.off) return;
+    // Google's own button (its logo and wording are how players know it's really Google), sized to the box it sits in,
+    // in Google's dark theme to match the game. Set up once per page (initialize twice makes Google's script misbehave);
+    // the box keeps its height while it loads and the button fades in when it's there.
     const draw = () => {
-      if (!$('acct-google')) return;
+      const el = $('acct-google'); if (!el) return;
       try {
-        google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: (res) => acctGoogle(res.credential), auto_select: false, use_fedcm_for_prompt: true });
-        google.accounts.id.renderButton($('acct-google'), { theme: 'outline', size: 'large', text, shape: 'pill' });
-      } catch (e) { $('acct-google').textContent = 'Google sign-in couldn’t start.'; }
+        if (!acctUi.gsiInit) { google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: (res) => acctGoogle(res.credential), auto_select: false, use_fedcm_for_prompt: true }); acctUi.gsiInit = true; }
+        const w = Math.max(200, Math.min(400, Math.floor(el.getBoundingClientRect().width) || 300));
+        el.innerHTML = '';
+        google.accounts.id.renderButton(el, { type: 'standard', theme: 'filled_black', size: 'large', text, shape: 'pill', logo_alignment: 'left', width: w });
+        const shown = () => { if (el.querySelector('iframe, div[role="button"]')) el.classList.add('ready'); else setTimeout(shown, 100); };
+        shown();
+      } catch (e) { el.classList.add('ready'); el.textContent = 'Google sign-in couldn’t start.'; }
     };
     if (window.google && google.accounts && google.accounts.id) { draw(); return; }
     if (!acctUi.gsi) {
@@ -11717,10 +11784,13 @@ Floors.floor = (() => {
   function acctDraw() {
     if (!$('acct')) return;
     const a = acct, dis = acctUi.busy ? 'disabled' : '';
-    const google = GOOGLE_CLIENT_ID && !acctUi.off ? '<div id="acct-google" class="acct-google"></div>' : '';
+    const google = GOOGLE_CLIENT_ID && !acctUi.off ? '<div id="acct-google" class="acct-google"></div><p class="acct-trust">Sign-in is handled by Google. We never see your password or email.</p>' : '';
     $('acct').innerHTML = a ? `
       <p class="hint" style="margin:0">${a.google ? 'Signed in with Google. Sign in on another phone to play as the same player.' : 'Guest on this phone. Sign in with Google to keep it if you change or reset your phone.'}</p>
       ${a.dev ? '<p class="hint acct-dev" style="margin:0">Developer mode is on: every feature is open to this account.</p>' : ''}
+      <div style="text-align:center">${nameplate(a.tag, a.title, 'big')}</div>
+      ${(a.titles || []).length ? `<span class="hint">Title under your name</span>
+      <div class="seg" role="group" aria-label="Title">${a.titles.map(t => `<button data-title="${t}" aria-pressed="${a.title === t}" ${dis}>${esc(TITLES[t].name)}</button>`).join('')}<button data-title="" aria-pressed="${!a.title}" ${dis}>None</button></div>` : ''}
       <span class="hint">Your gamertag</span>
       <span class="joinrow"><input class="tour-in" id="acct-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Your gamertag" value="${esc(a.tag)}"><button class="btn" id="acct-tag-ok" ${dis}>Save</button></span>
       ${a.google ? '' : google}
@@ -11740,6 +11810,11 @@ Floors.floor = (() => {
     if ($('acct-tag')) $('acct-tag').addEventListener('keydown', (e) => { if (e.key === 'Enter') acctRename($('acct-tag').value); });
     on('acct-out', () => { if (!acctUi.outSure && !(acct && acct.google)) { acctUi.outSure = true; acctDraw(); return; } acctLogOut(); });
     on('hist-open', openHistorySheet);
+    $('acct').querySelectorAll('[data-title]').forEach(b => b.addEventListener('click', () => acctDo(async () => {
+      const r = await acctCall('title', { title: b.dataset.title }, true);
+      if (r.status !== 200) return acctFail(r);
+      acctTake(r); if (phase === 'start' && !m) drawHome(); return 'Title saved.';
+    })));
     on('acct-del', () => { if (acctUi.sure) acctDelete(); else { acctUi.sure = true; acctDraw(); } });
     acctGoogleButton();
   }
@@ -14125,7 +14200,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const here = srv ? net.foeHere : net.connected;
     const rk = srv && net.ranked;
     overlay(`<div class="card">
-      ${rk ? `<span class="eyebrow" style="color:var(--gold)">Ranked · best of 3</span>${here && rk.tags[1] ? `<p class="big" style="margin:0">${esc(rk.tags[0])} vs ${esc(rk.tags[1])}</p>` : ''}` : ''}
+      ${rk ? `<span class="eyebrow" style="color:var(--gold)">Ranked · best of 3</span>${here && rk.tags[1] ? `<p class="big vs-row" style="margin:0">${nameplate(rk.tags[0], (rk.titles || [])[0])}<span>vs</span>${nameplate(rk.tags[1], (rk.titles || [])[1])}</p>` : ''}` : ''}
       <span class="eyebrow">Match code</span>
       <span class="code" aria-label="Match code">${net.code}</span>
       <p class="status ${here ? '' : 'wait'}" id="lobby-status">${problem ? esc(problem) : here ? 'Your friend is here!' : ((srv ? net.connected : net.peer && net.peer.open) ? 'Waiting for your friend to open the link' : 'Setting up the match')}</p>

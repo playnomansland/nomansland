@@ -78,6 +78,15 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 6 * 60 *
     const dev = await call('google', { credential: idToken({ email: 'dev@example.com', email_verified: true }) });
     assert.ok(dev.player.dev, 'the developer account');
 
+    // ----- titles -----
+    assert.deepStrictEqual([A.player.titles, A.player.title], [['day1'], 'day1'], 'a first-week account has Day 1');
+    assert.deepStrictEqual([dev.player.titles, dev.player.title], [['dev', 'day1'], 'dev'], 'a developer has DEV too, shown first');
+    assert.strictEqual((await call('title', { title: 'dev' }, A.session)).status, 400, 'not someone else\'s title');
+    assert.strictEqual((await call('title', { title: '' }, A.session)).player.title, '', 'no title shown');
+    assert.strictEqual((await call('me', {}, A.session)).player.title, '', 'and it stays that way');
+    assert.strictEqual((await call('title', { title: 'day1' }, A.session)).player.title, 'day1');
+    assert.strictEqual((await call('title', { title: 'day1' }, dev.session)).player.title, 'day1', 'a developer can pick Day 1');
+
     // ----- accounts are needed -----
     let ws = await phone(newCode(), { create: true, ranked: true });
     assert.deepStrictEqual([ws.first.t, ws.first.why], ['denied', 'account'], 'no session: no ranked match');
@@ -141,6 +150,8 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 6 * 60 *
     assert.strictEqual(row(A.player.id)[want[0]], 1, 'Alpha\'s result');
     assert.strictEqual(row(B.player.id)[want[1]], 1, 'Bravo\'s result');
     assert.strictEqual(row(A.player.id).tag, 'Alpha');
+    assert.strictEqual(row(A.player.id).title, 'day1', 'the leaderboard shows titles');
+    assert.deepStrictEqual(f.ranked.titles, ['day1', 'day1'], 'so does the series');
 
     // a rematch after a decided series starts a new one; leaving loses it
     mark(a, b);
