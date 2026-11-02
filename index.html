@@ -11440,11 +11440,12 @@ Floors.floor = (() => {
     document.documentElement.classList.toggle('home', on);
     $('home').hidden = !on;
     if (on) paintHomeBg();
-    homeWiz(on && home.screen !== 'welcome' && home.screen !== 'signup' && home.screen !== 'login');
+    homeWiz(on && WIZ_PC && home.screen !== 'welcome' && home.screen !== 'signup' && home.screen !== 'login');
   }
   // the Flame Wizard on the main menu: the 3D model as a still picture and its fire cone, frozen; a tap on him (or the text)
   // plays the blast for 1 second (WIZ_PLAY_MS): the cone flickers, sparks fly and BABABABABA shakes, then it freezes again
   const WIZ_PLAY_MS = 1000;
+  const WIZ_PC = matchMedia('(hover: hover) and (pointer: fine)').matches; // computers only (a mouse): never on phones or tablets
   const wiz = { on: false, raf: 0, sparks: [], until: 0, t0: 0, hit: null, frame: null };
   function homeWiz(on) {
     const box = $('home-wiz');

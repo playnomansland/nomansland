@@ -59,7 +59,8 @@ A first version of **2v2**, open to developer accounts only for now.
 
 - A **Flame Wizard** now stands at the left edge of the main menu: the same 3D model as on the battlefield, blasting an orange fire cone from his staff across the screen, with a big **BABABABABA** above him in a cartoon font.
 - It all stands still until you **tap him** (or the text): then the fire flickers, sparks fly and BABABABABA shakes for 1 second.
-- He sits under the buttons, so taps on the menu work as before.
+- He sits under the buttons, so clicks on the menu work as before.
+- He's only on computers (with a mouse), not on phones or tablets.
 - If 3D can't start on a device, he shows as the 2D Flame Wizard symbol instead.
 
 ---
