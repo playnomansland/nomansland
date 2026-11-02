@@ -3239,17 +3239,19 @@ html.pc .corner button span { display: inline; }
   function acctTake(r) {
     if (typeof r.rankedOn === 'boolean' && typeof home !== 'undefined') home.rankedOn = r.rankedOn;
     if (!r.player) return;
-    acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, dev: !!r.player.dev, titles: Array.isArray(r.player.titles) ? r.player.titles.filter(t => TITLES[t]) : [], title: TITLES[r.player.title] ? r.player.title : '', session: r.session || acct.session, ts: now() });
+    acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, dev: !!r.player.dev, titles: Array.isArray(r.player.titles) ? r.player.titles.filter(t => TITLES[t]) : [], title: TITLES[r.player.title] ? r.player.title : '', tagNext: +r.player.tagNext || 0, session: r.session || acct.session, ts: now() });
   }
   function acctFail(r) {
     if (r.status === 503 && r.error === 'accounts off') { acctUi.off = true; return 'Accounts aren’t switched on yet on the game server.'; }
     if (r.status === 429) return 'Too many tries from this network. Wait a while and try again.';
+    if (r.status === 429 && r.error === 'too soon') return `You can change your gamertag once a week. Next change: ${tagWhen(r.next)}.`;
     if (r.status === 400 && r.error === 'bad tag') return 'Gamertags are 2–16 letters, digits, spaces, _ . or -.';
     if (r.status === 401 && r.error === 'google token') return 'Google sign-in didn’t go through. Try again.';
     if (r.status === 401) { acctSave(null); return 'This phone was signed out. Make a new guest or sign in with Google.'; }
     if (r.status === 503 && r.error === 'google unavailable') return 'Couldn’t check with Google just now. Try again.';
     return 'Couldn’t reach the game server. Check your connection and try again.';
   }
+  const tagWhen = (t) => { try { return new Date(t).toLocaleString(undefined, { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }); } catch (e) { return new Date(t).toString(); } };
   async function acctDo(fn) {
     if (acctUi.busy) return;
     acctUi.busy = true; acctUi.msg = 'One moment…'; acctDraw();
@@ -3331,7 +3333,8 @@ html.pc .corner button span { display: inline; }
       ${(a.titles || []).length ? `<span class="hint">Title under your name</span>
       <div class="seg" role="group" aria-label="Title">${a.titles.map(t => `<button data-title="${t}" aria-pressed="${a.title === t}" ${dis}>${esc(TITLES[t].name)}</button>`).join('')}<button data-title="" aria-pressed="${!a.title}" ${dis}>None</button></div>` : ''}
       <span class="hint">Your gamertag</span>
-      <span class="joinrow"><input class="tour-in" id="acct-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Your gamertag" value="${esc(a.tag)}"><button class="btn" id="acct-tag-ok" ${dis}>Save</button></span>
+      <span class="joinrow"><input class="tour-in" id="acct-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Your gamertag" value="${esc(a.tag)}" ${a.tagNext > now() ? 'disabled' : ''}><button class="btn" id="acct-tag-ok" ${dis} ${a.tagNext > now() ? 'disabled' : ''}>Save</button></span>
+      <p class="hint" style="margin:0">${a.dev ? 'Developer: change it any time.' : a.tagNext > now() ? `You can change it again on ${tagWhen(a.tagNext)}.` : 'You can change it once a week.'}</p>
       ${a.google ? '' : google}
       <span class="btnrow"><button class="btn" id="hist-open">Match history</button><button class="btn" id="acct-out" ${dis}>${acctUi.outSure ? 'Tap again to log out' : 'Log out'}</button></span>
       ${acctUi.outSure && !a.google ? '<p class="hint" style="margin:0">A guest can’t log back in: sign up with Google first to keep this gamertag and your results.</p>' : ''}

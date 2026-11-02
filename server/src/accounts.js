@@ -16,7 +16,7 @@
 //   /account/guest   { tag? }            -> { player, session }
 //   /account/me      (auth)              -> { player, session? (only when rotated) }
 //   /account/google  { credential } (auth optional) -> { player, session, linked: 'new'|'guest'|'existing' }
-//   /account/tag     { tag } (auth)      -> { player }
+//   /account/tag     { tag } (auth)      -> { player }  (once a week, developers any time: 429 'too soon' { next })
 //   /account/signout { all? } (auth)     -> { ok }
 //   /account/delete  (auth)              -> { ok }  (login, sessions and gamertag removed; the id stays as a tombstone)
 //   /account/title   { title } (auth)   -> { player }  (shows one of the player's titles under the gamertag; '' = none)
@@ -53,7 +53,8 @@ let schemaReady = null;
 function ensureSchema(db) {
   if (!schemaReady) schemaReady = db.batch(SCHEMA.map((s) => db.prepare(s)))
     // players.title (2026-11-02): the title picked to show; added to a table that may already exist
-    .then(() => db.prepare('ALTER TABLE players ADD COLUMN title TEXT').run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }))
+    // players.tag_changed (2026-11-02): when the gamertag was last changed (one change a week; developers any time)
+    .then(() => Promise.all(['title TEXT', 'tag_changed INTEGER'].map((c) => db.prepare('ALTER TABLE players ADD COLUMN ' + c).run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }))))
     .catch((e) => { schemaReady = null; throw e; });
   return schemaReady;
 }
@@ -63,6 +64,11 @@ function ensureSchema(db) {
 //   day1  "Day 1" (purple): every account made in the first week, up to the end of Sunday 2026-11-08 (Stockholm time)
 //   dev   "DEV" (pink): developer accounts (the server's dev column)
 // The player picks which one shows (players.title); none picked = the newest earned one (DEV before Day 1).
+// Gamertags: one change a week (TAG_EVERY), any time for developers. Naming a brand-new account (in its first
+// TAG_FRESH, e.g. sign-up's gamertag after Google) doesn't count.
+export const TAG_EVERY = 7 * 24 * 3600e3;
+const TAG_FRESH = 10 * 60e3;
+const tagNext = (p) => (p && !p.dev && p.tag_changed ? p.tag_changed + TAG_EVERY : 0);
 export const DAY1_END = Date.UTC(2026, 10, 8, 23, 0, 0); // Monday 2026-11-09 00:00 in Stockholm
 export function titlesOf(p) {
   const out = [];
@@ -222,9 +228,9 @@ export async function leaderboard(env, cors) {
 }
 
 async function playerOut(db, id) {
-  const p = await db.prepare('SELECT id, tag, created, dev, title FROM players WHERE id = ?').bind(id).first();
+  const p = await db.prepare('SELECT id, tag, created, dev, title, tag_changed FROM players WHERE id = ?').bind(id).first();
   const logins = await db.prepare('SELECT provider FROM logins WHERE player = ?').bind(id).all();
-  return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google'), dev: !!p.dev, titles: titlesOf(p), title: titleShown(p) };
+  return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google'), dev: !!p.dev, titles: titlesOf(p), title: titleShown(p), tagNext: tagNext(p) > Date.now() ? tagNext(p) : 0 };
 }
 
 // Developer mode: a Google account whose verified email is in the secret DEV_EMAILS (comma separated; a Cloudflare
@@ -327,7 +333,12 @@ export async function handleAccount(request, env, cors) {
     if (route === 'tag') {
       const tag = cleanTag(body.tag);
       if (!tag) return json({ error: 'bad tag' }, 400, cors);
-      await db.prepare('UPDATE players SET tag = ? WHERE id = ?').bind(tag, me.player).run();
+      const p = await db.prepare('SELECT tag, created, dev, tag_changed FROM players WHERE id = ?').bind(me.player).first();
+      if (tag !== p.tag) {
+        if (tagNext(p) > now) return json({ error: 'too soon', next: tagNext(p) }, 429, cors);
+        const fresh = now - p.created < (env.ACCOUNT_TAG_FRESH_MS != null ? +env.ACCOUNT_TAG_FRESH_MS : TAG_FRESH); // the setting is for tests
+        await db.prepare('UPDATE players SET tag = ?, tag_changed = ? WHERE id = ?').bind(tag, fresh || p.dev ? p.tag_changed : now, me.player).run();
+      }
       return json({ player: await playerOut(db, me.player) }, 200, cors);
     }
     if (route === 'signout') {

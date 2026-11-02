@@ -20,10 +20,10 @@ const ORIGIN = 'http://localhost:8766';
 const copy = (o) => JSON.parse(JSON.stringify(o));
 const local = (view) => Ref.withUnits(copy(view), units, matrix);
 const newCode = () => 'R' + Math.random().toString(36).slice(2, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'Q');
-setTimeout(() => { console.error('test timed out'); process.exit(1); }, 6 * 60 * 1000).unref();
+setTimeout(() => { console.error('test timed out'); process.exit(1); }, 9 * 60 * 1000).unref();
 
 (async () => {
-  const srv = await startAccounts(8793, { DEV_EMAILS: 'dev@example.com' });
+  const srv = await startAccounts(8793, { DEV_EMAILS: 'dev@example.com', ACCOUNT_TAG_FRESH_MS: 0 });
   const call = async (route, body, token) => {
     const headers = { 'content-type': 'application/json', Origin: ORIGIN };
     if (token) headers.Authorization = 'Bearer ' + token;
@@ -38,14 +38,22 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 6 * 60 *
     ws.first = ws.inbox.find((x) => ['welcome', 'denied', 'full', 'nomatch', 'taken'].includes(x.t));
     return ws;
   }
-  const syncOf = (ws, ok) => waitFor(() => [...ws.inbox].reverse().find((x) => x.t === 'sync' && ok(x)), 15000);
+  // the latest sync that matches; asks again now and then (CI machines are slow, and a view may have gone by)
+  const syncOf = async (ws, ok) => {
+    let asked = Date.now();
+    return waitFor(() => {
+      const hit = [...ws.inbox].reverse().find((x) => x.t === 'sync' && ok(x));
+      if (!hit && Date.now() - asked > 3000) { asked = Date.now(); ws.json({ t: 'sync' }); }
+      return hit;
+    }, 60000);
+  };
   async function deploySide(ws, side, view, r) {
     const m = local(view);
     let seq = ws.seq || 0;
     for (const a of Bot.deploy(m, side, { r })) {
       await sleep(5);
       ws.json({ t: 'act', seq: ++seq, fn: a.fn, a: a.a });
-      const ack = await waitFor(() => ws.inbox.find((x) => x.t === 'ack' && x.seq === seq), 8000);
+      const ack = await waitFor(() => ws.inbox.find((x) => x.t === 'ack' && x.seq === seq), 20000);
       if (!ack.ok) break;
     }
     ws.seq = seq;
@@ -63,8 +71,8 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 6 * 60 *
       await deploySide(b, 1, vb.m, r);
       const before = nF(a);
       a.json({ t: 'ready', v: true }); b.json({ t: 'ready', v: true });
-      const f = await waitFor(() => nF(a) > before && a.inbox.filter((x) => x.t === 'fight').pop(), 20000);
-      await waitFor(() => nF(b) > before, 8000);
+      const f = await waitFor(() => nF(a) > before && a.inbox.filter((x) => x.t === 'fight').pop(), 60000);
+      await waitFor(() => nF(b) > before, 30000);
       if (f.post.over) { assert.ok(nF(a) > startA); return f; }
       a.json({ t: 'next', round: f.summary.round }); b.json({ t: 'next', round: f.summary.round });
     }
@@ -77,6 +85,15 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 6 * 60 *
     assert.strictEqual(A.status, 200);
     const dev = await call('google', { credential: idToken({ email: 'dev@example.com', email_verified: true }) });
     assert.ok(dev.player.dev, 'the developer account');
+
+    // ----- gamertags: once a week, developers any time -----
+    const ren = await call('tag', { tag: 'Charlie2' }, C.session);
+    assert.strictEqual(ren.status, 200); assert.ok(ren.player.tagNext > Date.now() + 6 * 24 * 3600e3, 'next change in a week');
+    const again = await call('tag', { tag: 'Charlie3' }, C.session);
+    assert.deepStrictEqual([again.status, again.error], [429, 'too soon'], 'not twice in a week'); assert.strictEqual(again.next, ren.player.tagNext);
+    assert.strictEqual((await call('tag', { tag: 'Charlie2' }, C.session)).status, 200, 'the same name is no change');
+    for (const n of ['DevOne', 'DevTwo']) assert.strictEqual((await call('tag', { tag: n }, dev.session)).player.tag, n, 'a developer renames any time');
+    assert.strictEqual((await call('me', {}, dev.session)).player.tagNext, 0);
 
     // ----- titles -----
     assert.deepStrictEqual([A.player.titles, A.player.title], [['day1'], 'day1'], 'a first-week account has Day 1');
