@@ -140,12 +140,13 @@ const Engine = (() => {
   // pctHit: every hit also deals this share of the target's max health (not to structures); that part ignores armor (ward still caps the hit)
   // Bleed (u.bleedEvery = n: every n-th hit a body lands on the same target gives it a stack of bleed; Titanium spears
   // give one too). A bleeding body loses BLEED.dmg every BLEED.pulse s for BLEED.secs s (each new stack starts that time
-  // again); each stack doubles the damage, up to BLEED.max stacks, and from 4 stacks it also loses a share of its max
-  // health a second (BLEED.pct[n] %: 4 stacks, 5 stacks; not structures). Bleed skips armor and ward, like poison. The stacks belong to the target, so
+  // again); each stack doubles the damage, up to BLEED.max stacks, and from 3 stacks it also loses a share of its max
+  // health a second (BLEED.pct[n] %: 3 stacks, 4 stacks; not structures). Since 2026-11-02 stack 1 hits like the old
+  // stack 2 (dmg 6, was 3) and the cap is 4 (was 5): each stack is the old one above it, so it peaks sooner. Bleed skips armor and ward, like poison. The stacks belong to the target, so
   // every source adds to the same ones. u.bleedLonger: its stacks last that many seconds more; u.bleedNoHeal: a body
   // bleeding from it can't heal or regenerate until the bleed runs out; u.bleedStun: a body it brings to BLEED.max
   // stacks is stunned that many seconds.
-  const BLEED = { dmg: 3, pulse: 0.5, secs: 2.5, max: 5, pct: { 4: 2, 5: 5 } };
+  const BLEED = { dmg: 6, pulse: 0.5, secs: 2.5, max: 4, pct: { 3: 2, 4: 5 } };
   // Poisoned bodies heal POISON_HEAL % as much (slime units drink poison and heal fully) and move POISON_SLOW % slower
   // while the poison lasts (the stronger of this and any other slow counts; not slime units or Berserkers)
   const POISON_HEAL = 50, POISON_SLOW = 20;
@@ -262,7 +263,7 @@ const Engine = (() => {
     turret:  { label: 'Extra turret', params: [['turrets', 'Attacks at once (each with its own target and reload)', 2, 1]] },
     frenzy:  { label: 'Frenzy', params: [['pct', 'Attack speed per hit (+% of base)', 10, 1], ['cap', 'Most attacks per second', 2, 0.1]] },
     spread:  { label: 'Spread', params: [['min', 'Least distance (m)', 1, 0.5], ['max', 'Most distance (m)', 6, 0.5]] },
-    mortar:  { label: 'Mortar', params: [['range', 'Range (+m)', 15, 1], ['min', 'Minimum range (m)', 5, 0.5], ['aps', 'Attack speed (+ attacks per second)', 0.1, 0.05]] },
+    mortar:  { label: 'Mortar', params: [['range', 'Range (+m)', 15, 1], ['min', 'Minimum range (m)', 5, 0.5], ['aps', 'Attack speed (+ attacks per second)', 0.1, 0.05], ['speed', 'Shell speed (m/s, 0 = hits at once)', 0, 1]] },
     momentum: { label: 'Momentum', params: [['accel', 'Rolling acceleration (+%)', 100, 10]] },
     unfold:  { label: 'Unfold (rolling units walk instead)', params: [] },
     link:    { label: 'Linked health', params: [['hp', 'Health (+%)', 15, 5]] },
@@ -285,7 +286,7 @@ const Engine = (() => {
     bleedHit: { label: 'Bleed on every hit', params: [['n', 'Bleed stacks per hit', 2, 1]] },
     bull:    { label: 'Charge through', params: [['every', 'Every this many attacks (from the first)', 3, 1], ['hit', 'Charge damage', 100, 10], ['push', 'Knockback (m)', 6, 0.5], ['armor', 'Armor while charging (+)', 4, 1], ['run', 'Runs on past its target (m)', 6, 0.5]] },
     flare:   { label: 'Flare', params: [['per', 'Attack speed stored per second idle (%)', 10, 1], ['max', 'Most stored (%)', 100, 10], ['shot', 'Stored % per extra shot', 25, 5]] },
-    portal:  { label: 'Summon portal', params: [['unit', 'Summons (unit name)', 'Brute', null], ['level', 'Its base level (0 = as bought)', 1, 1], ['speed', 'Its move speed (m/s)', 4.5, 0.1], ['cone', 'Its swipe (degrees each side)', 90, 5], ['secs', 'Portal stays (s)', 4, 0.5]] },
+    portal:  { label: 'Summon portal', params: [['unit', 'Summons (unit name)', 'Brute', null], ['level', 'Its base level (0 = as bought)', 1, 1], ['speed', 'Its move speed (m/s)', 4.5, 0.1], ['cone', 'Its swipe (degrees each side)', 90, 5], ['secs', 'Portal stays (s)', 4, 0.5], ['hp', 'Its health (+%)', 0, 5], ['hit', 'Its hit (+%)', 0, 5], ['aps', 'Its attack speed (+%)', 0, 5]] },
     overwatch: { label: 'Overwatch', params: [['hp', 'Watchtower health', 200, 25]] },
     freeMove: { label: 'Free moves', params: [] },
     silent:  { label: 'Silent first strike', params: [] },
@@ -350,7 +351,7 @@ const Engine = (() => {
       case 'turret': return `Attacks ${n('turrets')} different enemies at once.`;
       case 'frenzy': return `Each hit: +${n('pct')}% attack speed (max ${n('cap')}/s).`;
       case 'spread': return `Bodies scatter ${n('min')}–${n('max')} m at fight start.`;
-      case 'mortar': return `+${n('range')} m range${+P('aps') ? `, +${n('aps')} attacks/s` : ''}. Can’t hit within ${n('min')} m.`;
+      case 'mortar': return `+${n('range')} m range${+P('aps') ? `, +${n('aps')} attacks/s` : ''}. Can’t hit within ${n('min')} m.${+P('speed') > 0 ? ` Lobs shells (${n('speed')} m/s).` : ''}`;
       case 'shield': return `Blocks the first ${+P('hits') === 1 ? 'hit' : `${n('hits')} hits`} each fight.`;
       case 'building': return `Place a ${String(P('building'))}. Builders build it in the fight.`;
       case 'momentum': return `Reaches full roll speed ${n('accel')}% faster.`;
@@ -467,7 +468,9 @@ const Engine = (() => {
         case 'turret': u.turrets = Math.max(u.turrets || 1, Math.min(6, Math.round(P('turrets')))); break;
         case 'shield': u.shield = (u.shield || 0) + Math.max(0, Math.round(P('hits'))); break;
         case 'spread': u.spread = [Math.max(0, P('min')), Math.max(0, P('min'), P('max'))]; break;
-        case 'mortar': u.range = u.range + P('range'); u.minRange = Math.max(u.minRange || 0, P('min')); u.aps = u.aps + Math.max(0, P('aps')); break;
+        case 'mortar': u.range = u.range + P('range'); u.minRange = Math.max(u.minRange || 0, P('min')); u.aps = u.aps + Math.max(0, P('aps'));
+          if (P('speed') > 0) { u.projSpeed = Math.max(2, P('speed')); u.lob = true; } // a lobbed shell: lands where it was aimed, over walls
+          break;
         case 'frenzy': u.frenzyPct = (u.frenzyPct || 0) + Math.max(0, P('pct')); u.frenzyCap = Math.max(u.frenzyCap || 0, Math.max(0.05, P('cap'))); break;
         case 'explode': u.deathBlast = Math.max(u.deathBlast || 0, Math.max(0, P('pct'))); u.blastAt = Math.max(u.blastAt || 0, Math.max(0, P('radius'))); break;
         case 'dodge': u.dodge = Math.min(90, Math.max(u.dodge || 0, P('pct'))); break;
@@ -506,7 +509,8 @@ const Engine = (() => {
           // the summon: the unit's plain stats at the given level (a level 2 Brute), with its own speed and a swipe
           const name = String(skillParam(d, 'unit')), src = (roster || []).find(r => r && r.name === name);
           const { skills, skillDefs, skillsOn, skillsInnate, skillMods, skillOr, skillNeeds, skillNeedsAny, trait, ...plain } = src || { name, cost: 0, bodies: 1, hp: 1100, hit: 98, aps: 1.1, range: 2, speed: 5, splash: 0, defense: 'armor', defVal: 3 };
-          const base = leveled(withTraits({ ...plain, level: 0 }), Math.max(0, Math.round(P('level'))));
+          const lv = leveled(withTraits({ ...plain, level: 0 }), Math.max(0, Math.round(P('level'))));
+          const base = { ...lv, hp: lv.hp * Math.max(0.05, 1 + P('hp') / 100), hit: lv.hit * Math.max(0, 1 + P('hit') / 100), aps: lv.aps * Math.max(0.05, 1 + P('aps') / 100) };
           u.portal = { secs: Math.max(0, P('secs')), unit: withTraits({ ...base, level: 0, name: name === 'Brute' ? 'Hellfiend' : name + ' (summoned)', tag: name === 'Brute' ? 'HEL' : plain.tag, bodies: 1, cost: 0, unlock: 0,
             speed: Math.max(0.5, P('speed')), flame: Math.max(1, Math.min(180, P('cone'))), slam: true, pierce: 0, burst: 1, pellets: 1, shape: 'imp', color: '#B3261E', summoned: true }) };
           break;
@@ -2081,6 +2085,11 @@ const Engine = (() => {
         if (b.u.ram) { ram(b, foes); continue; }
         if (b.u.roll > 0) { roll(b, foes); continue; }
         if (b.follow) { escortMove(b); continue; }
+        if (b.u.drop && !b.dropped) { // a drop not yet made (the airship): it flies straight on into the enemy's territory first
+          const dy = b.u.drop.y - b.y, mv = Math.min(Math.abs(dy), spd(b) * moveMul(b) * dt);
+          b.hx = 0; b.hy = Math.sign(dy) || b.u.drop.dir; b.y += b.hy * mv; b.moved += mv;
+          continue;
+        }
         if (b.spreadTo) { // Spread: run out to its own spot first
           const sx = b.spreadTo.x - b.x, sy = b.spreadTo.y - b.y, sd = hyp(sx, sy);
           const mv = Math.min(sd, spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * dt);
@@ -2352,7 +2361,7 @@ const Engine = (() => {
             b.slowMove = Math.max(b.slowMove, POISON_SLOW); b.slowT = Math.max(b.slowT, dt * 1.5);
           }
         }
-        if (b.bleed) { // every BLEED.pulse s: BLEED.dmg, doubled for each stack after the first, and a share of max health at 4 and 5 stacks
+        if (b.bleed) { // every BLEED.pulse s: BLEED.dmg, doubled for each stack after the first, and a share of max health at 3 and 4 stacks
           const bl = b.bleed;
           bl.pulse -= dt;
           if (bl.pulse <= 1e-9) {
@@ -2449,6 +2458,19 @@ const Engine = (() => {
               if (terBlock && !kid.u.aloft) keepOut(kid); // not dropped in the water
               stats[b.side].totalHp += kid.u.hp;
             }
+          }
+        }
+        // a drop (the sniper tower's airship): count bodies of drop.unit, once a fight, the moment it crosses the line
+        // y = drop.y going the way of drop.dir (+1: up, -1: down) into the enemy's territory
+        if (b.u.drop && !b.dropped && (b.y - b.u.drop.y) * b.u.drop.dir >= 0) {
+          b.dropped = true;
+          const fwd = b.side === 0 ? 1 : -1;
+          for (let k = 0; k < b.u.drop.count; k++) {
+            const [ox, oy] = SPAWN_SPOTS[k % SPAWN_SPOTS.length];
+            const kid = newBody(b.u.drop.unit, b.side, b.x + ox * g.spacing * 0.7, b.y + oy * fwd * g.spacing * 0.7, spawnNo[b.side]++, -1);
+            all.push(kid); sides[b.side].push(kid);
+            if (terBlock && !kid.u.aloft) keepOut(kid); // not dropped in the water
+            stats[b.side].totalHp += kid.u.hp;
           }
         }
       }

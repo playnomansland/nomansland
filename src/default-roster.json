@@ -231,16 +231,18 @@
       "name": "Ember Mortar",
       "cost": 150,
       "params": {
-        "range": 18,
+        "range": 12,
         "min": 5,
-        "aps": 0
+        "aps": 0,
+        "speed": 20
       },
       "also": [
         {
           "type": "stats",
           "params": {
             "hit": -20,
-            "aps": -0.1
+            "aps": -0.1,
+            "apsPct": -20
           }
         }
       ]
@@ -706,9 +708,12 @@
       "params": {
         "unit": "Brute",
         "level": 1,
-        "speed": 4.5,
+        "speed": 3.15,
         "cone": 90,
-        "secs": 4
+        "secs": 4,
+        "hp": -30,
+        "hit": -30,
+        "aps": -30
       },
       "flat": true
     },
@@ -1253,7 +1258,7 @@
       "bodies": 2,
       "hp": 65,
       "hit": 75,
-      "aps": 0.7,
+      "aps": 0.595,
       "range": 19,
       "speed": 4,
       "splash": 0,
@@ -2094,9 +2099,9 @@
       "name": "Truespear",
       "cost": 500,
       "bodies": 1,
-      "hp": 1800,
+      "hp": 1260,
       "hit": 150,
-      "aps": 0.9,
+      "aps": 0.765,
       "range": 23,
       "speed": 3,
       "splash": 0,
@@ -2143,9 +2148,9 @@
       "name": "Shiv",
       "cost": 200,
       "noPack": 1,
-      "bodies": 4,
-      "hp": 150,
-      "hit": 13,
+      "bodies": 3,
+      "hp": 200,
+      "hit": 17.3,
       "aps": 1.5,
       "range": 18,
       "speed": 3,
@@ -2155,7 +2160,7 @@
       "bleedEvery": 2,
       "trait": {
         "name": "Apply bleed",
-        "text": "Every 2nd knife on a target adds bleed. Stacks to 5, past armor."
+        "text": "Every 2nd knife on a target adds bleed. Stacks to 4, past armor."
       },
       "skills": [
         "aeroblades",

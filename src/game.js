@@ -49,7 +49,7 @@ const Game = (() => {
       muster: { name: 'Muster', text: '1 extra deployment every round, for free.' } }, // see musterOn
     { id: 'sniper', name: 'Sniper tower', text: 'Slow, huge range, double damage. Can’t hit within 1 tile.', unit: { ...TOWER, name: 'Sniper Tower', kind: 'sniper', hp: 500, hit: 60, aps: 0.4, range: 32, minRange: TILE, color: '#B9C7D6' },
       skill: { name: 'Eagle eye', text: 'Tower and Snipers: +3 m range, +10% attack speed.' },
-      skill2: { name: 'Deploy airship', cost: 400, text: 'An untouchable airship shoots like a level 3 Sniper and drops paratroopers each fight. Snipers and tower: +30 hit.' },
+      skill2: { name: 'Deploy airship', cost: 400, text: 'An untouchable airship shoots like a level 2 Sniper and drops 3 paratroopers once each fight as it flies into enemy territory. Snipers and tower: +30 hit.' },
       mark: { name: 'Mark Bounty', cost: 50, text: 'Mark one enemy squad for the rest of the match. Your Snipers deal it +15% damage and see it through stealth; +100 gold each fight a Sniper takes its last body. The mark can’t be moved; if they sell the squad, place it again for free.' } }, // see MARK
     { id: 'bastion', name: 'Bastion', text: `Tough. Burns all enemies within ${MOAT.range} m.`,
       unit: { ...TOWER, name: 'Bastion', kind: 'bastion', hp: 1000, hit: MOAT.hit, aps: MOAT.aps, range: MOAT.range, moat: { ...MOAT }, idle: true, color: '#B79C8A' }, // idle: the moat is its only attack
@@ -227,36 +227,41 @@ const Game = (() => {
     return E.withTraits({ name: 'Wall', cost: 0, bodies: 1, hp: BWALL.hp, hit: 0, aps: 1, range: 0, speed: 0, splash: 0, shape: 'square', color: '#9C8F7A', structure: true, lesser: true, idle: true, kind: 'wall',
       barrier: across ? BWALL.thick / 2 : TILE / 2, barrierY: across ? TILE / 2 : BWALL.thick / 2, defense: 'armor', defVal: BWALL.armor, level: 0 }); };
   // Deploy airship (sniper tower): squad id -4, can't be hit (Engine: aloft), stops hover m short of its target;
-  // drops one paratrooper every `every` s, up to `max` alive; +sniperHit damage per hit for the tower, the airship and Snipers
-  const AIRSHIP = { speed: 3, hover: 14, every: 5, max: 6, sniperHit: 30, level: 2 }; // level: it shoots like a Sniper at this level (2 = level 3)
+  // drops `drop` paratroopers at once, once a fight, as it flies into the enemy's deployment zone; +sniperHit damage per
+  // hit for the tower, the airship and Snipers
+  const AIRSHIP = { speed: 3, hover: 14, drop: 3, sniperHit: 30, level: 1 }; // level: it shoots like a Sniper at this level (1 = level 2)
   const INVEST = { gold: 800 }; // Major investment (bank): paid back at the start of the next round
   // Mage tower: each round its owner may call one mage general, who swaps the tower's attack for that round's fight
-  // only, and/or the teleport general (extra: called on top of another general, or alone).
-  // m.mageGen[side] = { round, id, tp }: id = the general (or null), tp = teleport called; it counts only in the round
-  // it was bought. Hidden from the opponent until the fight.
+  // only, and/or the teleport general (extra: bought once, on top of any general, for the rest of the match).
+  // m.mageGen[side] = { round, id, tp }: id = the general called in that round (or null), tp = the round the teleport
+  // general was bought (0: not bought; an old save's true counts for its own round only). Hidden from the opponent
+  // until the fight it was bought for.
   const MAGE_GENERALS = [
     { id: 'meteor', name: 'Meteor mage general', cost: 100, text: 'Tower calls down weak meteors.' },
     { id: 'lightning', name: 'Lightning mage general', cost: 50, text: 'Chain lightning: 100 damage, jumps 5 times.' },
     { id: 'water', name: 'Water mage general', cost: 50, text: 'Tower heals your units instead of attacking.' },
-    { id: 'teleport', name: 'Teleport mage general', cost: 100, extra: true, text: 'Stacks with another general. A fallen tower teleports instead of crippling you.' },
+    { id: 'teleport', name: 'Teleport mage general', cost: 150, extra: true, text: 'Lasts the rest of the match and stacks with any general. A fallen tower teleports instead of crippling you.' },
   ];
   const MAGE = { meteorHit: 25, meteorAps: 50, boltHit: 100, boltAps: 0.8, boltRange: 3, jumps: 5, jumpHit: 60, jumpReach: 6, waterHeal: 100, waterAps: 0.8, waterRange: 40 };
   const METEOR = { hit: 114, aps: 0.3, range: 50, minRange: 12, burst: 3, splash: 5.5, windUp: 2, projSpeed: 22 }; // used when the roster has no Meteor Caller
   const mageGenInfo = (id) => MAGE_GENERALS.find(x => x.id === id) || null;
   const isExtraGen = (id) => !!(mageGenInfo(id) || {}).extra;
-  // what the player called this round: { id, tp } or null (an old save's { id: 'teleport' } counts as tp)
-  const mageCalled = (m, side) => {
-    const g = m && m.mageGen && m.mageGen[side];
-    if (!g || g.round !== m.round || towerType(m, side).id !== 'mage') return null;
-    return isExtraGen(g.id) ? { id: null, tp: true } : { id: g.id || null, tp: !!g.tp };
+  const mageRec = (m, side) => { const g = m && m.mageGen && m.mageGen[side]; return g && towerType(m, side).id === 'mage' ? g : null; };
+  // the general called this round (not teleport); an old save's { id: 'teleport' } counts as tp
+  const mageGenOf = (m, side) => { const g = mageRec(m, side); return g && g.round === m.round && !isExtraGen(g.id) ? g.id || null : null; };
+  // the round the teleport general was bought in (0: not bought)
+  const mageTpRound = (m, side) => {
+    const g = mageRec(m, side); if (!g) return 0;
+    if (typeof g.tp === 'number') return g.tp <= m.round ? g.tp : 0;
+    return g.round === m.round && (g.tp || isExtraGen(g.id)) ? m.round : 0;
   };
-  const mageGenOf = (m, side) => (mageCalled(m, side) || {}).id || null; // the general called this round (not teleport)
-  const mageTpOf = (m, side) => !!(mageCalled(m, side) || {}).tp;       // the teleport general called this round
+  const mageTpOf = (m, side) => mageTpRound(m, side) > 0; // the teleport general is on (bought this round or before)
+  const mageTpNew = (m, side) => mageTpRound(m, side) === m.round; // ...bought this round (can still be undone)
   const mageGenCost = (id) => (mageGenInfo(id) || {}).cost || 0;
-  const setMageGen = (m, side, id, tp) => { if (!m.mageGen) m.mageGen = [null, null]; m.mageGen[side] = id || tp ? { round: m.round, id: id || null, tp: !!tp } : null; };
+  const setMageGen = (m, side, id, tp) => { if (!m.mageGen) m.mageGen = [null, null]; m.mageGen[side] = id || tp ? { round: m.round, id: id || null, tp: tp || 0 } : null; };
   // Blixten: a general can take the round's discounted purchase ({ kind: 'mgen' }, or { kind: 'mtp' } for teleport); swapping generals keeps it
   const mageGenFree = (m, side) => !!mageGenOf(m, side) && isMapFree(m, side, { kind: 'mgen' });
-  const mageTpFree = (m, side) => mageTpOf(m, side) && isMapFree(m, side, { kind: 'mtp' });
+  const mageTpFree = (m, side) => mageTpNew(m, side) && isMapFree(m, side, { kind: 'mtp' });
   // what calling id costs a player now (a discounted general swapped for another stays discounted)
   const mageGenPrice = (m, side, id) => isExtraGen(id) ? (mageTpFree(m, side) || (!mageTpOf(m, side) && mapFreeLeft(m, side)) ? blix(mageGenCost(id)) : mageGenCost(id))
     : mageGenFree(m, side) || (!mageGenOf(m, side) && mapFreeLeft(m, side)) ? blix(mageGenCost(id)) : mageGenCost(id);
@@ -271,23 +276,23 @@ const Game = (() => {
       const free = mapFreeLeft(m, side);
       if (free) useMapFree(m, side, { kind: 'mtp' });
       m.gold[side] -= free ? blix(mageGenCost(id)) : mageGenCost(id);
-      setMageGen(m, side, mageGenOf(m, side), true);
+      setMageGen(m, side, mageGenOf(m, side), m.round);
       return true;
     }
     const cur = mageGenOf(m, side), free = mageGenFree(m, side) || (!cur && mapFreeLeft(m, side));
     if (cur) m.gold[side] += mageGenPaid(m, side);
     if (free && !mageGenFree(m, side)) useMapFree(m, side, { kind: 'mgen' });
     m.gold[side] -= free ? blix(mageGenCost(id)) : mageGenCost(id);
-    setMageGen(m, side, id, mageTpOf(m, side));
+    setMageGen(m, side, id, mageTpRound(m, side));
     return true;
   }
   // send back the general called this round (id: 'teleport' for the teleport general)
   function undoMageGen(m, side, id) {
-    const tp = isExtraGen(id), cur = tp ? (mageTpOf(m, side) ? id : null) : mageGenOf(m, side);
+    const tp = isExtraGen(id), cur = tp ? (mageTpNew(m, side) ? id : null) : mageGenOf(m, side); // teleport: only in the round it was bought
     if (!cur) return false;
     const wasFree = tp ? mageTpFree(m, side) : mageGenFree(m, side);
     m.gold[side] += wasFree ? blix(mageGenCost(cur)) : mageGenCost(cur);
-    setMageGen(m, side, tp ? mageGenOf(m, side) : null, tp ? false : mageTpOf(m, side));
+    setMageGen(m, side, tp ? mageGenOf(m, side) : null, tp ? 0 : mageTpRound(m, side));
     if (wasFree) passMapFree(m, side);
     return true;
   }
@@ -410,7 +415,7 @@ const Game = (() => {
     { id: 'felix', name: 'Felix', ability: '+50 gold a round from round 3, +100 from round 6.' },
     { id: 'enzo', name: 'Enzo', ability: 'No skill buying. Each unit gets its first skill free with 2+ squads.' },
     { id: 'matteo', name: 'Matteo - the Gentleman', ability: 'Charisma spreads with kills. At 5, a squad converts its first kill each fight.' },
-    { id: 'otto', name: 'Otto - The Gambler', ability: 'Slot machine: 50 gold a spin, 3 spins a round. Three of a kind pays out, or hurts.' },
+    { id: 'otto', name: 'Otto - The Gambler', ability: 'Slot machine: 50 gold a spin, 3 spins a round. Three of a kind pays out, or hurts. After 5 losing spins in a row, the next one always wins.' },
   ];
   // ---------- the Standard pack ----------
   // A smaller match for new players, picked on the menu: fewer units with clear jobs (one or two of each kind per tier),
@@ -479,7 +484,7 @@ const Game = (() => {
     else if (m.towerSkill && m.towerSkill[side] === m.round) { rec = { kind: 'tskill' }; back = TOWER_SKILL.cost; }
     else if (m.towerSkill2 && m.towerSkill2[side] === m.round && !(towerType(m, side).skill2 || {}).noFree) { rec = { kind: 'tskill2' }; back = towerType(m, side).skill2.cost; }
     else if (mageGenOf(m, side)) { rec = { kind: 'mgen' }; back = mageGenCost(mageGenOf(m, side)); }
-    else if (mageTpOf(m, side)) { rec = { kind: 'mtp' }; back = mageGenCost('teleport'); }
+    else if (mageTpNew(m, side)) { rec = { kind: 'mtp' }; back = mageGenCost('teleport'); }
     if (rec) { useMapFree(m, side, rec); m.gold[side] += back - blix(back); }
   }
   // ---------- maps ----------
@@ -1853,9 +1858,12 @@ const Game = (() => {
         const { skills, skillDefs, skillsOn, skillsInnate, skillMods, ...plain } = (m.units || []).find(x => x && x.name === 'Wisps') || GUARD;
         const para = E.withTraits({ ...plain, name: 'Paratrooper', level: 0, bodies: 1, shape: 'diamond', color: '#E2D3A6' });
         const sn = (m.units || []).find(x => x && x.name === 'Sniper'), sl = sn ? E.leveled(E.withTraits({ ...sn, level: 0 }), AIRSHIP.level) : null;
-        const shot = sl ? { hit: sl.hit, aps: sl.aps, range: sl.range, splash: 0, projSpeed: sl.projSpeed || 0, spinUp: 0, spinHit: 0 } : {}; // a level 3 Sniper's attack
-        const au = E.withTraits({ ...tu, ...shot, name: 'Airship', kind: 'airship', structure: false, aloft: true, hp: 1, speed: AIRSHIP.speed, hover: AIRSHIP.hover,
-          spawn: { unit: para, count: 1, every: AIRSHIP.every, max: AIRSHIP.max, waves: 0 } });
+        const shot = sl ? { hit: sl.hit, aps: sl.aps, range: sl.range, splash: 0, projSpeed: sl.projSpeed || 0, spinUp: 0, spinHit: 0 } : {}; // a level 2 Sniper's attack
+        // the edge of the enemy's zone: side 0 flies up (toward row 0) past the edge of row ZONE - 1, side 1 down past row ROWS - ZONE
+        const edge = tileToWorld(0, side === 0 ? ZONE - 1 : ROWS - ZONE).y + (side === 0 ? -1 : 1) * TILE / 2;
+        const { spawn, ...tower } = tu;
+        const au = E.withTraits({ ...tower, ...shot, name: 'Airship', kind: 'airship', structure: false, aloft: true, hp: 1, speed: AIRSHIP.speed, hover: AIRSHIP.hover,
+          drop: { unit: para, count: AIRSHIP.drop, y: edge, dir: side === 0 ? 1 : -1 } });
         const aw = tileToWorld(t.col, side === 0 ? ROWS - ZONE - 1 : ZONE); // it takes off from the front row of its side's half of no man's land
         const ab = E.buildSquad(au, side, aw.x, aw.y, -4, TILE, idx);
         idx += ab.length; out.push(...ab);
@@ -2359,18 +2367,35 @@ const Game = (() => {
   // skull −SLOT.skullHp health (never below 1), shoe a free move and +1 deployment this round, coin +SLOT.coinGold,
   // goblin a random tier 1 squad at level 2 (unlocked too, no deployment used), chest +SLOT.chestGold.
   // m.slots[side][round] = [{ win: symbol or null, unit (goblin) }, ...]. A spin can't be undone.
-  const SLOT = { cost: 50, perRound: 3, skullHp: 5, coinGold: 100, chestGold: 500,
+  // Forgiveness luck: after SLOT.forgive losing spins in a row (nothing or skulls, across rounds), the next spin always
+  // wins one of the good prizes (shoe, coin, goblin, chest, by their odds).
+  const SLOT = { cost: 50, perRound: 3, skullHp: 5, coinGold: 100, chestGold: 500, forgive: 5,
     odds: [['skull', 12], ['shoe', 12], ['coin', 12], ['goblin', 3], ['chest', 1]], symbols: ['skull', 'shoe', 'coin', 'goblin', 'chest'] };
   const slotSpins = (m, side, round = m && m.round) => (m && m.slots && m.slots[side] && m.slots[side][round]) || [];
   const slotWins = (m, side, sym) => slotSpins(m, side).filter(x => x.win === sym).length;
   const slotMovesLeft = (m, side) => slotWins(m, side, 'shoe') - m.armies[side].filter(q => q.luckMove === m.round).length;
   const canSpin = (m, side) => !!m && !m.over && charOf(m, side) === 'otto' && slotSpins(m, side).length < SLOT.perRound && m.gold[side] >= SLOT.cost;
   const slotRng = (m, side, round, k) => rng(m.seed + round * 5471 + side * 7919 + k * 613 + 29);
+  const slotLost = (rec) => !rec || !rec.win || rec.win === 'skull';
+  // losing spins in a row before the k-th spin of round (counted back through earlier rounds)
+  function slotDry(m, side, round, k) {
+    let n = 0;
+    for (let rd = round; rd >= 1; rd--) {
+      const list = slotSpins(m, side, rd), end = rd === round ? Math.min(k, list.length) : list.length;
+      for (let i = end - 1; i >= 0; i--) { if (!slotLost(list[i])) return n; n++; }
+    }
+    return n;
+  }
+  const slotForgiven = (m, side, round, k) => slotDry(m, side, round, k) >= SLOT.forgive;
   // the k-th spin of a round: what it wins, and for a goblin, which tier 1 unit (one not left out of the match)
   function slotOutcome(m, side, round, k) {
     const r = slotRng(m, side, round, k), x = r() * 100;
     let acc = 0, win = null;
     for (const [sym, p] of SLOT.odds) { acc += p; if (x < acc) { win = sym; break; } }
+    if (slotLost({ win }) && slotForgiven(m, side, round, k)) { // forgiveness luck: a good prize, by its odds
+      const good = SLOT.odds.filter(([sym]) => sym !== 'skull'), tot = good.reduce((a, [, p]) => a + p, 0), y = r() * tot;
+      acc = 0; for (const [sym, p] of good) { acc += p; if (y < acc) { win = sym; break; } }
+    }
     const out = { win };
     if (win === 'goblin') {
       const pool = m.units.map((_, i) => i).filter(i => isTier1(m, i) && !isOff(m, i, side) && !m.units[i].building);
@@ -3071,11 +3096,11 @@ const Game = (() => {
     canBuyBuilding, buyBuilding, buildingSkills, buildingSkillInfo, bskillOf, bskillCost, canBuyBuildingSkill, buyBuildingSkill, undoBuildingSkill,
     buildingXpNeeded, buildingLevelCost, buildingReady, levelBuilding, undoLevelBuilding, constructBuff, buildingBodies, canBuySkill, buySkill, undoSkill, sellValue, sell,
     isRider, freeOut, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
-    TOWER, TOWER_TYPES, OUTPOST, TOWER_PICK_ROUND, towerType, towerChoices, needsTowerPick, setTowerType, settleTowerPicks, TOWER_SKILL, towerSkillOf, towerSkillVisible, towerPicked, canBuyTowerSkill, buyTowerSkill, undoTowerSkill, towerSkillCost, towerSkill2Of, towerSkill2Visible, towerSkill2Cost, canBuyTowerSkill2, buyTowerSkill2, undoTowerSkill2, towerSkill2On, AIRSHIP, MOAT, BWALL, BWALL_SQ, EDGES, bwallsOf, bwallOn, edgeOf, bwallWorld, bwallsLeft, bwallShown, bwallSpotOk, placeBwall, unplaceBwall, ensureBwalls, bwallUnit, INVEST, MAGE_GENERALS, mageGenPrice, MAGE, mageGenInfo, mageGenOf, mageTpOf, isExtraGen, mageGenCost, canBuyMageGen, buyMageGen, undoMageGen, mageTowerUnit, generalUnit, LOAN, loanNow, investNow, bankBusy, investNow, bankBusy, canTakeLoan, takeLoan, undoLoan, towerRounds, troundInfo, troundOn, troundCost, canBuyTround, buyTround, undoTround, SLIME_UNITS, slimeTowerUnit, slimeSkillDefs, TOWER_MID, towerColOk, towerAt, needsTower, placeTower, ensureTower,
+    TOWER, TOWER_TYPES, OUTPOST, TOWER_PICK_ROUND, towerType, towerChoices, needsTowerPick, setTowerType, settleTowerPicks, TOWER_SKILL, towerSkillOf, towerSkillVisible, towerPicked, canBuyTowerSkill, buyTowerSkill, undoTowerSkill, towerSkillCost, towerSkill2Of, towerSkill2Visible, towerSkill2Cost, canBuyTowerSkill2, buyTowerSkill2, undoTowerSkill2, towerSkill2On, AIRSHIP, MOAT, BWALL, BWALL_SQ, EDGES, bwallsOf, bwallOn, edgeOf, bwallWorld, bwallsLeft, bwallShown, bwallSpotOk, placeBwall, unplaceBwall, ensureBwalls, bwallUnit, INVEST, MAGE_GENERALS, mageGenPrice, MAGE, mageGenInfo, mageGenOf, mageTpOf, mageTpRound, mageTpNew, isExtraGen, mageGenCost, canBuyMageGen, buyMageGen, undoMageGen, mageTowerUnit, generalUnit, LOAN, loanNow, investNow, bankBusy, investNow, bankBusy, canTakeLoan, takeLoan, undoLoan, towerRounds, troundInfo, troundOn, troundCost, canBuyTround, buyTround, undoTround, SLIME_UNITS, slimeTowerUnit, slimeSkillDefs, TOWER_MID, towerColOk, towerAt, needsTower, placeTower, ensureTower,
     FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, isOff, enemyHolds, inNoMans, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
     STANDARD_PACK, ICE, ALTAR, GOLEM, isIce, hailRound, altarRound, stormShift, stormRows, hailTiles, altarCost, altarRefund, altarCount, pushRoom, altarBought, addAltar, buyAltar, undoAltar, snowgres, snowgreUnit,
     MAPS, SKINS, MAP_LOOK, lookOf, EDITOR_MAPS, TERRAIN, objectiveOf, objectiveTiles, SHAPE_PATH, terrainTile, terrainBlocks, terrainOf, groundHeight, ELF_TOWER, SHROOM, SHROOM_SPLIT, shroomAt, shroomTileAt, shroomRemoval, SHROOM_REMOVE, shroomCost, removeShroom, undoRemoveShroom, mapOf, elfSpot, rollMap, BRIBE_COST, bribeList, bribeGold, bribeCount, bribeNow, bribeCost, bribeRefund, ELF_POWER, elfPowered, elfUnit, ELF_OWN, elfOwnCost, elfOwnOf, elfOwnAt, elfOwnUnlocked, elfOwnOffered, canBuyElfOwn, elfOwnSpotOk, buyElfOwn, undoElfOwn, bribeLeader, canBribe, bribe, undoBribe,
-    CHARACTERS, CHAR, charOf, SLOT, slotSpins, slotWins, slotMovesLeft, canSpin, slotOutcome, slotReels, spin, takeSpins, aiSlots, charInfo, enzoSkill, enzoActive, charmOf, isGentleman, canGiveCharm, giveCharm, undoCharm, ensureCharm, felixGold, isTier1, rollBuffTiles, onBuffTile, zoeBuff, yotImps, yotLevel, TOWER_SPOT, towerSpot,
+    CHARACTERS, CHAR, charOf, SLOT, slotSpins, slotDry, slotWins, slotMovesLeft, canSpin, slotOutcome, slotReels, spin, takeSpins, aiSlots, charInfo, enzoSkill, enzoActive, charmOf, isGentleman, canGiveCharm, giveCharm, undoCharm, ensureCharm, felixGold, isTier1, rollBuffTiles, onBuffTile, zoeBuff, yotImps, yotLevel, TOWER_SPOT, towerSpot,
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,

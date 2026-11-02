@@ -13,7 +13,7 @@ const body = (u, side, x, y) => E.buildSquad(u, side, x, y, side * 10, 6)[0];
 const dummy = (hp, extra) => E.withTraits({ name: 'Dummy', cost: 1, bodies: 1, hp, hit: 0, aps: 1, range: 1, speed: 0, splash: 0, idle: true, ...extra });
 const steps = (bt, s) => { for (let k = 0; k < Math.round(s / G.dt); k++) bt.step(); };
 
-// bleed: every second knife on the same target is a stack; 3 health a pulse for 2.5 s, doubled per stack
+// bleed: every second knife on the same target is a stack; 6 health a pulse for 2.5 s, doubled per stack, up to 4
 {
   const shiv = body(unit('Shiv'), 0, 0, -10), d = body(dummy(100000), 1, 0, 5);
   const bt = E.createBattle([shiv], [d], G);
@@ -24,20 +24,20 @@ const steps = (bt, s) => { for (let k = 0; k < Math.round(s / G.dt); k++) bt.ste
   steps(bt, 8);
   assert.strictEqual(d.bleed.n, E.BLEED.max, 'stacks top out at ' + E.BLEED.max);
   assert.ok(d.bleed.t <= E.BLEED.secs + 1e-9, 'a stack lasts ' + E.BLEED.secs + ' s');
-  assert.ok(E.BLEED.dmg === 3 && E.BLEED.secs === 2.5 && E.BLEED.pulse === 0.5, 'bleed: 3 a pulse, twice a second, for 2.5 s');
-  // a lone stack: 5 pulses of 3 over 2.5 s, then it is gone
+  assert.ok(E.BLEED.dmg === 6 && E.BLEED.max === 4 && E.BLEED.secs === 2.5 && E.BLEED.pulse === 0.5, 'bleed: 6 a pulse, twice a second, for 2.5 s, up to 4 stacks');
+  // a lone stack: 5 pulses of 6 over 2.5 s, then it is gone (each stack is the old one above it)
   const v = body(dummy(1000), 1, 0, 0), src = body(dummy(1000), 0, 0, -30); // a source that never attacks: only the bleed hurts v
   const bt2 = E.createBattle([src], [v], G);
   const bleed = (n) => { v.bleed = { n, t: E.BLEED.secs, pulse: E.BLEED.pulse, src, noHeal: false }; };
   bleed(1); steps(bt2, 3.5);
-  assert.ok(Math.abs(v.hp - 985) < 1e-6, `1 stack: 15 damage in all (${v.hp})`);
+  assert.ok(Math.abs(v.hp - 970) < 1e-6, `1 stack: 30 damage in all (${v.hp})`);
   assert.strictEqual(v.bleed, null, 'and then it stops');
+  v.hp = 1000; bleed(3); steps(bt2, 3.5);
+  assert.ok(Math.abs(v.hp - (1000 - 5 * 24 - 2.5 * 2 / 100 * 1000)) < 1e-6, `3 stacks: 24 a pulse and 2% of max health a second (${v.hp})`);
   v.hp = 1000; bleed(4); steps(bt2, 3.5);
-  assert.ok(Math.abs(v.hp - (1000 - 5 * 24 - 2.5 * 2 / 100 * 1000)) < 1e-6, `4 stacks: 24 a pulse and 2% of max health a second (${v.hp})`);
-  v.hp = 1000; bleed(5); steps(bt2, 3.5);
-  assert.ok(Math.abs(v.hp - (1000 - 5 * 48 - 2.5 * 5 / 100 * 1000)) < 1e-6, `5 stacks: 48 a pulse and 5% of max health a second (${v.hp})`);
+  assert.ok(Math.abs(v.hp - (1000 - 5 * 48 - 2.5 * 5 / 100 * 1000)) < 1e-6, `4 stacks: 48 a pulse and 5% of max health a second (${v.hp})`);
 }
-// Anemia stuns at 5 stacks; Too deep stops regeneration and lasts a second longer
+// Anemia stuns at 4 stacks; Too deep stops regeneration and lasts a second longer
 {
   const d = body(dummy(100000, { regen: 5 }), 1, 0, 5);
   const s = body(withSkills('Shiv', ['anemia', 'tooDeep']), 0, 0, -10);

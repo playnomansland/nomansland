@@ -90,7 +90,7 @@
     if (s.mark && s.mark[h] && s.mark[h].round === round) s.mark[h] = null;
     if (s.towerSkill && s.towerSkill[h] === round) s.towerSkill[h] = 0;
     if (s.towerSkill2 && s.towerSkill2[h] === round) s.towerSkill2[h] = 0;
-    if (s.mageGen) s.mageGen[h] = null;
+    if (s.mageGen) { const tr = G.mageTpRound(s, h); s.mageGen[h] = tr && tr < round ? { round: -1, id: null, tp: tr } : null; } // the teleport general stays seen once its round is over
     if (s.loan && s.loan[h] === round) s.loan[h] = 0;
     if (s.tround) s.tround[h] = {};
     if (s.mapFree && s.mapFree[h]) delete s.mapFree[h][round];

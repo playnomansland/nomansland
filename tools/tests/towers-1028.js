@@ -29,13 +29,31 @@ m = mk('keep'); m.towers[1].type = null; m.extraDeploys[1] = 0; m.gold[1] = 2000
 assert.ok(Game.buyDeploy(m, 1) && m.gold[1] === 2000 - Game.CONFIG.extraDeployCost);
 assert.ok(Game.setTowerType(m, 1, 'keep') && m.extraDeploys[1] === 0 && m.gold[1] === 2000 && Game.deploysAllowed(m, 1) === base + 1);
 
-// Sniper tower: airship 400, shooting like a level 3 Sniper
+// Sniper tower: airship 400, shooting like a level 2 Sniper, dropping 3 paratroopers once, into the enemy's zone
 assert.strictEqual(T.find(t => t.id === 'sniper').skill2.cost, 400);
 m = mk('sniper');
 Game.buyTowerSkill2(m, 0);
 let b = Game.bodiesFor(m, 0).find(x => x.squad === -4);
 const sn = units[ui('Sniper')];
-assert.ok(b && Math.abs(b.u.hit - sn.hit * 3) < 1e-9 && b.u.aps === sn.aps && b.u.range === sn.range, 'airship: a level 3 Sniper\'s attack');
+assert.ok(b && Math.abs(b.u.hit - sn.hit * 2) < 1e-9 && b.u.aps === sn.aps && b.u.range === sn.range, 'airship: a level 2 Sniper\'s attack');
+assert.ok(!b.u.spawn && b.u.drop && b.u.drop.count === 3, 'airship: one drop of 3, no spawning');
+for (const side of [0, 1]) {
+  const ma = mk('sniper'); ma.towers[1].type = 'sniper'; Game.buyTowerSkill2(ma, side);
+  sq(ma, 1 - side, 'Brute', 5, side === 0 ? 2 : 13, 1); // a target deep in the enemy's zone
+  sq(ma, side, 'Brute', 5, side === 0 ? 13 : 2, 1);
+  const sa = Game.startBattle(ma), drops = [];
+  let air = null, kids = 0;
+  for (let k = 0; k < 3000 && sa.step(); k++) {
+    const bs = sa.bodies;
+    air = air || bs.find(x => x.squad === -4 && x.side === side);
+    const n = bs.filter(x => x.side === side && x.u.name === 'Paratrooper').length;
+    if (n > kids) { drops.push({ n: n - kids, y: air.y }); kids = n; }
+  }
+  assert.strictEqual(drops.length, 1, 'side ' + side + ': one drop a fight');
+  assert.strictEqual(drops[0].n, 3, 'side ' + side + ': 3 paratroopers at once');
+  const edge = Game.bodiesFor(ma, side).find(x => x.squad === -4).u.drop.y;
+  assert.ok(side === 0 ? drops[0].y >= edge - 1e-9 : drops[0].y <= edge + 1e-9, 'side ' + side + ': dropped inside enemy territory');
+}
 
 // Mark Bounty: 50 once, only an enemy squad from an earlier round, can't be moved, free again once the squad is sold
 m = mk('sniper');

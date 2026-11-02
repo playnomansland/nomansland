@@ -4,6 +4,28 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 2 November 2026 – Balance and fixes
+
+### Unit sheets
+- A unit's **stats** (bodies, health, hit, attacks per second, range, speed) now sit at the **top of its sheet**, right under its name, instead of at the bottom.
+
+### Towers
+- **Mage tower – Teleport mage general:** now **150 gold** (was 100) and **lasts the rest of the match** once bought, on top of whichever general you call each round. It can be undone only in the round you buy it.
+- **Sniper tower – Deploy airship (nerf):** the airship now shoots like a **level 2 Sniper** (was level 3). Instead of a paratrooper every 5 seconds, it flies straight into enemy territory and drops **3 paratroopers at once, once per fight**, then fights as before.
+
+### Units
+- **Ember Imps – Ember Mortar (nerf):** attack speed −20%, range bonus +12 m (was +18 m), and the mortar now **lobs shells at 20 m/s** instead of hitting at once, so fast units can step out of the blast.
+- **Ember Imps – Summon hellfiend (nerf):** the Hellfiend has 30% less health, hit, attack speed and move speed.
+- **Wisps (nerf):** attack speed −15% (0.7 → 0.6 attacks a second).
+- **Truespear (nerf):** attack speed −15% (0.9 → 0.77) and health −30% (1800 → 1260).
+- **Shiv:** now **3 bodies** (was 4). Each knife hits harder (13 → 17.3) and each body has more health (150 → 200), so the squad deals and takes about the same as before.
+- **Bleed:** stacks now top out at **4** (was 5), and each stack hits like the one above it used to: stack 1 is the old stack 2, and so on. Bleed reaches its peak faster. Anemia now stuns at 4 stacks.
+
+### Leaders
+- **Otto – The Gambler: forgiveness luck.** After 5 losing spins in a row (nothing, or skulls), the next spin always wins a prize. The slot machine shows how close you are.
+
+---
+
 ## 2 November 2026 – Flame Wizard on the main menu
 
 - A **Flame Wizard** now stands at the left edge of the main menu: the same 3D model as on the battlefield, turned toward you and standing still, blasting an orange fire cone from his staff across the screen, with sparks flying and a big wobbling **BABABABABA** above him in a cartoon font.
