@@ -19,17 +19,18 @@ function percentile(values, p) {
 
 function main() {
   const args = process.argv.slice(2);
-  let out = 'balance-lab-profile.json';
+  let out = 'balance-lab-profile.json', mode = 'reference';
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--out') out = args[++i];
+    else if (args[i] === '--mode') mode = args[++i];
     else if (args[i] === '--help' || args[i] === '-h') {
-      console.log('Usage: node tools/profile-matchup-matrix.js [--out balance-lab-profile.json]');
+      console.log('Usage: node tools/profile-matchup-matrix.js [--mode reference|indexed] [--out balance-lab-profile.json]');
       return;
     } else throw new Error('Unknown argument: ' + args[i]);
   }
 
   const startedAt = new Date().toISOString();
-  const prepared = Lab.prepareRoster();
+  const prepared = Lab.prepareRoster({ rebuildMatrix: true, targetingMode: mode });
   const profile = prepared.profiling;
   const durations = profile.matchups.map(m => m.elapsedMs);
   const steps = profile.matchups.map(m => m.steps);
@@ -38,6 +39,7 @@ function main() {
     generatedAt: new Date().toISOString(),
     startedAt,
     commit: process.env.GITHUB_SHA || null,
+    targetingMode: mode,
     runtime: { node: process.version, platform: process.platform, arch: process.arch },
     fingerprints: {
       engine: hash('src/engine.js'),

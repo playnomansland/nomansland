@@ -9,6 +9,7 @@ const path = require('path');
 const Engine = require('../src/engine.js');
 const Game = require('../src/game.js');
 const roster = require('../src/default-roster.json');
+const prepareUnits = require('../server/src/prepare-units.cjs');
 
 const DEFAULTS = Object.freeze({ matches: 10, seed: 700000, maxRounds: 30, map: 'standard' });
 
@@ -32,7 +33,15 @@ function parseArgs(argv) {
   return out;
 }
 
-function prepareRoster() {
+// The units and counter table every real match uses: src/demo-units.json (built by tools/counter-table.js),
+// prepared by the very code the server uses (server/src/prepare-units.cjs, checked against the page's useSet).
+// No battles run. rebuildMatrix: true instead builds a table from the roster with the engine (for profiling only;
+// its settings differ from the shipped table's). targetingMode: 'indexed' runs those battles on the fast paths.
+function prepareRoster(options = {}) {
+  if (!options.rebuildMatrix) {
+    const { units, matrix } = prepareUnits(Engine, require('../src/demo-units.json'));
+    return { units, matrix, source: 'src/demo-units.json' };
+  }
   const skill = id => roster.skills.find(s => s.id === id) || null;
   const units = roster.units.map(u => ({
     ...u,
@@ -73,7 +82,7 @@ function prepareRoster() {
       }
       lastHeartbeatAt = Date.now();
     }
-  }, { progressEvery: 100 });
+  }, { progressEvery: 100, targetingMode: options.targetingMode || 'reference' });
   const matrixElapsedMs = Date.now() - matrixStartedAt;
   const totalElapsedMs = matchupTimings.reduce((sum, item) => sum + item.elapsedMs, 0);
   const slowest = matchupTimings.slice().sort((a, b) => b.elapsedMs - a.elapsedMs).slice(0, 10);
@@ -82,7 +91,9 @@ function prepareRoster() {
   for (const item of slowest) {
     console.log('  ' + item.matchup + ': ' + item.elapsedMs + 'ms / ' + item.steps + ' steps');
   }
-  return { units, matrix, settings, profiling: {
+  // the AI reads plain scores (as in demo-units.json), not battle results
+  const scores = matrix.map((row, i) => row.map((r, j) => i === j || !r ? 0 : r.score));
+  return { units, matrix: scores, settings, source: 'engine matrix from src/default-roster.json', profiling: {
     unitCount: units.length,
     uniqueMatchups: totalMatchups,
     matrixElapsedMs,
@@ -209,7 +220,7 @@ function runBatch(options = {}) {
   return {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
-    source: { engine: 'src/engine.js', game: 'src/game.js', roster: 'src/default-roster.json' },
+    source: { engine: 'src/engine.js', game: 'src/game.js', units: prepared.source },
     config: { matches: config.matches, seed: config.seed >>> 0, maxRounds: config.maxRounds, map: config.map, mirror: !!config.mirror, ai: 'current Game.aiDeploy' },
     summary: summarize(results, prepared.units),
     matches: results

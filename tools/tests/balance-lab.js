@@ -54,9 +54,9 @@ const Lab = require('../balance-lab.js');
 }
 
 {
-  // Exercise roster preparation without running the engine's expensive all-vs-all
-  // matchup simulations. The real matrix is exercised once by the CI smoke test.
+  // Default: the shipped units and counter table, prepared like the server does it, with no battles.
   const Engine = require('../../src/engine.js');
+  const demo = require('../../src/demo-units.json');
   const originalMatrix = Engine.matrix;
   let matrixCalled = false;
   let instrumentationOptions;
@@ -64,19 +64,24 @@ const Lab = require('../balance-lab.js');
     matrixCalled = true;
     instrumentationOptions = options;
     onProgress({ type: 'matchup-complete', completed: 1, total: 1, unitAName: 'A', unitBName: 'B', steps: 12, elapsedMs: 4 });
-    return units.map((_, i) => units.map((__, j) => i === j ? null : { score: 0 }));
+    return units.map((_, i) => units.map((__, j) => i === j ? null : { score: 0.25 }));
   };
   try {
     const prepared = Lab.prepareRoster();
-    assert.ok(prepared.units.length > 0, 'loads the live roster');
-    assert.strictEqual(matrixCalled, true, 'builds the engine matchup matrix');
-    assert.deepStrictEqual(instrumentationOptions, { progressEvery: 100 }, 'enables opt-in matchup instrumentation');
-    assert.strictEqual(prepared.matrix.length, prepared.units.length);
-    assert.strictEqual(prepared.matrix[0].length, prepared.units.length);
+    assert.strictEqual(matrixCalled, false, 'uses the shipped counter table');
+    assert.strictEqual(prepared.units.length, demo.units.length);
+    assert.deepStrictEqual(prepared.matrix, demo.matrix);
+    assert.ok(prepared.matrix.every(r => r.every(x => typeof x === 'number')), 'plain scores, as the AI reads them');
+    const rebuilt = Lab.prepareRoster({ rebuildMatrix: true, targetingMode: 'indexed' });
+    assert.strictEqual(matrixCalled, true, 'rebuild builds the engine matchup matrix');
+    assert.deepStrictEqual(instrumentationOptions, { progressEvery: 100, targetingMode: 'indexed' });
+    assert.strictEqual(rebuilt.matrix.length, rebuilt.units.length);
+    assert.strictEqual(rebuilt.matrix[0][1], 0.25, 'rebuilt table holds scores, not battle results');
+    assert.strictEqual(rebuilt.matrix[0][0], 0);
   } finally {
     Engine.matrix = originalMatrix;
   }
-  console.log('ok  live roster preparation and matchup matrix wiring');
+  console.log('ok  roster preparation (shipped table) and matrix rebuild wiring');
 }
 
 console.log('Balance Lab tests passed.');

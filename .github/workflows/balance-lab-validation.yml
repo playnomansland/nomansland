@@ -4,6 +4,9 @@ concurrency:
   group: balance-lab-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# Every change to the engine, the game or the lab: the quick checks (a few minutes), including the fast-path
+# differential test (the grids must give bit-for-bit the reference battles). The full 378-battle profile is slow
+# (~30 min reference): only when started by hand, with the targeting mode to profile.
 on:
   pull_request:
     paths:
@@ -12,14 +15,32 @@ on:
       - "tools/profile-matchup-matrix.js"
       - "tools/tests/balance-lab.js"
       - "tools/tests/targeting-determinism.js"
+      - "tools/tests/fast-paths.js"
       - ".github/workflows/balance-lab-validation.yml"
-      - ".github/workflows/balance-lab-profile.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/engine.js"
+      - "src/game.js"
+      - "src/demo-units.json"
+      - "tools/balance-lab.js"
+      - "tools/tests/fast-paths.js"
   workflow_dispatch:
+    inputs:
+      profile:
+        description: "Also profile the full matchup matrix"
+        type: boolean
+        default: false
+      mode:
+        description: "Targeting mode for the profile"
+        type: choice
+        options: [indexed, reference]
+        default: indexed
 
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 90
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -31,9 +52,13 @@ jobs:
         run: node tools/tests/balance-lab.js
       - name: Run targeting determinism baseline
         run: node tools/tests/targeting-determinism.js
+      - name: Fast paths give identical battles
+        run: QUICK=1 node tools/tests/fast-paths.js
       - name: Profile live-engine matchup matrix
-        run: node tools/profile-matchup-matrix.js --out reports/balance-lab-profile.json
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.profile }}
+        run: node tools/profile-matchup-matrix.js --mode ${{ inputs.mode }} --out reports/balance-lab-profile.json
       - name: Upload profiling report
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.profile }}
         uses: actions/upload-artifact@v4
         with:
           name: balance-lab-profile
