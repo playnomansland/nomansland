@@ -33,7 +33,7 @@ export const ACCOUNT = {
 const DAY = 24 * 3600e3;
 
 const SCHEMA = [
-  `CREATE TABLE IF NOT EXISTS players (id TEXT PRIMARY KEY, tag TEXT, created INTEGER NOT NULL, seen INTEGER NOT NULL, deleted INTEGER)`,
+  `CREATE TABLE IF NOT EXISTS players (id TEXT PRIMARY KEY, tag TEXT, created INTEGER NOT NULL, seen INTEGER NOT NULL, deleted INTEGER, dev INTEGER NOT NULL DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS logins (provider TEXT NOT NULL, subject TEXT NOT NULL, player TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (provider, subject))`,
   `CREATE INDEX IF NOT EXISTS logins_player ON logins (player)`,
   `CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, player TEXT NOT NULL, created INTEGER NOT NULL, expires INTEGER NOT NULL)`,
@@ -111,8 +111,9 @@ export async function verifyGoogle(token, env) {
 }
 
 // ---------- storage helpers ----------
-async function hit(db, bucket, ip) {
-  const [max, win] = ACCOUNT.RATE[bucket];
+async function hit(db, bucket, ip, env) {
+  let [max, win] = ACCOUNT.RATE[bucket];
+  if (bucket === 'google' && +env.ACCOUNT_GOOGLE_RATE) max = +env.ACCOUNT_GOOGLE_RATE;   // tests only
   const now = Date.now();
   // the IP only as a hash, and only for the length of the window (old rows are swept on guest creation)
   const k = bucket + ':' + (await sha256('nml-ip:' + (ip || 'none'))).slice(0, 32);
@@ -145,9 +146,19 @@ async function auth(db, request) {
 }
 
 async function playerOut(db, id) {
-  const p = await db.prepare('SELECT id, tag, created FROM players WHERE id = ?').bind(id).first();
+  const p = await db.prepare('SELECT id, tag, created, dev FROM players WHERE id = ?').bind(id).first();
   const logins = await db.prepare('SELECT provider FROM logins WHERE player = ?').bind(id).all();
-  return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google') };
+  return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google'), dev: !!p.dev };
+}
+
+// Developer mode: a Google account whose verified email is in the secret DEV_EMAILS (comma separated; a Cloudflare
+// secret, never in the repo). Decided by the server at every Google sign-in, so removing an email takes it away at
+// that account's next sign-in. The email is compared and dropped, never stored. Guests are never developers.
+// Every feature that is ever locked or gated per player must let a player with dev: true through.
+function isDevEmail(claims, env) {
+  if (!env.DEV_EMAILS || claims.email_verified !== true || typeof claims.email !== 'string') return false;
+  const list = env.DEV_EMAILS.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return list.includes(claims.email.trim().toLowerCase());
 }
 
 // ---------- the route handler ----------
@@ -168,7 +179,7 @@ export async function handleAccount(request, env, cors) {
     await ensureSchema(db);
     const ip = request.headers.get('CF-Connecting-IP') || '';
     const bucket = route === 'guest' ? 'guest' : route === 'google' ? 'google' : 'other';
-    if (!(await hit(db, bucket, ip))) return json({ error: 'slow down' }, 429, cors);
+    if (!(await hit(db, bucket, ip, env))) return json({ error: 'slow down' }, 429, cors);
     const now = Date.now();
 
     if (route === 'guest') {
@@ -205,7 +216,7 @@ export async function handleAccount(request, env, cors) {
       }
       // the guest session that signed in is done either way; the phone gets a session for the signed-in player
       if (me) await db.prepare('DELETE FROM sessions WHERE hash = ?').bind(me.hash).run();
-      await db.prepare('UPDATE players SET seen = ? WHERE id = ?').bind(now, id).run();
+      await db.prepare('UPDATE players SET seen = ?, dev = ? WHERE id = ?').bind(now, isDevEmail(claims, env) ? 1 : 0, id).run();
       const session = await newSession(db, id);
       return json({ player: await playerOut(db, id), session, linked }, 200, cors);
     }

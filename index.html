@@ -195,6 +195,7 @@ a { color: var(--you); }
 .hist li span { font-size: 12px; color: var(--muted); }
 .acct { display: grid; gap: 10px; }
 .acct-google { min-height: 44px; }
+.acct-dev { color: var(--gold); }
 .volrow { display: flex; align-items: center; gap: 10px; flex: 1; justify-content: flex-end; }
 .volrow input { flex: 1; max-width: 220px; accent-color: var(--gold); }
 .volrow .num { width: 3ch; text-align: right; font-family: var(--font-data); font-size: 13px; }
@@ -11171,6 +11172,10 @@ const Render2D = (cv, view, opts = {}) => {
   try { acct = JSON.parse(localStorage.getItem(ACCT_STORE) || 'null'); } catch (e) {}
   if (!(acct && /^p[0-9a-f]{16}$/.test(acct.id) && /^[0-9a-f]{64}$/.test(acct.session))) acct = null;
   const acctUi = { busy: false, msg: '', off: false, sure: false, gsi: null };
+  // Developer mode: the server marks a player as a developer (its DEV_EMAILS secret); the page only reads the flag.
+  // Anything ever locked or gated per player checks devMode() and lets developers through. For server-side gates the
+  // server checks its own flag; this copy is for the page.
+  const devMode = () => !!(acct && acct.dev);
   function acctSave(a) {
     acct = a;
     try { a ? localStorage.setItem(ACCT_STORE, JSON.stringify(a)) : localStorage.removeItem(ACCT_STORE); } catch (e) {}
@@ -11187,7 +11192,7 @@ const Render2D = (cv, view, opts = {}) => {
   // keeps the phone's copy in step with an answer that carries a player (and maybe a new session)
   function acctTake(r) {
     if (!r.player) return;
-    acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, session: r.session || acct.session, ts: now() });
+    acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, dev: !!r.player.dev, session: r.session || acct.session, ts: now() });
   }
   function acctFail(r) {
     if (r.status === 503 && r.error === 'accounts off') { acctUi.off = true; return 'Accounts aren’t switched on yet on the game server.'; }
@@ -11258,6 +11263,7 @@ const Render2D = (cv, view, opts = {}) => {
     const google = GOOGLE_CLIENT_ID && !acctUi.off ? '<div id="acct-google" class="acct-google"></div>' : '';
     $('acct').innerHTML = a ? `
       <p class="hint" style="margin:0">${a.google ? 'Signed in with Google. Sign in on another phone to play as the same player.' : 'Guest on this phone. Sign in with Google to keep it if you change or reset your phone.'}</p>
+      ${a.dev ? '<p class="hint acct-dev" style="margin:0">Developer mode is on: every feature is open to this account.</p>' : ''}
       <span class="hint">Your gamertag</span>
       <span class="joinrow"><input class="tour-in" id="acct-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Your gamertag" value="${esc(a.tag)}"><button class="btn" id="acct-tag-ok" ${dis}>Save</button></span>
       ${a.google ? '' : google}
@@ -11286,7 +11292,7 @@ const Render2D = (cv, view, opts = {}) => {
     acctDraw();
     acctRefresh();
   }
-  if (qs.has('test')) window.__acct = () => ({ acct, ui: acctUi, google: acctGoogle });
+  if (qs.has('test')) window.__acct = () => ({ acct, ui: acctUi, google: acctGoogle, dev: devMode() });
 
   // ---------- flow: vs Claude ----------
   // Only inside Claude: the page asks Claude (on the player's own account) for its move each round.

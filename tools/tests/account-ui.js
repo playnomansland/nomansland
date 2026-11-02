@@ -26,7 +26,7 @@ const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') + msg); if (!c) fai
 setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 * 1000).unref();
 
 (async () => {
-  const srv = await startAccounts(8794);
+  const srv = await startAccounts(8794, { DEV_EMAILS: 'dev@example.com' });
   const PAGE = `http://127.0.0.1:8766/account-test.html?test&server=${srv.base}`;
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
   const urls = [];
@@ -44,7 +44,7 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 *
   const idle = (p) => p.waitForFunction(() => window.__acct && !window.__acct().ui.busy, null, { timeout: 10000 });
   const state = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('phonebellum.account.v1') || 'null'));
   const open = async (p) => { await p.click('#acct-open'); await idle(p); };
-  const google = async (p, sub) => { await p.evaluate((c) => { window.__nextCred = c; }, idToken({ sub })); await p.click('#fake-g'); await idle(p); };
+  const google = async (p, sub, claims = {}) => { await p.evaluate((c) => { window.__nextCred = c; }, idToken({ sub, ...claims })); await p.click('#fake-g'); await idle(p); };
 
   try {
     const a = await phone('a');
@@ -91,6 +91,13 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 *
     await google(a, sub);
     s = await state(a);
     ok(s && s.id !== guestId && s.tag !== 'Vilhelm', 'after deleting, the same Google account starts a new player');
+
+    const d = await phone('dev');
+    await open(d);
+    await google(d, '8' + Date.now(), { email: 'dev@example.com', email_verified: true });
+    ok((await state(d)).dev === true && await d.evaluate(() => window.__acct().dev) === true, 'a developer account: devMode() is on');
+    ok(/Developer mode is on/.test(await text(d)), 'the sheet says so');
+    ok(!(await state(a)).dev && !/Developer mode/.test(await text(a)), 'other accounts are not developers');
 
     const c = await phone('off', { off: true });
     await open(c);

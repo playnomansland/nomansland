@@ -25,7 +25,7 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 *
   const conf = fs.readFileSync(path.join(__dirname, '../wrangler.toml'), 'utf8');
   assert.ok(/^#?\s*\[\[d1_databases\]\]/m.test(conf), 'wrangler.toml mentions the accounts database');
   assert.ok(/if \(!db\) return json\(\{ error: 'accounts off' \}, 503/.test(fs.readFileSync(path.join(__dirname, '../src/accounts.js'), 'utf8')));
-  const srv = await startAccounts(8795, { ACCOUNT_ROTATE_MS: 1500 });
+  const srv = await startAccounts(8795, { ACCOUNT_ROTATE_MS: 1500, ACCOUNT_GOOGLE_RATE: 60, DEV_EMAILS: 'Dev@Example.com, other@example.com' });
 
   const call = async (route, body, token, origin = ORIGIN) => {
     const headers = { 'content-type': 'application/json' };
@@ -89,6 +89,18 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 *
     const other1 = await ok('google', { credential: idToken() }, s2.session);
     assert.strictEqual(other1.linked, 'new');
     assert.strictEqual((await call('me', {}, s2.session)).status, 401, 'the session that switched accounts ends');
+
+    // ----- developer mode: a verified email in DEV_EMAILS, decided at each sign-in, never for guests -----
+    assert.strictEqual(g.player.dev, false, 'a guest is not a developer');
+    assert.strictEqual(s1.player.dev, false, 'an email not in the list');
+    const devSub = '2222' + crypto.randomInt(1e9);
+    const dv = await ok('google', { credential: idToken({ sub: devSub, email: 'dev@example.COM', email_verified: true }) });
+    assert.strictEqual(dv.player.dev, true, 'a listed, verified email is a developer (case ignored)');
+    assert.strictEqual((await ok('me', {}, dv.session)).player.dev, true, 'and stays one');
+    const unv = await ok('google', { credential: idToken({ email: 'other@example.com', email_verified: false }) });
+    assert.strictEqual(unv.player.dev, false, 'an unverified email is not');
+    const dv2 = await ok('google', { credential: idToken({ sub: devSub, email: 'new@example.com', email_verified: true }) });
+    assert.strictEqual(dv2.player.dev, false, 'taken away when the account\'s email is no longer listed');
 
     const bad = {
       audience: idToken({ aud: 'someone-else' }), issuer: idToken({ iss: 'https://evil.example' }),

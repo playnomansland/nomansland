@@ -24,6 +24,7 @@ class_name = "HistoryRoom"
 
 # Accounts (step 5): a D1 database. Until this block is filled in and uncommented, /account/* answers 503
 # 'accounts off' and nothing else changes. The tables are made by the Worker itself (accounts.js, ensureSchema).
+# Developer mode: the secret DEV_EMAILS (set by the deploy workflow from the GitHub secret of the same name).
 # test/accounts.test.js adds a local copy of this block by itself when it is still commented out.
 # [[d1_databases]]
 # binding = "ACCOUNTS"
