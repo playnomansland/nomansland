@@ -4,6 +4,34 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 2 November 2026 – New home screen, ranked play and the leaderboard
+
+### A new way in
+- **Welcome screen:** the big No Mans Land title over an autumn battlefield, with **Log in**, **Play as guest** and **Sign up**.
+- **Sign up** has its own screen: pick a gamertag, then sign up with Google (keeps your account on any device) or as a guest on this one. **Log in** is Google sign-in.
+- **Stay logged in?** is asked right after you make an account or log in, so the game can open straight on the menu next time. Change it any time in **Settings**. Off means you're logged out when you close the browser.
+
+### The main menu
+- One big **PLAY** button. It opens **Play vs Friend** and **Play vs AI**, with the match settings and the box for a match or tournament code.
+- **Profile** and **Settings** sit in the top right corner (round icons on phones, labelled buttons on computers). Profile has your gamertag, Google sign-in, **Match history** and **Log out**.
+- **Tutorial**, **How to play**, **Encyclopedia** and the new **Leaderboard** are along the bottom, with the music player under them.
+- The game has a new app icon: the wizard.
+
+### Maps, looks and packs
+- Everyone now plays on one map, **Standard** (the bigger board that used to be called Test Grid). The old 12×16 board is now **Old standard** and, like the other maps, only shows up for the developer.
+- The **look** picker sits under the map and shows a preview of the look you pick. **Random** shows a slice of every look in one picture.
+- Two unit packs: **Learn the game** (the old Standard pack: fewer units, leaders and towers) and **Standard** (every unit and leader except Blixten). What's in a pack can't be changed, except on the developer account.
+
+### Ranked
+- Choose **Normal** or **Ranked** in the PLAY popup. Ranked is played against a friend as a **best of 3** on the Standard map with the Standard pack, and both players pick from the **same 5 leaders** and the **same 3 towers**, like in the tournament.
+- Ranked needs an account on both sides. A guest is enough, and a friend who joins without one gets a guest account on the spot.
+- Win 2 games to take the series. **Next game** starts the next one; after the series, **New series** starts over. Leaving a ranked match loses the series.
+- Only ranked series count on the **Leaderboard**: every player's wins, ties and losses and their win share (a tie counts as half a win).
+- The developer can switch ranked on and off for everyone in Settings.
+- **Tournaments:** hosting a tournament and Practice vs bots are now developer only. Anyone can still join a tournament with its code or link.
+
+---
+
 ## 2 November 2026 – Accounts
 
 - **Account** on the start screen. Tap **Play as a guest** to get your own gamertag on this phone, no sign-up needed. You can change the gamertag any time.

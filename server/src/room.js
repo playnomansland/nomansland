@@ -9,22 +9,33 @@
 // - A tournament match (/room/<CODE>?t=<TOURNAMENT>): the tournament (TourRoom.matchFor) checks the player's own
 //   tournament key and says which side they are. The match starts by itself once both are in, and the result goes
 //   straight from here to the tournament (TourRoom.serverResult): no phone reports it.
+// - A ranked match (hello { create, ranked, session }): a friend's match played as a best of 3 with fixed settings
+//   (RANKED). Both players need an account: each phone sends its session in hello and the room checks it
+//   (accounts.js sessionPlayer); the same player can't take both sides. Rematch plays the next game of the series;
+//   once it is decided (2 wins, or 3 games played) the result goes to the leaderboard (recordSeries) and a rematch
+//   starts a new series. Leaving a ranked match (forfeit) loses the whole series.
 //
 // Messages in:  hello { create | key | (nothing: join) | tour id + tkey | watch }, start { settings }, act { seq, fn, a }, ready { v },
 //               next { round }, rematch, forfeit, speed { s }, sync, ping
 // Messages out: welcome { side, key, seq }, taken, nomatch, lobby { here }, sync { phase, m (view), remaining, held, ready, nextReady,
 //               rematch, summary, ack, here }, ack { seq, ok, h }, status {...}, fight { pre, post, summary },
-//               speed { s }, forfeit { side }, full, denied, pong
+//               speed { s }, forfeit { side }, full, denied { why? }, pong. welcome, lobby, sync and fight carry ranked
+//               (the series: { tags, wins, ties, games, best, done, result, forfeit }) in a ranked match.
 import { DurableObject } from 'cloudflare:workers';
 import Game from '../../src/game.js';
 import Ref from '../../src/referee.js';
 import { LIMITS, json, readMessage, secret } from './limits.js';
 import { builtin } from './units.js';
 import { roundRow, forfeitRow } from './history.js';
+import { sessionPlayer, rankedOn, recordSeries } from './accounts.js';
 import { VERSION } from './version.js';
 
 const KEEP_MS = 24 * 3600 * 1000; // a match nobody touched for a day is deleted
 const SPEEDS = [1, 1.5, 2];
+// Ranked: the Standard map, all units, every leader but Blixten, and both players draw from the same 5 packages
+// (leaders) and the same 3 towers, as in the tournaments. Only the look is the creator's pick.
+export const RANKED = { map: 'testgrid', packOptions: 5, mirror: true, offChars: ['blixten'], offUnits: [], offTowers: [] };
+const BEST_OF = 3;
 
 export class Room extends DurableObject {
   constructor(ctx, env) {
@@ -69,13 +80,35 @@ export class Room extends DurableObject {
   syncMsg(ws, gone) {
     const a = this.att(ws), R = this.R, now = Date.now();
     const side = a.role === 'p' ? a.side : -1;
-    if (!R || !R.m || R.phase === 'lobby') return { t: 'lobby', here: this.here(gone), names: this.meta && this.meta.tour ? this.meta.tour.names : null };
+    if (!R || !R.m || R.phase === 'lobby') return { t: 'lobby', here: this.here(gone), names: this.meta && this.meta.tour ? this.meta.tour.names : null, ranked: this.rankedView() };
     return {
       t: 'sync', phase: R.phase, round: R.m.round, m: Ref.viewOf(R, side), remaining: R.deadline ? R.deadline - now : 0, held: R.held,
       ready: R.ready, nextReady: R.nextReady, rematch: R.rematch, summary: R.summary, fights: R.fights,
       ack: side >= 0 ? R.seq[side] : 0, here: this.here(gone), forfeit: R.forfeit != null ? R.forfeit : null,
-      names: this.meta && this.meta.tour ? this.meta.tour.names : null,
+      names: this.meta && this.meta.tour ? this.meta.tour.names : null, ranked: this.rankedView(),
     };
+  }
+  // ----- ranked play -----
+  rankedView() {
+    const rk = this.meta && this.meta.ranked;
+    return rk ? { tags: rk.tags, wins: rk.wins, ties: rk.ties, games: rk.games, best: BEST_OF, done: rk.done, result: rk.result, forfeit: rk.forfeit } : null;
+  }
+  // a game of the series is over (forfeitSide: that side left, which loses the series); counted once per game
+  tally(forfeitSide) {
+    const rk = this.meta && this.meta.ranked, R = this.R;
+    if (!rk || rk.done || !R || !R.m || !R.m.over || rk.counted === R.seed) return;
+    rk.counted = R.seed; rk.games++;
+    if (forfeitSide === 0 || forfeitSide === 1) { rk.done = true; rk.result = 1 - forfeitSide; rk.forfeit = forfeitSide; }
+    else {
+      const w = R.m.winner;
+      if (w === 0 || w === 1) rk.wins[w]++; else rk.ties++;
+      const need = Math.floor(BEST_OF / 2) + 1;
+      if (rk.wins[0] >= need || rk.wins[1] >= need || rk.games >= BEST_OF) { rk.done = true; rk.result = rk.wins[0] > rk.wins[1] ? 0 : rk.wins[1] > rk.wins[0] ? 1 : -1; }
+    }
+    if (rk.done) {
+      const run = recordSeries(this.env, rk.ids, rk.result).catch((e) => console.warn('ranked result not saved', e && e.message));
+      try { this.ctx.waitUntil(run); } catch {}
+    }
   }
   // Sends every socket its view if it changed since the last one it got. skip: a socket that is in step already
   // (the player whose own action this was: it only needs the ack), noted as up to date.
@@ -97,7 +130,8 @@ export class Room extends DurableObject {
     for (const s of this.sockets(gone)) this.send(s, text);
   }
   broadcastFight(f) {
-    const text = JSON.stringify({ t: 'fight', pre: f.pre, post: f.post, summary: f.summary, fights: this.R.fights });
+    this.tally();
+    const text = JSON.stringify({ t: 'fight', pre: f.pre, post: f.post, summary: f.summary, fights: this.R.fights, ranked: this.rankedView() });
     for (const s of this.sockets()) { this.send(s, text); this.sent.delete(s); }
     this.push(); // the result screen's state (nextReady, rematch) right after
     this.record(f);
@@ -109,7 +143,8 @@ export class Room extends DurableObject {
   historyInfo() {
     const t = this.meta && this.meta.tour, R = this.R;
     const room = t ? t.room : (this.code || (this.meta && this.meta.code) || '');
-    return { room, tour: t ? t.code : null, match: t ? t.match : null, matchId: `${room}-${((R && R.seed) >>> 0).toString(36)}`, names: t ? t.names : null };
+    const rk = this.meta && this.meta.ranked;
+    return { room, tour: t ? t.code : null, match: t ? t.match : null, matchId: `${room}-${((R && R.seed) >>> 0).toString(36)}`, names: t ? t.names : rk ? rk.tags : null };
   }
   record(f, forfeitSide) {
     if (!this.env.HISTORY) return;
@@ -150,7 +185,9 @@ export class Room extends DurableObject {
       }
       case 'start': {
         if (side !== 0 || (this.meta && this.meta.tour) || (R && R.m && R.phase !== 'lobby') || !this.here()[1]) return;
-        this.R = Ref.create(d.settings, units);
+        const rk = this.meta && this.meta.ranked;
+        if (rk && !(rk.ids[0] && rk.ids[1])) return;
+        this.R = Ref.create(rk ? { ...RANKED, skin: d.settings && typeof d.settings.skin === 'string' ? d.settings.skin : '' } : d.settings, units);
         Ref.start(this.R, units, matrix, now, this.seed());
         await this.save(); this.push({ force: true });
         return;
@@ -181,14 +218,17 @@ export class Room extends DurableObject {
       case 'rematch': {
         if (!R || (this.meta && this.meta.tour)) return;
         const again = Ref.rematch(R, side, units, matrix, now, this.seed());
+        const rk = this.meta && this.meta.ranked;
+        if (again && rk && rk.done) Object.assign(rk, { wins: [0, 0], ties: 0, games: 0, done: false, result: null, forfeit: null, counted: null }); // a new series
         await this.save();
         if (again) this.push({ force: true }); else this.status();
         return;
       }
       case 'forfeit': {
         if (!R || !Ref.forfeit(R, side)) return;
+        this.tally(side);
         await this.save();
-        const text = JSON.stringify({ t: 'forfeit', side });
+        const text = JSON.stringify({ t: 'forfeit', side, ranked: this.rankedView() });
         for (const s of this.sockets()) this.send(s, text);
         this.record(null, side);
         await this.ended();
@@ -219,8 +259,17 @@ export class Room extends DurableObject {
       if (!this.R) this.R = Ref.create(info.settings, this.units().units);
     } else {
       // a friend's match: create makes side 0 (the code must be free), a join takes side 1, a key gets its side back
-      const keys = (this.meta && this.meta.keys) || ['', ''];
       const k = typeof d.key === 'string' ? d.key : '';
+      // a ranked match needs an account on both sides: look the player up first (the slots are checked after, so two
+      // phones joining at once can't both take side 1 while this waits)
+      const wantsRanked = d.create ? d.ranked === true : !!(this.meta && this.meta.ranked);
+      let who = null, on = true;
+      if (wantsRanked && !(k && this.meta && this.meta.keys.includes(k))) {
+        try { who = await sessionPlayer(this.env, d.session); if (d.create && who && !who.dev) on = await rankedOn(this.env); } catch (e) { who = null; } // developers may play while it is off
+        if (!who) { this.send(ws, { t: 'denied', why: 'account' }); return; }
+        if (!on) { this.send(ws, { t: 'denied', why: 'ranked off' }); return; }
+      }
+      const keys = (this.meta && this.meta.keys) || ['', ''];
       side = [0, 1].find((sd) => k && keys[sd] === k);
       if (side == null) {
         if (d.create) { if (keys[0]) { this.send(ws, { t: 'taken' }); return; } side = 0; }
@@ -228,6 +277,11 @@ export class Room extends DurableObject {
         else if (!keys[1]) side = 1;
         else { this.send(ws, { t: 'full' }); return; } // two players already: Watch instead
         if (!this.meta) this.meta = { tour: null, keys: ['', ''], code: a.code || '' };
+        if (side === 0 && wantsRanked) this.meta.ranked = { ids: [who.id, ''], tags: [who.tag, ''], wins: [0, 0], ties: 0, games: 0, done: false, result: null, forfeit: null, counted: null };
+        if (side === 1 && this.meta.ranked) {
+          if (who.id === this.meta.ranked.ids[0]) { this.send(ws, { t: 'denied', why: 'self' }); return; }
+          this.meta.ranked.ids[1] = who.id; this.meta.ranked.tags[1] = who.tag;
+        }
         this.meta.keys[side] = secret();
       }
       key = this.meta.keys[side];
@@ -236,7 +290,7 @@ export class Room extends DurableObject {
     for (const s of this.players(side)) if (s !== ws) { this.setAtt(s, { role: 'x' }); try { s.close(1000, 'replaced'); } catch {} }
     this.setAtt(ws, { role: 'p', side });
     this.sent.delete(ws);
-    this.send(ws, { t: 'welcome', side, key, seq: this.R ? this.R.seq[side] : 0, version: VERSION, tour: this.meta.tour ? { names: this.meta.tour.names } : null });
+    this.send(ws, { t: 'welcome', side, key, seq: this.R ? this.R.seq[side] : 0, version: VERSION, tour: this.meta.tour ? { names: this.meta.tour.names } : null, ranked: this.rankedView() });
     const R = this.R;
     if (R) Ref.setAway(R, side, false, now);
     // a tournament match starts by itself once both players are in

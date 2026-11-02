@@ -9,9 +9,10 @@
 //   GET /tour/<CODE>       -> WebSocket into the tournament for that code (TourRoom: the server keeps the tournament)
 //   GET /history?limit=&before= -> saved rounds of server matches, newest first, paged (HistoryRoom, step 4)
 //   GET /history/<MATCH>   -> one match's rounds (<ROOM>-<seed>, or a bare room code for that room's newest match)
+//   GET /leaderboard       -> ranked players with wins, ties and losses, and whether ranked play is on (accounts.js)
 //   POST /account/<route>  -> accounts (step 5; guest, me, google, tag, signout, delete): see accounts.js
 import { json } from './limits.js';
-import { handleAccount } from './accounts.js';
+import { handleAccount, leaderboard } from './accounts.js';
 import { VERSION } from './version.js';
 export { Room } from './room.js';
 export { TourRoom } from './tour.js';
@@ -39,11 +40,15 @@ export default {
     if (request.method !== 'GET') return json({ error: 'method' }, 405);
 
     if (url.pathname === '/') {
-      return new Response(`No Mans Land game server is running (${VERSION}).\nPlay at https://snetendare.github.io/phone-bellum/\n`, {
+      return new Response(`No Mans Land game server is running (${VERSION}).\nPlay at https://playnomansland.github.io/\n`, {
         headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' },
       });
     }
     if (url.pathname === '/health') return json({ ok: true, version: VERSION }, 200, cors);
+    if (url.pathname === '/leaderboard') {
+      if (!allowedOrigin(request, env)) return json({ error: 'origin' }, 403);
+      return leaderboard(env, cors);
+    }
     if (url.pathname === '/selftest') return env.ROOM.getByName('selftest').fetch(new Request('https://room/selftest'));
 
     const h = url.pathname.match(/^\/history(?:\/([^/]+))?\/?$/);

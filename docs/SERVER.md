@@ -77,3 +77,12 @@ Built 2026-11-02 (`server/src/accounts.js`, routes in `server/src/index.js`):
 
 - Only when enough players are online that queue times stay short. Until then: tournaments, invite codes and vs AI.
 - Built on steps 3 and 5: only server-refereed matches between signed-in players count. A rating (Glicko-2 or similar) per player, a matchmaking Room that pairs by rating and widens the range the longer someone waits, and the queue only open when the expected wait is short.
+
+
+## Ranked play and the leaderboard (2026-11-02)
+
+- A ranked match is a friend's match on the Room with hello { create, ranked: true, session }. Both phones send their account session in hello (never in the URL); the Room checks it with accounts.js sessionPlayer. No account: denied { why: 'account' }; the same player on both sides: 'self'; switched off: 'ranked off' (developers may still create one).
+- Settings are fixed by the server (room.js RANKED): map testgrid ("Standard"), packOptions 5, mirror, offChars ['blixten']; only the creator's look is kept.
+- meta.ranked keeps the series ({ ids, tags, wins, ties, games, done, result, forfeit, counted }); tally() counts each finished game once (by seed). Best of 3: 2 wins, or 3 games (equal wins = a tie). A forfeit loses the series. When decided, recordSeries adds w/t/l to D1 table ranked. Rematch = next game; after a decided series, a new series. welcome, lobby, sync, fight and forfeit carry ranked.
+- D1 tables: ranked (player, w, t, l, updated) and config (k, v; 'ranked' = 'on' | 'off'). POST /account/ranked { on } (developer only, the server's dev column) switches it; /account/me returns rankedOn. GET /leaderboard (origin-checked) -> { on, rows: [{ id, tag, w, t, l }] }, best win share first, deleted accounts left out.
+- Tests: server/test/ranked.test.js (in npm test).

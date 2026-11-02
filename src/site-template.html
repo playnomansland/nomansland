@@ -456,6 +456,67 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
 .tbr .w { fill: var(--gold); font-weight: 700; }
 .tbr .l { opacity: 0.45; }
 .tbr .tbd, .tbr .bye { fill: var(--muted); font-style: italic; font-weight: 400; }
+
+/* ---------- home screens (2026-11-02): welcome, sign up, log in, the main menu and the PLAY popup ---------- */
+/* Full screen over the game, on the painted autumn floor (#home-bg). html.home hides the game while they show. */
+html.home .app { visibility: hidden; }
+.home { position: fixed; inset: 0; z-index: 4; overflow: hidden; background: #3c3b24; }
+.home-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.home::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 42%, rgba(13, 19, 21, 0.05), rgba(13, 19, 21, 0.62) 78%), linear-gradient(180deg, rgba(13, 19, 21, 0.35), transparent 30%, transparent 70%, rgba(13, 19, 21, 0.5)); }
+.home-in { position: relative; z-index: 1; height: 100%; overflow-y: auto; display: grid; grid-template-rows: auto 1fr auto; justify-items: center; padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(14px + env(safe-area-inset-bottom, 0px)); gap: 14px; }
+.home-title { width: min(92vw, 860px); display: block; margin: 0 auto; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45)) drop-shadow(0 0 22px rgba(0, 0, 0, 0.35)); user-select: none; -webkit-user-drag: none; }
+.home-title.stack { display: none; }
+@media (max-width: 640px) { .home-title.wide { display: none; } .home-title.stack { display: block; width: min(86vw, 440px); } }
+.home-mid { align-self: center; display: grid; justify-items: center; gap: 18px; width: 100%; max-width: 520px; }
+.home .hbtn { border: 2px solid rgba(255, 255, 255, 0.9); background: rgba(13, 19, 21, 0.55); color: #fff; border-radius: 10px; font: 700 18px var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; padding: 12px 18px; min-height: 54px; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35); transition: transform 0.08s ease, background-color 0.15s ease; }
+.home .hbtn:hover { background: rgba(13, 19, 21, 0.72); }
+.home .hbtn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35); }
+.home .hbtn.gold { border-color: var(--gold); background: linear-gradient(180deg, #F0C65A, #C4932C); color: #1B1405; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25); }
+.home .hbtn[disabled] { opacity: 0.45; cursor: default; }
+.home .hlink { border: 0; background: none; color: #fff; font: 600 14px var(--font-display); letter-spacing: 0.05em; text-decoration: underline; text-underline-offset: 3px; padding: 6px 8px; opacity: 0.92; }
+.welcome-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: min(100%, 460px); align-items: start; }
+.welcome-btns > div { display: grid; justify-items: center; gap: 4px; }
+.welcome-btns .hbtn { width: 100%; }
+.home-card { width: min(100%, 440px); background: rgba(21, 33, 37, 0.92); border: 1px solid var(--line); border-radius: 12px; padding: 18px 16px; display: grid; gap: 12px; text-align: left; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); }
+.home-card h3 { font-size: 20px; }
+.home-card .acct-google { min-height: 44px; }
+.home-msg { margin: 0; min-height: 1.2em; color: var(--gold); font-size: 14px; text-align: center; text-shadow: 0 1px 2px #000; }
+.play-big { font-size: 34px !important; min-width: min(78vw, 300px); min-height: 84px !important; border-radius: 14px !important; letter-spacing: 0.14em !important; }
+.home-more { display: grid; gap: 8px; justify-items: center; width: min(100%, 360px); }
+.home-more .btn { width: 100%; }
+.home-top { width: 100%; display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 8px; }
+.home-top .home-title { grid-column: 2; width: min(60vw, 520px); }
+@media (max-width: 640px) { .home-top .home-title.stack { width: min(52vw, 230px); } }
+.corner { grid-column: 3; justify-self: end; display: flex; gap: 8px; }
+.corner button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255, 255, 255, 0.75); background: rgba(13, 19, 21, 0.6); color: #fff; border-radius: 999px; padding: 0; width: 42px; height: 42px; justify-content: center; font: 600 14px var(--font-display); }
+.corner button span { display: none; }
+html.pc .corner button { width: auto; padding: 0 14px 0 10px; border-radius: 8px; }
+html.pc .corner button span { display: inline; }
+.home-foot { width: 100%; max-width: 760px; display: grid; gap: 10px; justify-items: center; }
+.tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.tiles button { display: grid; justify-items: center; gap: 4px; min-width: 84px; padding: 10px 10px 8px; border: 1px solid rgba(255, 255, 255, 0.35); background: rgba(13, 19, 21, 0.62); color: #fff; border-radius: 10px; font: 600 12px var(--font-display); letter-spacing: 0.04em; }
+.tiles button svg { width: 22px; height: 22px; }
+.tiles button.hot { border-color: var(--gold); color: var(--gold); }
+.home .mplayer { background: rgba(13, 19, 21, 0.62); border-color: rgba(255, 255, 255, 0.25); }
+.pop-back { position: absolute; inset: 0; z-index: 2; background: rgba(8, 11, 12, 0.55); display: grid; place-items: center; padding: 16px; overflow-y: auto; }
+.pop-back.auto { position: relative; inset: auto; background: none; padding: 0; overflow: visible; } /* the UI tests: in the page's flow, so the menu stays clickable */
+.pop { width: min(100%, 460px); max-height: calc(100dvh - 32px); overflow-y: auto; background: rgba(21, 33, 37, 0.97); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55); animation: popin 0.16s ease-out; }
+@keyframes popin { from { transform: translateY(10px) scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
+.pop-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pop-modes .hbtn { font-size: 16px; }
+.pop .bar { flex-wrap: wrap; }
+.maps.one { grid-template-columns: minmax(0, 96px); }
+.look-box { display: grid; gap: 6px; }
+.look-pre { width: 150px; max-width: 46%; aspect-ratio: 14 / 18; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); background: var(--board); justify-self: center; }
+.ranked-note { margin: 0; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--gold); background: rgba(230, 184, 74, 0.1); font-size: 13px; }
+.lb { width: 100%; border-collapse: collapse; font-size: 14px; }
+.lb th, .lb td { padding: 6px 6px; border-bottom: 1px solid var(--line); text-align: right; }
+.lb th:nth-child(2), .lb td:nth-child(2) { text-align: left; }
+.lb th { font: 600 11px var(--font-display); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.lb tr.me td { color: var(--gold); }
+.lb td.num { font-family: var(--font-data); }
+.series { display: flex; justify-content: center; gap: 10px; align-items: baseline; font-family: var(--font-display); }
+.series b { font-size: 22px; }
 </style>
 <script>
 // PC or phone: a fine pointer that can hover (a mouse) and room for the board and controls side by side
@@ -491,6 +552,8 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
   <div class="panel" id="panel"></div>
   <button class="dock-tab" id="dock-toggle" aria-controls="panel" hidden></button>
 </div>
+
+<div class="home" id="home" hidden><canvas class="home-bg" id="home-bg" aria-hidden="true"></canvas><div class="home-in" id="home-in"></div></div>
 
 <div class="dd" id="stats-dd" hidden role="dialog" aria-label="Damage last round"></div>
 <div class="sheet-back" id="sheet-back" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-h"></div></div>
@@ -997,7 +1060,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
   function openSoundSheet() {
     const inMatch = !!m && phase !== 'start' && phase !== 'lobby';
     $('sheet').innerHTML = `
-      <div class="bar" data-keep><h3 id="sheet-h">${inMatch ? 'Settings' : 'Sound'}</h3><button class="btn small" id="close">Close</button></div>
+      <div class="bar" data-keep><h3 id="sheet-h">Settings</h3><button class="btn small" id="close">Close</button></div>
       <div class="bar">
         <span class="hint">Music</span>
         <div class="seg" role="group" aria-label="Music">
@@ -1044,6 +1107,19 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
         </div>
       </div>
       <button class="btn" id="to-menu">Main menu</button>` : ''}
+      ${!inMatch ? `<div class="bar">
+        <span class="hint">Stay logged in on this device</span>
+        <div class="seg" role="group" aria-label="Stay logged in">
+          <button data-stay="1" aria-pressed="${staying()}">On</button><button data-stay="0" aria-pressed="${!staying()}">Off</button>
+        </div>
+      </div>
+      <p class="hint" style="margin:0">Off: you’re logged out when you close the browser.${acct && !acct.google ? ' A guest can’t log back in, so sign up with Google first.' : ''}</p>` : ''}
+      ${!inMatch && devMode() ? `<div class="bar">
+        <span class="hint">Ranked play (developer: for everyone)</span>
+        <div class="seg" role="group" aria-label="Ranked play">
+          <button data-rk="1" aria-pressed="${home.rankedOn === true}">On</button><button data-rk="0" aria-pressed="${home.rankedOn === false}">Off</button>
+        </div>
+      </div><p class="hint" id="rk-msg" style="margin:0" aria-live="polite"></p>` : ''}
       <div class="songs" role="group" aria-label="Menu music">
         <span class="hint">Menu music</span>
         <button data-song="" aria-pressed="${!snd.song}">All menu songs</button>
@@ -1085,6 +1161,17 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
       $('vol').value = snd.vol; $('vol-n').textContent = snd.vol; showOn();
     }));
     if ($('to-menu')) $('to-menu').addEventListener('click', askForfeit);
+    $('sheet').querySelectorAll('[data-stay]').forEach(b => b.addEventListener('click', () => {
+      setStay(b.dataset.stay === '1');
+      $('sheet').querySelectorAll('[data-stay]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    }));
+    $('sheet').querySelectorAll('[data-rk]').forEach(b => b.addEventListener('click', async () => {
+      $('rk-msg').textContent = 'One moment…';
+      const r = await acctCall('ranked', { on: b.dataset.rk === '1' }, true);
+      if (r.status !== 200) { $('rk-msg').textContent = r.status === 403 ? 'Only a developer can do that.' : acctFail(r); return; }
+      home.rankedOn = !!r.on; $('rk-msg').textContent = r.on ? 'Ranked is on for everyone.' : 'Ranked is off for players (developers can still play it).';
+      $('sheet').querySelectorAll('[data-rk]').forEach(x => x.setAttribute('aria-pressed', String((x.dataset.rk === '1') === !!r.on)));
+    }));
     $('sheet').querySelectorAll('[data-board]').forEach(b => b.addEventListener('click', () => {
       set3d(b.dataset.board === '3d');
       $('sheet').querySelectorAll('[data-board]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
@@ -1099,39 +1186,81 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
       $('sheet').querySelectorAll('[data-q3d]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
     }));
   }
-  let mapPick = '';         // the map the host picked for the next match ('' = random)
+  let mapPick = '';         // the map the host picked for the next match ('' = random). Only developers pick: see curMap
   let pickFor = '', pickSel = null, pickPeek = false, pickHtml = ''; // the choose-one-of-3 cards over the board (syncPick)
-  const MAP_SHORT = { standard: 'Standard', forest: 'Forest', cavern: 'Cavern', ice: 'Peak', testgrid: 'Test', bridge: 'Bridge', rush: 'Rush' };
-  // the 3D board's look for a map with skins (Standard, Test): '' = the map's own, 'random' = a new one each match; saved on this device, the host's counts
+  const MAP_SHORT = { standard: 'Old std', forest: 'Forest', cavern: 'Cavern', ice: 'Peak', testgrid: 'Standard', bridge: 'Bridge', rush: 'Rush' };
+  // Maps (2026-11-02): everyone plays the Standard map (id 'testgrid', the bigger board; the first 12x16 board is now
+  // "Old standard"). Only developers pick a map, as before; their pick is mapPick.
+  const STD_MAP = 'testgrid';
+  const curMap = () => devMode() ? mapPick : STD_MAP;
+  // the 3D board's look for a map with skins (Standard, Old standard): '' = the map's own, 'random' = a new one each
+  // match; saved on this device, the host's counts
   let skinPick = '';
   try { const v = localStorage.getItem('pb-skin') || ''; if (v === 'random' || Game.SKINS.some(x => x.id === v)) skinPick = v; } catch (e) {}
   const skinnable = (id) => { const mp = Game.MAPS.find(x => x.id === id); return !!(mp && mp.skins); };
-  const mapSeg = () => `<div class="bar">
+  // the look a pick stands for ('' = the map's own)
+  const lookShown = () => skinPick || Game.MAP_LOOK[curMap() || 'standard'] || 'meadow';
+  // where the menu's settings are drawn: the PLAY popup on the home screen, else the panel (the friend's lobby)
+  const setRoot = () => (phase === 'start' && $('home-in')) || $('panel');
+  const mapCard = (id) => `<button data-map="${id}" aria-pressed="${curMap() === id}"${id ? ` title="${esc(Game.MAPS.find(mp => mp.id === id).name)}"` : ''}><img src="${mapThumb(id)}" alt=""><span>${id ? esc(MAP_SHORT[id] || Game.MAPS.find(mp => mp.id === id).name) : 'Random'}</span></button>`;
+  const mapSeg = () => `<div class="bar map-bar">
         <span class="hint">Map</span>
-        <div class="maps" role="group" aria-label="Map">
-          ${[''].concat(Game.MAPS.map(mp => mp.id)).map(id => `<button data-map="${id}" aria-pressed="${mapPick === id}"${id ? ` title="${esc(Game.MAPS.find(mp => mp.id === id).name)}"` : ''}><img src="${mapThumb(id)}" alt=""><span>${id ? esc(MAP_SHORT[id] || Game.MAPS.find(mp => mp.id === id).name) : 'Random'}</span></button>`).join('')}
+        <div class="maps${devMode() ? '' : ' one'}" role="group" aria-label="Map">
+          ${devMode() ? [''].concat(Game.MAPS.map(mp => mp.id)).map(mapCard).join('') : mapCard(STD_MAP)}
         </div>
       </div>
-      <div class="bar" id="skin-bar"${skinnable(mapPick) ? '' : ' hidden'}>
+      ${lookSeg()}`;
+  // the look picker sits under the map, with a preview of the pick (Random: a slice of every look in one picture)
+  const lookSeg = () => `<div class="look-box" id="skin-bar"${skinnable(curMap() || 'standard') ? '' : ' hidden'}>
         <span class="hint">Look</span>
-        <div class="seg looks" role="group" aria-label="Look of the 3D board">
-          ${[{ id: '', name: 'Own' }].concat(Game.SKINS, [{ id: 'random', name: 'Random' }]).map(k => `<button data-skin="${k.id}" aria-pressed="${skinPick === k.id}">${esc(k.name)}</button>`).join('')}
+        <div class="seg looks" role="group" aria-label="Look of the board">
+          ${Game.SKINS.concat([{ id: 'random', name: 'Random' }]).map(k => `<button data-skin="${k.id}" aria-pressed="${(k.id === 'random' ? skinPick === 'random' : skinPick !== 'random' && lookShown() === k.id)}">${esc(k.name)}</button>`).join('')}
         </div>
+        <img class="look-pre" id="look-pre" alt="" src="${lookThumb(skinPick === 'random' ? 'random' : lookShown())}">
       </div>`;
-  const wireMapSeg = () => { $('panel').querySelectorAll('[data-map]').forEach(b => b.addEventListener('click', () => {
+  const wireMapSeg = () => { const root = setRoot(); root.querySelectorAll('[data-map]').forEach(b => b.addEventListener('click', () => {
+    if (!devMode()) return;
     mapPick = b.dataset.map;
-    $('panel').querySelectorAll('[data-map]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-    const sum = $('panel').querySelector('#settings summary span');
+    root.querySelectorAll('[data-map]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    const sum = root.querySelector('#settings summary span');
     if (sum) sum.textContent = mapPick ? Game.MAPS.find(mp => mp.id === mapPick).name : 'Random map';
-    const sb = $('panel').querySelector('#skin-bar'); if (sb) sb.hidden = !skinnable(mapPick);
+    const sb = root.querySelector('#skin-bar'); if (sb) { sb.outerHTML = lookSeg(); wireLookSeg(); }
     peekMap();
   }));
-  $('panel').querySelectorAll('[data-skin]').forEach(b => b.addEventListener('click', () => {
-    skinPick = b.dataset.skin;
+  wireLookSeg(); };
+  const wireLookSeg = () => { const root = setRoot(); root.querySelectorAll('[data-skin]').forEach(b => b.addEventListener('click', () => {
+    skinPick = b.dataset.skin === (Game.MAP_LOOK[curMap() || 'standard'] || '') ? '' : b.dataset.skin;
     try { localStorage.setItem('pb-skin', skinPick); } catch (e) {}
-    $('panel').querySelectorAll('[data-skin]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    root.querySelectorAll('[data-skin]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    const pre = root.querySelector('#look-pre'); if (pre) pre.src = lookThumb(b.dataset.skin);
     peekMap();
   })); };
+  // Look previews: the Standard board in a look, drawn by a 2D renderer of its own that paints the looks' floors
+  // (src/floors.js) like the 3D board does. Random: a vertical slice of each look side by side.
+  let lookR = null;
+  const lookThumbs = {};
+  function lookThumb(id) {
+    if (lookThumbs[id] != null) return lookThumbs[id];
+    if (!lookR) lookR = Render2D(document.createElement('canvas'), () => ({ m: null, me: 0, phase: 'start', units, mode: 'ai', fx: [] }),
+      { ground: Floors.floor, look: (src) => src ? Floors.LOOKS[Floors.lookOf(src)] : null, grid: 'rgba(20, 28, 16, 0.22)', zoneA: 0.1 });
+    const mapId = curMap() && skinnable(curMap()) ? curMap() : STD_MAP;
+    const one = (k) => { try { Game.useGrid(mapId); return lookR.thumb(Game.createMatch(units, M, 12345, mapId, null, [], { skin: k }), 150); } catch (e) { return ''; } finally { Game.useGrid(m); } };
+    if (id !== 'random') return (lookThumbs[id] = one(id));
+    const parts = Game.SKINS.map(k => lookThumbs[k.id] != null ? lookThumbs[k.id] : (lookThumbs[k.id] = one(k.id)));
+    lookThumbs.random = parts[0] || '';
+    const imgs = parts.map(src => { const im = new Image(); im.src = src; return im; });
+    Promise.all(imgs.map(im => im.decode ? im.decode().catch(() => {}) : null)).then(() => {
+      const w = imgs[0].naturalWidth, h = imgs[0].naturalHeight; if (!w) return;
+      const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+      const n = imgs.length, sw = w / n;
+      imgs.forEach((im, i) => g.drawImage(im, i * sw, 0, sw, h, i * sw, 0, sw, h));
+      g.strokeStyle = 'rgba(13, 19, 21, 0.85)'; g.lineWidth = 2;
+      for (let i = 1; i < n; i++) { g.beginPath(); g.moveTo(i * sw, 0); g.lineTo(i * sw, h); g.stroke(); }
+      lookThumbs.random = c.toDataURL();
+      document.querySelectorAll('#look-pre').forEach(x => { if (skinPick === 'random') x.src = lookThumbs.random; });
+    });
+    return lookThumbs.random;
+  }
   // characters left out of the package draw (saved on this device; the host's list counts in a match with a friend)
   let offChars = [];
   try { offChars = JSON.parse(localStorage.getItem('pb-off-chars') || '[]').filter(id => Game.charInfo(id)); } catch (e) {}
@@ -1140,43 +1269,51 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
   try { offUnits = JSON.parse(localStorage.getItem('pb-off-units') || '[]').filter(n => typeof n === 'string'); } catch (e) {}
   const offIdx = () => units.map((u, i) => offUnits.includes(u.name) ? i : -1).filter(i => i >= 0);
   const unitsOn = () => units.length - offIdx().length;
-  // the unit pack: 'standard' (Game.STANDARD_PACK: fewer units, leaders and towers, for new players; the default) or
-  // 'all' (everything, minus what Leaders and Units leave out). Saved on this device; the host's counts with a friend.
-  // A Counter Lab roster always plays as 'all'.
-  const PACK_STORE = 'pb-unit-pack';
-  let unitPack = 'standard';
-  try { if (localStorage.getItem(PACK_STORE) === 'all') unitPack = 'all'; } catch (e) {}
-  const packOn = () => unitPack === 'standard' && !customSet;
+  // The unit pack (2026-11-02), saved on this device; the host's counts with a friend:
+  //  'learn'    Learn the game: Game.STANDARD_PACK (fewer units, leaders and towers, for new players)
+  //  'standard' Standard: every unit, leader and tower except the leader Blixten
+  //  'custom'   developers only: every unit, leader and tower, minus what Leaders and Units leave out (the old All units)
+  // A Counter Lab roster always plays as 'custom'. Nobody but a developer can change what a pack holds.
+  const PACK_STORE = 'pb-unit-pack2';
+  const STD_OFF_CHARS = ['blixten'];
+  let unitPack = 'learn';
+  try {
+    const v = localStorage.getItem(PACK_STORE), old = localStorage.getItem('pb-unit-pack'); // the old values: 'standard' = the small pack, 'all'
+    if (['learn', 'standard', 'custom'].includes(v)) unitPack = v; else if (old === 'all') unitPack = 'standard';
+  } catch (e) {}
+  const packNow = () => customSet ? 'custom' : unitPack === 'custom' && !devMode() ? 'standard' : unitPack;
+  const packOn = () => packNow() === 'learn';
   const SP = Game.STANDARD_PACK;
   const packUnits = () => units.filter(u => SP.units.includes(u.name)).length;
   const packTowers = () => Game.TOWER_TYPES.filter(x => !SP.offTowers.includes(x.id));
   // what a new match takes from the menu: units, leaders and towers left out, and the rules of a Counter Lab roster
-  const matchOff = () => packOn() && packUnits() >= 2 ? units.map((u, i) => SP.units.includes(u.name) ? -1 : i).filter(i => i >= 0) : offIdx();
-  const matchChars = () => packOn() ? Game.CHARACTERS.map(c => c.id).filter(id => !SP.chars.includes(id)) : offChars;
+  const matchOff = () => packOn() && packUnits() >= 2 ? units.map((u, i) => SP.units.includes(u.name) ? -1 : i).filter(i => i >= 0) : packNow() === 'standard' ? [] : offIdx();
+  const matchChars = () => packOn() ? Game.CHARACTERS.map(c => c.id).filter(id => !SP.chars.includes(id)) : packNow() === 'standard' ? STD_OFF_CHARS.slice() : offChars;
   const matchOpts = () => ({ skin: skinPick || null, lastSkin: (m && m.skin) || null, offUnits: matchOff(), offTowers: packOn() ? SP.offTowers : [], rules: customSet && rawSet.rules && typeof rawSet.rules === 'object' ? rawSet.rules : null });
   const packNote = () => packOn()
-    ? `${packUnits()} units, ${SP.chars.length} leaders, ${packTowers().length} towers. A good first match.`
-    : `All ${unitsOn() === units.length ? units.length : `${unitsOn()} of ${units.length}`} units, ${charsOn()} leaders, ${Game.TOWER_TYPES.length} towers. Pick which in Match settings.`;
+    ? `${packUnits()} units, ${SP.chars.length} leaders, ${packTowers().length} towers. The best way to start.`
+    : packNow() === 'standard' ? `All ${units.length} units, ${Game.CHARACTERS.length - STD_OFF_CHARS.length} leaders and ${Game.TOWER_TYPES.length} towers. What ranked is played with.`
+    : `${unitsOn() === units.length ? 'All ' + units.length : `${unitsOn()} of ${units.length}`} units, ${charsOn()} leaders, ${Game.TOWER_TYPES.length} towers. Pick which below (developer).`;
   const packSeg = () => customSet ? '' : `<div class="bar">
         <span class="hint">Units</span>
         <div class="seg" role="group" aria-label="Unit pack">
-          <button data-pack="standard" aria-pressed="${unitPack === 'standard'}">Standard pack</button><button data-pack="all" aria-pressed="${unitPack === 'all'}">All units</button>
+          <button data-pack="learn" aria-pressed="${packNow() === 'learn'}">Learn the game</button><button data-pack="standard" aria-pressed="${packNow() === 'standard'}">Standard</button>${devMode() ? `<button data-pack="custom" aria-pressed="${packNow() === 'custom'}">Custom</button>` : ''}
         </div>
       </div>
       <span class="hint" id="pack-note" style="margin-top:-6px">${packNote()}</span>`;
-  const wirePackSeg = () => $('panel').querySelectorAll('[data-pack]').forEach(b => b.addEventListener('click', () => {
-    unitPack = b.dataset.pack === 'all' ? 'all' : 'standard';
-    if (unitPack === 'all') offChars = []; // All units brings every leader into the draw too
-    try { localStorage.setItem(PACK_STORE, unitPack); if (unitPack === 'all') localStorage.setItem('pb-off-chars', '[]'); } catch (e) {}
-    $('panel').querySelectorAll('[data-pack]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-    $('pack-note').textContent = packNote();
-    const picks = $('panel').querySelector('.picks');
+  const wirePackSeg = () => { const root = setRoot(); root.querySelectorAll('[data-pack]').forEach(b => b.addEventListener('click', () => {
+    const v = b.dataset.pack;
+    unitPack = v === 'custom' && devMode() ? 'custom' : v === 'standard' ? 'standard' : 'learn';
+    try { localStorage.setItem(PACK_STORE, unitPack); } catch (e) {}
+    root.querySelectorAll('[data-pack]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    root.querySelector('#pack-note').textContent = packNote();
+    const picks = root.querySelector('.picks');
     if (picks) { pickOpen = ''; picks.outerHTML = charSeg(); wireCharSeg(); }
-  }));
-  // Leaders and Units: a button each, opening a small menu to leave some out (one open at a time)
+  })); };
+  // Leaders and Units (developers, Custom pack): a button each, opening a small menu to leave some out (one open at a time)
   let pickOpen = '';
   const charsOn = () => Game.CHARACTERS.length - offChars.length;
-  const charSeg = () => packOn() ? `<div class="bar picks"><span class="hint">The Standard pack picks the units and leaders, and leaves out the mage and slime towers. Choose All units to pick them yourself.</span></div>` : `<div class="bar picks">
+  const charSeg = () => packNow() !== 'custom' ? '<div class="picks" hidden></div>' : `<div class="bar picks">
         <span class="btnrow">
           <button class="btn small" id="pick-chars" aria-expanded="${pickOpen === 'chars'}" aria-controls="pick-menu">Leaders <span class="num" id="chars-n">${charsOn()}/${Game.CHARACTERS.length}</span> ${pickOpen === 'chars' ? '▴' : '▾'}</button>
           <button class="btn small" id="pick-units" aria-expanded="${pickOpen === 'units'}" aria-controls="pick-menu">Units <span class="num" id="units-n">${unitsOn()}/${units.length}</span> ${pickOpen === 'units' ? '▴' : '▾'}</button>
@@ -1199,7 +1336,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     return '';
   };
   const wireCharSeg = () => {
-    const box = $('panel').querySelector('.picks');
+    const box = setRoot().querySelector('.picks');
     if (!box || !$('pick-chars')) return;
     const redraw = () => {
       ['chars', 'units'].forEach(k => { const b = $('pick-' + k); b.setAttribute('aria-expanded', String(pickOpen === k)); b.lastChild.textContent = ' ' + (pickOpen === k ? '▴' : '▾'); });
@@ -1213,7 +1350,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
         try { localStorage.setItem('pb-off-chars', JSON.stringify(offChars)); } catch (e) {}
         b.setAttribute('aria-pressed', String(off));
         $('chars-n').textContent = `${charsOn()}/${Game.CHARACTERS.length}`;
-        if ($('pack-note')) $('pack-note').textContent = packNote();
+        if (box.parentNode.querySelector('#pack-note')) box.parentNode.querySelector('#pack-note').textContent = packNote();
       }));
       box.querySelectorAll('[data-unit]').forEach(b => b.addEventListener('click', () => {
         const name = b.dataset.unit, off = offUnits.includes(name);
@@ -1222,7 +1359,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
         try { localStorage.setItem('pb-off-units', JSON.stringify(offUnits)); } catch (e) {}
         b.setAttribute('aria-pressed', String(off));
         $('units-n').textContent = `${unitsOn()}/${units.length}`;
-        if ($('pack-note')) $('pack-note').textContent = packNote();
+        if (box.parentNode.querySelector('#pack-note')) box.parentNode.querySelector('#pack-note').textContent = packNote();
       }));
     };
     ['chars', 'units'].forEach(k => $('pick-' + k).addEventListener('click', () => { pickOpen = pickOpen === k ? '' : k; redraw(); }));
@@ -1230,7 +1367,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
   };
   // match settings (map, characters, timer, units) sit folded away on the menu and in the lobby
   let settingsOpen = false;
-  const settingsBox = (inner) => `<details class="settings" id="settings"${settingsOpen ? ' open' : ''}><summary>Match settings<span>${esc(mapPick ? Game.MAPS.find(mp => mp.id === mapPick).name : 'Random map')}</span></summary><div class="settings-body">${inner}</div></details>`;
+  const settingsBox = (inner) => `<details class="settings" id="settings"${settingsOpen ? ' open' : ''}><summary>Match settings<span>${esc(curMap() ? Game.MAPS.find(mp => mp.id === curMap()).name : 'Random map')}</span></summary><div class="settings-body">${inner}</div></details>`;
   const wireSettings = () => { const d = $('settings'); if (d) d.addEventListener('toggle', () => { settingsOpen = d.open; }); };
   let deadline = 0;         // local time the deploy phase ends (0 = no countdown running)
   let pausedLeft = 0;       // host: countdown time left while the opponent is away
@@ -1467,6 +1604,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
       el.hidden = !b;
       if (b) { el.textContent = `🔥${n}`; el.title = `${n} wins in a row · breaking the streak pays ${b} gold`; }
     }
+    if (home.screen) syncHome();
     $('phase').textContent = { start: 'Ready', lobby: 'Lobby', draft: 'Draft', deploy: 'Deploy', battle: 'Battle', result: 'Result', end: 'Match over' }[phase];
     $('foe-name').textContent = foeName();
     $('you-name').textContent = mode === 'spec' && tour.spec ? tour.spec.host : 'You'; // spectating: the host's side is at the bottom
@@ -2216,6 +2354,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     peekTimer = setTimeout(() => o.classList.remove('peek'), 2200);
   }
   function overlay(html) {
+    if (typeof syncHome === 'function' && home.screen) syncHome();
     const o = $('overlay'); clearTimeout(peekTimer); o.classList.remove('peek');
     if (!html) { o.hidden = true; o.innerHTML = ''; return; }
     o.hidden = false; o.innerHTML = html;
@@ -2240,74 +2379,261 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     if (netBack && !(netBack.code && netBack.key && now() - netBack.ts < 6 * 3600e3)) netBack = null;
     if (resume && netBack) resume = null;
     const newcomer = !tutDone && !resume; // the tutorial leads the menu until it's been played to the end
-    overlay(`<div class="card">
-      <h2>No Mans Land</h2>
-      <p class="big">Build an army. Watch it fight. Last one standing wins.</p>
-      <span class="btnrow">${newcomer ? '' : '<button class="btn small" id="tutorial">Tutorial</button>'}<button class="btn small" id="how">How to play</button><button class="btn small" id="ency-open">Encyclopedia</button><button class="btn small" id="music-open">Sound</button><button class="btn small" id="hist-open">Match history</button><button class="btn small" id="acct-open">Account</button></span>
-      ${playerHtml()}
-    </div>`);
-    wirePlayer();
-    $('music-open').addEventListener('click', openSoundSheet);
-    $('ency-open').addEventListener('click', () => openEncyclopedia());
-    if ($('hist-open')) $('hist-open').addEventListener('click', openHistorySheet);
-    if ($('acct-open')) $('acct-open').addEventListener('click', openAccountSheet);
-    $('panel').innerHTML = `
-      ${tour.role ? `<button class="btn primary" id="tour-back">Back to tournament ${esc(tour.code)}</button>` : ''}
-      ${resume ? `<button class="btn primary" id="resume">Resume match ${esc(resume.code)}</button>` : ''}
-      ${netBack ? `<button class="btn primary" id="net-resume">Back to match ${esc(netBack.code)}</button>` : ''}
-      ${newcomer ? '<button class="btn primary" id="tutorial">New here? Play the tutorial</button>' : ''}
-      <div class="bar">
-        <button class="btn ${resume || newcomer ? '' : 'primary'}" id="friend" style="flex:1">Challenge a friend</button>
-        <button class="btn" id="go" style="flex:1">Play vs AI</button>
-      </div>
-      ${sampleFn ? `<button class="btn primary" id="vs-claude">Play vs Claude</button>` : ''}
-      <div class="bar">
-        <span class="hint">${factionsReady() ? 'Factions: draft two factions each, then fight with their units and towers.' : 'Factions mode: coming soon.'}</span>
-        <button class="btn small" id="factions-ai" ${factionsReady() ? '' : 'disabled'}>Factions vs AI</button>
-      </div>
-      <div class="bar">
-        <span class="hint">${devReady() ? 'Factions – devtest: buildings, Powers and spells on the big Test Grid.' : 'Factions – devtest: no factions yet.'}</span>
-        <button class="btn small" id="devtest-ai" ${devReady() ? '' : 'disabled'}>Factions – devtest</button>
-      </div>
-      <div class="bar">
-        <span class="hint">Have a code? (4 letters: a tournament)</span>
-        <span class="joinrow"><input id="code-in" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Match code" placeholder="CODE"><button class="btn" id="join">Join</button></span>
-      </div>
-      <span class="hint" id="join-msg" aria-live="polite" hidden></span>
-      ${tour.role ? '' : `<div class="bar"><span class="hint">Invite friends to a tournament: brackets, gamertags, your rules.</span><span class="btnrow"><button class="btn small" id="tour-new">Host a tournament</button><button class="btn small" id="tour-practice">Practice vs bots</button></span></div>`}
-      ${packSeg()}
-      ${settingsBox(`
-        ${mapSeg()}
-        ${charSeg()}
-        <div class="bar">
-          <span class="hint">Deploy timer vs AI</span>
-          <div class="seg" role="group" aria-label="Deploy timer vs AI">
-            <button data-tm="1" aria-pressed="${timerOn}">On</button><button data-tm="0" aria-pressed="${!timerOn}">Off</button>
-          </div>
+    overlay(null); $('panel').innerHTML = '';
+    home.ctx = { resume, netBack, newcomer };
+    if (!home.screen || home.screen === 'menu' || !home.welcomeNeeded()) home.screen = home.welcomeNeeded() ? 'welcome' : 'menu';
+    drawHome();
+    size(); render();
+  }
+
+  // ---------- home screens (2026-11-02) ----------
+  // welcome: the title, Log in (Sign up under it) and Play as guest; signup and login: their own screens; menu: the
+  // main menu (PLAY, with a popup for Play vs Friend / Play vs AI and the match settings; Profile and Settings top
+  // right; tutorial, encyclopedia, leaderboard and tournaments along the bottom, and the music player). All of it is
+  // drawn over a painted autumn floor (#home-bg, src/floors.js) and only while phase is 'start' (syncHome).
+  // The welcome screen shows until this phone has an account or has chosen to play as a guest (WELCOME_STORE).
+  const WELCOME_STORE = 'pb-welcomed';
+  const MODE_STORE = 'pb-match-mode';
+  const HOME_AUTO = (qs.has('test') || navigator.webdriver === true) && !qs.has('welcome'); // the UI tests (Playwright): no welcome screen or Stay logged in question, the PLAY popup open; ?welcome shows the real flow
+  const home = { screen: '', ctx: {}, pop: HOME_AUTO, // ?test (the UI tests): the PLAY popup starts open, so Play vs AI, Play vs Friend and the code box are there at once
+    msg: '', busy: false, mode: 'normal', rankedOn: null, bgKey: '',
+    welcomeNeeded: () => { if (acct || HOME_AUTO) return false; try { return !localStorage.getItem(WELCOME_STORE) && !sessionStorage.getItem(WELCOME_STORE); } catch (e) { return false; } } };
+  try { if (localStorage.getItem(MODE_STORE) === 'ranked') home.mode = 'ranked'; } catch (e) {}
+  const welcomed = () => { try { acctStore().setItem(WELCOME_STORE, '1'); } catch (e) {} };
+  function setStay(on) {
+    try { localStorage.setItem(STAY_STORE, on ? '1' : '0'); } catch (e) {}
+    acctSave(acct); // moves the saved account to the right place
+    try { localStorage.removeItem(WELCOME_STORE); sessionStorage.removeItem(WELCOME_STORE); } catch (e) {}
+    welcomed();
+  }
+  function syncHome() {
+    const on = phase === 'start' && !m && !!home.screen && !(tour.role && !tour.menu) && !$('home-in').dataset.off;
+    document.documentElement.classList.toggle('home', on);
+    $('home').hidden = !on;
+    if (on) paintHomeBg();
+  }
+  // the autumn floor, full screen (repainted when the window changes size)
+  function paintHomeBg() {
+    const cvh = $('home-bg'), r = cvh.getBoundingClientRect(), W = Math.round(r.width), H = Math.round(r.height);
+    if (!W || !H) return;
+    const key = W + 'x' + H;
+    if (home.bgKey === key) return;
+    home.bgKey = key;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cvh.width = Math.round(W * dpr); cvh.height = Math.round(H * dpr);
+    const g = cvh.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const t = Math.max(34, Math.min(W, H) / 10);
+    if (!Floors.floor(g, W, H, t, 'autumn')) { g.fillStyle = '#5C5B39'; g.fillRect(0, 0, W, H); }
+    g.strokeStyle = 'rgba(20, 28, 16, 0.18)'; g.lineWidth = 1; // a faint grid, like the board's tiles
+    for (let x = (W / 2) % t; x < W; x += t) { g.beginPath(); g.moveTo(x + 0.5, 0); g.lineTo(x + 0.5, H); g.stroke(); }
+    for (let y = (H / 2) % t; y < H; y += t) { g.beginPath(); g.moveTo(0, y + 0.5); g.lineTo(W, y + 0.5); g.stroke(); }
+  }
+  addEventListener('resize', () => { if (!$('home').hidden) { home.bgKey = ''; paintHomeBg(); } });
+  const titleImg = (cls = '') => `<img class="home-title wide ${cls}" src="img/title.png" alt="No Mans Land"><img class="home-title stack ${cls}" src="img/title-stack.png" alt="No Mans Land">`;
+  const HICON = {
+    user: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="currentColor"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="currentColor"/></svg>',
+    cog: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.4-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.7a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.4 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.7h4l.4-2.7a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>',
+    school: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3 1 9l11 6 9-4.9V17h2V9zM5 13.2v4L12 21l7-3.8v-4L12 17z"/></svg>',
+    book: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 3h11a3 3 0 0 1 3 3v15H7a2 2 0 0 1-2-2zm2 14v2h10v-2zM8 6v2h8V6z"/></svg>',
+    help: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m1 17h-2v-2h2zm2.1-7.7-.9.9c-.7.7-1.2 1.3-1.2 2.8h-2v-.5c0-1.1.5-2.1 1.2-2.8l1.2-1.3a2 2 0 1 0-3.4-1.4H8a4 4 0 1 1 7.1 2.3"/></svg>',
+    trophy: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 3h10v2h4v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 15v3h4v3H7v-3h4v-3a5 5 0 0 1-3.7-3H7a4 4 0 0 1-4-4V5h4zm0 4H5v1a2 2 0 0 0 2 2zm10 0v3a2 2 0 0 0 2-2V7z"/></svg>',
+    bracket: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M3 4h5v6H3M3 14h5v6H3M8 7h4v10H8M12 12h4M16 9h5v6h-5z"/></svg>',
+  };
+
+  function drawHome() {
+    syncHome();
+    const el = $('home-in');
+    if (home.screen === 'welcome') drawWelcome(el);
+    else if (home.screen === 'signup' || home.screen === 'login') drawSignIn(el);
+    else drawMenu(el);
+  }
+  function homeMsg(t) { home.msg = t || ''; const x = $('home-msg'); if (x) x.textContent = home.msg; }
+  function homeDone() { welcomed(); home.screen = 'menu'; home.msg = ''; drawHome(); }
+
+  // the first screen: the title, Log in (Sign up under it, smaller) and Play as guest
+  function drawWelcome(el) {
+    el.innerHTML = `<div></div><div class="home-mid">
+        ${titleImg()}
+        <div class="welcome-btns">
+          <div><button class="hbtn" id="w-login">Log in</button><button class="hlink" id="w-signup">Sign up</button></div>
+          <div><button class="hbtn" id="w-guest" ${home.busy ? 'disabled' : ''}>Play as guest</button></div>
         </div>
-        ${TEST ? `<div class="bar">
-          <span class="hint">Level-up cost (test setting)</span>
-          <div class="seg" role="group" aria-label="Level-up cost">
-            ${[50, 75].map(c => `<button data-c="${c}" aria-pressed="${Game.CONFIG.levelCostPerTier === c}">${c} gold</button>`).join('')}
-          </div>
-        </div>` : ''}
-        <div class="bar">
-          <span class="hint">${customSet ? `Your ${units.length} Counter Lab units` : `${units.length} built-in units`}${reportDb ? '. Matches are saved for Claude to review.' : ''}</span>
-          <span class="btnrow"><button class="btn small" id="load-units">Load units</button><a class="btn small" id="lab-link" href="lab.html" style="text-decoration:none;color:inherit;display:inline-block">Counter Lab</a></span>
-        </div>`)}`;
+        <p class="home-msg" id="home-msg" aria-live="polite">${esc(home.msg)}</p>
+      </div><div></div>`;
+    $('w-login').addEventListener('click', () => { home.screen = 'login'; home.msg = ''; drawHome(); });
+    $('w-signup').addEventListener('click', () => { home.screen = 'signup'; home.msg = ''; drawHome(); });
+    $('w-guest').addEventListener('click', playAsGuest);
+  }
+  // Play as guest: a guest account on the server (a gamertag of its own); without the server, straight to the menu
+  async function playAsGuest() {
+    if (home.busy) return;
+    if (acct) { homeDone(); return; }
+    home.busy = true; homeMsg('One moment…');
+    const r = await acctCall('guest', {});
+    home.busy = false;
+    if (r.status === 200) acctTake(r);
+    homeDone();
+  }
+  // Sign up (its own screen: a gamertag, then Google or a guest with that name) and Log in (Google)
+  function drawSignIn(el) {
+    const up = home.screen === 'signup';
+    el.innerHTML = `<div>${titleImg()}</div><div class="home-mid">
+        <div class="home-card">
+          <h3>${up ? 'Sign up' : 'Log in'}</h3>
+          ${up ? `<p class="hint" style="margin:0">Pick your gamertag. Sign up with Google to keep your account on any phone or computer, or just make a guest account on this one.</p>
+            <span class="hint">Gamertag</span>
+            <input class="tour-in" id="su-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Gamertag" placeholder="2–16 letters" value="${esc(home.tag || '')}">`
+          : '<p class="hint" style="margin:0">Log in with the Google account you signed up with. You get your gamertag, match history and ranked results back on this device.</p>'}
+          <div id="acct-google" class="acct-google"></div>
+          ${up ? '<button class="btn" id="su-guest">Sign up as a guest instead</button>' : ''}
+          <p class="hint" id="acct-msg" aria-live="polite" style="margin:0;color:var(--gold)">${esc(home.msg)}</p>
+          <span class="btnrow"><button class="btn small" id="si-back">Back</button>${up ? '<button class="btn small" id="si-other">I have an account: Log in</button>' : '<button class="btn small" id="si-other">New here? Sign up</button>'}</span>
+        </div>
+      </div><div></div>`;
+    const tagIn = $('su-tag');
+    if (tagIn) tagIn.addEventListener('input', () => { home.tag = tagIn.value; });
+    $('si-back').addEventListener('click', () => { home.screen = 'welcome'; home.msg = ''; drawHome(); });
+    $('si-other').addEventListener('click', () => { home.screen = up ? 'login' : 'signup'; home.msg = ''; drawHome(); });
+    if ($('su-guest')) $('su-guest').addEventListener('click', async () => {
+      const tag = (tagIn.value || '').trim();
+      if (tag && !cleanTagOk(tag)) { signMsg('Gamertags are 2–16 letters, digits, spaces, _ . or -.'); return; }
+      signMsg('One moment…');
+      const r = await acctCall('guest', tag ? { tag } : {});
+      if (r.status !== 200) { signMsg(acctFail(r)); return; }
+      acctTake(r); homeDone();
+    });
+    acctUi.after = async (r) => { // Google said yes (acctGoogle): Sign up keeps the gamertag typed here
+      const tag = up && tagIn ? tagIn.value.trim() : '';
+      if (tag && cleanTagOk(tag) && r.linked === 'new') await acctCall('tag', { tag }, true).then(x => { if (x.status === 200) acctTake(x); });
+      if (phase === 'start') homeDone();
+    };
+    acctGoogleButton(up ? 'signup_with' : 'signin_with');
+  }
+  const cleanTagOk = (t) => /^[\p{L}\p{N} _.-]{2,16}$/u.test(t.normalize('NFC').replace(/\s+/g, ' ').trim());
+  const signMsg = (t) => { home.msg = t; if ($('acct-msg')) $('acct-msg').textContent = t; };
+
+  // the main menu
+  function drawMenu(el) {
+    const { resume, netBack, newcomer } = home.ctx;
+    const inTour = !!tour.role;
+    el.innerHTML = `<div class="home-top">
+        ${titleImg()}
+        <div class="corner">
+          <button id="acct-open" aria-label="Profile">${HICON.user}<span>${acct ? esc(acct.tag) : 'Profile'}</span></button>
+          <button id="music-open" aria-label="Settings">${HICON.cog}<span>Settings</span></button>
+        </div>
+      </div>
+      <div class="home-mid">
+        <button class="hbtn gold play-big" id="play">Play</button>
+        <div class="home-more">
+          ${inTour ? `<button class="btn primary" id="tour-back">Back to tournament ${esc(tour.code)}</button>` : ''}
+          ${resume ? `<button class="btn primary" id="resume">Resume match ${esc(resume.code)}</button>` : ''}
+          ${netBack ? `<button class="btn primary" id="net-resume">Back to match ${esc(netBack.code)}</button>` : ''}
+          ${newcomer ? '<button class="btn primary" id="tutorial-new">New here? Play the tutorial</button>' : ''}
+        </div>
+      </div>
+      <div class="home-foot">
+        <div class="tiles">
+          <button id="tutorial" class="${newcomer ? 'hot' : ''}">${HICON.school}Tutorial</button>
+          <button id="how">${HICON.help}How to play</button>
+          <button id="ency-open">${HICON.book}Encyclopedia</button>
+          <button id="lb-open">${HICON.trophy}Leaderboard</button>
+          ${inTour || !devMode() ? '' : `<button id="tours-open">${HICON.bracket}Tournaments</button>`}
+        </div>
+        ${playerHtml()}
+      </div>
+      ${home.pop ? `<div class="pop-back${HOME_AUTO ? ' auto' : ''}" id="pop-back">${playPop()}</div>`
+        : acct && stayPref() == null && !HOME_AUTO ? `<div class="pop-back" id="stay-back"><div class="pop" role="dialog" aria-modal="true" aria-labelledby="stay-h">
+          <h3 id="stay-h">Stay logged in?</h3>
+          <p class="hint" style="margin:0">Keep ${esc(acct.tag)} logged in on this device, so the game opens straight on the menu next time. You can change this in Settings.</p>
+          <div class="pop-modes"><button class="hbtn gold" id="stay-yes">Yes</button><button class="hbtn" id="stay-no">No</button></div>
+        </div></div>` : ''}`;
+    wirePlayer();
+    if ($('stay-yes')) { $('stay-yes').addEventListener('click', () => { setStay(true); drawHome(); }); $('stay-no').addEventListener('click', () => { setStay(false); drawHome(); }); }
+    $('play').addEventListener('click', () => { home.pop = true; drawHome(); });
+    $('music-open').addEventListener('click', openSoundSheet);
+    $('acct-open').addEventListener('click', openAccountSheet);
+    $('ency-open').addEventListener('click', () => openEncyclopedia());
     $('how').addEventListener('click', openHowTo);
     $('tutorial').addEventListener('click', startTutorial);
-    $('friend').addEventListener('click', () => { matchKind = 'standard'; hostLobby(); });
-    $('go').addEventListener('click', () => { matchKind = 'standard'; startAiMatch(); });
-    $('factions-ai').addEventListener('click', () => { matchKind = 'factions'; startAiMatch(); });
-    $('devtest-ai').addEventListener('click', () => { matchKind = 'devtest'; startAiMatch(); });
-    if ($('vs-claude')) $('vs-claude').addEventListener('click', startClaudeMatch);
+    if ($('tutorial-new')) $('tutorial-new').addEventListener('click', startTutorial);
+    $('lb-open').addEventListener('click', openLeaderboard);
+    if ($('tours-open')) $('tours-open').addEventListener('click', openToursSheet);
     if ($('resume')) $('resume').addEventListener('click', () => resumeHost(resume));
     if ($('net-resume')) $('net-resume').addEventListener('click', () => srvJoin(netBack.code, { key: netBack.key, side: netBack.side }));
     if ($('tour-back')) $('tour-back').addEventListener('click', () => { tour.menu = false; showStart(); });
+    if (home.pop) wirePop();
+    if (!home.asked) rankedCheck();
+  }
+  // is ranked on? (the server's switch; asked once per visit to the menu, quietly)
+  async function rankedCheck() {
+    home.asked = true;
+    try { const r = await fetch(`${SERVER_URL}/leaderboard`); const j = r.ok ? await r.json() : null; home.rankedOn = j ? !!j.on : null; if (j) home.board = j; }
+    catch (e) { home.rankedOn = null; }
+    if (phase === 'start' && home.pop && $('pop-back') && home.rankedOn != null) drawHome();
+  }
+  const rankedAllowed = () => home.rankedOn === true || devMode();
+  const ranked = () => home.mode === 'ranked' && rankedAllowed();
+
+  // the PLAY popup: Play vs Friend / Play vs AI, Normal or Ranked, the match settings, a code to join, and more
+  function playPop() {
+    const rk = ranked();
+    const rankNote = home.rankedOn === false && !devMode() ? 'Ranked is switched off right now.' : home.rankedOn == null && !devMode() ? 'Ranked needs the game server, which can’t be reached right now.' : '';
+    return `<div class="pop" role="dialog" aria-modal="true" aria-labelledby="pop-h">
+      <div class="bar"><h3 id="pop-h">Play</h3><button class="btn small" id="pop-close">Close</button></div>
+      <div class="pop-modes">
+        <button class="hbtn gold" id="friend">Play vs Friend</button>
+        <button class="hbtn" id="go" ${rk ? 'disabled' : ''}>Play vs AI</button>
+      </div>
+      <div class="bar">
+        <span class="hint">Mode</span>
+        <div class="seg" role="group" aria-label="Normal or ranked">
+          <button data-mode="normal" aria-pressed="${!rk}">Normal</button><button data-mode="ranked" aria-pressed="${rk}" ${rankedAllowed() ? '' : 'disabled'}>Ranked</button>
+        </div>
+      </div>
+      ${rk ? `<p class="ranked-note">Ranked: a best of 3 against a friend, on the Standard map with the Standard pack. Both of you pick from the same 5 leaders and the same 3 towers. Only ranked matches count on the leaderboard.${home.rankedOn === false ? ' (Switched off for players; open to you as a developer.)' : ''}</p>`
+        : rankNote ? `<p class="hint" style="margin:0">${rankNote}</p>` : ''}
+      ${rk ? lookSeg() : `${packSeg()}${mapSeg()}${charSeg()}
+      <div class="bar">
+        <span class="hint">Deploy timer vs AI</span>
+        <div class="seg" role="group" aria-label="Deploy timer vs AI">
+          <button data-tm="1" aria-pressed="${timerOn}">On</button><button data-tm="0" aria-pressed="${!timerOn}">Off</button>
+        </div>
+      </div>`}
+      <div class="bar">
+        <span class="hint">Have a code?</span>
+        <span class="joinrow"><input id="code-in" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Match code" placeholder="CODE"><button class="btn" id="join">Join</button></span>
+      </div>
+      <span class="hint" id="join-msg" aria-live="polite" hidden></span>
+      ${sampleFn ? `<button class="btn primary" id="vs-claude">Play vs Claude</button>` : ''}
+      ${HOME_AUTO && !tour.role ? '<span class="btnrow"><button class="btn small" id="tour-new">Host a tournament</button><button class="btn small" id="tour-practice">Practice vs bots</button></span>' : ''}
+      ${devMode() ? `<details class="settings"><summary>Developer<span>more modes</span></summary><div class="settings-body">
+        <div class="bar"><span class="hint">${factionsReady() ? 'Factions: draft two factions each.' : 'Factions mode: coming soon.'}</span><button class="btn small" id="factions-ai" ${factionsReady() ? '' : 'disabled'}>Factions vs AI</button></div>
+        <div class="bar"><span class="hint">${devReady() ? 'Buildings, Powers and spells on the big board.' : 'No factions yet.'}</span><button class="btn small" id="devtest-ai" ${devReady() ? '' : 'disabled'}>Factions – devtest</button></div>
+        ${TEST ? `<div class="bar"><span class="hint">Level-up cost (test setting)</span><div class="seg" role="group" aria-label="Level-up cost">${[50, 75].map(c => `<button data-c="${c}" aria-pressed="${Game.CONFIG.levelCostPerTier === c}">${c} gold</button>`).join('')}</div></div>` : ''}
+        <div class="bar"><span class="hint">${customSet ? `Your ${units.length} Counter Lab units` : `${units.length} built-in units`}${reportDb ? '. Matches are saved for Claude to review.' : ''}</span>
+          <span class="btnrow"><button class="btn small" id="load-units">Load units</button><a class="btn small" id="lab-link" href="lab.html" style="text-decoration:none;color:inherit;display:inline-block">Counter Lab</a></span></div>
+      </div></details>` : ''}
+    </div>`;
+  }
+  function wirePop() {
+    const root = $('home-in');
+    const close = () => { home.pop = false; drawHome(); };
+    $('pop-close').addEventListener('click', close);
+    $('pop-back').addEventListener('click', (e) => { if (e.target === $('pop-back')) close(); });
+    $('friend').addEventListener('click', () => { matchKind = 'standard'; if (ranked()) rankedHost(); else hostLobby(); });
+    $('go').addEventListener('click', () => { if (ranked()) return; matchKind = 'standard'; startAiMatch(); });
+    root.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
+      home.mode = b.dataset.mode === 'ranked' && rankedAllowed() ? 'ranked' : 'normal';
+      try { localStorage.setItem(MODE_STORE, home.mode); } catch (e) {}
+      drawHome();
+    }));
+    if ($('factions-ai')) $('factions-ai').addEventListener('click', () => { matchKind = 'factions'; startAiMatch(); });
+    if ($('devtest-ai')) $('devtest-ai').addEventListener('click', () => { matchKind = 'devtest'; startAiMatch(); });
+    if ($('vs-claude')) $('vs-claude').addEventListener('click', startClaudeMatch);
+    if ($('load-units')) $('load-units').addEventListener('click', openLoader);
     if ($('tour-new')) $('tour-new').addEventListener('click', () => tourCreate());
     if ($('tour-practice')) $('tour-practice').addEventListener('click', () => tourPractice());
-    $('load-units').addEventListener('click', openLoader);
     const joinNow = () => {
       const c = $('code-in').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (c.length === 4) { tourJoin(c); return; } // a tournament
@@ -2316,16 +2642,56 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     };
     $('join').addEventListener('click', joinNow);
     $('code-in').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinNow(); });
-    $('panel').querySelectorAll('[data-c]').forEach(b => b.addEventListener('click', () => {
+    root.querySelectorAll('[data-c]').forEach(b => b.addEventListener('click', () => {
       Game.CONFIG.levelCostPerTier = +b.dataset.c;
-      $('panel').querySelectorAll('[data-c]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      root.querySelectorAll('[data-c]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
     }));
-    wireMapSeg(); wireCharSeg(); wirePackSeg(); wireSettings();
-    $('panel').querySelectorAll('[data-tm]').forEach(b => b.addEventListener('click', () => {
+    root.querySelectorAll('[data-tm]').forEach(b => b.addEventListener('click', () => {
       timerOn = b.dataset.tm === '1';
-      $('panel').querySelectorAll('[data-tm]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      root.querySelectorAll('[data-tm]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
     }));
-    size(); render();
+    if (ranked()) wireLookSeg(); else { wireMapSeg(); wireCharSeg(); wirePackSeg(); }
+  }
+  // Play vs Friend in ranked: needs an account (a guest is made on the spot if this phone has none)
+  async function rankedHost() {
+    if (!srvOk()) { homeMsgPop('Ranked needs the game server.'); return; }
+    if (!acct) {
+      const r = await acctCall('guest', {});
+      if (r.status !== 200) { homeMsgPop(acctFail(r)); return; }
+      acctTake(r);
+    }
+    srvHost({ ranked: true });
+  }
+  function homeMsgPop(t) { const x = $('join-msg'); if (x) { x.hidden = false; x.textContent = t; } }
+
+  // Tournaments: host one or practise against bots (joining is by code in the PLAY popup or a link)
+  function openToursSheet() { // developers only (Vilhelm, 2026-11-02); joining by code or link stays open to everyone
+    if (!devMode()) return;
+    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Tournaments</h3><button class="btn small" id="close">Close</button></div>
+      <p class="hint" style="margin:0">Invite friends to a tournament: brackets, gamertags, your rules. Got a tournament code? Type it under Play → Have a code.</p>
+      <span class="btnrow"><button class="btn primary" id="tour-new">Host a tournament</button><button class="btn" id="tour-practice">Practice vs bots</button></span>`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', closeSheet);
+    $('tour-new').addEventListener('click', () => { closeSheet(true); tourCreate(); });
+    $('tour-practice').addEventListener('click', () => { closeSheet(true); tourPractice(); });
+  }
+  // Leaderboard: ranked results from the server (wins, ties, losses), best first
+  async function openLeaderboard() {
+    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Leaderboard</h3><button class="btn small" id="close">Close</button></div>
+      <p class="hint" id="lb-msg" aria-live="polite" style="margin:0">Loading…</p><div id="lb"></div>`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', closeSheet);
+    let j = null;
+    try { const r = await fetch(`${SERVER_URL}/leaderboard`); j = r.ok ? await r.json() : null; } catch (e) { j = null; }
+    if (!$('lb')) return;
+    if (!j) { $('lb-msg').textContent = 'Couldn’t reach the game server. Check your connection and try again.'; return; }
+    home.rankedOn = !!j.on; home.board = j;
+    const pct = (r) => Math.round((r.w + r.t / 2) / Math.max(1, r.w + r.t + r.l) * 100);
+    $('lb-msg').textContent = (j.rows.length ? 'Ranked best-of-3 series. Win share counts a tie as half a win.' : 'No ranked results yet. Play a ranked match against a friend to get on the board.') + (j.on ? '' : ' Ranked is switched off right now.');
+    if (!j.rows.length) return;
+    $('lb').innerHTML = `<table class="lb"><thead><tr><th>#</th><th>Player</th><th>W</th><th>T</th><th>L</th><th>Win %</th></tr></thead><tbody>
+      ${j.rows.map((r, i) => `<tr class="${acct && r.id === acct.id ? 'me' : ''}"><td class="num">${i + 1}</td><td>${esc(r.tag)}</td><td class="num">${r.w}</td><td class="num">${r.t}</td><td class="num">${r.l}</td><td class="num">${pct(r)}%</td></tr>`).join('')}
+      </tbody></table>`;
   }
 
   // the rules, kept out of the way: the menu only has a one-line pitch and this button
@@ -2458,16 +2824,22 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
       phase = 'end'; hud(); netStatus();
       const wait = !solo() && rematch[me];
       const asked = !solo() && rematch[foe()] && !rematch[me];
+      const rk = mode === 'net' && !inTour && net.ranked; // a ranked series: the score, and Next game instead of Rematch
+      const rkWin = rk && rk.done && rk.result === me, rkLoss = rk && rk.done && rk.result === foe();
       overlay(`<div class="card">
+        ${rk ? `<span class="eyebrow" style="color:var(--gold)">Ranked · game ${rk.games} of up to ${rk.best}</span>
+          <div class="series"><span>${esc(rk.tags[me] || 'You')}</span><b class="num">${rk.wins[me]} – ${rk.wins[foe()]}</b><span>${esc(rk.tags[foe()] || 'Opponent')}</span></div>
+          ${rk.ties ? `<span class="hint">${rk.ties} drawn</span>` : ''}
+          ${rk.done ? `<p class="big" style="margin:0;color:${rkWin ? 'var(--you)' : rkLoss ? 'var(--foe)' : 'var(--ink)'}">${rkWin ? 'You won the series!' : rkLoss ? 'You lost the series.' : 'The series is a tie.'} It’s on the leaderboard.</p>` : ''}` : ''}
         <span class="eyebrow">After ${m.history.length} rounds</span>
         <h2 class="${win ? 'you' : loss ? 'foe' : ''}">${win ? 'Victory' : loss ? 'Defeat' : 'Draw'}</h2>
         <p class="big">${lines.join(' ')}</p>
-        ${asked && !inTour ? '<p>Your opponent wants a rematch.</p>' : ''}
+        ${asked && !inTour ? `<p>${rk && !rk.done ? 'Your opponent is ready for the next game.' : 'Your opponent wants a rematch.'}</p>` : ''}
         <div class="btnrow">
           ${inTour ? '<button class="btn primary" id="again">Back to the tournament</button>'
             : solo() ? '<button class="btn primary" id="again">Play again</button>'
             : inTour ? '<button class="btn primary" id="again">Back to the tournament</button>'
-            : `<button class="btn primary" id="again" ${wait ? 'disabled' : ''}>${wait ? 'Waiting for opponent…' : 'Rematch'}</button>`}
+            : `<button class="btn primary" id="again" ${wait ? 'disabled' : ''}>${wait ? 'Waiting for opponent…' : rk && !rk.done ? 'Next game' : rk ? 'New series' : 'Rematch'}</button>`}
           <button class="btn" id="look">Look at board</button>
           <button class="btn" id="menu">Main menu</button>
         </div>
@@ -2521,7 +2893,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     if (!m || phase === 'end' || mode === 'tutorial') { quitToMenu(); return; }
     $('sheet').innerHTML = `
       <div class="bar" data-keep><h3 id="sheet-h">Main menu</h3></div>
-      <p class="big" style="margin:0">You will forfeit the match. Are you sure?</p>
+      <p class="big" style="margin:0">${mode === 'net' && net.ranked ? 'You will forfeit and lose the ranked series. Are you sure?' : 'You will forfeit the match. Are you sure?'}</p>
       <span class="btnrow"><button class="btn primary" id="forfeit-yes">Yes</button><button class="btn" id="forfeit-no">No</button></span>`;
     $('forfeit-yes').addEventListener('click', forfeit);
     $('forfeit-no').addEventListener('click', openSoundSheet);
@@ -2553,7 +2925,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     overlay(`<div class="card">
       <span class="eyebrow">Round ${m.round}</span>
       <h2 class="you">Victory</h2>
-      <p class="big">Your opponent forfeited the match.</p>
+      <p class="big">${net.ranked && !inTour ? 'Your opponent left: you win the ranked series.' : 'Your opponent forfeited the match.'}</p>
       <div class="btnrow"><button class="btn primary" id="menu">${inTour ? 'Back to the tournament' : 'Main menu'}</button><button class="btn" id="look">Look at board</button></div>
     </div>`);
     $('panel').innerHTML = '';
@@ -2724,16 +3096,26 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
   const GOOGLE_CLIENT_ID = '732949481177-ikom5gqq07pt0sg89km9mth5d9ibfvmi.apps.googleusercontent.com';   // public OAuth client id (Google Cloud Console); empty = Google sign-in off
   const ACCT_STORE = 'phonebellum.account.v1';
   let acct = null;
-  try { acct = JSON.parse(localStorage.getItem(ACCT_STORE) || 'null'); } catch (e) {}
+  // Stay logged in (2026-11-02): on (the default), the account is kept on this device (localStorage) and the game
+  // opens straight on the menu; off, it lasts until the browser is closed (sessionStorage). STAY_STORE: '1' | '0';
+  // missing = not asked yet (asked on the menu right after making an account or logging in).
+  const STAY_STORE = 'pb-stay';
+  const stayPref = () => { try { return localStorage.getItem(STAY_STORE); } catch (e) { return null; } };
+  const staying = () => stayPref() !== '0';
+  const acctStore = () => { try { return staying() ? localStorage : sessionStorage; } catch (e) { return null; } };
+  try { acct = JSON.parse(localStorage.getItem(ACCT_STORE) || sessionStorage.getItem(ACCT_STORE) || 'null'); } catch (e) {}
   if (!(acct && /^p[0-9a-f]{16}$/.test(acct.id) && /^[0-9a-f]{64}$/.test(acct.session))) acct = null;
-  const acctUi = { busy: false, msg: '', off: false, sure: false, gsi: null };
+  const acctUi = { busy: false, msg: '', off: false, sure: false, gsi: null, after: null, outSure: false };
   // Developer mode: the server marks a player as a developer (its DEV_EMAILS secret); the page only reads the flag.
   // Anything ever locked or gated per player checks devMode() and lets developers through. For server-side gates the
   // server checks its own flag; this copy is for the page.
   const devMode = () => !!(acct && acct.dev);
   function acctSave(a) {
     acct = a;
-    try { a ? localStorage.setItem(ACCT_STORE, JSON.stringify(a)) : localStorage.removeItem(ACCT_STORE); } catch (e) {}
+    try {
+      localStorage.removeItem(ACCT_STORE); sessionStorage.removeItem(ACCT_STORE);
+      if (a) acctStore().setItem(ACCT_STORE, JSON.stringify(a));
+    } catch (e) {}
   }
   async function acctCall(route, body, withSession) {
     const headers = { 'content-type': 'application/json' };
@@ -2746,6 +3128,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
   }
   // keeps the phone's copy in step with an answer that carries a player (and maybe a new session)
   function acctTake(r) {
+    if (typeof r.rankedOn === 'boolean' && typeof home !== 'undefined') home.rankedOn = r.rankedOn;
     if (!r.player) return;
     acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, dev: !!r.player.dev, session: r.session || acct.session, ts: now() });
   }
@@ -2761,7 +3144,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
   async function acctDo(fn) {
     if (acctUi.busy) return;
     acctUi.busy = true; acctUi.msg = 'One moment…'; acctDraw();
-    try { acctUi.msg = (await fn()) || ''; } finally { acctUi.busy = false; acctDraw(); }
+    try { acctUi.msg = (await fn()) || ''; } finally { acctUi.busy = false; acctDraw(); if (!$('acct') && $('acct-msg')) $('acct-msg').textContent = acctUi.msg; }
   }
   const acctGuest = () => acctDo(async () => {
     const r = await acctCall('guest', {});
@@ -2777,8 +3160,17 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     const r = await acctCall('google', { credential }, true);
     if (r.status !== 200) return acctFail(r);
     acctSave(null); acctTake({ ...r, session: r.session });
+    if (acctUi.after) { const f = acctUi.after; acctUi.after = null; await f(r); }
     return r.linked === 'existing' ? 'Signed in. Welcome back, ' + r.player.tag + '.' : r.linked === 'guest' ? 'Signed in. Your guest is kept on your Google account.' : 'Signed in with Google.';
   });
+  // Log out (Profile): signed out on this phone, back to the welcome screen
+  async function acctLogOut() {
+    await acctSignOut();
+    acctUi.outSure = false;
+    try { localStorage.removeItem(WELCOME_STORE); sessionStorage.removeItem(WELCOME_STORE); } catch (e) {}
+    closeSheet(true); home.screen = 'welcome'; home.msg = '';
+    if (phase === 'start' && !m) showStart();
+  }
   const acctSignOut = () => acctDo(async () => {
     await acctCall('signout', {}, true);   // signed out on this phone even if the server can't be reached
     try { if (window.google && google.accounts) google.accounts.id.disableAutoSelect(); } catch (e) {}
@@ -2795,14 +3187,14 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     if (r.status !== 200) return acctFail(r);
     acctTake(r); return '';
   });
-  function acctGoogleButton() {
+  function acctGoogleButton(text = 'signin_with') {
     const box = $('acct-google');
     if (!box || !GOOGLE_CLIENT_ID || acctUi.off) return;
     const draw = () => {
       if (!$('acct-google')) return;
       try {
         google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: (res) => acctGoogle(res.credential), auto_select: false, use_fedcm_for_prompt: true });
-        google.accounts.id.renderButton($('acct-google'), { theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill' });
+        google.accounts.id.renderButton($('acct-google'), { theme: 'outline', size: 'large', text, shape: 'pill' });
       } catch (e) { $('acct-google').textContent = 'Google sign-in couldn’t start.'; }
     };
     if (window.google && google.accounts && google.accounts.id) { draw(); return; }
@@ -2822,11 +3214,13 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
       <span class="hint">Your gamertag</span>
       <span class="joinrow"><input class="tour-in" id="acct-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Your gamertag" value="${esc(a.tag)}"><button class="btn" id="acct-tag-ok" ${dis}>Save</button></span>
       ${a.google ? '' : google}
-      <span class="btnrow">${a.google ? `<button class="btn small" id="acct-out" ${dis}>Sign out</button>` : ''}<button class="btn small" id="acct-del" ${dis}>${acctUi.sure ? 'Tap again to delete' : 'Delete account'}</button></span>
+      <span class="btnrow"><button class="btn" id="hist-open">Match history</button><button class="btn" id="acct-out" ${dis}>${acctUi.outSure ? 'Tap again to log out' : 'Log out'}</button></span>
+      ${acctUi.outSure && !a.google ? '<p class="hint" style="margin:0">A guest can’t log back in: sign up with Google first to keep this gamertag and your results.</p>' : ''}
+      <span class="btnrow"><button class="btn small" id="acct-del" ${dis}>${acctUi.sure ? 'Tap again to delete' : 'Delete account'}</button></span>
       ${acctUi.sure ? '<p class="hint" style="margin:0">Deleting removes your gamertag and sign-in for good. Past match results stay, without your name.</p>' : ''}`
     : `
       <p class="hint" style="margin:0">No account needed to play. Make a guest to get a gamertag on this phone${GOOGLE_CLIENT_ID ? ', or sign in with Google to keep it on any phone' : ''}.</p>
-      <span class="btnrow"><button class="btn primary" id="acct-guest" ${dis}>Play as a guest</button></span>
+      <span class="btnrow"><button class="btn primary" id="acct-guest" ${dis}>Play as a guest</button><button class="btn" id="hist-open">Match history</button></span>
       ${google}
       ${GOOGLE_CLIENT_ID ? '' : '<p class="hint" style="margin:0">Sign in with Google is coming soon.</p>'}`;
     $('acct-msg').textContent = acctUi.msg;
@@ -2834,16 +3228,17 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     on('acct-guest', acctGuest);
     on('acct-tag-ok', () => acctRename($('acct-tag').value));
     if ($('acct-tag')) $('acct-tag').addEventListener('keydown', (e) => { if (e.key === 'Enter') acctRename($('acct-tag').value); });
-    on('acct-out', acctSignOut);
+    on('acct-out', () => { if (!acctUi.outSure && !(acct && acct.google)) { acctUi.outSure = true; acctDraw(); return; } acctLogOut(); });
+    on('hist-open', openHistorySheet);
     on('acct-del', () => { if (acctUi.sure) acctDelete(); else { acctUi.sure = true; acctDraw(); } });
     acctGoogleButton();
   }
   function openAccountSheet() {
-    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Account</h3><button class="btn small" id="close">Close</button></div>
+    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Profile</h3><button class="btn small" id="close">Close</button></div>
       <div id="acct" class="acct"></div><p class="hint" id="acct-msg" aria-live="polite" style="margin:0"></p>`;
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', closeSheet);
-    acctUi.msg = ''; acctUi.sure = false;
+    acctUi.msg = ''; acctUi.sure = false; acctUi.outSure = false; acctUi.after = () => { if (phase === 'start' && !m) drawHome(); };
     acctDraw();
     acctRefresh();
   }
@@ -2862,7 +3257,7 @@ html.tourtv .tbr.big svg { max-height: 62svh; margin: 0 auto; }
     if (!sampleFn) { startAiMatch(); return; }
     leaveNet();
     mode = 'claude'; me = 0; restoreSet();
-    m = Game.createMatch(units, M, (now() ^ (Math.random() * 1e9)) >>> 0, mapPick, m && m.map ? m.map.id : null, matchChars(), matchOpts());
+    m = Game.createMatch(units, M, (now() ^ (Math.random() * 1e9)) >>> 0, curMap(), m && m.map ? m.map.id : null, matchChars(), matchOpts());
     nextReady = [false, false]; rematch = [false, false];
     claude.off = false; claude.history = [];
     startReport();
@@ -3427,7 +3822,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (matchKind === 'factions' && factionsReady()) { startDraft(); return; }
     if (matchKind === 'devtest' && devReady()) { startDraft(); return; }
     restoreSet();
-    m = Game.createMatch(units, M, (now() ^ (Math.random() * 1e9)) >>> 0, mapPick, m && m.map ? m.map.id : null, matchChars(), matchOpts());
+    m = Game.createMatch(units, M, (now() ^ (Math.random() * 1e9)) >>> 0, curMap(), m && m.map ? m.map.id : null, matchChars(), matchOpts());
     nextReady = [false, false]; rematch = [false, false];
     startReport();
     beginAiRound();
@@ -5218,11 +5613,13 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const srv = mode === 'net';
     const link = srv ? playLink() : shareLink();
     const here = srv ? net.foeHere : net.connected;
+    const rk = srv && net.ranked;
     overlay(`<div class="card">
+      ${rk ? `<span class="eyebrow" style="color:var(--gold)">Ranked · best of 3</span>${here && rk.tags[1] ? `<p class="big" style="margin:0">${esc(rk.tags[0])} vs ${esc(rk.tags[1])}</p>` : ''}` : ''}
       <span class="eyebrow">Match code</span>
       <span class="code" aria-label="Match code">${net.code}</span>
       <p class="status ${here ? '' : 'wait'}" id="lobby-status">${problem ? esc(problem) : here ? 'Your friend is here!' : ((srv ? net.connected : net.peer && net.peer.open) ? 'Waiting for your friend to open the link' : 'Setting up the match')}</p>
-      ${factionsReady() ? `<div class="seg" role="group" aria-label="Gamemode"><button data-kind="standard" aria-pressed="${matchKind !== 'factions'}">Standard</button><button data-kind="factions" aria-pressed="${matchKind === 'factions'}">Factions</button></div>` : ''}
+      ${factionsReady() && !rk ? `<div class="seg" role="group" aria-label="Gamemode"><button data-kind="standard" aria-pressed="${matchKind !== 'factions'}">Standard</button><button data-kind="factions" aria-pressed="${matchKind === 'factions'}">Factions</button></div>` : ''}
       <button class="btn primary" id="start" ${here ? '' : 'disabled'}>Start match</button>
     </div>`);
     $('panel').innerHTML = `
@@ -5235,12 +5632,13 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         </span>
         <button class="btn" id="cancel">Cancel</button>
       </div>
-      ${srv ? '<span class="hint">The game server referees this match. <button class="btn small" id="use-peer">Phone to phone instead</button> (for Factions).</span>' : ''}
+      ${rk ? `<p class="ranked-note">Ranked: the Standard map and pack, the same 5 leaders and 3 towers for you both. Win 2 games to take the series; only ranked series count on the leaderboard. Your friend needs an account too (they get a guest one when they join).</p>${lookSeg()}`
+      : `${srv ? '<span class="hint">The game server referees this match. <button class="btn small" id="use-peer">Phone to phone instead</button> (for Factions).</span>' : ''}
       ${packSeg()}
       ${settingsBox(`
         ${mapSeg()}
         ${charSeg()}
-        <span class="hint">You both play with the units on this device: ${customSet ? `your ${units.length} Counter Lab units` : packOn() ? `the Standard pack (${packUnits()} of the ${units.length} built-in units)` : `the ${units.length} built-in units`}.</span>`)}`;
+        <span class="hint">You both play with the units on this device: ${customSet ? `your ${units.length} Counter Lab units` : packOn() ? `the Learn the game pack (${packUnits()} of the ${units.length} built-in units)` : `the ${units.length} built-in units`}.</span>`)}`}`;
     if ($('share')) $('share').addEventListener('click', () => { navigator.share({ title: 'No Mans Land', text: `Fight me in No Mans Land! Code ${net.code}`, url: link }).catch(() => {}); });
     $('copy').addEventListener('click', () => {
       const done = () => { $('copy').textContent = 'Copied'; setTimeout(() => { if ($('copy')) $('copy').textContent = 'Copy link'; }, 1500); };
@@ -5251,7 +5649,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     $('start').addEventListener('click', hostStartMatch);
     $('overlay').querySelectorAll('[data-kind]').forEach(b => b.addEventListener('click', () => { matchKind = b.dataset.kind; if (srv && matchKind === 'factions') hostLobby(true); else drawLobby(); }));
     if ($('use-peer')) $('use-peer').addEventListener('click', () => hostLobby(true));
-    wireMapSeg(); wireCharSeg(); wirePackSeg(); wireSettings();
+    if (rk) wireLookSeg(); else { wireMapSeg(); wireCharSeg(); wirePackSeg(); wireSettings(); }
   }
   function selectLink() { const r = document.createRange(); r.selectNodeContents($('link')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 
@@ -5261,7 +5659,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const tx = tourLive();
     if (!tx && matchKind === 'factions' && factionsReady()) { startDraft(); return; }
     restoreSet();
-    m = tx ? tourCreateMatch(tx) : Game.createMatch(units, M, (now() ^ (Math.random() * 1e9)) >>> 0, mapPick, m && m.map ? m.map.id : null, matchChars(), matchOpts());
+    m = tx ? tourCreateMatch(tx) : Game.createMatch(units, M, (now() ^ (Math.random() * 1e9)) >>> 0, curMap(), m && m.map ? m.map.id : null, matchChars(), matchOpts());
     lastSummary = null; nextReady = [false, false]; rematch = [false, false];
     startReport();
     hostBeginRound();
@@ -5741,9 +6139,10 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     useSet(BUILTIN, false);
   }
   // a friend's match: this phone makes it (side 0) and picks the settings in the lobby
-  function srvHost() {
+  function srvHost(o = {}) {
     leaveNet();
     mode = 'net'; me = 0; m = null; phase = 'lobby'; bt = null; matchKind = 'standard';
+    net.wantRanked = !!o.ranked; net.ranked = o.ranked ? { tags: [acct ? acct.tag : 'You', ''], wins: [0, 0], ties: 0, games: 0, best: 3, done: false } : null;
     net.srv = true; net.create = true; net.key = ''; net.tourCode = ''; net.code = newCode();
     hud(); netStatus(); render();
     drawLobby();
@@ -5754,6 +6153,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     leaveNet();
     if (!o.watch) { mode = 'net'; me = o.side === 0 ? 0 : 1; } else mode = 'spec';
     m = null; phase = 'lobby'; bt = null; battlePre = null; deadline = 0; lastSummary = null; matchKind = 'standard';
+    net.wantRanked = false; net.ranked = null;
     net.srv = true; net.create = false; net.key = o.key || ''; net.tourCode = o.tour || ''; net.code = code; net.watch = !!o.watch; net.typed = !!o.typed;
     if (!o.tour && !o.watch) { const u = new URL(location.href.split('#')[0]); u.searchParams.delete('join'); u.searchParams.set('play', code); history.replaceState(null, '', u.toString()); } // a reload comes back to it
     hud(); netStatus(); render();
@@ -5769,7 +6169,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     ws.onopen = () => {
       if (net.ws !== ws) return;
       net.connected = true; net.tries = 0;
-      const hello = net.watch ? { watch: true } : net.tourCode ? { id: tour.myId, tkey: tour.key } : net.key ? { key: net.key } : net.create ? { create: true } : {};
+      const hello = net.watch ? { watch: true } : net.tourCode ? { id: tour.myId, tkey: tour.key } : net.key ? { key: net.key } : net.create ? { create: true, ...(net.wantRanked ? { ranked: true } : {}) } : {};
+      if (acct && !net.watch && !net.tourCode && !net.key) hello.session = acct.session; // ranked matches check who this is (never in the URL)
       ws.send(JSON.stringify({ t: 'hello', ...hello }));
       clearInterval(net.ping); net.ping = setInterval(() => { if (net.ws === ws && ws.readyState === 1) ws.send('{"t":"ping"}'); }, 30000);
       netStatus();
@@ -5782,7 +6183,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       netStatus();
       if (phase === 'deploy' && mode === 'net') panelDeploy();
       // the game server can't be reached at all: a new friend's match goes phone to phone (PeerJS) instead
-      if (!net.welcomed && net.tries >= 1 && phase === 'lobby' && !m && !net.tourCode && !net.watch && (net.create || net.typed) && peerAvailable()) {
+      if (!net.welcomed && net.tries >= 1 && phase === 'lobby' && !m && !net.tourCode && !net.watch && !net.wantRanked && (net.create || net.typed) && peerAvailable()) {
         const code = net.code, typed = net.typed; leaveNet();
         if (typed) joinMatch(code); else hostLobby(true);
         return;
@@ -5793,7 +6194,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   function srvRetry() { clearTimeout(net.retryTimer); net.tries++; net.retryTimer = setTimeout(() => { if (net.alive && !net.ws) srvOpen(); }, Math.min(8000, 600 * net.tries)); }
   // the match settings from this phone's menu (map, look, units, leaders and towers left out)
-  const srvSettings = () => ({ map: mapPick || '', skin: skinPick || '', offUnits: matchOff().map(i => units[i].name), offChars: matchChars().slice(), offTowers: packOn() ? SP.offTowers.slice() : [] });
+  const srvSettings = () => ({ map: curMap() || '', skin: skinPick || '', offUnits: matchOff().map(i => units[i].name), offChars: matchChars().slice(), offTowers: packOn() ? SP.offTowers.slice() : [] });
   // one of this phone's own actions (a Game call that worked): to the server, and kept until it says it has it
   function srvAct(fn, a) {
     net.seq++;
@@ -5821,6 +6222,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (me === 0) drawLobby(); else guestWaiting(net.foeHere ? 'Connected. Waiting for your friend to start the match' : 'Connected');
   }
   function srvRecv(d) {
+    if ('ranked' in d && d.t !== 'ack') net.ranked = d.ranked || null;
     if (d.t === 'welcome') {
       net.welcomed = true;
       if (d.side >= 0) { me = d.side; net.key = d.key || net.key; net.seq = Math.max(net.seq, d.seq | 0); srvSave(); }
@@ -5832,6 +6234,17 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (d.t === 'nomatch') { // not a server match: an older phone-to-phone one (PeerJS) with this code
       const code = net.code; leaveNet();
       if (peerAvailable()) joinMatch(code); else overlayMsg('No such match', `Nobody is hosting match ${code}.`);
+      return;
+    }
+    if (d.t === 'denied' && d.why) { // a ranked match: no account (one is made on the spot and the join tried again), switched off, or yourself
+      const code = net.code, create = net.create;
+      if (d.why === 'account' && !acct && !create && !net.retriedAcct) {
+        leaveNet(); net.retriedAcct = true;
+        acctCall('guest', {}).then(r => { if (r.status === 200) { acctTake(r); srvJoin(code, { typed: true }); } else overlayMsg('Ranked match', 'Ranked matches need an account. Make one on the main menu (Play as guest is enough).'); });
+        return;
+      }
+      leaveNet(); srvForget();
+      overlayMsg('Ranked match', d.why === 'ranked off' ? 'Ranked play is switched off right now.' : d.why === 'self' ? 'That’s your own ranked match: send the link to a friend.' : 'Ranked matches need an account. Make one on the main menu (Play as guest is enough).');
       return;
     }
     if (d.t === 'full' || d.t === 'denied') { const code = net.code; leaveNet(); srvForget(); overlayMsg(d.t === 'full' ? 'Match is full' : 'Not your match', d.t === 'full' ? `Two players are already in match ${code}.` : 'This match is for two other players.'); return; }
@@ -5955,6 +6368,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // a practice tournament: you and 7 bots, to try it all out
   function tourPractice() { tourCreate(7, 'Practice cup'); }
   function tourCreate(bots, name) {
+    if (!devMode() && !HOME_AUTO) return; // hosting is for developers (2026-11-02)
     let nm = '';
     try { nm = localStorage.getItem('pb-tour-name') || ''; } catch (e) {}
     tourLeave(false);
@@ -6012,7 +6426,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   // the match settings from the menu's own pickers (map, look, unit pack, leaders and units left out)
   function tourCaptured() {
-    return { map: mapPick || '', skin: skinPick || '', pack: packOn() ? 'standard' : 'all',
+    return { map: curMap() || '', skin: skinPick || '', pack: packOn() ? 'standard' : 'all',
       offUnits: matchOff().map(i => units[i].name), offChars: matchChars().slice(), offTowers: packOn() ? SP.offTowers.slice() : [] };
   }
   const tourCapture = () => tourDo('settings', tourCaptured());

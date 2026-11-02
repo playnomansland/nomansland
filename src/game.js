@@ -520,14 +520,14 @@ const Game = (() => {
       ...(ed.base === 'testgrid' ? { rangeAdd: 2, rangeAddMin: 5, slowSteps: [[3, 0.2], [5, 0.2]], tuneKeep: ['Shiv', 'Water Mage'] } : {}), ...extra };
   }
   const MAPS = [
-    { id: 'standard', name: 'Standard', short: 'No special rules.', text: 'No special rules.', plain: true, skins: true }, // only when picked, never random
+    { id: 'standard', name: 'Old standard', short: 'No special rules.', text: 'No special rules.', plain: true, skins: true }, // only when picked, never random
     { id: 'forest', name: 'Forest Clearing', short: 'Bribe the elf tower to fight for you.', text: 'Bribe the elf tower to fight for you. Healing ×1.5.', boostHp: 15, boostUnits: ['Ent', 'Earth Wizard'], healMul: 1.5, elfTower: true },
     { id: 'cavern', name: 'Mushroom Cavern', short: 'Shorter range. Mushroom tiles buff, speed up or poison.', text: '−25% range. Purple tiles buff, yellow speed up, green poison.', stealthDmg: 20, rangeCut: 25, rangeKeep: 5, shrooms: true, pointMirror: true },
     // Frozen Peak's hailstorm and altar are switched off for now (iceOff): the map is its snowy floor and music with no
     // special rules. To bring them back, take iceOff out and use iceShort / iceText as short / text again.
     { id: 'ice', name: 'Frozen Peak', short: 'A snowy mountain top. No special rules for now.', text: 'No special rules.', iceOff: true,
       iceShort: 'Hail from round 2. An ice altar rises on even rounds.', iceText: 'Every fight from round 2: a hailstorm drops 10 hail tiles in the storm band (no man’s land at first); units standing in hail take 20 damage per second. Even rounds: the altar of ice rises in the middle of the board. Tap it to buy ice walls for your tower, push the storm band toward your opponent, or summon a Snowgre.', ice: true },
-    { id: 'testgrid', name: 'Test Grid', short: 'A bigger board: each zone is 14 by 7 tiles.', text: 'Bigger board. A treasury pays 50 gold per fight it survives.', plain: true, skins: true, grid: { cols: 14, rows: 18, zone: 7 }, pointMirror: true, treasury: true,
+    { id: 'testgrid', name: 'Standard', short: 'A bigger board: each zone is 14 by 7 tiles.', text: 'Bigger board. A treasury pays 50 gold per fight it survives.', plain: true, skins: true, grid: { cols: 14, rows: 18, zone: 7 }, pointMirror: true, treasury: true,
       rangeAdd: 2, rangeAddMin: 5, slowSteps: [[3, 0.2], [5, 0.2]], tuneKeep: ['Shiv', 'Water Mage'] }, // only when picked, never random
     // the Test Grid's board and rules, with two rivers and a raised bridge between them across no man's land
     editorMap('bridge', EDITOR_MAPS.bridge, { name: 'Bridge', short: 'Hold the raised bridge between two rivers for 50 gold. High ground shoots further and harder.', text: 'Two rivers nobody can wade across, a raised bridge between them. Hold the bridge with more units than your opponent for 5 seconds in a row to win it: +50 gold. From higher ground: +1 m range and +2% damage per level above the target, as much less shooting uphill. A treasury pays 50 gold per fight it survives.',
