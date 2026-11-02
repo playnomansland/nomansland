@@ -9,7 +9,9 @@
 //   GET /tour/<CODE>       -> WebSocket into the tournament for that code (TourRoom: the server keeps the tournament)
 //   GET /history?limit=&before= -> saved rounds of server matches, newest first, paged (HistoryRoom, step 4)
 //   GET /history/<MATCH>   -> one match's rounds (<ROOM>-<seed>, or a bare room code for that room's newest match)
+//   POST /account/<route>  -> accounts (step 5; guest, me, google, tag, signout, delete): see accounts.js
 import { json } from './limits.js';
+import { handleAccount } from './accounts.js';
 import { VERSION } from './version.js';
 export { Room } from './room.js';
 export { TourRoom } from './tour.js';
@@ -27,6 +29,13 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const cors = allowedOrigin(request, env) ? { 'access-control-allow-origin': request.headers.get('Origin'), vary: 'Origin' } : {};
+    if (url.pathname.startsWith('/account/')) {
+      // Only the game's own pages; the session token goes in the Authorization header, so browsers ask first (OPTIONS).
+      if (!allowedOrigin(request, env)) return json({ error: 'origin' }, 403);
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { ...cors,
+        'access-control-allow-methods': 'POST', 'access-control-allow-headers': 'authorization, content-type', 'access-control-max-age': '600' } });
+      return handleAccount(request, env, cors);
+    }
     if (request.method !== 'GET') return json({ error: 'method' }, 405);
 
     if (url.pathname === '/') {

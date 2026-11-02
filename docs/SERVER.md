@@ -16,7 +16,7 @@ Started 2026-11-02. The website stays on GitHub Pages; the server only handles o
 2. Tournaments on the server (live since 2026-11-02): `TourRoom` (`server/src/tour.js`) keeps each tournament in its own storage and runs `Tour.apply` for the organizer. Organizer and players each get a secret key; ids are public, keys never are. Bot-vs-bot matches are played by the server. Tournaments are deleted when ended or after 14 days untouched. Matches themselves are still phone-to-phone (step 3). Old tournament history is not carried over.
 3. Server as referee (live since 2026-11-02): `Room` (`server/src/room.js`) keeps each live match; the rules are `src/referee.js` (shared with the page and node tests). Phones send actions (`{ t: 'act', seq, fn, a }`: a Game function from `Referee.ACTIONS` and its arguments), never their gold or army. The Room runs them through the same Game functions (which check gold, tiles and unlocks), on that player's side only, only while deploying and before Ready, and acks each with a fingerprint of that side. It runs the deploy clock (alarms), the fight and the round flow, and sends each phone only its view (`Referee.view`). A friend's match: the phone that makes it is side 0 (`hello { create }`), the friend side 1, each with a secret key for reconnects. A tournament match (`/room/<CODE>?t=<T>`): `TourRoom.matchFor` checks the player's tournament key and says the side; the Room reports the result with `TourRoom.serverResult` (Durable Object RPC), and phones' own reports are ignored. Matches are deleted after a day untouched. PeerJS stays as a fallback (Factions, Counter Lab units, a tournament's `net: 'peer'` setting, and when the server can't be reached) until a tournament has run on the server.
 4. Match history on the server (built 2026-11-02): the server saves every round of every server match itself; the phones no longer post server matches to the Google Sheet (the Sheet is exported and kept as an archive). Details below.
-5. Accounts (below). 6. Ranked (below).
+5. Accounts (built 2026-11-02, switched off until the D1 database is bound; details below). 6. Ranked (below).
 
 ## Match history (step 4)
 
@@ -48,13 +48,29 @@ Added when the player count calls for it (no redesign needed):
 
 ## Accounts (step 5)
 
+The idea:
+
 - Play as a guest first: the phone gets a random player id from the server and a gamertag. No sign-up needed to try the game.
 - One tap to keep it: "Sign in with Google" (and "Sign in with Apple", which the App Store requires when an iPhone app offers Google sign-in). Later maybe Discord.
-- The player's id is our own; Google/Apple are just keys linked to it. Signing in on a new phone finds the same player. A guest who signs in keeps their history.
+- The player's id is our own; Google/Apple are just keys linked to it. Signing in on a new phone finds the same player. A guest who signs in keeps their id and gamertag.
 - The server checks Google's and Apple's signed tokens itself, then gives the phone its own session (expires, can be revoked). No passwords stored by us.
-- Accounts and sessions go in a Cloudflare D1 database (SQL, also on the free plan); matches and tournaments stay in their Rooms.
-- Needed from Vilhelm then: a Google Cloud OAuth client id (free) and, for the iPhone app, an Apple Developer account.
 - Account deletion removes the login and personal data; past match results stay with an anonymous name.
+
+Built 2026-11-02 (`server/src/accounts.js`, routes in `server/src/index.js`):
+
+- Storage: the D1 database `nml-accounts`, bound as `ACCOUNTS`. The block in `server/wrangler.toml` stays commented out until the database exists; until then every `/account/*` route answers 503 `accounts off` and nothing else changes. The Worker makes its own tables (`CREATE TABLE IF NOT EXISTS`, once per isolate), so no migration step is needed in the deploy.
+- Routes, all `POST` with a JSON body (8 KB at most), the same origin check as the rooms, and a preflight answer for the Authorization header:
+  - `/account/guest { tag? }` -> `{ player, session }`. A new player `p` + 16 hex digits, gamertag `Guest NNNN` unless one is given.
+  - `/account/google { credential }` -> `{ player, session, linked }`. Verifies Google's ID token: RS256 signature against Google's published keys (cached by their max-age, refetched once for an unknown key id), audience = `GOOGLE_CLIENT_ID`, issuer, expiry (1 minute leeway), not issued in the future. `linked` is `existing` (that Google account's player, on any phone), `guest` (the signed-in guest gets the login and keeps id and gamertag) or `new`. The session that made the call ends either way.
+  - `/account/me` -> `{ player, session? }`, `/account/tag { tag }`, `/account/signout { all? }`, `/account/delete`. These need `Authorization: Bearer <session>`.
+- Gamertags: 2-16 letters (any language), digits, space, `_ . -`. Not unique.
+- Sessions: 32 random bytes; the phone keeps the token (`phonebellum.account.v1`), the server only its SHA-256. 30 days from the last rotation; `/account/me` rotates a session older than a day and leaves the old token working for 5 minutes. At most 10 per player (the oldest go). Tokens only in the Authorization header, never in URLs or logs.
+- Limits per IP (the IP kept only as a hash, for the length of the window): 20 guest requests an hour, 30 Google sign-ins per 10 minutes, 120 other calls a minute. A tournament on one wifi stays well inside these.
+- What is stored: `players` (id, gamertag, created, last seen, deleted), `logins` (provider, Google's subject id, player), `sessions` (token hash, player, created, expires), `hits` (rate-limit counters). No email, name or picture from Google. Deleting an account removes its logins and sessions and blanks the gamertag; the id stays as a tombstone so past results can point at an anonymous player. Account rows have no expiry; sessions end after 30 days.
+- The page: Account on the start screen (`openAccountSheet` in `src/site-template.html`). Nothing is created until the player taps Play as a guest or signs in. Google's script (`accounts.google.com/gsi/client`) is loaded only when the sheet opens and `GOOGLE_CLIENT_ID` is set in the page.
+- Not yet (after the 2026-11-08 tournament): tournament players and match history rows linked to player ids, so a player's history follows the account. A guest who signs in to a Google account that already has a player becomes that player; the old guest is left as it is (it has no history to move yet).
+- Tests: `server/test/accounts.test.js` (in `npm test`; signs its own Google-style tokens against a local key server, checks every route, rotation, limits and refusals) and `node tools/tests/account-ui.js` (the sheet in the browser with a fake Google button; needs `python3 -m http.server 8766`). Both run against a local D1 database (`server/test/accounts-env.js`).
+- To switch on: create the D1 database `nml-accounts` and give the deploy token Account / D1 / Edit; put the database id in the `[[d1_databases]]` block and uncomment it; put the Google OAuth client id in `[vars]` as `GOOGLE_CLIENT_ID` and in the page's `GOOGLE_CLIENT_ID`.
 
 ## Ranked (later)
 

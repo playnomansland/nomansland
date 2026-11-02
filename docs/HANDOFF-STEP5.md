@@ -4,6 +4,17 @@ Written 2026-11-02 at the end of step 4. Read this, then `docs/SERVER.md` (the p
 
 Repo: snetendare/phone-bellum, push to main. Server: https://nml-server.nomansland.workers.dev (Cloudflare Workers + Durable Objects), deployed by `.github/workflows/server-deploy.yml` on push to main once the tests pass. Vilhelm wants plain-text replies with no bold, and direct answers.
 
+## Status (end of 2026-11-02 session)
+
+Stages 1 and 2 are built, tested and pushed; accounts are switched off on the live server until Vilhelm's setup is done. Details: docs/SERVER.md, "Accounts (step 5)".
+
+- Decisions (Vilhelm): D1 for accounts; tournaments and history do not use player ids before Sunday.
+- Server: `server/src/accounts.js` (guest, google, me, tag, signout, delete), routed in `server/src/index.js`. No D1 binding = 503 'accounts off'. Nothing in room.js, tour.js, referee.js, tournament.js or the page's 'net' mode was touched.
+- Page: Account button on the start screen, `openAccountSheet` and `GOOGLE_CLIENT_ID` (empty) in `src/site-template.html`.
+- Tests: `server/test/accounts.test.js` (in npm test), `tools/tests/account-ui.js`, shared setup `server/test/accounts-env.js` (local D1 via a config copy in `server/.wrangler/accounts-test.toml`, local key server, `idToken()`).
+- Waiting on Vilhelm (asked 2026-11-02): the D1 database id, D1 Edit on the deploy token, the Google OAuth client id. Then: uncomment and fill the `[[d1_databases]]` block, add `GOOGLE_CLIENT_ID` to `[vars]` and to the page, push, and check `/account/guest` from the live page (WebFetch can't, it has no game Origin). The accounts tests then use the real block's binding locally (accountsConfig() skips the copy).
+- Next (stage 3, after Sunday 2026-11-08): tournament joins and match history rows carry the player id; history per player.
+
 ## Hard rule this week
 
 There is a real tournament on Sunday 2026-11-08 on server matches. Nothing that changes match play may be deployed after Saturday 2026-11-07: `src/referee.js`, the Room's act/ready/fight flow (`server/src/room.js`), the page's 'net' mode, and the tournament flow (`server/src/tour.js`, `src/tournament.js`). Accounts must be built beside them, not inside them, until after Sunday. If a step 5 change needs to touch any of these, do it after the tournament, or keep it behind a switch that is off and leaves today's code path unchanged.

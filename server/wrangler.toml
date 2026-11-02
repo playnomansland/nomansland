@@ -22,6 +22,14 @@ class_name = "TourRoom"
 name = "HISTORY"
 class_name = "HistoryRoom"
 
+# Accounts (step 5): a D1 database. Until this block is filled in and uncommented, /account/* answers 503
+# 'accounts off' and nothing else changes. The tables are made by the Worker itself (accounts.js, ensureSchema).
+# test/accounts.test.js adds a local copy of this block by itself when it is still commented out.
+# [[d1_databases]]
+# binding = "ACCOUNTS"
+# database_name = "nml-accounts"
+# database_id = "<id from the Cloudflare dashboard>"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
