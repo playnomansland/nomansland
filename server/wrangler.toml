@@ -5,7 +5,7 @@ compatibility_date = "2026-10-01"
 
 # Pages that may open a connection. Anything else is turned away.
 [vars]
-ALLOWED_ORIGINS = "https://snetendare.github.io,https://nomansland.github.io,http://localhost:8766,http://127.0.0.1:8766,http://localhost:8787"
+ALLOWED_ORIGINS = "https://snetendare.github.io,https://playnomansland.github.io,http://localhost:8766,http://127.0.0.1:8766,http://localhost:8787"
 
 # One Room per match code. SQLite-backed, so it works on the Free plan.
 [[durable_objects.bindings]]
