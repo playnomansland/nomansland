@@ -51,29 +51,31 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 9 * 60 *
     const m = local(view);
     let seq = ws.seq || 0;
     for (const a of Bot.deploy(m, side, { r })) {
-      await sleep(5);
+      await sleep(75); // a real tap pace: the room allows 150 messages per 10 s and drops a phone that sends more
       ws.json({ t: 'act', seq: ++seq, fn: a.fn, a: a.a });
       const ack = await waitFor(() => ws.inbox.find((x) => x.t === 'ack' && x.seq === seq), 20000);
       if (!ack.ok) break;
     }
     ws.seq = seq;
   }
-  // plays one game of the series (both phones already in deploy of round 1); returns the last fight message
-  async function playGame(a, b, seed) {
+  // plays one game of the series (both phones already in deploy of round 1); only `builder` (0 or 1) deploys an army,
+  // so it wins, and the games stay short. Returns the last fight message.
+  async function playGame(a, b, seed, builder) {
     const r = Bot.rng(seed);
     const nF = (s) => s.inbox.filter((x) => x.t === 'fight').length;
-    const startA = nF(a);
+    const [ws, side] = builder === 0 ? [a, 0] : [b, 1];
     for (let round = 1; round < 40; round++) {
       const before = nF(a); // counted before deploying: on a slow machine the round's clock may run out and the server fights by itself
-      const va = await syncOf(a, (x) => x.phase === 'deploy' && x.round === round && a.inbox.indexOf(x) >= a.gameStart);
-      await deploySide(a, 0, va.m, r);
-      b.json({ t: 'sync' }); await sleep(60);
-      const vb = await syncOf(b, (x) => x.phase === 'deploy' && x.round === round && b.inbox.indexOf(x) >= b.gameStart);
-      await deploySide(b, 1, vb.m, r);
+      const v = await syncOf(ws, (x) => x.phase === 'deploy' && x.round === round && ws.inbox.indexOf(x) >= ws.gameStart);
+      await deploySide(ws, side, v.m, r);
       a.json({ t: 'ready', v: true }); b.json({ t: 'ready', v: true });
-      const f = await waitFor(() => nF(a) > before && a.inbox.filter((x) => x.t === 'fight').pop(), 60000);
+      const f = await waitFor(() => nF(a) > before && a.inbox.filter((x) => x.t === 'fight').pop(), 60000).catch((e) => {
+        const tail = (w) => w.inbox.slice(-6).map((x) => x.t + (x.phase ? ':' + x.phase : '') + (x.round ? ':r' + x.round : '') + (x.ready ? ':ready' + JSON.stringify(x.ready) : '') + (x.t === 'ack' ? ':' + x.ok + ':' + x.why : '') + (x.held ? ':held' + x.held : '') + (x.remaining ? ':rem' + x.remaining : ''));
+        console.log('stuck in round', round, 'builder', builder, 'sockets', a.readyState, b.readyState, 'a:', tail(a), 'b:', tail(b));
+        throw e;
+      });
       await waitFor(() => nF(b) > before, 30000).catch(() => waitFor(() => nF(b) >= nF(a), 30000));
-      if (f.post.over) { assert.ok(nF(a) > startA); return f; }
+      if (f.post.over) return f;
       a.json({ t: 'next', round: f.summary.round }); b.json({ t: 'next', round: f.summary.round });
     }
     throw new Error('game did not end');
@@ -148,15 +150,15 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 9 * 60 *
     assert.ok(!v1.m.packages[0].some((p) => p.char === 'blixten'), 'never Blixten');
     assert.ok(!(v1.m.offUnits || []).length, 'every unit');
 
-    let games = 0, f;
-    for (; games < 3; games++) {
-      if (games) {
-        mark(a, b);
-        a.json({ t: 'rematch' }); b.json({ t: 'rematch' });
-      }
-      f = await playGame(a, b, 7 + games);
-      assert.strictEqual(f.ranked.games, games + 1, 'the game is counted');
-      if (f.ranked.done) break;
+    // game 1 to Alpha, game 2 to Bravo (1-1: the score must carry over), game 3 to Alpha (2-1)
+    let f;
+    for (const [g, builder] of [[0, 0], [1, 1], [2, 0]].entries()) {
+      if (g) { mark(a, b); a.json({ t: 'rematch' }); b.json({ t: 'rematch' }); }
+      f = await playGame(a, b, 7 + g, builder[1]);
+      assert.strictEqual(f.ranked.games, g + 1, 'the game is counted');
+      assert.strictEqual(f.post.winner, builder[1], `game ${g + 1} goes to the side that built an army`);
+      assert.deepStrictEqual(f.ranked.wins, [[1, 0], [1, 1], [2, 1]][g], `the score after game ${g + 1}`);
+      assert.strictEqual(f.ranked.done, g === 2, 'decided after game 3');
     }
     const rk = f.ranked;
     assert.ok(rk.done, 'decided within 3 games');
