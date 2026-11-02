@@ -16,9 +16,10 @@ const a=byName.get(nameA),b=byName.get(nameB);
 if(!a||!b) throw new Error('Unknown matchup unit: '+(!a?nameA:nameB));
 const settings={...Game.SETTINGS,...roster.settings,bounds:{x0:-36,x1:36,y0:-48,y1:48}};
 let steps=0;
+const profileCounters={validTargetsCalls:0,validTargetsBodiesScanned:0,validTargetsCandidates:0};
 const started=performance.now();
-// Same battle entry point used by Engine.matrix; progress callback only observes completed steps.
-const result=Engine.battle(a,b,settings,{progressEvery:1,onProgress:p=>{steps=p.steps;}});
+// Same battle entry point used by Engine.matrix. Sparse progress callbacks avoid per-step profiler overhead.
+const result=Engine.battle(a,b,settings,{progressEvery:100,profileCounters,onProgress:p=>{steps=p.steps;}});
 const elapsedMs=performance.now()-started;
 const hash=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 process.stdout.write(JSON.stringify({
@@ -26,5 +27,6 @@ process.stdout.write(JSON.stringify({
  runtime:{node:process.version,platform:process.platform,arch:process.arch},
  settings:{dt:settings.dt,timeCap:settings.timeCap,budget:settings.budget},
  fingerprints:{engine:hash('src/engine.js'),game:hash('src/game.js'),roster:hash('src/default-roster.json')},
- execution:{steps,simulationSeconds:result.time,elapsedMs:Number(elapsedMs.toFixed(3)),msPerStep:steps?Number((elapsedMs/steps).toFixed(3)):null,winner:result.winner,timeout:result.timeout,survivors:result.survivors,finalBodies:result.counts}
+ execution:{steps,simulationSeconds:result.time,elapsedMs:Number(elapsedMs.toFixed(3)),msPerStep:steps?Number((elapsedMs/steps).toFixed(3)):null,winner:result.winner,timeout:result.timeout,survivors:result.survivors,finalBodies:result.counts},
+ targetingProfile:{...profileCounters,scansPerStep:steps?Number((profileCounters.validTargetsBodiesScanned/steps).toFixed(2)):null,candidatesPerCall:profileCounters.validTargetsCalls?Number((profileCounters.validTargetsCandidates/profileCounters.validTargetsCalls).toFixed(2)):null}
 },null,2)+'\n');
