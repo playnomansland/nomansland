@@ -781,6 +781,7 @@ const Engine = (() => {
       if (v.u.structure && v.u.teleport && !v.teleported) {
         v.teleported = true; v.alive = true; v.hp = 1; v.diedTick = undefined; v.poison = null; v.bleed = null;
         v.x = v.u.teleport.x; v.y = v.u.teleport.y;
+        invalidateTargetIndex();
         return;
       }
       // a lesser building (Factions devtest) doesn't cripple its side. The penalty starts with the next tick, so the
@@ -805,6 +806,7 @@ const Engine = (() => {
           const [ox, oy] = SPAWN_SPOTS[k++ % SPAWN_SPOTS.length], fwd = v.side === 0 ? 1 : -1;
           r.boarded = false; r.alive = true; r.carrier = null;
           r.x = v.x + ox * g.spacing * 0.5; r.y = v.y + oy * fwd * g.spacing * 0.5;
+          invalidateTargetIndex();
         }
       }
       // Spawn on death: new bodies take its place (they join at the end of this tick).
@@ -891,6 +893,7 @@ const Engine = (() => {
     // to it and hit it.
     const barriers = all.filter(b => b.u.barrier > 0);
     const halfX = (w) => w.u.barrier, halfY = (w) => w.u.barrierY > 0 ? w.u.barrierY : w.u.barrier;
+    const maxTargetBarrierRadius = (side) => { let r = 0; for (const w of sides[side]) if (w.u.barrier > 0) r = Math.max(r, hyp(halfX(w), halfY(w))); return r; };
     const gap = (f, b) => f.u.barrier > 0 ? hyp(Math.max(0, Math.abs(f.x - b.x) - halfX(f)), Math.max(0, Math.abs(f.y - b.y) - halfY(f))) : dist(f, b);
     // the first enemy wall a shot from a to v would run into (not v itself), or null
     function wallBetween(a, v) {
@@ -1534,6 +1537,46 @@ const Engine = (() => {
       if (v.alive && poolHp(v) < before) bleedOn(p.owner, v, p.bleed); // a shield or a dodge stops the bleed too
     }
 
+    // Experimental broad-phase target index. Exact targeting filters remain in validTargets.
+    // Rebuilt at the start of each attack phase; exceptional in-phase target movement invalidates it.
+    const TARGET_CELL = 8;
+    let targetIndex = null;
+    let targetIndexDirty = true;
+    function invalidateTargetIndex() { targetIndexDirty = true; }
+    function buildTargetIndex() {
+      const bySide = [new Map(), new Map()];
+      const order = [new Map(), new Map()];
+      for (let side = 0; side < 2; side++) {
+        const bodies = sides[side];
+        for (let i = 0; i < bodies.length; i++) {
+          const body = bodies[i];
+          order[side].set(body, i);
+          const cx = Math.floor(body.x / TARGET_CELL), cy = Math.floor(body.y / TARGET_CELL);
+          const key = cx + ',' + cy;
+          let bucket = bySide[side].get(key);
+          if (!bucket) bySide[side].set(key, bucket = []);
+          bucket.push(body);
+        }
+      }
+      targetIndex = { bySide, order };
+      targetIndexDirty = false;
+    }
+    function indexedTargets(side, x, y, radius) {
+      if (!targetIndex || targetIndexDirty) buildTargetIndex();
+      const buckets = targetIndex.bySide[side], found = [], seen = new Set();
+      const minX = Math.floor((x - radius) / TARGET_CELL), maxX = Math.floor((x + radius) / TARGET_CELL);
+      const minY = Math.floor((y - radius) / TARGET_CELL), maxY = Math.floor((y + radius) / TARGET_CELL);
+      for (let cy = minY; cy <= maxY; cy++) for (let cx = minX; cx <= maxX; cx++) {
+        const bucket = buckets.get(cx + ',' + cy);
+        if (!bucket) continue;
+        for (const body of bucket) if (!seen.has(body)) { seen.add(body); found.push(body); }
+      }
+      // Preserve the original sides[] order for stable-sort tie breaking.
+      const order = targetIndex.order[side];
+      found.sort((a, b) => order.get(a) - order.get(b));
+      return found;
+    }
+
     // enemies the unit may attack right now, nearest first
     function validTargets(b, caller = 'attack') {
       const valid = [];
@@ -1541,7 +1584,10 @@ const Engine = (() => {
       const callerCounters = counters && counters.byCaller && (counters.byCaller[caller] || (counters.byCaller[caller] = { calls: 0, bodiesScanned: 0, candidates: 0 }));
       if (counters) counters.validTargetsCalls++;
       if (callerCounters) callerCounters.calls++;
-      for (const f of sides[1 - b.side]) {
+      const foes = opts.targetingMode === 'indexed'
+        ? indexedTargets(1 - b.side, b.x, b.y, reachOf(b) + 4 * Math.abs(heightRange) + maxTargetBarrierRadius(1 - b.side) + 0.01)
+        : sides[1 - b.side];
+      for (const f of foes) {
         if (counters) counters.validTargetsBodiesScanned++;
         if (callerCounters) callerCounters.bodiesScanned++;
         if (!pickable(b, f)) continue;
@@ -2483,6 +2529,7 @@ const Engine = (() => {
       // wins a trade just by being processed first (side 0 used to win one-shot duels like Sniper vs Sniper); the sides
       // take turns going first (see first). Likewise a stun or slow that lands during the attacks only counts from the
       // next tick (atkStun, atkSlow: as they were when the attacks began), and heals wait for the end (healLater)
+      targetIndex = null; targetIndexDirty = true; // movement phase has finished for this tick
       const attackers = turnOrder();
       for (const b of attackers) { b.atkStun = b.stunT > 0; b.atkSlow = b.slowT > 0 ? b.slowAtk : 0; }
       healLater = [];
