@@ -1553,7 +1553,13 @@ const Engine = (() => {
         }
       }
       valid.sort((p, q) => b.u.backline ? q[0] - p[0] : p[0] - q[0]);
-      return valid.map(v => v[1]);
+      const targets = valid.map(v => v[1]);
+      // Opt-in trace for differential targeting tests. No trace allocation or ID bookkeeping
+      // occurs during normal battles.
+      if (typeof opts.onTargetQuery === 'function') {
+        opts.onTargetQuery({ attacker: b, caller, targets });
+      }
+      return targets;
     }
 
     // the enemy a body attacks: once it has picked one it stays on it until it dies, hides or leaves its reach,
