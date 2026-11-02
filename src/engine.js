@@ -893,7 +893,6 @@ const Engine = (() => {
     // to it and hit it.
     const barriers = all.filter(b => b.u.barrier > 0);
     const halfX = (w) => w.u.barrier, halfY = (w) => w.u.barrierY > 0 ? w.u.barrierY : w.u.barrier;
-    const maxTargetBarrierRadius = (side) => { let r = 0; for (const w of sides[side]) if (w.u.barrier > 0) r = Math.max(r, hyp(halfX(w), halfY(w))); return r; };
     const gap = (f, b) => f.u.barrier > 0 ? hyp(Math.max(0, Math.abs(f.x - b.x) - halfX(f)), Math.max(0, Math.abs(f.y - b.y) - halfY(f))) : dist(f, b);
     // the first enemy wall a shot from a to v would run into (not v itself), or null
     function wallBetween(a, v) {
@@ -1559,11 +1558,20 @@ const Engine = (() => {
           bucket.push(body);
         }
       }
-      targetIndex = { bySide, order };
+      const maxBarrierRadius = [0, 1].map(side => {
+        let radius = 0;
+        for (const body of sides[side]) if (body.u.barrier > 0) {
+          const hx = body.u.barrier, hy = body.u.barrierY > 0 ? body.u.barrierY : body.u.barrier;
+          radius = Math.max(radius, hyp(hx, hy));
+        }
+        return radius;
+      });
+      targetIndex = { bySide, order, maxBarrierRadius };
       targetIndexDirty = false;
     }
-    function indexedTargets(side, x, y, radius) {
+    function indexedTargets(side, x, y, reach) {
       if (!targetIndex || targetIndexDirty) buildTargetIndex();
+      const radius = reach + 4 * Math.abs(heightRange) + targetIndex.maxBarrierRadius[side] + 0.01;
       const buckets = targetIndex.bySide[side], found = [], seen = new Set();
       const minX = Math.floor((x - radius) / TARGET_CELL), maxX = Math.floor((x + radius) / TARGET_CELL);
       const minY = Math.floor((y - radius) / TARGET_CELL), maxY = Math.floor((y + radius) / TARGET_CELL);
@@ -1586,7 +1594,7 @@ const Engine = (() => {
       if (counters) counters.validTargetsCalls++;
       if (callerCounters) callerCounters.calls++;
       const foes = opts.targetingMode === 'indexed'
-        ? indexedTargets(1 - b.side, b.x, b.y, reachOf(b) + 4 * Math.abs(heightRange) + maxTargetBarrierRadius(1 - b.side) + 0.01)
+        ? indexedTargets(1 - b.side, b.x, b.y, reachOf(b))
         : sides[1 - b.side];
       for (const f of foes) {
         if (counters) counters.validTargetsBodiesScanned++;
