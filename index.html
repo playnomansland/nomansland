@@ -4314,6 +4314,10 @@ const Game = (() => {
     // deeper zones (8 rows) and only 2 rows of no man's land: the armies meet almost at once
     editorMap('rush', EDITOR_MAPS.rush, { short: 'Deep zones, only 2 rows of no man’s land: the armies meet at once.', text: 'Each zone is 14 by 8 tiles, with only 2 rows of no man’s land between them, so the armies meet almost at once. The towers stand one column further in, and the back corners are flank tiles too. A treasury pays 50 gold per fight it survives.' }), // only when picked, never random
   ];
+  // Boards only drawn, never played or picked (not in MAPS): 'duo' is two Standard boards side by side, the field of a
+  // 2v2 fight (src/duo.js). A match on it is only a picture of the fight (Duo.view).
+  const VIEW_MAPS = [{ id: 'duo', name: '2v2', short: 'Two Standard boards side by side.', text: 'Two Standard boards side by side.', plain: true, skins: true, view: true, grid: { cols: 28, rows: 18, zone: 7 } }];
+  const findMap = (id) => MAPS.find(x => x.id === id) || VIEW_MAPS.find(x => x.id === id);
   // Looks (skins) for the 3D board: a map with skins (the Standard and the Test Grid) can be played in any of them; the
   // others have their own look. Only how the board looks: the rules stay the map's. The match keeps the host's pick (m.skin).
   const SKINS = [{ id: 'meadow', name: 'Meadow' }, { id: 'autumn', name: 'Autumn' }, { id: 'snow', name: 'Snow' }, { id: 'frost', name: 'Darkwoods' }, { id: 'desert', name: 'Desert' }];
@@ -4648,7 +4652,7 @@ const Game = (() => {
     if (mp && mp.spots && mp.spots.tower[side]) return { ...mp.spots.tower[side] }; // an editor map's own tile
     return side === 1 && mp && mp.pointMirror ? { col: COLS - 1 - t.col, row: t.row } : { ...t };
   };
-  const mapOf = (m) => (m && m.map && MAPS.find(x => x.id === m.map.id)) || null;
+  const mapOf = (m) => (m && m.map && findMap(m.map.id)) || null;
   // a map's own range and speed for a unit (Test Grid): +rangeAdd m for units with rangeAddMin m of range or more, and
   // each [speed, cut] step in slowSteps the unit reaches takes cut m/s off its move speed. Units in tuneKeep keep theirs.
   function mapTuned(mp, u) {
@@ -4793,14 +4797,18 @@ const Game = (() => {
   }
   // riders follow their carrier's tile
   const syncRiders = (m, side) => { for (const s of m.armies[side]) if (isRider(s)) { const c = carrierOf(m, side, s); if (c) { s.col = c.col; s.row = c.row; } else delete s.in; } };
-  const tileToWorld = (col, row) => ({ x: (col - (COLS - 1) / 2) * TILE, y: ((ROWS - 1) / 2 - row) * TILE });
+  // XOFF: metres added to every tile's x (0 except while a 2v2 lane builds its bodies beside the other lane: see withXOff)
+  let XOFF = 0;
+  const tileToWorld = (col, row) => ({ x: (col - (COLS - 1) / 2) * TILE + XOFF, y: ((ROWS - 1) / 2 - row) * TILE });
+  // runs fn with the board shifted dx metres sideways (2v2, src/duo.js: each lane is its own match, side by side in one fight)
+  function withXOff(dx, fn) { const was = XOFF; XOFF = dx; try { return fn(); } finally { XOFF = was; } }
   const BOUNDS = { x0: -COLS * TILE / 2, x1: COLS * TILE / 2, y0: -ROWS * TILE / 2, y1: ROWS * TILE / 2 }; // the board in world metres
   // Switches the board to the grid of a match's map (or of a map id): COLS, ROWS, ZONE and what hangs on them. The
   // objects keep their identity, so everything holding them sees the new grid. Returns true when the grid changed.
   // Every exported function that takes a match calls it first (see the end of this file), so callers needn't.
   function useGrid(mOrId) {
     const id = mOrId && typeof mOrId === 'object' ? (mOrId.map && mOrId.map.id) : mOrId;
-    const mp = id ? MAPS.find(x => x.id === id) : null, g = (mp && mp.grid) || GRID;
+    const mp = id ? findMap(id) : null, g = (mp && mp.grid) || GRID;
     FLANK_SET = (mp && mp.flankSet) || null;
     if (g.cols === COLS && g.rows === ROWS && g.zone === ZONE) return false;
     COLS = g.cols; ROWS = g.rows; ZONE = g.zone;
@@ -5572,7 +5580,7 @@ const Game = (() => {
       if (zoe) for (const x of b) x.zoe = true; // for the rising-stars effect
       if (purple) for (const x of b) x.shroom = true; // for the drifting spores effect
       if (isFlank(side, sq.col, sq.row) && (sq.round === m.round || sq.movedRound === m.round)) for (const x of b) x.delay = FLANK.delay * (ch === 'wilhelm' ? CHAR.wilhelmDelay : 1); // only in its first fight
-      if (isFlank(side, sq.col, sq.row)) for (const x of b) x.march = [w.x < 0 ? 1 : -1, 0]; // a flank squad marches in toward the middle until it spots an enemy
+      if (isFlank(side, sq.col, sq.row)) for (const x of b) x.march = [w.x - XOFF < 0 ? 1 : -1, 0]; // a flank squad marches in toward the middle until it spots an enemy
       idx += b.length;
       out.push(...b);
     }
@@ -6878,7 +6886,7 @@ const Game = (() => {
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,
-    zoneRows, inZone, tileToWorld, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, resolve, aiDeploy, occupied,
+    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, resolve, aiDeploy, occupied,
     GRID, useGrid,
     DEV, CAT_NAMES, LESSER_SQ, WALL_SQ, setDevData, devBuilding, devPower, devSpell, isDev, towerUp, pickCat, devOffer, pickNow, needsDevPick, devPick, undoDevPick, devShown,
     lessersOf, placedLessers, unplacedLesser, lesserAt, lesserSpotOk, placeLesser, lesserUnit, auraFor, modUnit, powersOf, devGold, devDeploys,
@@ -7214,6 +7222,307 @@ if (typeof module !== 'undefined') module.exports = Game;
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Referee = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+// ===== 2v2 (developer test, 2026-11-02) =====
+// Two Standard boards side by side. Each board is a lane: an ordinary 1v1 match of its own (src/game.js), so deploying,
+// the shop, levels, skills, leaders and towers all work as in 1v1, and each phone plays its own lane with the usual UI.
+// The two teams are the two sides: team A is side 0 in both lanes, team B side 1.
+//
+//   seat 0 = A1 (lane 0, side 0)   seat 1 = A2 (lane 1, side 0)
+//   seat 2 = B1 (lane 0, side 1)   seat 3 = B2 (lane 1, side 1)
+//
+// The fight is one battle on the wide field: every body of both lanes, lane 0 on the left, lane 1 on the right (each
+// lane's own board shifted half a board sideways, Game.withXOff). Nothing keeps units in their lane: awareness works as
+// in any fight, so a squad near the middle can spot, walk over to and fight the other lane's enemies.
+// After the fight the result is split back by lane (squad ids of lane 1 are moved by OFF inside the battle), each lane
+// is resolved as a 1v1 round (XP, gold, streaks, treasuries ...), and the damage both lanes take comes off one shared
+// team health.
+//
+// This file also has the refereed 2v2 match (D) the game server keeps (server/src/duo.js), built from two Referee
+// lanes. Draws nothing and sends nothing: the page, the server and node tests share it.
+//   const Duo = require('./src/duo.js')   (in the page: the global Duo)
+(function (root) {
+  const G = (typeof Game !== 'undefined') ? Game : require('./game.js');
+  const E = (typeof Engine !== 'undefined') ? Engine : require('./engine.js');
+  const Ref = (typeof Referee !== 'undefined') ? Referee : require('./referee.js');
+
+  const V = 1;
+  const MAP = 'testgrid';            // both lanes are Standard boards
+  const VIEW_MAP = 'duo';            // the wide board a 2v2 fight is drawn on (Game.VIEW_MAPS)
+  const OFF = 1000000;               // lane 1's squad ids inside the fight are moved by this
+  const HP = 2 * G.START_HP;         // each team's shared health (two lanes take damage every round)
+  const BIG = 1e6;                   // a lane's health while it is resolved (the team's health is kept apart)
+  const SEATS = [{ lane: 0, side: 0 }, { lane: 1, side: 0 }, { lane: 0, side: 1 }, { lane: 1, side: 1 }];
+  const SEAT_NAMES = ['A1', 'A2', 'B1', 'B2'];
+  const seatOf = (lane, side) => SEATS.findIndex(s => s.lane === lane && s.side === side);
+  const mateOf = (seat) => seatOf(1 - SEATS[seat].lane, SEATS[seat].side);
+
+  // ----- squad ids inside the fight -----
+  const remap = (L, id) => L === 0 || typeof id !== 'number' ? id : id >= 0 ? id + OFF : id - OFF;
+  const laneOfId = (id) => id >= OFF || id <= -OFF ? 1 : 0;
+  const unmap = (id) => id >= OFF ? id - OFF : id <= -OFF ? id + OFF : id;
+
+  // how far each lane's board is moved sideways (metres): half a Standard board each way
+  function laneDx(L) { G.useGrid(MAP); return (L === 0 ? -1 : 1) * G.COLS * G.TILE / 2; }
+
+  // as Referee.fight: towers, packages, tower picks and walls nobody placed are settled first
+  function settle(m) {
+    G.ensureTower(m, 0); G.ensureTower(m, 1);
+    G.ensurePack(m, 0); G.ensurePack(m, 1);
+    G.settleTowerPicks(m);
+    G.ensureBwalls(m, 0); G.ensureBwalls(m, 1);
+  }
+
+  // The fight of two lanes (matches with units, as they stand when it begins): a steppable Engine battle on the wide
+  // field. Changes nothing. Bodies carry .lane.
+  function battle(lanes, opts = {}) {
+    const A = [], B = [], tiles = [], strikes = [], neutrals = [], charm = [{}, {}];
+    let g = null;
+    lanes.forEach((m, L) => {
+      const dx = laneDx(L);
+      G.withXOff(dx, () => {
+        const s = G.battleSetup(m);
+        if (!g) g = s.g;
+        tiles.push(...(s.opts.tiles || [])); strikes.push(...(s.opts.strikes || [])); neutrals.push(...(s.opts.neutrals || []));
+        for (const sd of [0, 1]) {
+          const c = s.opts.charm && s.opts.charm[sd];
+          if (c) for (const k in c) charm[sd][remap(L, +k)] = c[k];
+          for (const b of G.bodiesFor(m, sd)) { b.squad = remap(L, b.squad); b.lane = L; (sd === 0 ? A : B).push(b); }
+        }
+      });
+    });
+    G.useGrid(MAP);
+    const half = G.COLS * G.TILE, rows = G.ROWS * G.TILE / 2;
+    g = { ...g, bounds: { x0: -half, x1: half, y0: -rows, y1: rows } };
+    const ch = charm.map(c => Object.keys(c).length ? c : null);
+    return E.createBattle(A, B, g, { tiles, strikes, neutrals, charm: ch, terrain: null, objective: null, record: opts.record !== false });
+  }
+
+  // lane L's share of a wide fight's result, in that lane's own squad ids (as Game.resolve wants it). The winner and
+  // timeout are the whole fight's: a team wins or loses the round together.
+  function laneResult(res, L, m) {
+    const squads = {};
+    for (const k in res.squads) {
+      const q = res.squads[k];
+      if (laneOfId(q.squad) !== L) continue;
+      const id = unmap(q.squad);
+      squads[q.side + ':' + id] = { ...q, squad: id };
+    }
+    const charm = (res.charm || [null, null]).map(c => {
+      if (!c) return null;
+      const o = {};
+      for (const k in c) if (laneOfId(+k) === L) o[unmap(+k)] = c[k];
+      return Object.keys(o).length ? o : null;
+    });
+    // Mark Bounty: the whole fight says a side's Sniper took a marked squad's last body; it pays in the lane whose mark it was
+    const markKill = [0, 1].map(sd => {
+      if (!(res.markKill && res.markKill[sd])) return false;
+      const mk = G.markOf(m, sd), q = mk && squads[(1 - sd) + ':' + mk.squad];
+      return !!(q && q.alive === 0);
+    });
+    const buildings = (res.buildings || []).filter(b => laneOfId(b.squad) === L).map(b => ({ ...b, squad: unmap(b.squad) }));
+    return { ...res, squads, charm, markKill, buildings, objective: -1 };
+  }
+
+  // Plays the fight of two lanes and applies it. lanes: the two matches (changed), hp: [team A, team B] (changed).
+  // Returns { pres, posts, summaries } (snapshots before and after, each lane's summary; summary.duo has the team's).
+  function fight(lanes, hp) {
+    for (const m of lanes) settle(m);
+    const pres = lanes.map(m => Ref.snapshot(m));
+    const bt = battle(lanes, { record: false });
+    while (bt.step()) {}
+    const res = bt.result();
+    const lost = [0, 0], dmg = [0, 0], towerHp = [0, 0];
+    const summaries = lanes.map((m, L) => {
+      m.hp = [BIG, BIG];
+      const sm = G.resolve(m, laneResult(res, L, m));
+      for (const sd of [0, 1]) { lost[sd] += BIG - m.hp[sd]; dmg[sd] += sm.dmg[sd] || 0; towerHp[sd] += (sm.towerHp && sm.towerHp[sd]) || 0; }
+      return sm;
+    });
+    for (const sd of [0, 1]) hp[sd] = Math.max(0, hp[sd] - lost[sd]);
+    const over = hp[0] <= 0 || hp[1] <= 0, winner = hp[0] > 0 ? 0 : hp[1] > 0 ? 1 : -1;
+    lanes.forEach((m, L) => {
+      m.hp = hp.slice();
+      if (over) { m.over = true; m.winner = winner; }
+      const sm = summaries[L];
+      sm.duo = { lane: L, laneDmg: sm.dmg.slice(), laneTowerHp: (sm.towerHp || [0, 0]).slice(), lost: lost.slice(), hp: hp.slice(), winner: res.winner, over };
+      sm.dmg = dmg.slice(); sm.towerHp = towerHp.slice(); // the results screen shows the team's damage
+    });
+    return { pres, posts: lanes.map(m => Ref.snapshot(m)), summaries };
+  }
+
+  // A picture of the two lanes on the wide board (a match on Game's 'duo' view map), for drawing a 2v2 fight: lane 0's
+  // match with both lanes' squads (lane 1's moved COLS tiles right, ids by OFF). Snapshots in, a snapshot out.
+  function view(pres) {
+    G.useGrid(MAP);
+    const cols = G.COLS, v = JSON.parse(JSON.stringify(pres[0]));
+    v.map = { ...(v.map || {}), id: VIEW_MAP };
+    v.armies = [0, 1].map(sd => (pres[0].armies[sd] || []).map(q => ({ ...q, lane: 0 }))
+      .concat((pres[1].armies[sd] || []).map(q => ({ ...q, col: q.col + cols, id: remap(1, q.id), lane: 1 }))));
+    v.duo = true;
+    return v;
+  }
+
+  // ===================== the refereed 2v2 match (the game server keeps it) =====================
+  // D: { v, settings, phase: 'lobby' | 'deploy' | 'result' | 'end', lanes: [R, R] (Referee lanes), bots: [b x4],
+  //      hp: [team A, team B], ready, nextReady, rematch, away: [x4], deadline, held, summary: [lane 0's, lane 1's],
+  //      fights, seed, forfeit (the seat that left, or null) }
+  // A seat's actions go through its lane's Referee (the very same checks as 1v1); the clock, Ready and the fight are
+  // the whole match's. Times are passed in (now).
+  const AWAY_MAX_MS = Ref.AWAY_MAX_MS, GRACE_MS = Ref.GRACE_MS, MIN_LEFT_MS = 10000;
+
+  function create(settings, units) {
+    const s = Ref.cleanSettings({ ...(settings || {}), map: MAP }, units);
+    s.map = MAP;
+    return { v: V, settings: s, phase: 'lobby', lanes: [null, null], bots: [false, false, false, false], hp: [HP, HP],
+      ready: [false, false, false, false], nextReady: [false, false, false, false], rematch: [false, false, false, false],
+      away: [0, 0, 0, 0], deadline: 0, held: 0, summary: null, fights: 0, seed: 0, forfeit: null };
+  }
+  const laneOf = (D, seat) => D.lanes[SEATS[seat].lane];
+  const deployMsOf = (D) => (D.lanes[0].m.round === 1 ? D.settings.deploy1 : D.settings.deploy) * 1000;
+  const humans = (D) => [0, 1, 2, 3].filter(k => !D.bots[k]);
+  const picksPending = (D) => humans(D).some(k => G.needsTowerPick(laneOf(D, k).m, SEATS[k].side));
+  const someoneAway = (D, now) => humans(D).some(k => D.away[k] && now - D.away[k] < AWAY_MAX_MS);
+  // each lane's own referee state follows the match's (its act checks phase, Ready and the deadline)
+  function mirror(D) {
+    for (const R of D.lanes) {
+      if (!R) continue;
+      R.phase = D.phase; R.deadline = D.deadline; R.held = D.held;
+      R.ready = [0, 1].map(sd => !!D.ready[seatOf(D.lanes.indexOf(R), sd)]);
+      R.summary = D.summary ? D.summary[D.lanes.indexOf(R)] : null;
+    }
+  }
+  function clock(D, now) {
+    if (D.phase !== 'deploy') { D.deadline = 0; D.held = 0; mirror(D); return; }
+    const stop = picksPending(D) || someoneAway(D, now);
+    if (stop && D.deadline) { D.held = Math.max(MIN_LEFT_MS / 2, D.deadline - now); D.deadline = 0; }
+    else if (!stop && !D.deadline) { D.deadline = now + Math.max(MIN_LEFT_MS, D.held || deployMsOf(D)); D.held = 0; }
+    mirror(D);
+  }
+  // a bot's turn at the start of a round: package, tower pick and squads (it levels up when the fight begins)
+  function botTurn(D, seat) {
+    const R = laneOf(D, seat), m = R.m, sd = SEATS[seat].side;
+    if (G.needsPack(m, sd)) G.choosePack(m, sd, Math.floor(Math.random() * m.packages[sd].length));
+    if (G.needsTowerPick(m, sd)) { const ch = G.towerChoices(m, sd); G.setTowerType(m, sd, ch[Math.floor(Math.random() * ch.length)].id); }
+    G.aiDeploy(m, sd);
+  }
+  function beginRound(D, now) {
+    D.phase = 'deploy';
+    D.ready = D.bots.slice(); D.nextReady = [false, false, false, false]; D.rematch = [false, false, false, false];
+    for (const R of D.lanes) {
+      R.round = R.m.round; R.nextReady = [false, false]; R.rematch = [false, false]; R.undo = [null, null];
+      R.base = { gold: R.m.gold.slice(), nextId: R.m.nextId.slice() };
+    }
+    for (let k = 0; k < 4; k++) if (D.bots[k]) botTurn(D, k);
+    D.deadline = 0; D.held = deployMsOf(D);
+    clock(D, now);
+  }
+  // a new match (the lobby's Start, or a rematch). bots: the seats nobody sits in.
+  function start(D, units, matrix, now, seed, bots) {
+    if (bots) D.bots = bots.slice(0, 4).map(Boolean);
+    D.seed = seed >>> 0;
+    D.lanes = [0, 1].map(L => {
+      const R = Ref.create(D.settings, units);
+      R.settings = D.settings;
+      Ref.start(R, units, matrix, now, (D.seed + L * 0x9e3779b1) >>> 0);
+      return R;
+    });
+    D.hp = [HP, HP];
+    for (const R of D.lanes) R.m.hp = D.hp.slice();
+    D.summary = null; D.fights = 0; D.forfeit = null;
+    beginRound(D, now);
+    return true;
+  }
+  const canAct = (D, seat) => D.phase === 'deploy' && !D.ready[seat] && !D.lanes[0].m.over;
+  // one action from a seat (as Referee.act: { seq, fn, a }). Returns { ok, h, why }.
+  function act(D, seat, d, now) {
+    const R = laneOf(D, seat), sd = SEATS[seat].side;
+    mirror(D);
+    if (!canAct(D, seat)) {
+      const seq = Number.isInteger(d && d.seq) ? d.seq : 0;
+      if (seq > R.seq[sd]) R.seq[sd] = seq;
+      return { ok: false, why: D.ready[seat] ? 'ready' : 'phase' };
+    }
+    const r = Ref.act(R, sd, d, now);
+    clock(D, now); // a tower pick may let the clock start (Referee.act only looks at its own lane)
+    return r;
+  }
+  function setReady(D, seat, v, now) {
+    if (D.phase !== 'deploy' || D.lanes[0].m.over || (D.deadline && now > D.deadline + GRACE_MS)) return null;
+    D.ready[seat] = !!v; mirror(D);
+    return D.ready.every(Boolean) ? runFight(D, now) : null;
+  }
+  function runFight(D, now) {
+    if (D.phase !== 'deploy') return null;
+    for (let k = 0; k < 4; k++) if (D.bots[k]) G.aiLevel(laneOf(D, k).m, SEATS[k].side);
+    const f = fight(D.lanes.map(R => R.m), D.hp);
+    D.fights++;
+    for (const R of D.lanes) R.fights = D.fights;
+    D.summary = f.summaries;
+    D.phase = D.lanes[0].m.over ? 'end' : 'result';
+    D.ready = [false, false, false, false]; D.rematch = [false, false, false, false];
+    D.nextReady = [0, 1, 2, 3].map(k => D.bots[k] || !!D.away[k]); // bots, and players who are away, move on by themselves
+    D.deadline = 0; D.held = 0;
+    mirror(D);
+    return f;
+  }
+  function tick(D, now) {
+    if (D.phase === 'deploy') {
+      clock(D, now);
+      if (D.deadline && now >= D.deadline + GRACE_MS) return runFight(D, now);
+    }
+    return null;
+  }
+  function due(D, now) {
+    if (D.phase !== 'deploy') return 0;
+    if (D.deadline) return D.deadline + GRACE_MS;
+    const left = humans(D).filter(k => D.away[k]).map(k => D.away[k] + AWAY_MAX_MS).filter(t => t > now);
+    return left.length ? Math.min(...left) + 50 : 0;
+  }
+  function next(D, seat, round, now) {
+    if (D.phase !== 'result' || !D.summary || round !== D.summary[0].round) return false;
+    D.nextReady[seat] = true;
+    if (D.nextReady.every(Boolean)) { beginRound(D, now); return true; }
+    return false;
+  }
+  function rematch(D, seat, units, matrix, now, seed) {
+    if (D.phase !== 'end') return false;
+    D.rematch[seat] = true;
+    if (humans(D).every(k => D.rematch[k])) return start(D, units, matrix, now, seed);
+    return false;
+  }
+  // a player leaves: their team loses
+  function forfeit(D, seat) {
+    if (D.phase === 'lobby' || D.phase === 'end' || !D.lanes[0] || D.lanes[0].m.over) return false;
+    const sd = SEATS[seat].side;
+    D.hp[sd] = 0;
+    for (const R of D.lanes) { R.m.over = true; R.m.winner = 1 - sd; R.m.hp = D.hp.slice(); }
+    D.phase = 'end'; D.deadline = 0; D.held = 0; D.forfeit = seat;
+    for (const R of D.lanes) R.forfeit = sd;
+    mirror(D);
+    return true;
+  }
+  function setAway(D, seat, away, now) {
+    D.away[seat] = away ? (D.away[seat] || now) : 0;
+    if (away && D.phase === 'result') { D.nextReady[seat] = true; if (D.nextReady.every(Boolean)) { beginRound(D, now); return true; } }
+    clock(D, now);
+    return false;
+  }
+  // what one seat sees: its own lane as in 1v1 (m), and its teammate's lane as their team sees it (mate)
+  function viewFor(D, seat) {
+    const own = SEATS[seat], R = D.lanes[own.lane], O = D.lanes[1 - own.lane], deploy = D.phase === 'deploy';
+    return { m: Ref.view(R.m, own.side, deploy, R.base), mate: Ref.view(O.m, own.side, deploy, O.base) };
+  }
+  const save = (D) => ({ ...D, lanes: D.lanes.map(R => R ? Ref.save(R) : null) });
+  const load = (o, units, matrix) => o && o.v === V ? { ...o, lanes: (o.lanes || [null, null]).map(R => R ? Ref.load(R, units, matrix) : null) } : null;
+
+  const api = {
+    V, MAP, VIEW_MAP, OFF, HP, SEATS, SEAT_NAMES, seatOf, mateOf, remap, unmap, laneOfId, laneDx, settle, battle, laneResult, fight, view,
+    create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, viewFor, clock, canAct, save, load, humans,
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  root.Duo = api;
 })(typeof window !== 'undefined' ? window : globalThis);
 
 // Tournaments: players, pairings, results and standings. Draws nothing and sends nothing (the page does that), so
@@ -7851,9 +8160,11 @@ const Art = (() => {
 // colour and how strongly the zones are tinted on a painted floor.
 const Render2D = (cv, view, opts = {}) => {
   let ctx = cv.getContext('2d'); // swapped for a moment while drawing map thumbnails (thumb)
-  let m = null, me = 0, phase = 'start', units = [], mode = 'ai', bt = null, battlePre = null, fx = [], battleCam = null;
+  let m = null, me = 0, phase = 'start', units = [], mode = 'ai', bt = null, battlePre = null, fx = [], battleCam = null, win = null;
   let selected = null, moving = null, drag = null, hoverTile = null, rangeOf = null, editable = false, placingUnit = null, placingElf = false, placingTower = false, placingWall = false, dev = null, placingBuilding = null;
-  const pull = () => { ({ m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf, editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev } = view()); };
+  const pull = () => { ({ m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf, editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev, win = null } = view()); };
+  // win (a 2v2 fight on a phone): { aspect, cols, x } the canvas is shaped for `aspect` columns, shows `cols` of them
+  // (zoomed out up to the whole wide board) and starts at screen column x; the board sits in the middle top to bottom
   const foe = () => 1 - me;
   const css = Art.css, tag = Shapes.tag;
   const { ELF_COL, SHROOM_COL, CHARM_COL, BLEED_COL, POOL_COL, FROST_COL, GLUT_COL } = Art;
@@ -7861,7 +8172,8 @@ const Render2D = (cv, view, opts = {}) => {
   function size() {
     const r = cv.getBoundingClientRect();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    W = r.width; H = W * Game.ROWS / Game.COLS;
+    pull();
+    W = r.width; H = W * Game.ROWS / (win ? win.aspect : Game.COLS);
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     S = W / (Game.COLS * Game.TILE);
@@ -8292,6 +8604,12 @@ const Render2D = (cv, view, opts = {}) => {
     ctx.strokeStyle = css('--you');
     ctx.beginPath(); ctx.moveTo(0, mine); ctx.lineTo(W, mine); ctx.stroke();
     ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const dv = phase === 'battle' && battlePre ? battlePre : m;
+    if (dv && dv.duo) { // a 2v2 fight: where the two boards meet
+      ctx.strokeStyle = css('--muted'); ctx.globalAlpha = 0.55; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
   }
 
   // ---------- Factions devtest: spells, arrows, the tower's tile, where things may go (on the floor, so the 3D board
@@ -9096,6 +9414,19 @@ const Render2D = (cv, view, opts = {}) => {
   }
   function draw() {
     pull();
+    if (win && m) { // a window on the wide board: draw the whole board, moved and scaled into the canvas
+      const cw = W, ch = H, s0 = S;
+      S = cw / (win.cols * Game.TILE);
+      const bw = Game.COLS * Game.TILE * S, bh = Game.ROWS * Game.TILE * S;
+      ctx.save(); ctx.fillStyle = css('--board'); ctx.fillRect(0, 0, cw, ch);
+      ctx.translate(-win.x * Game.TILE * S, Math.max(0, (ch - bh) / 2));
+      W = bw; H = bh;
+      try { drawInner(); } finally { ctx.restore(); W = cw; H = ch; S = s0; }
+      return;
+    }
+    drawInner();
+  }
+  function drawInner() {
     if (!m) { drawBoard(); return; }
     if (bt && phase === 'battle' && battleCam) { // the battle cam, zoomed in around its focus
       const fx0 = PX(battleCam.x), fy0 = PY(battleCam.y);
@@ -9110,7 +9441,11 @@ const Render2D = (cv, view, opts = {}) => {
   function tileAt(clientX, clientY) {
     pull();
     const r = cv.getBoundingClientRect();
-    const x = (clientX - r.left) / r.width * Game.COLS, y = (clientY - r.top) / r.height * Game.ROWS;
+    let x = (clientX - r.left) / r.width * Game.COLS, y = (clientY - r.top) / r.height * Game.ROWS;
+    if (win) { // the window on the wide board (see draw)
+      const t = r.width / win.cols, oy = Math.max(0, (r.height - Game.ROWS * t) / 2);
+      x = (clientX - r.left) / t + win.x; y = (clientY - r.top - oy) / t;
+    }
     const c = Math.floor(x), rw = Math.floor(y);
     if (c < 0 || rw < 0 || c >= Game.COLS || rw >= Game.ROWS) return null;
     const fx = x - c, fy = y - rw; // where in the tile (for a wall's edge), in model terms
@@ -10055,8 +10390,8 @@ Floors.floor = (() => {
   const boardView = () => ({ m: lookPre() || m || menuPre(), me, phase, units, mode, bt: lookPre() ? null : bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf,
     editable: editable(), placingUnit: placingUnit(), placingElf: placingElf(), placingTower: placingTower(), placingWall: placingWall(),
     dev: m && m.dev ? { bPlacing, castMode, guideMode, guideId: guideDrag ? guideDrag.id : guideMode !== 'pick' ? guideMode : null, guide: guideDrag ? guideDrag.pts : guideMode != null && guideMode !== 'pick' ? guideDraft : null } : null,
-    battleCam: cam && cam.k > 0 ? { zoom: 1 + (CAM.zoom - 1) * cam.k, x: cam.x, y: cam.y, k: cam.k } : null,
-    placingBuilding: placingBuilding() });
+    battleCam: cam && cam.k > 0 ? { zoom: 1 + (CAM.zoom - 1) * cam.k, x: cam.x, y: cam.y, k: cam.k } : duoFocus(),
+    placingBuilding: placingBuilding(), win: duoWin() });
   const board = Render2D(cv, boardView);
   let board3d = null; // the 3D board when it's on (see "the 3D board" below)
   const size = () => (board3d || board).size();
@@ -10188,10 +10523,10 @@ Floors.floor = (() => {
   let gridKey = Game.COLS + 'x' + Game.ROWS;
   function syncGrid() {
     Game.useGrid(m);
-    const key = Game.COLS + 'x' + Game.ROWS;
+    const w = duoWin(), key = Game.COLS + 'x' + Game.ROWS + (w ? 'w' + w.aspect : '');
     if (key === gridKey) return;
     gridKey = key;
-    document.documentElement.style.setProperty('--board-ar', String(Game.COLS / Game.ROWS));
+    document.documentElement.style.setProperty('--board-ar', String((w ? w.aspect : Game.COLS) / Game.ROWS));
     if (board3d) { stop3d(); start3d(); } else size();
   }
   function render() {
@@ -10252,8 +10587,9 @@ Floors.floor = (() => {
     const v = phase === 'battle' && battlePre ? battlePre : m;
     const hpMe = v ? v.hp[me] : Game.START_HP, hpFoe = v ? v.hp[foe()] : Game.START_HP;
     $('hp-you').textContent = hpMe; $('hp-foe').textContent = hpFoe;
-    $('hpbar-you').style.width = (hpMe / Game.START_HP * 100) + '%';
-    $('hpbar-foe').style.width = (hpFoe / Game.START_HP * 100) + '%';
+    const hpFull = net.duo && mode === 'net' ? Duo.HP : Game.START_HP; // 2v2: the team's shared health
+    $('hpbar-you').style.width = Math.min(100, hpMe / hpFull * 100) + '%';
+    $('hpbar-foe').style.width = Math.min(100, hpFoe / hpFull * 100) + '%';
     $('round').textContent = v ? v.round : 1;
     for (const [id, sd] of [['streak-you', me], ['streak-foe', foe()]]) { // a live shutdown bounty on a win streak
       const n = v && v.streak ? v.streak[sd] || 0 : 0, el = $(id), b = Game.shutdownGold(n);
@@ -10265,8 +10601,13 @@ Floors.floor = (() => {
     // usernames and titles (2026-11-02): this phone's account, and the opponent's on a server match
     const mine = mode !== 'spec' && mode !== 'tutorial' && acct ? acct : null, theirs = foePlayer();
     const hudName = (tag, title) => `<span class="hud-tag">${esc(tag)}</span>${titleHtml(title)}`;
-    const fh = theirs ? hudName(foeName(), theirs.title) : esc(foeName());
-    const yh = mine ? hudName(mine.tag, mine.title) : esc(mode === 'spec' && tour.spec ? tour.spec.host : 'You'); // spectating: the host's side is at the bottom
+    let fh = theirs ? hudName(foeName(), theirs.title) : esc(foeName());
+    let yh = mine ? hudName(mine.tag, mine.title) : esc(mode === 'spec' && tour.spec ? tour.spec.host : 'You'); // spectating: the host's side is at the bottom
+    if (net.duo && net.duoInfo && net.duoInfo.names && mode === 'net') { // 2v2: both teams
+      const nm = net.duoInfo.names, mySd = me, seats = [0, 1, 2, 3].filter(k => Duo.SEATS[k].side === mySd), foes = [0, 1, 2, 3].filter(k => Duo.SEATS[k].side !== mySd);
+      yh = esc('You & ' + (nm[seats.find(k => k !== net.duoInfo.seat)] || 'mate'));
+      fh = esc(foes.map(k => nm[k] || Duo.SEAT_NAMES[k]).join(' & '));
+    }
     // a ranked series: the score in games, from this player's side, above the round number
     const rk = mode === 'net' && net.ranked && m ? net.ranked : null, chip = $('series-chip');
     chip.hidden = !rk;
@@ -10287,6 +10628,7 @@ Floors.floor = (() => {
   function netStatus() {
     if (solo()) { setNet(''); return; }
     if (mode === 'spec') { setNet(net.connected ? `Watching ${tour.spec ? tour.spec.host + ' vs ' + tour.spec.foe : 'a match'}` : 'Connecting to the match…', net.connected ? 'ok' : 'bad'); dock(); return; }
+    if (mode === 'net' && net.duo && net.connected && m && phase !== 'lobby') { setNet(duoLine(), 'ok'); dock(); return; }
     if (mode === 'net' && net.connected && !net.foeHere && m && !m.over && phase !== 'lobby') setNet('Opponent disconnected. The clock waits for them…', 'bad');
     else if (net.connected) setNet(mode === 'host' ? `Match ${net.code} · opponent connected` : `Match ${net.code} · connected`, 'ok');
     else if (phase === 'lobby') setNet('');
@@ -11336,7 +11678,7 @@ Floors.floor = (() => {
     $('lb-open').addEventListener('click', openLeaderboard);
     if ($('tours-open')) $('tours-open').addEventListener('click', openToursSheet);
     if ($('resume')) $('resume').addEventListener('click', () => resumeHost(resume));
-    if ($('net-resume')) $('net-resume').addEventListener('click', () => srvJoin(netBack.code, { key: netBack.key, side: netBack.side }));
+    if ($('net-resume')) $('net-resume').addEventListener('click', () => netBack.duo ? duoJoin(netBack.code, netBack.key) : srvJoin(netBack.code, { key: netBack.key, side: netBack.side }));
     if ($('tour-back')) $('tour-back').addEventListener('click', () => { tour.menu = false; showStart(); });
     if (home.pop) wirePop();
     if (!home.asked) rankedCheck();
@@ -11378,7 +11720,7 @@ Floors.floor = (() => {
       </div>`}
       <div class="bar">
         <span class="hint">Have a code?</span>
-        <span class="joinrow"><input id="code-in" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Match code" placeholder="CODE"><button class="btn" id="join">Join</button></span>
+        <span class="joinrow"><input id="code-in" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Match code" placeholder="CODE"><button class="btn" id="join">Join</button></span>
       </div>
       <span class="hint" id="join-msg" aria-live="polite" hidden></span>
       ${sampleFn ? `<button class="btn primary" id="vs-claude">Play vs Claude</button>` : ''}
@@ -11386,6 +11728,7 @@ Floors.floor = (() => {
       ${devMode() ? `<details class="settings"><summary>Developer<span>more modes</span></summary><div class="settings-body">
         <div class="bar"><span class="hint">${factionsReady() ? 'Factions: draft two factions each.' : 'Factions mode: coming soon.'}</span><button class="btn small" id="factions-ai" ${factionsReady() ? '' : 'disabled'}>Factions vs AI</button></div>
         <div class="bar"><span class="hint">${devReady() ? 'Buildings, Powers and spells on the big board.' : 'No factions yet.'}</span><button class="btn small" id="devtest-ai" ${devReady() ? '' : 'disabled'}>Factions – devtest</button></div>
+        <div class="bar"><span class="hint">2v2: two boards side by side. Invite three players, set the teams.</span><button class="btn small" id="duo-new">2v2 lobby</button></div>
         ${TEST ? `<div class="bar"><span class="hint">Level-up cost (test setting)</span><div class="seg" role="group" aria-label="Level-up cost">${[50, 75].map(c => `<button data-c="${c}" aria-pressed="${Game.CONFIG.levelCostPerTier === c}">${c} gold</button>`).join('')}</div></div>` : ''}
         <div class="bar"><span class="hint">${customSet ? `Your ${units.length} Counter Lab units` : `${units.length} built-in units`}${reportDb ? '. Matches are saved for Claude to review.' : ''}</span>
           <span class="btnrow"><button class="btn small" id="load-units">Load units</button><a class="btn small" id="lab-link" href="lab.html" style="text-decoration:none;color:inherit;display:inline-block">Counter Lab</a></span></div>
@@ -11406,6 +11749,7 @@ Floors.floor = (() => {
     }));
     if ($('factions-ai')) $('factions-ai').addEventListener('click', () => { matchKind = 'factions'; startAiMatch(); });
     if ($('devtest-ai')) $('devtest-ai').addEventListener('click', () => { matchKind = 'devtest'; startAiMatch(); });
+    if ($('duo-new')) $('duo-new').addEventListener('click', () => duoHost());
     if ($('vs-claude')) $('vs-claude').addEventListener('click', startClaudeMatch);
     if ($('load-units')) $('load-units').addEventListener('click', openLoader);
     if ($('tour-new')) $('tour-new').addEventListener('click', () => tourCreate());
@@ -11413,6 +11757,7 @@ Floors.floor = (() => {
     const joinNow = () => {
       const c = $('code-in').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (c.length === 4) { tourJoin(c); return; } // a tournament
+      if (c.length === DUO_CODE_LEN) { duoJoin(c); return; } // a 2v2 match
       if (c.length !== 5) { $('join-msg').hidden = false; $('join-msg').textContent = 'Match codes are 5 letters and numbers, tournament codes 4.'; return; }
       if (srvOk()) srvJoin(c, { typed: true }); else joinMatch(c); // the game server first (an older phone-to-phone match: see 'nomatch')
     };
@@ -11567,10 +11912,11 @@ Floors.floor = (() => {
     const iWon = sum.winner === me && !sum.timeout, iLost = sum.winner === foe() && !sum.timeout;
     const head = sum.timeout ? 'Time ran out' : iWon ? `Round ${sum.round} won` : iLost ? `Round ${sum.round} lost` : 'Draw';
     const cls = iWon ? 'you' : iLost ? 'foe' : '';
-    const them = foeName();
+    const duo = net.duo && mode === 'net' && sum.duo; // 2v2: the damage is the team's
+    const them = duo ? 'Their team' : foeName();
     const lines = [];
     if (sum.dmg[foe()]) lines.push(`${them} takes <b class="num">${sum.dmg[foe()]}</b> damage.`);
-    if (sum.dmg[me]) lines.push(`You take <b class="num">${sum.dmg[me]}</b> damage.`);
+    if (sum.dmg[me]) lines.push(`${duo ? 'Your team takes' : 'You take'} <b class="num">${sum.dmg[me]}</b> damage.`);
     if (!sum.dmg[0] && !sum.dmg[1]) lines.push('Nobody takes damage.');
     if (sum.towerFell && sum.towerFell[foe()]) lines.push(`You broke ${mode === 'claude' ? 'Claude’s' : 'the enemy’s'} tower${towerLoss(sum, foe()) ? `: −${towerLoss(sum, foe())} health for them` : ''}.`);
     if (sum.towerFell && sum.towerFell[me]) lines.push(`Your tower fell${towerLoss(sum, me) ? `: −${towerLoss(sum, me)} health` : ''}.`);
@@ -12707,7 +13053,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     phase = 'battle'; selected = null; deadline = 0; timeUp = false; watchSq = null;
     sfx('battle');
     battlePre = withUnits(pre); lastPre = battlePre;
-    bt = Game.startBattle(battlePre);
+    if (net.duo && net.duoPres && mode === 'net') duoBattle(); // 2v2: both lanes on the wide board
+    else bt = Game.startBattle(battlePre);
     fx = []; acc = 0; lastTs = 0;
     cam = { end: lastSummary && lastSummary.round === pre.round ? lastSummary.time : null, decided: false, on: false, k: 0, x: 0, y: 0 };
     closeSheet(); overlay(null); hud(); panelBattle(); render();
@@ -12792,6 +13139,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     }
     battlePre = null;
     inspect = null;
+    if (duoRestore()) bt = null; // 2v2: back to this phone's own lane (its board shows the squads after the fight)
     render();
     showResult(lastSummary);
   }
@@ -13384,7 +13732,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // It falls back to the 2D board when it can't start (no WebGL), when the phone drops the WebGL context, and when
   // fights run under 20 fps at low quality (slower fights step the quality down first), with one line on the board.
   const THREE_URL = './vendor/three.module.min.js'; // the artifact build points this at jsDelivr
-  const V3D = '7487552a9a'; // the 3D code's version (src/build.js puts a hash of it here)
+  const V3D = 'c58e917acb'; // the 3D code's version (src/build.js puts a hash of it here)
   const B3D_STORE = 'phone-bellum-board';
   const force2d = /[?&]board=2d\b/.test(location.search);
   const force3d = !force2d && (/[?&]board=3d\b/.test(location.search) || window.PB_FORCE3D === true);
@@ -14314,7 +14662,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // the guest sends its own deployments and plays back the same battle.
   // =====================================================================
   const net = { peer: null, conn: null, code: '', connected: false, retryTimer: 0, tries: 0, alive: false, specs: new Set(), // specs: spectators' connections (host)
-    srv: false, ws: null, ping: 0, key: '', create: false, typed: false, welcomed: false, tourCode: '', watch: false, foeHere: false, seq: 0, pending: [], replaying: false }; // a match on the game server (see srvOpen)
+    srv: false, ws: null, ping: 0, key: '', create: false, typed: false, welcomed: false, tourCode: '', watch: false, foeHere: false, seq: 0, pending: [], replaying: false, // a match on the game server (see srvOpen)
+    duo: false, duoInfo: null, duoPres: null, duoHost: false, duoLobby: null }; // a 2v2 match (src/duo.js, see duoHost)
   const peerOpts = () => {
     const o = { debug: 1 };
     if (qs.get('peerhost')) { o.host = qs.get('peerhost'); o.port = +qs.get('peerport') || 9000; o.path = qs.get('peerpath') || '/'; o.secure = qs.get('peersecure') === '1'; }
@@ -14344,11 +14693,12 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     try { if (net.ws) net.ws.close(); } catch (e) {}
     clearInterval(net.ping);
     net.peer = null; net.conn = null; net.connected = false; net.code = ''; net.tries = 0;
-    Object.assign(net, { srv: false, ws: null, key: '', create: false, typed: false, welcomed: false, tourCode: '', watch: false, foeHere: false, seq: 0, pending: [], replaying: false });
+    Object.assign(net, { srv: false, ws: null, key: '', create: false, typed: false, welcomed: false, tourCode: '', watch: false, foeHere: false, seq: 0, pending: [], replaying: false, duo: false, duoInfo: null, duoPres: null, duoHost: false, duoLobby: null });
+    duoRestore();
     liveSpeed = [1, 1]; // a new live match starts at 1x
     // the address bar, not qs: joinMatch puts join= back in it after the first leaveNet
     const u = new URLSearchParams(location.search);
-    if (u.has('join') || u.has('play')) { u.delete('join'); u.delete('play'); qs.delete('join'); qs.delete('play'); history.replaceState(null, '', location.pathname + (u.toString() ? '?' + u : '')); }
+    if (u.has('join') || u.has('play') || u.has('duo')) { u.delete('join'); u.delete('play'); u.delete('duo'); qs.delete('join'); qs.delete('play'); qs.delete('duo'); history.replaceState(null, '', location.pathname + (u.toString() ? '?' + u : '')); }
   }
 
   // ----- host -----
@@ -14450,7 +14800,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function selectLink() { const r = document.createRange(); r.selectNodeContents($('link')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 
   function hostStartMatch() {
-    if (mode === 'net') { if (net.foeHere && me === 0 && !net.tourCode) send({ t: 'start', settings: srvSettings() }); return; } // the server starts it
+    if (mode === 'net') { if (net.duo) return; if (net.foeHere && me === 0 && !net.tourCode) send({ t: 'start', settings: srvSettings() }); return; } // the server starts it
     if (!net.connected) return;
     const tx = tourLive();
     if (!tx && matchKind === 'factions' && factionsReady()) { startDraft(); return; }
@@ -14927,7 +15277,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   const NET_STORE = 'phonebellum.net.v1'; // { code, key, side, ts }: a friend's match on the server, to come back to
   const srvOk = () => typeof WebSocket === 'function' && !qs.has('peer');
   const playLink = () => { const u = new URL(shareLink()); u.searchParams.delete('join'); u.searchParams.set('play', net.code); return u.toString(); };
-  function srvSave() { try { if (mode === 'net' && net.key && !net.tourCode) localStorage.setItem(NET_STORE, JSON.stringify({ code: net.code, key: net.key, side: me, ts: now() })); } catch (e) {} }
+  function srvSave() { try { if (mode === 'net' && net.key && !net.tourCode) localStorage.setItem(NET_STORE, JSON.stringify({ code: net.code, key: net.key, side: me, ts: now(), ...(net.duo ? { duo: true } : {}) })); } catch (e) {} }
   function srvForget() { try { localStorage.removeItem(NET_STORE); } catch (e) {} }
   // the built-in units for a server match (the server only plays those); the player's own come back after it
   function srvUnits() {
@@ -14961,12 +15311,13 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     net.alive = true;
     clearTimeout(net.retryTimer);
     let ws;
-    try { ws = new WebSocket(`${SERVER_URL.replace(/^http/, 'ws')}/room/${net.code}${net.tourCode ? '?t=' + net.tourCode : ''}`); } catch (e) { srvRetry(); return; }
+    try { ws = new WebSocket(`${SERVER_URL.replace(/^http/, 'ws')}/${net.duo ? 'duo' : 'room'}/${net.code}${net.tourCode ? '?t=' + net.tourCode : ''}`); } catch (e) { srvRetry(); return; }
     net.ws = ws;
     ws.onopen = () => {
       if (net.ws !== ws) return;
       net.connected = true; net.tries = 0;
       const hello = net.watch ? { watch: true } : net.tourCode ? { id: tour.myId, tkey: tour.key } : net.key ? { key: net.key } : net.create ? { create: true, ...(net.wantRanked ? { ranked: true } : {}) } : {};
+      if (net.duo) delete hello.ranked;
       if (acct && !net.watch && !net.tourCode) hello.session = acct.session; // who this is: ranked needs it, and the other phone shows the username (never in the URL)
       ws.send(JSON.stringify({ t: 'hello', ...hello }));
       clearInterval(net.ping); net.ping = setInterval(() => { if (net.ws === ws && ws.readyState === 1) ws.send('{"t":"ping"}'); }, 30000);
@@ -14980,7 +15331,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       netStatus();
       if (phase === 'deploy' && mode === 'net') panelDeploy();
       // the game server can't be reached at all: a new friend's match goes phone to phone (PeerJS) instead
-      if (!net.welcomed && net.tries >= 1 && phase === 'lobby' && !m && !net.tourCode && !net.watch && !net.wantRanked && (net.create || net.typed) && peerAvailable()) {
+      if (net.duo && !net.welcomed && net.tries >= 3 && !m) { leaveNet(); overlayMsg('2v2', 'Can’t reach the game server. 2v2 only runs there.'); return; }
+      if (!net.duo && !net.welcomed && net.tries >= 1 && phase === 'lobby' && !m && !net.tourCode && !net.watch && !net.wantRanked && (net.create || net.typed) && peerAvailable()) {
         const code = net.code, typed = net.typed; leaveNet();
         if (typed) joinMatch(code); else hostLobby(true);
         return;
@@ -15019,6 +15371,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (me === 0) drawLobby(); else guestWaiting(net.foeHere ? 'Connected. Waiting for your friend to start the match' : 'Connected');
   }
   function srvRecv(d) {
+    if (net.duo && duoRecv(d)) return;
     if ('ranked' in d && d.t !== 'ack') net.ranked = d.ranked || null;
     if ('players' in d && d.t !== 'ack') { net.players = d.players || null; hud(); }
     if (d.t === 'welcome') {
@@ -15118,6 +15471,175 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function srvSpec(d) {
     if (d.t === 'sync' && d.m && !m) srvUnits();
     if (d.t === 'sync' || d.t === 'fight') specRecv(d);
+  }
+
+  // =====================================================================
+  // 2v2 (developer test, 2026-11-02; src/duo.js, server/src/duo.js). Two Standard boards side by side: each phone plays
+  // its own lane as a server match (mode 'net' with net.duo: the same deploy screen, actions and Ready as 1v1), the
+  // 2v2 room adds the seats and the teammate's lane (net.duoInfo), and the fight is played back on the wide board from
+  // both lanes as they stood (net.duoPres): m is the wide picture while it plays (Duo.view), then this lane again.
+  // Only a developer account can make a 2v2 lobby; anyone with the code (6 letters) or the link can join it.
+  // =====================================================================
+  const DUO_CODE_LEN = 6;
+  const newDuoCode = () => newCode() + CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  const duoLink = () => { const u = new URL(shareLink()); u.searchParams.delete('join'); u.searchParams.set('duo', net.code); return u.toString(); };
+  var duoKeep = null; // this phone's lane while the wide fight plays (m is the picture of both lanes then)
+  var duoView = null; // a phone's view of the wide fight: { cols shown, half (one board's columns), x (first screen column), free (moved by hand) }
+  var duoPick = -1;   // the host's first tap when swapping two seats
+  function duoHost() {
+    if (!devMode()) { overlayMsg('2v2', 'Only developer accounts can make a 2v2 lobby for now. Ask a developer for the code.'); return; }
+    leaveNet();
+    mode = 'net'; me = 0; m = null; phase = 'lobby'; bt = null; battlePre = null; lastSummary = null; matchKind = 'standard';
+    net.srv = true; net.duo = true; net.create = true; net.key = ''; net.code = newDuoCode(); net.players = null; net.ranked = null;
+    duoPick = -1;
+    hud(); netStatus(); render();
+    drawDuoLobby();
+    srvOpen();
+  }
+  function duoJoin(code, key) {
+    leaveNet();
+    mode = 'net'; me = 0; m = null; phase = 'lobby'; bt = null; battlePre = null; lastSummary = null; matchKind = 'standard';
+    net.srv = true; net.duo = true; net.create = false; net.key = key || ''; net.code = code; net.players = null; net.ranked = null; net.typed = true;
+    duoPick = -1;
+    { const u = new URL(location.href.split('#')[0]); u.searchParams.delete('join'); u.searchParams.delete('play'); u.searchParams.set('duo', code); history.replaceState(null, '', u.toString()); } // a reload comes back to it
+    hud(); netStatus(); render();
+    guestWaiting('Connecting to 2v2 lobby ' + code);
+    srvOpen();
+  }
+  // messages only a 2v2 room sends (true: handled here); the rest go on to srvRecv as in 1v1
+  function duoRecv(d) {
+    if (d.t === 'welcome' && d.duo) {
+      net.welcomed = true; net.create = false;
+      me = d.side; net.key = d.key || net.key; net.seq = Math.max(net.seq, d.seq | 0); net.duoHost = !!d.host;
+      net.duoInfo = { ...(net.duoInfo || {}), seat: d.seat, lane: d.lane };
+      srvSave(); netStatus(); hud();
+      if (!m && phase === 'lobby') drawDuoLobby();
+      return true;
+    }
+    if (d.t === 'duolobby') { net.duoLobby = d; net.duoHost = !!d.host; if (!m && phase === 'lobby') drawDuoLobby(); return true; }
+    if (d.t === 'taken') { net.code = newDuoCode(); net.create = true; const ws = net.ws; net.ws = null; try { ws.close(); } catch (e) {} drawDuoLobby(); srvOpen(); return true; }
+    if (d.t === 'nomatch' || d.t === 'full' || d.t === 'denied') {
+      const code = net.code;
+      leaveNet(); srvForget();
+      overlayMsg('2v2', d.t === 'nomatch' ? `Nobody has made 2v2 lobby ${code}.` : d.t === 'full' ? `2v2 lobby ${code} is full or its match has started.`
+        : d.why === 'dev' ? 'Only developer accounts can make a 2v2 lobby for now.' : d.why === 'kicked' ? 'The host took you out of the lobby.' : 'You can’t join this 2v2 match.');
+      return true;
+    }
+    if (d.t === 'forfeit' && d.duo) {
+      net.duoInfo = { ...(net.duoInfo || {}), ...d.duo };
+      if (d.side === me && d.seat !== net.duoInfo.seat) { leaveNet(); srvForget(); overlayMsg('Your teammate left', 'Your team lost the 2v2 match.'); return true; }
+      return false; // the other team left: as a forfeit in 1v1
+    }
+    if (d.duo) {
+      const mate = d.duo.mate === undefined && net.duoInfo ? net.duoInfo.mate : d.duo.mate;
+      net.duoInfo = { ...(net.duoInfo || {}), ...d.duo, mate };
+      if (d.t === 'fight') net.duoPres = d.duo.pres || null;
+      netStatus(); hud();
+    }
+    return false;
+  }
+  // the lobby: four seats in two teams. The host taps two seats to swap them (a player onto an empty seat moves them)
+  function drawDuoLobby(problem) {
+    const L = net.duoLobby, seats = L ? L.seats : [null, null, null, null], mine = net.duoInfo ? net.duoInfo.seat : -1, host = net.duoHost;
+    const seatBtn = (k) => {
+      const p = seats[k];
+      return `<button class="btn duo-seat${duoPick === k ? ' primary' : ''}" data-seat="${k}" ${host ? '' : 'disabled'} aria-pressed="${duoPick === k}" style="display:grid;gap:2px;min-width:0;text-align:left">
+        <span class="hint" style="margin:0">${Duo.SEAT_NAMES[k]} · lane ${Duo.SEATS[k].lane + 1}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p ? esc(p.tag) + (k === mine ? ' (you)' : '') + (p.here ? '' : ' · away') : '<span class="hint">Empty · AI plays</span>'}</span></button>`;
+    };
+    const team = (sd, name) => `<div style="display:grid;gap:6px;min-width:0"><span class="eyebrow">${name}</span>${[0, 1, 2, 3].filter(k => Duo.SEATS[k].side === sd).map(seatBtn).join('')}</div>`;
+    const n = seats.filter(Boolean).length;
+    overlay(`<div class="card">
+      <span class="eyebrow">2v2 lobby · developer test</span>
+      <span class="code" aria-label="Lobby code">${esc(net.code)}</span>
+      <p class="status ${n >= 4 ? '' : 'wait'}" id="lobby-status">${problem ? esc(problem) : !net.welcomed ? 'Setting up the lobby' : `${n} of 4 here${host ? (duoPick >= 0 ? ' · tap another seat to swap' : ' · tap two seats to swap them') : ' · the host sets the teams'}`}</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%">${team(0, 'Team A')}${team(1, 'Team B')}</div>
+      ${host ? `<button class="btn primary" id="duo-start" ${net.welcomed ? '' : 'disabled'}>Start${n < 4 ? ` (AI in ${4 - n} seat${4 - n > 1 ? 's' : ''})` : ''}</button>` : '<p class="hint" style="margin:0">Waiting for the host to start.</p>'}
+    </div>`);
+    const link = duoLink();
+    $('panel').innerHTML = `
+      <span class="hint">Two Standard boards side by side: A1 and B1 fight on the left board, A2 and B2 on the right. Each player deploys on their own board as in 1v1; in the fight units can cross to the other board. Each team shares one health of ${Duo.HP}.</span>
+      <div class="linkbox" id="link">${esc(link)}</div>
+      <div class="bar">
+        <span class="btnrow">
+          ${navigator.share ? '<button class="btn primary" id="share">Share link</button>' : ''}
+          <button class="btn ${navigator.share ? '' : 'primary'}" id="copy">Copy link</button>
+        </span>
+        <button class="btn" id="cancel">Leave</button>
+      </div>`;
+    if ($('share')) $('share').addEventListener('click', () => { navigator.share({ title: 'No Mans Land 2v2', text: `Join my 2v2 in No Mans Land! Code ${net.code}`, url: link }).catch(() => {}); });
+    $('copy').addEventListener('click', () => {
+      const done = () => { $('copy').textContent = 'Copied'; setTimeout(() => { if ($('copy')) $('copy').textContent = 'Copy link'; }, 1500); };
+      if (navigator.clipboard) navigator.clipboard.writeText(link).then(done, () => selectLink()); else selectLink();
+    });
+    $('cancel').addEventListener('click', () => { leaveNet(); srvForget(); showStart(); });
+    if ($('duo-start')) $('duo-start').addEventListener('click', () => { duoPick = -1; send({ t: 'start', settings: { skin: skinPick || '' } }); });
+    $('overlay').querySelectorAll('[data-seat]').forEach(b => b.addEventListener('click', () => {
+      if (!net.duoHost) return;
+      const k = +b.dataset.seat;
+      if (duoPick < 0 || duoPick === k) { duoPick = duoPick === k ? -1 : k; drawDuoLobby(); return; }
+      send({ t: 'seat', a: duoPick, b: k }); duoPick = -1; drawDuoLobby();
+    }));
+  }
+  // the fight: both lanes on the wide board
+  function duoBattle() {
+    duoKeep = m; // this lane after the fight (the server's post)
+    battlePre = withUnits(Duo.view(net.duoPres)); lastPre = battlePre;
+    m = battlePre;
+    bt = Duo.battle(net.duoPres.map(withUnits));
+    net.duoPres = null;
+    // on a phone the fight starts on this player's own board (their opponent in front of them): drag sideways to look
+    // at the other board, pinch (or double tap) to see the whole field. On a PC the whole field shows.
+    Game.useGrid(battlePre);
+    const lane = net.duoInfo ? net.duoInfo.lane : 0, half = Game.COLS / 2;
+    duoView = { cols: half, half, x: me === 0 ? lane * half : (1 - lane) * half, free: false };
+  }
+  function duoRestore() { duoView = null; if (!duoKeep) return false; m = duoKeep; duoKeep = null; return true; }
+  // the window the 2D board shows of a 2v2 fight on a phone (null: the whole board, as on a PC or the 3D board)
+  function duoWin() {
+    if (!duoView || pcLayout() || board3d || !m || !m.duo) return null;
+    return { aspect: duoView.half, cols: duoView.cols, x: Math.max(0, Math.min(duoView.half * 2 - duoView.cols, duoView.x)) };
+  }
+  // the 3D board on a phone: the camera starts over this player's own board (the battle cam's focus), until they
+  // move it themselves
+  function duoFocus() {
+    if (!duoView || pcLayout() || !board3d || duoView.free || !m || !m.duo) return null;
+    return { zoom: 1.6, x: (net.duoInfo && net.duoInfo.lane === 1 ? 1 : -1) * duoView.half * Game.TILE / 2, y: 0, k: 0.45 };
+  }
+  // gestures on the 2D board during a 2v2 fight on a phone: one finger drags sideways, two pinch, a double tap swaps
+  // between this board and the whole field
+  {
+    const pts = new Map();
+    let pinch0 = null, lastTap = 0;
+    const live = () => phase === 'battle' && !!duoWin();
+    cv.addEventListener('pointerdown', (e) => {
+      if (duoView && phase === 'battle') duoView.free = true;
+      if (!live()) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch0 = { d: Math.hypot(a.x - b.x, a.y - b.y), cols: duoView.cols }; }
+      if (pts.size === 1) { const t = performance.now(); if (t - lastTap < 300) { duoView.cols = duoView.cols > duoView.half ? duoView.half : duoView.half * 2; render(); } lastTap = t; }
+    });
+    cv.addEventListener('pointermove', (e) => {
+      if (!live() || !pts.has(e.pointerId)) return;
+      const p = pts.get(e.pointerId), w = cv.getBoundingClientRect().width;
+      if (pts.size === 1) { duoView.x -= (e.clientX - p.x) / (w / duoView.cols); duoView.x = Math.max(0, Math.min(duoView.half * 2 - duoView.cols, duoView.x)); }
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2 && pinch0) {
+        const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
+        duoView.cols = Math.max(duoView.half, Math.min(duoView.half * 2, pinch0.cols * pinch0.d / Math.max(20, d)));
+      }
+      render();
+    });
+    const up = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch0 = null; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  }
+  // the line above the board: which board, and how the teammate is doing
+  function duoLine() {
+    const x = net.duoInfo;
+    if (!x || x.seat == null) return `2v2 · ${net.code}`;
+    const mate = Duo.mateOf(x.seat), nm = (x.names && x.names[mate]) || Duo.SEAT_NAMES[mate];
+    const st = x.bots && x.bots[mate] ? '' : x.here && !x.here[mate] ? 'away' : phase === 'deploy' ? (x.ready && x.ready[mate] ? 'ready' : 'deploying') : '';
+    return `2v2 · ${Duo.SEAT_NAMES[x.seat]} · ${x.lane === 0 ? 'left' : 'right'} board · teammate ${nm}${st ? ': ' + st : ''}`;
   }
 
   function overlayMsg(head, text) {
@@ -15913,9 +16435,14 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (tc.length === 4 && !(fresh(org) && org.key && org.code === tc)) tourJoin(tc, qs.has('watch'));
     else if (fresh(org) && org.key) tourResumeOrg(org);
     else if (fresh(mine) && mine.code) tourJoin(mine.code, false);
-    if (joinCode.length === 5 || playCode.length === 5) tour.menu = false;
+    if (joinCode.length === 5 || playCode.length === 5 || (qs.get('duo') || '').length === 6) tour.menu = false;
   }
-  if (playCode.length === 5) {
+  const duoCode = (qs.get('duo') || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); // a 2v2 match
+  if (duoCode.length === DUO_CODE_LEN) {
+    showStart();
+    let back = null; try { back = JSON.parse(localStorage.getItem(NET_STORE) || 'null'); } catch (e) {}
+    duoJoin(duoCode, back && back.duo && back.code === duoCode ? back.key : '');
+  } else if (playCode.length === 5) {
     showStart();
     let back = null; try { back = JSON.parse(localStorage.getItem(NET_STORE) || 'null'); } catch (e) {}
     if (back && back.code === playCode && back.key) srvJoin(playCode, { key: back.key, side: back.side }); else srvJoin(playCode);

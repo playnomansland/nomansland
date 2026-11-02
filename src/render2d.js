@@ -19,9 +19,11 @@
 // colour and how strongly the zones are tinted on a painted floor.
 const Render2D = (cv, view, opts = {}) => {
   let ctx = cv.getContext('2d'); // swapped for a moment while drawing map thumbnails (thumb)
-  let m = null, me = 0, phase = 'start', units = [], mode = 'ai', bt = null, battlePre = null, fx = [], battleCam = null;
+  let m = null, me = 0, phase = 'start', units = [], mode = 'ai', bt = null, battlePre = null, fx = [], battleCam = null, win = null;
   let selected = null, moving = null, drag = null, hoverTile = null, rangeOf = null, editable = false, placingUnit = null, placingElf = false, placingTower = false, placingWall = false, dev = null, placingBuilding = null;
-  const pull = () => { ({ m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf, editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev } = view()); };
+  const pull = () => { ({ m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf, editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev, win = null } = view()); };
+  // win (a 2v2 fight on a phone): { aspect, cols, x } the canvas is shaped for `aspect` columns, shows `cols` of them
+  // (zoomed out up to the whole wide board) and starts at screen column x; the board sits in the middle top to bottom
   const foe = () => 1 - me;
   const css = Art.css, tag = Shapes.tag;
   const { ELF_COL, SHROOM_COL, CHARM_COL, BLEED_COL, POOL_COL, FROST_COL, GLUT_COL } = Art;
@@ -29,7 +31,8 @@ const Render2D = (cv, view, opts = {}) => {
   function size() {
     const r = cv.getBoundingClientRect();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    W = r.width; H = W * Game.ROWS / Game.COLS;
+    pull();
+    W = r.width; H = W * Game.ROWS / (win ? win.aspect : Game.COLS);
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     S = W / (Game.COLS * Game.TILE);
@@ -460,6 +463,12 @@ const Render2D = (cv, view, opts = {}) => {
     ctx.strokeStyle = css('--you');
     ctx.beginPath(); ctx.moveTo(0, mine); ctx.lineTo(W, mine); ctx.stroke();
     ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const dv = phase === 'battle' && battlePre ? battlePre : m;
+    if (dv && dv.duo) { // a 2v2 fight: where the two boards meet
+      ctx.strokeStyle = css('--muted'); ctx.globalAlpha = 0.55; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
   }
 
   // ---------- Factions devtest: spells, arrows, the tower's tile, where things may go (on the floor, so the 3D board
@@ -1264,6 +1273,19 @@ const Render2D = (cv, view, opts = {}) => {
   }
   function draw() {
     pull();
+    if (win && m) { // a window on the wide board: draw the whole board, moved and scaled into the canvas
+      const cw = W, ch = H, s0 = S;
+      S = cw / (win.cols * Game.TILE);
+      const bw = Game.COLS * Game.TILE * S, bh = Game.ROWS * Game.TILE * S;
+      ctx.save(); ctx.fillStyle = css('--board'); ctx.fillRect(0, 0, cw, ch);
+      ctx.translate(-win.x * Game.TILE * S, Math.max(0, (ch - bh) / 2));
+      W = bw; H = bh;
+      try { drawInner(); } finally { ctx.restore(); W = cw; H = ch; S = s0; }
+      return;
+    }
+    drawInner();
+  }
+  function drawInner() {
     if (!m) { drawBoard(); return; }
     if (bt && phase === 'battle' && battleCam) { // the battle cam, zoomed in around its focus
       const fx0 = PX(battleCam.x), fy0 = PY(battleCam.y);
@@ -1278,7 +1300,11 @@ const Render2D = (cv, view, opts = {}) => {
   function tileAt(clientX, clientY) {
     pull();
     const r = cv.getBoundingClientRect();
-    const x = (clientX - r.left) / r.width * Game.COLS, y = (clientY - r.top) / r.height * Game.ROWS;
+    let x = (clientX - r.left) / r.width * Game.COLS, y = (clientY - r.top) / r.height * Game.ROWS;
+    if (win) { // the window on the wide board (see draw)
+      const t = r.width / win.cols, oy = Math.max(0, (r.height - Game.ROWS * t) / 2);
+      x = (clientX - r.left) / t + win.x; y = (clientY - r.top - oy) / t;
+    }
     const c = Math.floor(x), rw = Math.floor(y);
     if (c < 0 || rw < 0 || c >= Game.COLS || rw >= Game.ROWS) return null;
     const fx = x - c, fy = y - rw; // where in the tile (for a wall's edge), in model terms

@@ -19,6 +19,11 @@ class_name = "Room"
 name = "TOUR"
 class_name = "TourRoom"
 
+# 2v2 (developer test, 2026-11-02): one DuoRoom per 2v2 match code (two lanes, four seats; src/duo.js).
+[[durable_objects.bindings]]
+name = "DUO"
+class_name = "DuoRoom"
+
 # Match history (step 4): one HistoryRoom ('all') with its own SQLite keeps every round of every server match.
 [[durable_objects.bindings]]
 name = "HISTORY"
@@ -44,6 +49,10 @@ new_sqlite_classes = ["TourRoom"]
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = ["HistoryRoom"]
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["DuoRoom"]
 
 [observability]
 enabled = true

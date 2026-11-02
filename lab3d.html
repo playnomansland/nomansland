@@ -3754,6 +3754,10 @@ const Game = (() => {
     // deeper zones (8 rows) and only 2 rows of no man's land: the armies meet almost at once
     editorMap('rush', EDITOR_MAPS.rush, { short: 'Deep zones, only 2 rows of no man’s land: the armies meet at once.', text: 'Each zone is 14 by 8 tiles, with only 2 rows of no man’s land between them, so the armies meet almost at once. The towers stand one column further in, and the back corners are flank tiles too. A treasury pays 50 gold per fight it survives.' }), // only when picked, never random
   ];
+  // Boards only drawn, never played or picked (not in MAPS): 'duo' is two Standard boards side by side, the field of a
+  // 2v2 fight (src/duo.js). A match on it is only a picture of the fight (Duo.view).
+  const VIEW_MAPS = [{ id: 'duo', name: '2v2', short: 'Two Standard boards side by side.', text: 'Two Standard boards side by side.', plain: true, skins: true, view: true, grid: { cols: 28, rows: 18, zone: 7 } }];
+  const findMap = (id) => MAPS.find(x => x.id === id) || VIEW_MAPS.find(x => x.id === id);
   // Looks (skins) for the 3D board: a map with skins (the Standard and the Test Grid) can be played in any of them; the
   // others have their own look. Only how the board looks: the rules stay the map's. The match keeps the host's pick (m.skin).
   const SKINS = [{ id: 'meadow', name: 'Meadow' }, { id: 'autumn', name: 'Autumn' }, { id: 'snow', name: 'Snow' }, { id: 'frost', name: 'Darkwoods' }, { id: 'desert', name: 'Desert' }];
@@ -4088,7 +4092,7 @@ const Game = (() => {
     if (mp && mp.spots && mp.spots.tower[side]) return { ...mp.spots.tower[side] }; // an editor map's own tile
     return side === 1 && mp && mp.pointMirror ? { col: COLS - 1 - t.col, row: t.row } : { ...t };
   };
-  const mapOf = (m) => (m && m.map && MAPS.find(x => x.id === m.map.id)) || null;
+  const mapOf = (m) => (m && m.map && findMap(m.map.id)) || null;
   // a map's own range and speed for a unit (Test Grid): +rangeAdd m for units with rangeAddMin m of range or more, and
   // each [speed, cut] step in slowSteps the unit reaches takes cut m/s off its move speed. Units in tuneKeep keep theirs.
   function mapTuned(mp, u) {
@@ -4233,14 +4237,18 @@ const Game = (() => {
   }
   // riders follow their carrier's tile
   const syncRiders = (m, side) => { for (const s of m.armies[side]) if (isRider(s)) { const c = carrierOf(m, side, s); if (c) { s.col = c.col; s.row = c.row; } else delete s.in; } };
-  const tileToWorld = (col, row) => ({ x: (col - (COLS - 1) / 2) * TILE, y: ((ROWS - 1) / 2 - row) * TILE });
+  // XOFF: metres added to every tile's x (0 except while a 2v2 lane builds its bodies beside the other lane: see withXOff)
+  let XOFF = 0;
+  const tileToWorld = (col, row) => ({ x: (col - (COLS - 1) / 2) * TILE + XOFF, y: ((ROWS - 1) / 2 - row) * TILE });
+  // runs fn with the board shifted dx metres sideways (2v2, src/duo.js: each lane is its own match, side by side in one fight)
+  function withXOff(dx, fn) { const was = XOFF; XOFF = dx; try { return fn(); } finally { XOFF = was; } }
   const BOUNDS = { x0: -COLS * TILE / 2, x1: COLS * TILE / 2, y0: -ROWS * TILE / 2, y1: ROWS * TILE / 2 }; // the board in world metres
   // Switches the board to the grid of a match's map (or of a map id): COLS, ROWS, ZONE and what hangs on them. The
   // objects keep their identity, so everything holding them sees the new grid. Returns true when the grid changed.
   // Every exported function that takes a match calls it first (see the end of this file), so callers needn't.
   function useGrid(mOrId) {
     const id = mOrId && typeof mOrId === 'object' ? (mOrId.map && mOrId.map.id) : mOrId;
-    const mp = id ? MAPS.find(x => x.id === id) : null, g = (mp && mp.grid) || GRID;
+    const mp = id ? findMap(id) : null, g = (mp && mp.grid) || GRID;
     FLANK_SET = (mp && mp.flankSet) || null;
     if (g.cols === COLS && g.rows === ROWS && g.zone === ZONE) return false;
     COLS = g.cols; ROWS = g.rows; ZONE = g.zone;
@@ -5012,7 +5020,7 @@ const Game = (() => {
       if (zoe) for (const x of b) x.zoe = true; // for the rising-stars effect
       if (purple) for (const x of b) x.shroom = true; // for the drifting spores effect
       if (isFlank(side, sq.col, sq.row) && (sq.round === m.round || sq.movedRound === m.round)) for (const x of b) x.delay = FLANK.delay * (ch === 'wilhelm' ? CHAR.wilhelmDelay : 1); // only in its first fight
-      if (isFlank(side, sq.col, sq.row)) for (const x of b) x.march = [w.x < 0 ? 1 : -1, 0]; // a flank squad marches in toward the middle until it spots an enemy
+      if (isFlank(side, sq.col, sq.row)) for (const x of b) x.march = [w.x - XOFF < 0 ? 1 : -1, 0]; // a flank squad marches in toward the middle until it spots an enemy
       idx += b.length;
       out.push(...b);
     }
@@ -6318,7 +6326,7 @@ const Game = (() => {
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,
-    zoneRows, inZone, tileToWorld, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, resolve, aiDeploy, occupied,
+    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, resolve, aiDeploy, occupied,
     GRID, useGrid,
     DEV, CAT_NAMES, LESSER_SQ, WALL_SQ, setDevData, devBuilding, devPower, devSpell, isDev, towerUp, pickCat, devOffer, pickNow, needsDevPick, devPick, undoDevPick, devShown,
     lessersOf, placedLessers, unplacedLesser, lesserAt, lesserSpotOk, placeLesser, lesserUnit, auraFor, modUnit, powersOf, devGold, devDeploys,
@@ -6508,9 +6516,11 @@ const Art = (() => {
 // colour and how strongly the zones are tinted on a painted floor.
 const Render2D = (cv, view, opts = {}) => {
   let ctx = cv.getContext('2d'); // swapped for a moment while drawing map thumbnails (thumb)
-  let m = null, me = 0, phase = 'start', units = [], mode = 'ai', bt = null, battlePre = null, fx = [], battleCam = null;
+  let m = null, me = 0, phase = 'start', units = [], mode = 'ai', bt = null, battlePre = null, fx = [], battleCam = null, win = null;
   let selected = null, moving = null, drag = null, hoverTile = null, rangeOf = null, editable = false, placingUnit = null, placingElf = false, placingTower = false, placingWall = false, dev = null, placingBuilding = null;
-  const pull = () => { ({ m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf, editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev } = view()); };
+  const pull = () => { ({ m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf, editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev, win = null } = view()); };
+  // win (a 2v2 fight on a phone): { aspect, cols, x } the canvas is shaped for `aspect` columns, shows `cols` of them
+  // (zoomed out up to the whole wide board) and starts at screen column x; the board sits in the middle top to bottom
   const foe = () => 1 - me;
   const css = Art.css, tag = Shapes.tag;
   const { ELF_COL, SHROOM_COL, CHARM_COL, BLEED_COL, POOL_COL, FROST_COL, GLUT_COL } = Art;
@@ -6518,7 +6528,8 @@ const Render2D = (cv, view, opts = {}) => {
   function size() {
     const r = cv.getBoundingClientRect();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    W = r.width; H = W * Game.ROWS / Game.COLS;
+    pull();
+    W = r.width; H = W * Game.ROWS / (win ? win.aspect : Game.COLS);
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     S = W / (Game.COLS * Game.TILE);
@@ -6949,6 +6960,12 @@ const Render2D = (cv, view, opts = {}) => {
     ctx.strokeStyle = css('--you');
     ctx.beginPath(); ctx.moveTo(0, mine); ctx.lineTo(W, mine); ctx.stroke();
     ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const dv = phase === 'battle' && battlePre ? battlePre : m;
+    if (dv && dv.duo) { // a 2v2 fight: where the two boards meet
+      ctx.strokeStyle = css('--muted'); ctx.globalAlpha = 0.55; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
   }
 
   // ---------- Factions devtest: spells, arrows, the tower's tile, where things may go (on the floor, so the 3D board
@@ -7753,6 +7770,19 @@ const Render2D = (cv, view, opts = {}) => {
   }
   function draw() {
     pull();
+    if (win && m) { // a window on the wide board: draw the whole board, moved and scaled into the canvas
+      const cw = W, ch = H, s0 = S;
+      S = cw / (win.cols * Game.TILE);
+      const bw = Game.COLS * Game.TILE * S, bh = Game.ROWS * Game.TILE * S;
+      ctx.save(); ctx.fillStyle = css('--board'); ctx.fillRect(0, 0, cw, ch);
+      ctx.translate(-win.x * Game.TILE * S, Math.max(0, (ch - bh) / 2));
+      W = bw; H = bh;
+      try { drawInner(); } finally { ctx.restore(); W = cw; H = ch; S = s0; }
+      return;
+    }
+    drawInner();
+  }
+  function drawInner() {
     if (!m) { drawBoard(); return; }
     if (bt && phase === 'battle' && battleCam) { // the battle cam, zoomed in around its focus
       const fx0 = PX(battleCam.x), fy0 = PY(battleCam.y);
@@ -7767,7 +7797,11 @@ const Render2D = (cv, view, opts = {}) => {
   function tileAt(clientX, clientY) {
     pull();
     const r = cv.getBoundingClientRect();
-    const x = (clientX - r.left) / r.width * Game.COLS, y = (clientY - r.top) / r.height * Game.ROWS;
+    let x = (clientX - r.left) / r.width * Game.COLS, y = (clientY - r.top) / r.height * Game.ROWS;
+    if (win) { // the window on the wide board (see draw)
+      const t = r.width / win.cols, oy = Math.max(0, (r.height - Game.ROWS * t) / 2);
+      x = (clientX - r.left) / t + win.x; y = (clientY - r.top - oy) / t;
+    }
     const c = Math.floor(x), rw = Math.floor(y);
     if (c < 0 || rw < 0 || c >= Game.COLS || rw >= Game.ROWS) return null;
     const fx = x - c, fy = y - rw; // where in the tile (for a wall's edge), in model terms

@@ -14,6 +14,7 @@ on:
       - 'src/engine.js'
       - 'src/game.js'
       - 'src/referee.js'
+      - 'src/duo.js'
       - 'src/tournament.js'
       - 'src/*.json'
       - 'tools/net-bot.js'

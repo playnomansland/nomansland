@@ -7,6 +7,7 @@
 //   GET /room/<CODE>       -> WebSocket into the match Room for that code: the referee of a live match (step 3)
 //   GET /room/<CODE>?t=<T> -> the same for a match of tournament T
 //   GET /tour/<CODE>       -> WebSocket into the tournament for that code (TourRoom: the server keeps the tournament)
+//   GET /duo/<CODE>        -> WebSocket into a 2v2 match (DuoRoom; only a developer account can make one)
 //   GET /history?limit=&before= -> saved rounds of server matches, newest first, paged (HistoryRoom, step 4)
 //   GET /history/<MATCH>   -> one match's rounds (<ROOM>-<seed>, or a bare room code for that room's newest match)
 //   GET /leaderboard       -> ranked players with wins, ties and losses, and whether ranked play is on (accounts.js)
@@ -17,6 +18,7 @@ import { VERSION } from './version.js';
 export { Room } from './room.js';
 export { TourRoom } from './tour.js';
 export { HistoryRoom } from './history.js';
+export { DuoRoom } from './duo.js';
 
 const CODE_RE = /^[A-Z0-9]{4,8}$/;
 
@@ -64,7 +66,7 @@ export default {
       catch (e) { console.warn('history read', e && e.message); return json({ error: 'history unavailable' }, 503, cors); }
     }
 
-    const m = url.pathname.match(/^\/(room|tour)\/([^/]+)$/);
+    const m = url.pathname.match(/^\/(room|tour|duo)\/([^/]+)$/);
     if (m) {
       const code = m[2].toUpperCase();
       if (!CODE_RE.test(code)) return json({ error: 'bad code' }, 400);
@@ -75,7 +77,7 @@ export default {
       // Browsers always send Origin, so this keeps other websites from opening connections from a visitor's
       // browser. It is not a lock against scripts (they can fake it); the rooms' own checks handle those.
       if (!allowedOrigin(request, env)) return json({ error: 'origin' }, 403);
-      const ns = m[1] === 'room' ? env.ROOM : env.TOUR;
+      const ns = m[1] === 'room' ? env.ROOM : m[1] === 'duo' ? env.DUO : env.TOUR;
       const headers = new Headers(request.headers); headers.set('x-code', code);
       if (tour) headers.set('x-tour', tour);
       return ns.getByName(tour ? `${tour}.${code}` : code).fetch(new Request(request, { headers }));

@@ -52,6 +52,14 @@ Frozen Peak's hailstorm and altar of ice are switched off for now (`iceOff` on t
 
 Online play runs on our own server (Cloudflare Workers + Durable Objects) in `server/`: tournaments (step 2), the referee of live matches (step 3) match history (step 4: every round of every server match, `server/src/history.js`, read with `GET /history`) and accounts (step 5: guests and Sign in with Google, `server/src/accounts.js`, a D1 database; switched off until the database is bound). Plan, security and accounts: [docs/SERVER.md](docs/SERVER.md). Local: `cd server && npm i && npm run dev`; test: `npm test`.
 
+## 2v2 (developer test)
+
+- Rules and the refereed match: `src/duo.js` (global `Duo`, node-testable). Two lanes, each an ordinary 1v1 match on the Standard map (`testgrid`); team A is side 0 in both. Seats: 0 = A1 (lane 0, side 0), 1 = A2 (lane 1, side 0), 2 = B1, 3 = B2.
+- The fight: `Duo.battle(lanes)` builds every body of both lanes into one Engine battle, lane 0 shifted half a board left and lane 1 right (`Game.withXOff`), lane 1's squad ids moved by `Duo.OFF`. No engine change: awareness simply works across the seam. `Duo.laneResult` splits the result back, each lane is resolved with `Game.resolve`, and both lanes' damage comes off the shared team health (`Duo.HP`, 200).
+- Drawing: `Duo.view(pres)` is a picture of both lanes on the view-only map `duo` (`Game.VIEW_MAPS`, 28 x 18). On a phone the 2D board shows a window of it (`win` in the renderer's view: own board first, drag / pinch / double tap); on a PC the whole field.
+- Server: `server/src/duo.js` (DuoRoom, `/duo/<CODE>`, 6-letter codes). Only a developer account can create (local tests: `--var DUO_ANYONE:1`). Each phone gets its own lane as a normal server sync (mode `net`), plus `duo` (seats, names, team health, the teammate's lane as `mate`) and, with a fight, `duo.pres`.
+- Tests: `node tools/tests/duo.js` (headless), `server/test/duo.test.js` (in npm test), `tools/tests/duo-ui.js` (browser; http.server 8766 and wrangler dev on 8798 with DUO_ANYONE).
+
 ## Tournaments (invite only)
 
 - **Start screen → Host a tournament.** The game server keeps the tournament (`server/src/tour.js`, one Durable Object per tournament code, WebSocket `/tour/<CODE>`; the rules are `src/tournament.js`, global `Tour`, which runs in node and on the server). The organizer's phone gets a secret key when creating it and sends organizer actions as `{ t: 'org', op, a }` (`tourDo` → `Tour.apply` on the server); each player gets their own key on joining (ids are public, keys never are). The tournament goes on when the organizer's phone closes. Players join with `?tour=CODE` or the 4-letter code; `?tour=CODE&watch=1` is the big-screen view. `?server=URL` points the page at another game server (tests use a local one).

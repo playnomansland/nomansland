@@ -4,6 +4,30 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 2 November 2026 – 2v2 (developer test)
+
+A first version of **2v2**, open to developer accounts only for now.
+
+### How it works
+- **Two Standard boards side by side.** A1 and B1 fight on the left board, A2 and B2 on the right. Team A is at the bottom of both boards, team B at the top.
+- **Each player deploys on their own board, just like 1v1:** your own gold, packages, leader, tower, unlocks, skills and levels. Nothing you buy is shared with your teammate.
+- **One fight for all four.** When the fight starts, both boards fight at once as one big field. Nothing keeps units on their own board: a squad near the middle can spot enemies on the other board and walk over to fight them, so you can help your teammate (or get caught from the side).
+- **Shared team health: 200.** After the fight each board is scored as in 1v1 (survivors deal damage, a fallen tower costs health, gold, streaks and treasuries per board), and the damage from both boards comes off your team's health. A team at 0 loses.
+- **Hidden info as in 1v1:** you never see what the enemy deployed this round. Your teammate's board is known to your team.
+- If a player leaves the match, their team loses.
+
+### The lobby
+- Developer section of the Play menu: **2v2 lobby**. It gives a 6-letter code and an invite link. Anyone with the link or code can join (the code box now takes 6-letter codes too).
+- Players take the first free seat. **The host sets the teams:** tap one seat, then another, to swap them (or move a player to an empty seat).
+- **Start** works with fewer than four: every empty seat, and anyone not connected when it starts, is played by the AI.
+
+### Watching the fight
+- **On a PC** you see the whole field: both boards, all four players.
+- **On a phone** the fight opens on your own board, with your opponent in front of you. Drag sideways to look at the other board, pinch or double tap to see the whole field. (On the 3D board the camera starts over your own board.)
+- After the fight you're back on your own board for the next round. The bar above the board shows your seat, your board and how your teammate is doing.
+
+---
+
 ## 2 November 2026 – Balance and fixes
 
 ### Usernames

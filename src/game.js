@@ -540,6 +540,10 @@ const Game = (() => {
     // deeper zones (8 rows) and only 2 rows of no man's land: the armies meet almost at once
     editorMap('rush', EDITOR_MAPS.rush, { short: 'Deep zones, only 2 rows of no man’s land: the armies meet at once.', text: 'Each zone is 14 by 8 tiles, with only 2 rows of no man’s land between them, so the armies meet almost at once. The towers stand one column further in, and the back corners are flank tiles too. A treasury pays 50 gold per fight it survives.' }), // only when picked, never random
   ];
+  // Boards only drawn, never played or picked (not in MAPS): 'duo' is two Standard boards side by side, the field of a
+  // 2v2 fight (src/duo.js). A match on it is only a picture of the fight (Duo.view).
+  const VIEW_MAPS = [{ id: 'duo', name: '2v2', short: 'Two Standard boards side by side.', text: 'Two Standard boards side by side.', plain: true, skins: true, view: true, grid: { cols: 28, rows: 18, zone: 7 } }];
+  const findMap = (id) => MAPS.find(x => x.id === id) || VIEW_MAPS.find(x => x.id === id);
   // Looks (skins) for the 3D board: a map with skins (the Standard and the Test Grid) can be played in any of them; the
   // others have their own look. Only how the board looks: the rules stay the map's. The match keeps the host's pick (m.skin).
   const SKINS = [{ id: 'meadow', name: 'Meadow' }, { id: 'autumn', name: 'Autumn' }, { id: 'snow', name: 'Snow' }, { id: 'frost', name: 'Darkwoods' }, { id: 'desert', name: 'Desert' }];
@@ -874,7 +878,7 @@ const Game = (() => {
     if (mp && mp.spots && mp.spots.tower[side]) return { ...mp.spots.tower[side] }; // an editor map's own tile
     return side === 1 && mp && mp.pointMirror ? { col: COLS - 1 - t.col, row: t.row } : { ...t };
   };
-  const mapOf = (m) => (m && m.map && MAPS.find(x => x.id === m.map.id)) || null;
+  const mapOf = (m) => (m && m.map && findMap(m.map.id)) || null;
   // a map's own range and speed for a unit (Test Grid): +rangeAdd m for units with rangeAddMin m of range or more, and
   // each [speed, cut] step in slowSteps the unit reaches takes cut m/s off its move speed. Units in tuneKeep keep theirs.
   function mapTuned(mp, u) {
@@ -1019,14 +1023,18 @@ const Game = (() => {
   }
   // riders follow their carrier's tile
   const syncRiders = (m, side) => { for (const s of m.armies[side]) if (isRider(s)) { const c = carrierOf(m, side, s); if (c) { s.col = c.col; s.row = c.row; } else delete s.in; } };
-  const tileToWorld = (col, row) => ({ x: (col - (COLS - 1) / 2) * TILE, y: ((ROWS - 1) / 2 - row) * TILE });
+  // XOFF: metres added to every tile's x (0 except while a 2v2 lane builds its bodies beside the other lane: see withXOff)
+  let XOFF = 0;
+  const tileToWorld = (col, row) => ({ x: (col - (COLS - 1) / 2) * TILE + XOFF, y: ((ROWS - 1) / 2 - row) * TILE });
+  // runs fn with the board shifted dx metres sideways (2v2, src/duo.js: each lane is its own match, side by side in one fight)
+  function withXOff(dx, fn) { const was = XOFF; XOFF = dx; try { return fn(); } finally { XOFF = was; } }
   const BOUNDS = { x0: -COLS * TILE / 2, x1: COLS * TILE / 2, y0: -ROWS * TILE / 2, y1: ROWS * TILE / 2 }; // the board in world metres
   // Switches the board to the grid of a match's map (or of a map id): COLS, ROWS, ZONE and what hangs on them. The
   // objects keep their identity, so everything holding them sees the new grid. Returns true when the grid changed.
   // Every exported function that takes a match calls it first (see the end of this file), so callers needn't.
   function useGrid(mOrId) {
     const id = mOrId && typeof mOrId === 'object' ? (mOrId.map && mOrId.map.id) : mOrId;
-    const mp = id ? MAPS.find(x => x.id === id) : null, g = (mp && mp.grid) || GRID;
+    const mp = id ? findMap(id) : null, g = (mp && mp.grid) || GRID;
     FLANK_SET = (mp && mp.flankSet) || null;
     if (g.cols === COLS && g.rows === ROWS && g.zone === ZONE) return false;
     COLS = g.cols; ROWS = g.rows; ZONE = g.zone;
@@ -1798,7 +1806,7 @@ const Game = (() => {
       if (zoe) for (const x of b) x.zoe = true; // for the rising-stars effect
       if (purple) for (const x of b) x.shroom = true; // for the drifting spores effect
       if (isFlank(side, sq.col, sq.row) && (sq.round === m.round || sq.movedRound === m.round)) for (const x of b) x.delay = FLANK.delay * (ch === 'wilhelm' ? CHAR.wilhelmDelay : 1); // only in its first fight
-      if (isFlank(side, sq.col, sq.row)) for (const x of b) x.march = [w.x < 0 ? 1 : -1, 0]; // a flank squad marches in toward the middle until it spots an enemy
+      if (isFlank(side, sq.col, sq.row)) for (const x of b) x.march = [w.x - XOFF < 0 ? 1 : -1, 0]; // a flank squad marches in toward the middle until it spots an enemy
       idx += b.length;
       out.push(...b);
     }
@@ -3104,7 +3112,7 @@ const Game = (() => {
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,
-    zoneRows, inZone, tileToWorld, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, resolve, aiDeploy, occupied,
+    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, resolve, aiDeploy, occupied,
     GRID, useGrid,
     DEV, CAT_NAMES, LESSER_SQ, WALL_SQ, setDevData, devBuilding, devPower, devSpell, isDev, towerUp, pickCat, devOffer, pickNow, needsDevPick, devPick, undoDevPick, devShown,
     lessersOf, placedLessers, unplacedLesser, lesserAt, lesserSpotOk, placeLesser, lesserUnit, auraFor, modUnit, powersOf, devGold, devDeploys,
