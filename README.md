@@ -44,6 +44,10 @@ Frozen Peak's hailstorm and altar of ice are switched off for now (`iceOff` on t
 - **Switching away mid-fight** (another tab or app) pauses the replay where it is; coming back goes on from there. In a live match the other player waits on the results screen meanwhile (the next round needs both), so after 45 s away (`LIVE_AWAY`) the rest of the fight plays out to its result, as before. `tools/tests/playback-mp.js` checks both.
 - **Fair turns:** the engine gives neither side the edge in a tie. The side whose bodies act first alternates every tick; both sides move from where everyone stood when the tick began; a body killed this tick still attacks; heals, lifesteal, Glut, range cuts, knockback, stealth reveals and a fallen tower's penalty take hold once the tick's attacks have landed; side 1's squads stand mirrored (front row first); each side draws dodges and random heals from its own stream. Mirrored armies come out as exact mirrors (`node tools/tests/fairness.js`); before, the host won about 60% of mirrored duels that weren't draws.
 
+## Game server (in progress)
+
+Online play is moving to our own server (Cloudflare Workers + Durable Objects) in `server/`. Plan, security and accounts: [docs/SERVER.md](docs/SERVER.md). Local: `cd server && npm i && npm run dev`; test: `npm test`.
+
 ## Tournaments (invite only)
 
 - **Start screen → Host a tournament.** The organizer's page becomes the hub: it keeps the tournament (`src/tournament.js`, global `Tour`, no drawing or networking, so it runs in node) and every player's page keeps a second PeerJS connection to it (peer id `phonebellum-t1-<CODE>`, 4-character code), beside the one for their own match. Players open the invite link (`?tour=CODE`) or type the 4-letter code in the join box, and pick a gamertag (locked once it starts). `?tour=CODE&watch=1` is a big-screen view (no player).

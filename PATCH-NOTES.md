@@ -4,6 +4,16 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 2 November 2026 – Behind the scenes: our own game server
+
+Nothing changes in the game yet. This is the first step towards online play running on our own server instead of phone to phone:
+
+- A game server now exists (on Cloudflare). It can already play a full round of the real game and gets exactly the same result as your phone.
+- Next steps: tournaments that keep going even if the organizer's phone closes, then the server acting as referee in live matches so nobody can cheat by changing their game, then accounts with "Sign in with Google" (and Apple). Ranked play comes once there are enough players for short queues.
+- vs AI, solo and the Counter Lab keep working without the server.
+
+---
+
 ## 1 November 2026 – Leafblade and Hellfiend balance
 
 - **Leaf Wizard – Leafblade:** homing missile damage reduced from 150 to 100 per missile. Dash now has a 1.5-second cooldown per body between dash starts.

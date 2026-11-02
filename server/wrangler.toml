@@ -1,0 +1,20 @@
+# No Mans Land game server. Deployed by .github/workflows/server-deploy.yml when CLOUDFLARE_API_TOKEN is set.
+name = "nml-server"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Pages that may open a connection. Anything else is turned away.
+[vars]
+ALLOWED_ORIGINS = "https://snetendare.github.io,http://localhost:8766,http://127.0.0.1:8766,http://localhost:8787"
+
+# One Room per match or tournament code. SQLite-backed, so it works on the Free plan.
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
+
+[observability]
+enabled = true
