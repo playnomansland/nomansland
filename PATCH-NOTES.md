@@ -4,6 +4,17 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 2 November 2026 – Music player
+
+- Hover **Now playing** and it lights up; tap it to open the **playlist**. Tap any song there (or in Settings) to play it.
+- The menu music now goes **in order**: after the song that's playing comes the next one in the list, also after you pick a song yourself (play song D and song E comes next).
+- New **Shuffle** button: the next song is a random one instead.
+- New **Repeat** button: the song playing plays again and again.
+- Shuffle and Repeat are remembered on this device.
+- The look preview in the PLAY menu now shows both **treasuries** on the Standard map.
+
+---
+
 ## 2 November 2026 – Titles
 
 - **Titles** now show under your gamertag with a little glow: on the main menu, in your Profile, on the Leaderboard and in ranked matches.

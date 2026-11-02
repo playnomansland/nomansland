@@ -545,6 +545,15 @@ html.pc .corner button span { display: inline; }
 @keyframes tspin { to { transform: rotate(360deg); } }
 .title-pop > *:not(.tp-burst) { position: relative; }
 @media (prefers-reduced-motion: reduce) { .ptitle, .tp-burst, .tp-list { animation: none; } }
+
+/* the music player (2026-11-02): Now playing opens the playlist; shuffle and repeat */
+.mp-now { display: grid; justify-items: center; gap: 2px; border: 1px solid transparent; background: none; color: inherit; border-radius: 8px; padding: 4px 12px; cursor: pointer; transition: border-color 0.15s ease, background-color 0.15s ease; }
+.mp-now:hover:not([disabled]), .mp-now:focus-visible { border-color: var(--gold); background: rgba(230, 184, 74, 0.08); }
+.mp-now[disabled] { cursor: default; }
+.mp-mode { width: 30px; height: 30px; color: var(--muted); }
+.mp-mode svg { width: 15px; height: 15px; }
+.mp-mode[aria-pressed="true"] { color: var(--gold); border-color: var(--gold); }
+.sheet .mplayer { margin-top: 0; padding-top: 0; border-top: 0; }
 </style>
 <script>
 // PC or phone: a fine pointer that can hover (a mouse) and room for the board and controls side by side
@@ -865,23 +874,28 @@ html.pc .corner button span { display: inline; }
   let snd = { vol: DEFAULT_VOL, muted: false, song: '', solo: false };
   try {
     const p = JSON.parse(localStorage.getItem(SOUND_STORE) || 'null');
-    if (p && isFinite(p.vol)) snd = { vol: Math.max(0, Math.min(100, +p.vol)), muted: !!p.muted, song: SONGS[p.song] ? p.song : '', solo: !!p.solo };
+    if (p && isFinite(p.vol)) snd = { vol: Math.max(0, Math.min(100, +p.vol)), muted: !!p.muted, song: SONGS[p.song] ? p.song : '', solo: !!p.solo, shuffle: !!p.shuffle, repeat: !!p.repeat };
     else if (localStorage.getItem('phonebellum.music.v1') === 'off') snd.muted = true; // the old On/Off switch
   } catch (e) {}
   const saveSound = () => { try { localStorage.setItem(SOUND_STORE, JSON.stringify(snd)); } catch (e) {} };
   const musicLevel = () => snd.muted ? 0 : snd.vol / 100;
   let actx = null, musicUnlocked = false;
-  // one player per playlist: starts on a random track and, when it ends, goes on to another random one (never the
-  // same song twice in a row) for as long as the phase lasts; a paused playlist picks up where it stopped
-  function playlist(tracks) {
-    const pickNext = (cur) => { if (tracks.length < 2) return 0; let t = Math.floor(Math.random() * (tracks.length - 1)); return t >= cur ? t + 1 : t; };
+  // one player per playlist: starts on a random track and, when it ends, goes on to the next one for as long as the
+  // phase lasts; a paused playlist picks up where it stopped. pl.shuffle: the next song is a random other one (the
+  // deploy and battle playlists always shuffle); otherwise the next in the list, wrapping round, so a song picked
+  // from the list (pl.play) is followed by the one after it. pl.repeat: the song plays again and again.
+  function playlist(tracks, shuffle = true) {
+    const pickNext = (cur) => { if (tracks.length < 2) return 0; if (!pl.shuffle) return (cur + 1) % tracks.length; let t = Math.floor(Math.random() * (tracks.length - 1)); return t >= cur ? t + 1 : t; };
     let track = Math.floor(Math.random() * tracks.length), gain = null, stopT = 0;
     const el = new Audio(SONGS[tracks[track]].file);
     el.preload = 'none';
-    const pl = { el, playing: false, onChange: null }, past = []; // past: the songs played before, for Back
+    const pl = { el, playing: false, onChange: null, shuffle, repeat: false }, past = []; // past: the songs played before, for Back
     const load = (t) => { track = t; el.src = SONGS[tracks[track]].file; if (pl.playing) el.play().catch(() => {}); if (pl.onChange) pl.onChange(); };
     el.addEventListener('ended', () => pl.next());
     pl.song = () => tracks[track];
+    pl.list = () => tracks.slice();
+    pl.play = (id) => { const t = tracks.indexOf(id); if (t < 0) return; if (t !== track) { past.push(tracks[track]); if (past.length > 20) past.shift(); load(t); } else { try { el.currentTime = 0; } catch (e) {} } };
+    pl.setRepeat = (on) => { pl.repeat = !!on; el.loop = pl.repeat; };
     pl.next = () => { past.push(tracks[track]); if (past.length > 20) past.shift(); load(pickNext(track)); };
     // Back: to the start of this song, or (in its first 3 seconds) to the one before
     pl.back = () => {
@@ -920,10 +934,12 @@ html.pc .corner button span { display: inline; }
     };
     return pl;
   }
-  const menuSongs = () => snd.song ? [snd.song] : PLAYLISTS.menu;
+  const menuSongs = () => PLAYLISTS.menu; // every menu song; a picked one plays now and the list goes on from it
   let menuPaused = false; // the menu player's Pause (this visit only; the sheet's Music Off is the lasting switch)
-  const music = { menu: playlist(menuSongs()), deploy: playlist(PLAYLISTS.deploy), battle: playlist(PLAYLISTS.battle) };
+  const music = { menu: playlist(menuSongs(), !!snd.shuffle), deploy: playlist(PLAYLISTS.deploy), battle: playlist(PLAYLISTS.battle) };
   for (const id in MUSIC_COMBOS) for (const k in MUSIC_COMBOS[id]) music[k + '-' + id] = playlist(MUSIC_COMBOS[id][k]);
+  music.menu.setRepeat(!!snd.repeat);
+  if (snd.song && PLAYLISTS.menu.includes(snd.song)) music.menu.play(snd.song); // the song picked last time starts the list
   function syncMusic() {
     const on = musicUnlocked && musicLevel() > 0;
     music.menu.set(on && !menuPaused && (phase === 'start' || phase === 'lobby' || phase === 'draft'));
@@ -970,22 +986,29 @@ html.pc .corner button span { display: inline; }
   const ICONS = {
     play: icon(`<path d="${ICON_PLAY}"/>`), pause: icon(`<path d="${ICON_PAUSE}"/>`),
     next: icon(`<g transform="translate(0 6) scale(0.75)"><path d="${ICON_PLAY}"/></g><rect x="34" y="6" width="9" height="36" rx="3"/>`),
+    shuffle: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M3 7h3.5c4 0 6 10 10 10H21M3 17h3.5c1.6 0 2.8-1.6 3.9-3.5M13.6 10.5C14.7 8.6 15.9 7 17.5 7H21M18 4l3 3-3 3M18 14l3 3-3 3"/></svg>',
+    repeat: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M4 11V9a3 3 0 0 1 3-3h12M16 3l3 3-3 3M20 13v2a3 3 0 0 1-3 3H5M8 21l-3-3 3-3"/><text x="12" y="14.5" font-size="7" font-weight="700" text-anchor="middle" fill="currentColor" font-family="sans-serif">1</text></svg>',
     back: icon(`<g transform="translate(48 0) scale(-1 1)"><g transform="translate(0 6) scale(0.75)"><path d="${ICON_PLAY}"/></g><rect x="34" y="6" width="9" height="36" rx="3"/></g>`),
   };
   const menuPlaying = () => musicOn() && !menuPaused;
   const playerHtml = () => `<div class="mplayer" role="group" aria-label="Music player">
-      <span class="mp-label">Now playing</span>
-      <span id="mp-title">${esc(songName(music.menu.song()))}</span>
+      <button class="mp-now" id="mp-now" aria-label="Now playing: open the playlist"><span class="mp-label">Now playing</span>
+      <span id="mp-title">${esc(songName(music.menu.song()))}</span></button>
       <span class="mp-row">
+        <button class="mp-btn mp-mode" id="mp-shuffle" aria-label="Shuffle" aria-pressed="${music.menu.shuffle}" title="Shuffle">${ICONS.shuffle}</button>
         <button class="mp-btn" id="mp-back" aria-label="Back">${ICONS.back}</button>
         <button class="mp-btn mp-main" id="mp-play" aria-label="${menuPlaying() ? 'Pause' : 'Play'}">${menuPlaying() ? ICONS.pause : ICONS.play}</button>
         <button class="mp-btn" id="mp-next" aria-label="Next">${ICONS.next}</button>
+        <button class="mp-btn mp-mode" id="mp-repeat" aria-label="Repeat this song" aria-pressed="${music.menu.repeat}" title="Repeat this song">${ICONS.repeat}</button>
       </span>
     </div>`;
   function showPlayer() {
     const t = $('mp-title'), pb = $('mp-play');
     if (t) t.textContent = songName(music.menu.song());
     if (pb) { pb.innerHTML = menuPlaying() ? ICONS.pause : ICONS.play; pb.setAttribute('aria-label', menuPlaying() ? 'Pause' : 'Play'); }
+    if ($('mp-shuffle')) $('mp-shuffle').setAttribute('aria-pressed', String(music.menu.shuffle));
+    if ($('mp-repeat')) $('mp-repeat').setAttribute('aria-pressed', String(music.menu.repeat));
+    document.querySelectorAll('[data-song]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.song === music.menu.song())));
   }
   music.menu.onChange = showPlayer;
   function wirePlayer() {
@@ -996,8 +1019,39 @@ html.pc .corner button span { display: inline; }
       syncMusic(); showPlayer();
     });
     // a picked menu song plays on its own: Next goes back to all the menu songs
-    $('mp-next').addEventListener('click', () => { if (snd.song) { snd.song = ''; saveSound(); music.menu.tracks(menuSongs()); } else music.menu.next(); showPlayer(); });
+    $('mp-next').addEventListener('click', () => { music.menu.next(); showPlayer(); });
+    $('mp-shuffle').addEventListener('click', () => { music.menu.shuffle = snd.shuffle = !music.menu.shuffle; saveSound(); showPlayer(); });
+    $('mp-repeat').addEventListener('click', () => { music.menu.setRepeat(!music.menu.repeat); snd.repeat = music.menu.repeat; saveSound(); showPlayer(); });
+    $('mp-now').addEventListener('click', openPlaylist);
     $('mp-back').addEventListener('click', () => { music.menu.back(); showPlayer(); });
+  }
+
+  // a song picked from a list: it plays now (music on, the player unpaused) and the list goes on from it
+  function playSong(id) {
+    music.menu.play(id); snd.song = id; saveSound();
+    menuPaused = false;
+    if (!musicOn()) setMusic(true); else { wakeAudio(true); music.menu.wake(); syncMusic(); }
+    showPlayer();
+  }
+  const songList = () => `<div class="songs" role="group" aria-label="Menu music">
+      ${music.menu.list().map(id => `<button data-song="${id}" aria-pressed="${music.menu.song() === id}">${esc(songName(id))}</button>`).join('')}
+    </div>`;
+  const wireSongList = () => $('sheet').querySelectorAll('[data-song]').forEach(b => b.addEventListener('click', () => playSong(b.dataset.song)));
+  // Now playing (tap): the playlist, with the player on top
+  function openPlaylist() {
+    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Playlist</h3><button class="btn small" id="close">Close</button></div>
+      ${playerHtml().replace('id="mp-now"', 'id="mp-now" disabled')}
+      <p class="hint" style="margin:0">Tap a song to play it. The list carries on from there${music.menu.shuffle ? ' (in shuffled order while Shuffle is on)' : ''}.</p>
+      ${songList()}`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', closeSheet);
+    const ids = ['mp-now', 'mp-title', 'mp-play', 'mp-back', 'mp-next', 'mp-shuffle', 'mp-repeat'];
+    // the menu's own player is under the sheet: give the sheet's copy the ids while it is open
+    document.querySelectorAll('#home .mplayer [id]').forEach(x => { x.dataset.keepId = x.id; x.removeAttribute('id'); });
+    wirePlayer(); wireSongList();
+    const back = () => { if (!$('sheet-back').hidden && $('sheet').querySelector('.mplayer')) return setTimeout(back, 300); $('sheet').querySelectorAll('.mplayer [id]').forEach(x => x.removeAttribute('id')); document.querySelectorAll('[data-keep-id]').forEach(x => { if (!$(x.dataset.keepId)) x.id = x.dataset.keepId; delete x.dataset.keepId; }); showPlayer(); };
+    setTimeout(back, 300);
+    void ids;
   }
 
   // ---------- sound effects (audio/sfx/, by Snetänd): played through Web Audio from decoded buffers, so they start at
@@ -1148,11 +1202,8 @@ html.pc .corner button span { display: inline; }
           <button data-rk="1" aria-pressed="${home.rankedOn === true}">On</button><button data-rk="0" aria-pressed="${home.rankedOn === false}">Off</button>
         </div>
       </div><p class="hint" id="rk-msg" style="margin:0" aria-live="polite"></p>` : ''}
-      <div class="songs" role="group" aria-label="Menu music">
-        <span class="hint">Menu music</span>
-        <button data-song="" aria-pressed="${!snd.song}">All menu songs</button>
-        ${Object.keys(SONGS).map(id => `<button data-song="${id}" aria-pressed="${snd.song === id}">${esc(songName(id))}</button>`).join('')}
-      </div>
+      <span class="hint">Menu music: tap a song to play it, the list carries on from there</span>
+      ${songList()}
       `;
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', () => closeSheet(true));
@@ -1179,11 +1230,7 @@ html.pc .corner button span { display: inline; }
       snd.solo = b.dataset.solo === '1'; saveSound(); setAudioSession(); wakeAudio(true);
       $('sheet').querySelectorAll('[data-solo]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
     }));
-    $('sheet').querySelectorAll('[data-song]').forEach(b => b.addEventListener('click', () => {
-      snd.song = b.dataset.song; saveSound();
-      $('sheet').querySelectorAll('[data-song]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-      music.menu.tracks(menuSongs()); showPlayer();
-    }));
+    wireSongList();
     $('sheet').querySelectorAll('[data-mute]').forEach(b => b.addEventListener('click', () => {
       setMusic(b.dataset.mute === '0'); if (musicOn()) menuPaused = false; showPlayer();
       $('vol').value = snd.vol; $('vol-n').textContent = snd.vol; showOn();

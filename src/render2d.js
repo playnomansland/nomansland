@@ -735,6 +735,11 @@ const Render2D = (cv, view, opts = {}) => {
       if (m) {
         for (const side of [0, 1]) { const p = m.towers[side]; drawKeep((scol(p.col) + 0.5) * t, (srow(p.row) + 0.5) * t, t * 1.6, side, null, 'keep', g); }
         drawElfTower(m, false);
+        if (Game.treasuryOn(m)) { // the treasuries (Standard / Test Grid and the maps built on it), as at the start of a match
+          const u = Game.treasuryUnit();
+          for (const side of [0, 1]) { const ts = Game.treasurySpot(m, side); if (ts) drawLesser((scol(ts.col) + 0.5) * t, (srow(ts.row) + 0.5) * t, t * 1.3, side, u, null, false, false); }
+          ctx.globalAlpha = 1;
+        }
       } else { // Random: a question mark on the plain board
         g.fillStyle = css('--gold'); g.font = `700 ${Math.round(tw * 0.5)}px "Chakra Petch", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
         g.fillText('?', tw / 2, th / 2);
