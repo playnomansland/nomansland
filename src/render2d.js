@@ -722,8 +722,8 @@ const Render2D = (cv, view, opts = {}) => {
   }
   // A small picture of a match's board for the map picker: the board at the start of a match, with both towers
   // (and the elf tower). Drawn with the board's own drawing code, by pointing it at a small canvas for a moment.
-  function thumb(match) {
-    const tw = 96, th = tw * Game.ROWS / Game.COLS, dpr = 2;
+  function thumb(match, tw = 96) { // tw: the picture's width in px (the map picker's 96; look previews are bigger)
+    const th = tw * Game.ROWS / Game.COLS, dpr = 2;
     const oc = document.createElement('canvas'); oc.width = tw * dpr; oc.height = th * dpr;
     const g = oc.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
     const keep = { ctx, W, H, S, m, me, phase, mapBg, terBg };
@@ -735,6 +735,11 @@ const Render2D = (cv, view, opts = {}) => {
       if (m) {
         for (const side of [0, 1]) { const p = m.towers[side]; drawKeep((scol(p.col) + 0.5) * t, (srow(p.row) + 0.5) * t, t * 1.6, side, null, 'keep', g); }
         drawElfTower(m, false);
+        if (Game.treasuryOn(m)) { // the treasuries (Standard / Test Grid and the maps built on it), as at the start of a match
+          const u = Game.treasuryUnit();
+          for (const side of [0, 1]) { const ts = Game.treasurySpot(m, side); if (ts) drawLesser((scol(ts.col) + 0.5) * t, (srow(ts.row) + 0.5) * t, t * 1.3, side, u, null, false, false); }
+          ctx.globalAlpha = 1;
+        }
       } else { // Random: a question mark on the plain board
         g.fillStyle = css('--gold'); g.font = `700 ${Math.round(tw * 0.5)}px "Chakra Petch", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
         g.fillText('?', tw / 2, th / 2);

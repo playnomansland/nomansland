@@ -390,7 +390,71 @@
     return st.slice().sort((x, y) => ((place.get(x.id) ?? Infinity) - (place.get(y.id) ?? Infinity)) || ((reach.get(y.id) ?? -1) - (reach.get(x.id) ?? -1)) || (pos.get(x.id) - pos.get(y.id)));
   }
 
-  const api = { CODE_CHARS, POINTS, BOT_NAMES, swapSlots, editable, addBot, isBot, bestOf, finalBestOf, winsNeeded, score, gameOf, undoGame, rng, newCode, cleanName, suggestRounds, suggestCut, create, join, rename, remove, player, nameOf, active, swissRounds, cutSize,
+  // ----- the organizer's actions, as messages (2026-11-02: the server keeps the tournament) -----
+  // The organizer's phone sends { op, a } and the server runs it here, so nobody but the organizer can change the
+  // tournament, and only in ways these functions allow. opts: { rnd, maps (ids to pick a round's map from), orgName }.
+  // Returns true when something changed.
+  const SETTING_KEYS = { format: ['swiss', 'elim'], swissRounds: 'int', cut: 'int', bestOf: [1, 3, 5, 7], finalBestOf: [0, 1, 3, 5, 7], map: 'str', skin: 'str',
+    packOptions: [2, 3, 4, 5], mirror: [true, false], deploy1: 'int', deploy: 'int', next: 'int', pack: ['standard', 'all'], offUnits: 'list', offChars: 'list', offTowers: 'list',
+    net: ['server', 'peer'] }; // net: who referees the matches (the game server since 2026-11-02, or the host's phone over PeerJS)
+  function cleanSetting(k, v) {
+    const rule = SETTING_KEYS[k];
+    if (!rule) return undefined;
+    if (Array.isArray(rule)) return rule.includes(v) ? v : undefined;
+    if (rule === 'int') return Number.isInteger(v) && v >= -1 && v <= 600 ? v : undefined;
+    if (rule === 'str') return typeof v === 'string' && v.length <= 40 ? v : undefined;
+    if (rule === 'list') return Array.isArray(v) && v.length <= 200 && v.every(x => typeof x === 'string' && x.length <= 40) ? v.slice() : undefined;
+    return undefined;
+  }
+  function applySettings(t, obj) {
+    let changed = false;
+    if (!obj || typeof obj !== 'object') return false;
+    for (const k of Object.keys(obj)) { const v = cleanSetting(k, obj[k]); if (v !== undefined) { t.settings[k] = v; changed = true; } }
+    return changed;
+  }
+  const str = (x) => typeof x === 'string' ? x.slice(0, 40) : '';
+  function apply(t, op, a, opts) {
+    a = a && typeof a === 'object' ? a : {};
+    const o = opts || {}, rnd = o.rnd || Math.random;
+    switch (op) {
+      case 'rename': return rename(t, str(a.id), a.name);
+      case 'drop': return !!str(a.id) && str(a.id) !== t.org && remove(t, str(a.id));
+      case 'orgPlays':
+        if (t.status !== 'lobby') return false;
+        if (a.on) { if (player(t, t.org)) return false; join(t, t.org, a.name || o.orgName || 'Organizer'); t.orgPlays = true; return true; }
+        t.orgPlays = false; return remove(t, t.org);
+      case 'addBot': return !!addBot(t);
+      case 'noBots': { const bots = t.players.filter(p => p.bot); bots.forEach(p => remove(t, p.id)); return bots.length > 0; }
+      case 'advance': {
+        if (!advance(t, rnd)) return false;
+        const r = current(t), pool = o.maps || [];
+        if (r && !r.map && t.status === 'running') r.map = t.settings.map || (pool.length ? pool[Math.floor(rnd() * pool.length)] : 'standard');
+        return true;
+      }
+      case 'undoRound': return undoRound(t);
+      case 'result': {
+        const f = findMatch(t, str(a.id)), w = a.w;
+        if (!f || !['a', 'b', 'draw'].includes(w)) return false;
+        const old = f.match.result && f.match.result.hp;
+        return f.match.bo > 1 && f.match.conflict ? resolveGame(t, f.match.id, w) : report(t, f.match.id, w, old || [0, 0], (f.match.result && f.match.result.rounds) || 0, 'org');
+      }
+      case 'replay': return replay(t, str(a.id), rnd);
+      case 'undoGame': return undoGame(t, str(a.id));
+      case 'swapHost': return swapHost(t, str(a.id));
+      case 'swapSlots': {
+        const slot = (x) => x && typeof x === 'object' ? (x.p != null ? { p: str(x.p) } : { m: str(x.m), k: str(x.k) }) : null;
+        const s1 = slot(a.s1), s2 = slot(a.s2);
+        return !!(s1 && s2) && swapSlots(t, s1, s2);
+      }
+      case 'settings': return applySettings(t, a);
+      case 'name': { const n = cleanName(a.name); if (!n) return false; t.name = n; return true; }
+      default: return false;
+    }
+  }
+
+  // who referees human matches: the game server unless the organizer switched back to phone-to-phone (PeerJS)
+  const serverMatches = (t) => !t.settings || t.settings.net !== 'peer';
+  const api = { serverMatches, sideOf, apply, applySettings, SETTING_KEYS, CODE_CHARS, POINTS, BOT_NAMES, swapSlots, editable, addBot, isBot, bestOf, finalBestOf, winsNeeded, score, gameOf, undoGame, rng, newCode, cleanName, suggestRounds, suggestCut, create, join, rename, remove, player, nameOf, active, swissRounds, cutSize,
     standings, pairSwiss, bracketOrder, playoffFirst, nextPlan, advance, report, resolveGame, replay, swapHost, undoRound, roundDone, current, matchOf, findMatch, bracket, placings, outcome, winnerOf, sideOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Tour = api;

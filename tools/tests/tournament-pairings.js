@@ -1,13 +1,13 @@
 // The organizer changes who plays who: in Matches → Change pairings, tap a player, then the one to trade places with.
 // The players' screens follow; a game already going on a moved match stops ("Match moved") and its result never counts.
-// Needs: python3 -m http.server 8766 (repo root) and node tools/peer-server.js (port 9000).
+// Needs: python3 -m http.server 8766 (repo root), node tools/peer-server.js (port 9000) and the game server (cd server && npx wrangler dev --port 8798).
 const { chromium } = require('playwright-core');
 const ctx2d = require('./board2d');
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-const BASE = 'http://127.0.0.1:8766/?peerhost=127.0.0.1&peerport=9000&test';
+const BASE = 'http://127.0.0.1:8766/?peerhost=127.0.0.1&peerport=9000&server=http://127.0.0.1:8798&test';
 let fails = 0;
 const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') + msg); if (!c) fails++; };
-const T = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('phonebellum.tour.org.v1')).t);
+const T = (p) => p.evaluate(() => window.__tour());
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--disable-features=WebRtcHideLocalIpsWithMdns'] });
   const mk = async (n) => { const p = await (await ctx2d(b, { viewport: { width: 390, height: 844 } })).newPage(); p.on('pageerror', e => { console.log(`[${n}] PAGE ERROR`, e.message); fails++; }); p.nm = n; return p; };

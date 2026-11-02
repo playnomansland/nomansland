@@ -1,0 +1,60 @@
+# Tests the game server and deploys it to Cloudflare. See docs/SERVER.md.
+# Needs two repository secrets (Settings > Secrets and variables > Actions):
+#   CLOUDFLARE_API_TOKEN  - an API token made from the "Edit Cloudflare Workers" template
+#   CLOUDFLARE_ACCOUNT_ID - the Cloudflare account id
+# Optional: DEV_EMAILS - comma-separated Google emails that get developer mode (put into a Cloudflare secret).
+# Without them the tests still run and the deploy step is skipped.
+name: Server deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'src/engine.js'
+      - 'src/game.js'
+      - 'src/referee.js'
+      - 'src/tournament.js'
+      - 'src/*.json'
+      - 'tools/net-bot.js'
+      - '.github/workflows/server-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-deploy
+  cancel-in-progress: false
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: server
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEV_EMAILS: ${{ secrets.DEV_EMAILS }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "Cloudflare secrets not set yet: skipping deploy."
+            exit 0
+          fi
+          npx wrangler deploy
+          # developer accounts (docs/SERVER.md, Accounts): kept as a Cloudflare secret, never in the repo
+          if [ -n "$DEV_EMAILS" ]; then printf '%s' "$DEV_EMAILS" | npx wrangler secret put DEV_EMAILS; fi

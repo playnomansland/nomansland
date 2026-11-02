@@ -1,0 +1,49 @@
+# No Mans Land game server. Deployed by .github/workflows/server-deploy.yml when CLOUDFLARE_API_TOKEN is set.
+name = "nml-server"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Pages that may open a connection. Anything else is turned away.
+[vars]
+ALLOWED_ORIGINS = "https://snetendare.github.io,https://playnomansland.github.io,http://localhost:8766,http://127.0.0.1:8766,http://localhost:8787"
+# Google sign-in (step 5): the public OAuth client id. The server checks that Google ID tokens were made for it.
+GOOGLE_CLIENT_ID = "732949481177-ikom5gqq07pt0sg89km9mth5d9ibfvmi.apps.googleusercontent.com"
+
+# One Room per match code. SQLite-backed, so it works on the Free plan.
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "Room"
+
+# One TourRoom per tournament code: keeps the tournament, so it lives on when the organizer's phone closes.
+[[durable_objects.bindings]]
+name = "TOUR"
+class_name = "TourRoom"
+
+# Match history (step 4): one HistoryRoom ('all') with its own SQLite keeps every round of every server match.
+[[durable_objects.bindings]]
+name = "HISTORY"
+class_name = "HistoryRoom"
+
+# Accounts (step 5): the D1 database nml-accounts (on since 2026-11-02). Without this block /account/* answers 503
+# 'accounts off' and nothing else changes. The tables are made by the Worker itself (accounts.js, ensureSchema).
+# Developer mode: the secret DEV_EMAILS (set by the deploy workflow from the GitHub secret of the same name).
+# test/accounts.test.js adds a local copy of this block by itself when it is still commented out.
+[[d1_databases]]
+binding = "ACCOUNTS"
+database_name = "nml-accounts"
+database_id = "fb6dc6c6-cec5-4b50-a7cc-2bb6142f586c"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["TourRoom"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["HistoryRoom"]
+
+[observability]
+enabled = true

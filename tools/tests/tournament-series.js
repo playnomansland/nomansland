@@ -1,14 +1,14 @@
 // Knockout best of 3, the bracket and spectating: 4 players, Bo3 knockout. A big-screen viewer sees the bracket and
 // watches a semifinal: the board while they deploy (without the squads placed this round), the fight itself and the
 // result. Each game of a series is its own match with its own code; the series ends at 2 wins.
-// Needs: python3 -m http.server 8766 (repo root) and node tools/peer-server.js (port 9000).
+// Needs: python3 -m http.server 8766 (repo root), node tools/peer-server.js (port 9000) and the game server (cd server && npx wrangler dev --port 8798).
 const { chromium } = require('playwright-core');
 const ctx2d = require('./board2d');
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-const BASE = 'http://127.0.0.1:8766/?peerhost=127.0.0.1&peerport=9000&test';
+const BASE = 'http://127.0.0.1:8766/?peerhost=127.0.0.1&peerport=9000&server=http://127.0.0.1:8798&test';
 let fails = 0;
 const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') + msg); if (!c) fails++; };
-const T = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('phonebellum.tour.org.v1')).t);
+const T = (p) => p.evaluate(() => window.__tour());
 const phaseIs = (p, ph, ms = 20000) => p.waitForFunction((ph) => document.getElementById('phase').textContent === ph, ph, { timeout: ms });
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--disable-features=WebRtcHideLocalIpsWithMdns'] });
@@ -64,7 +64,7 @@ const phaseIs = (p, ph, ms = 20000) => p.waitForFunction((ph) => document.getEle
   // game 1: the guest forfeits; game 2 gets a new code
   await host.waitForFunction(() => ['Result', 'Match over'].includes(document.getElementById('phase').textContent), null, { timeout: 90000 });
   if (await guest.isVisible('#cog')) { await guest.click('#cog'); await guest.click('#to-menu'); await guest.click('#forfeit-yes'); }
-  await org.waitForFunction((id) => { const t = JSON.parse(localStorage.getItem('phonebellum.tour.org.v1')).t; return t.rounds[0].matches.find(mt => mt.id === id).games.length === 1; }, semi.id, { timeout: 15000 });
+  await org.waitForFunction((id) => { const t = window.__tour(); return t.rounds[0].matches.find(mt => mt.id === id).games.length === 1; }, semi.id, { timeout: 15000 });
   t = await T(org); const s1 = t.rounds[0].matches.find(mt => mt.id === semi.id);
   ok(s1.code !== semi.code && !s1.result, `game 1 in (${s1.games.map(g => g.winner)}), game 2 has a new code`);
   for (const p of [host, guest]) { if (await p.isVisible('#menu')) await p.click('#menu'); if (await p.isVisible('#again')) await p.click('#again'); }
@@ -73,7 +73,7 @@ const phaseIs = (p, ph, ms = 20000) => p.waitForFunction((ph) => document.getEle
   await host.click('#tour-play'); await sleep(400); await guest.click('#tour-play');
   await phaseIs(host, 'Deploy'); await phaseIs(guest, 'Deploy');
   await guest.click('#cog'); await guest.click('#to-menu'); await guest.click('#forfeit-yes');
-  await org.waitForFunction((id) => !!JSON.parse(localStorage.getItem('phonebellum.tour.org.v1')).t.rounds[0].matches.find(mt => mt.id === id).result, semi.id, { timeout: 15000 });
+  await org.waitForFunction((id) => !!window.__tour().rounds[0].matches.find(mt => mt.id === id).result, semi.id, { timeout: 15000 });
   t = await T(org); const s2 = t.rounds[0].matches.find(mt => mt.id === semi.id);
   ok(s2.result.score.join('-') === (semi.host === 'a' ? '2-0' : '0-2'), `series over ${s2.result.score.join('-')}, ${byId.get(s2[s2.result.winner])} goes through`);
   // the other semifinal: the organizer sets it game by game

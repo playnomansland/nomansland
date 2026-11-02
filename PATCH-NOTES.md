@@ -4,6 +4,140 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 2 November 2026 – Balance and fixes
+
+### Unit sheets
+- A unit's **stats** (bodies, health, hit, attacks per second, range, speed) now sit at the **top of its sheet**, right under its name, instead of at the bottom.
+
+### Towers
+- **Mage tower – Teleport mage general:** now **150 gold** (was 100) and **lasts the rest of the match** once bought, on top of whichever general you call each round. It can be undone only in the round you buy it.
+- **Sniper tower – Deploy airship (nerf):** the airship now shoots like a **level 2 Sniper** (was level 3). Instead of a paratrooper every 5 seconds, it flies straight into enemy territory and drops **3 paratroopers at once, once per fight**, then fights as before.
+
+### Units
+- **Ember Imps – Ember Mortar (nerf):** attack speed −20%, range bonus +12 m (was +18 m), and the mortar now **lobs shells at 20 m/s** instead of hitting at once, so fast units can step out of the blast.
+- **Ember Imps – Summon hellfiend (nerf):** the Hellfiend has 30% less health, hit, attack speed and move speed.
+- **Wisps (nerf):** attack speed −15% (0.7 → 0.6 attacks a second).
+- **Truespear (nerf):** attack speed −15% (0.9 → 0.77) and health −30% (1800 → 1260).
+- **Shiv:** now **3 bodies** (was 4). Each knife hits harder (13 → 17.3) and each body has more health (150 → 200), so the squad deals and takes about the same as before.
+- **Bleed:** stacks now top out at **4** (was 5), and each stack hits like the one above it used to: stack 1 is the old stack 2, and so on. Bleed reaches its peak faster. Anemia now stuns at 4 stacks.
+
+### Leaders
+- **Otto – The Gambler: forgiveness luck.** After 5 losing spins in a row (nothing, or skulls), the next spin always wins a prize. The slot machine shows how close you are.
+
+---
+
+## 2 November 2026 – Flame Wizard on the main menu
+
+- A **Flame Wizard** now stands at the left edge of the main menu: the same 3D model as on the battlefield, turned toward you and standing still, blasting an orange fire cone from his staff across the screen, with sparks flying and a big wobbling **BABABABABA** above him in a cartoon font.
+- He slides in each time you open the main menu. He sits under the buttons, so taps go through to the menu as before.
+- If 3D can't start on a device, he shows as the 2D Flame Wizard symbol instead.
+
+---
+
+## 2 November 2026 – Ranked fixes
+
+- **Fix:** the ranked series score could reset between games (win game 1, lose game 2, and it said 0–1 instead of 1–1). The server now counts each game before it saves the match, so the score survives the pause between games.
+- During a ranked match the **series score** (for example "Bo3 · 1–0") sits above the round number at the top of the screen. It changes once the fight has played out, so it never gives away the result early.
+
+---
+
+## 2 November 2026 – Music player
+
+- Hover **Now playing** and it lights up; tap it to open the **playlist**. Tap any song there (or in Settings) to play it.
+- The menu music now goes **in order**: after the song that's playing comes the next one in the list, also after you pick a song yourself (play song D and song E comes next).
+- New **Shuffle** button: the next song is a random one instead.
+- New **Repeat** button: the song playing plays again and again.
+- Shuffle and Repeat are remembered on this device.
+- The look preview in the PLAY menu now shows both **treasuries** on the Standard map.
+
+---
+
+## 2 November 2026 – Titles
+
+- **Titles** now show under your gamertag with a little glow: on the main menu, in your Profile, on the Leaderboard and in ranked matches.
+- **Day 1** (purple): everyone who makes an account in this first week, up to and including Sunday 8 November. Accounts made earlier today get it too.
+- **DEV** (pink): the developer's account.
+- Pick which title shows (or none) under **Profile**.
+- In a match, **You** and **Opponent** at the top are now your **gamertags with your titles**. Against a friend online you see their name and title (if they have an account); against the AI it still says Enemy.
+- **Gamertags** can be changed **once a week** (Profile shows when you can change it next). The developer can change theirs any time. Naming a brand-new account when you sign up doesn't count.
+- When you get a new title, the main menu greets you with a **"You have received a new Title!"** pop-up. Players who already had an account see it the next time they open the main menu.
+- **Fix:** on wide computer screens the welcome screen's title and buttons sat off to the right. They're centred now.
+- **Sign in with Google** looks better: Google's own button in its dark style, as wide as the box, with a short note that the sign-in is handled by Google. It no longer jumps around while it loads.
+
+---
+
+## 2 November 2026 – New home screen, ranked play and the leaderboard
+
+### A new way in
+- **Welcome screen:** the big No Mans Land title over an autumn battlefield, with **Log in**, **Play as guest** and **Sign up**.
+- **Sign up** has its own screen: pick a gamertag, then sign up with Google (keeps your account on any device) or as a guest on this one. **Log in** is Google sign-in.
+- **Stay logged in?** is asked right after you make an account or log in, so the game can open straight on the menu next time. Change it any time in **Settings**. Off means you're logged out when you close the browser.
+
+### The main menu
+- One big **PLAY** button. It opens **Play vs Friend** and **Play vs AI**, with the match settings and the box for a match or tournament code.
+- **Profile** and **Settings** sit in the top right corner (round icons on phones, labelled buttons on computers). Profile has your gamertag, Google sign-in, **Match history** and **Log out**.
+- **Tutorial**, **How to play**, **Encyclopedia** and the new **Leaderboard** are along the bottom, with the music player under them.
+- The game has a new app icon: the wizard.
+
+### Maps, looks and packs
+- Everyone now plays on one map, **Standard** (the bigger board that used to be called Test Grid). The old 12×16 board is now **Old standard** and, like the other maps, only shows up for the developer.
+- The **look** picker sits under the map and shows a preview of the look you pick. **Random** shows a slice of every look in one picture.
+- Two unit packs: **Learn the game** (the old Standard pack: fewer units, leaders and towers) and **Standard** (every unit and leader except Blixten). What's in a pack can't be changed, except on the developer account.
+
+### Ranked
+- Choose **Normal** or **Ranked** in the PLAY popup. Ranked is played against a friend as a **best of 3** on the Standard map with the Standard pack, and both players pick from the **same 5 leaders** and the **same 3 towers**, like in the tournament.
+- Ranked needs an account on both sides. A guest is enough, and a friend who joins without one gets a guest account on the spot.
+- Win 2 games to take the series. **Next game** starts the next one; after the series, **New series** starts over. Leaving a ranked match loses the series.
+- Only ranked series count on the **Leaderboard**: every player's wins, ties and losses and their win share (a tie counts as half a win).
+- The developer can switch ranked on and off for everyone in Settings.
+- **Tournaments:** hosting a tournament and Practice vs bots are now developer only. Anyone can still join a tournament with its code or link.
+
+---
+
+## 2 November 2026 – Accounts
+
+- **Account** on the start screen. Tap **Play as a guest** to get your own gamertag on this phone, no sign-up needed. You can change the gamertag any time.
+- **Sign in with Google** to keep your player if you change or reset your phone: sign in on another phone and you're the same player. A guest who signs in keeps their gamertag.
+- **Sign out** on one phone leaves your other phones signed in. **Delete account** (tap twice) removes your gamertag and sign-in for good; past match results stay, without your name.
+- We never store passwords, and nothing from your Google account except an id Google gives us for it: not your email, not your name.
+- For now the account only holds your gamertag. Matches and tournaments still work exactly as before; linking them to your account comes after Sunday's tournament.
+- **Developer mode** for the game's developer: a Google account on the server's private developer list gets every feature, now and in anything added later. The Account sheet shows when it's on.
+
+---
+
+## 2 November 2026 – Match history on the server
+
+- **Every online match is saved by the server.** Each round of every match on the game server (friends' matches and tournament matches) is saved by the server itself: map, look, leaders, both armies with levels and tiles, skills, towers, who won, damage and health. Tournament matches also keep the gamertags.
+- **Match history** on the start screen now reads from the server, newest first, with **Load more** for older battles. The **Phone-to-phone** tab shows the old list for phone-to-phone matches, and it is also shown if the server can't be reached.
+- Saving never gets in the way of a match: it happens after the fight is sent, and if it fails the match just goes on.
+- Rounds are kept for a year. The old Google Sheet is kept as an archive.
+
+---
+
+## 2 November 2026 – Our own game server: tournaments and live matches
+
+No Mans Land now has its own game server. Tournaments and live matches against friends run on it.
+
+### The server is the referee
+- **No more cheating in live matches.** Until now the host's phone ran the match and simply believed what the other phone said about its gold and army. Now the server keeps the match: your phone only says what you do (place, move, sell, level up, buy a skill, unlock, spin...), and the server checks every action against the rules before it counts. A changed game can't give itself gold, units it hasn't unlocked or squads on tiles it may not use.
+- **Secrets stay secret.** The server only sends your phone what you're allowed to see: your opponent's new squads, upgrades, sales, moves and picks stay hidden until the fight, and so do their leader and packages in round 1. Before, the host's phone had everything.
+- **Both players are equal.** Nobody has to be the host who keeps the page open. The server runs the deploy clock and the fight; it waits for a player who drops out (up to 2 minutes), and a reloaded phone goes straight back into the match (the link, or **Back to match** on the menu).
+- **Play a friend** now gives a `play=` link. Your opponent opens it, or types the 5-letter code on the start screen.
+- **Tournament matches** start by themselves once both players are in, and the result goes from the server straight to the tournament, so nobody can report a fake result. Spectators watch through the server too.
+
+### Tournaments live on the server
+- **Tournaments keep going without the organizer.** The tournament lives on the server, not on the organizer's phone. The organizer can close the page or run out of battery, and everything is still there when they come back. Players stay connected the whole time.
+- **Safer:** every player (and the organizer) gets a private key when they join. Nobody can report a result for someone else's match or use the organizer's buttons.
+- **Practice vs bots:** the server plays the bot-against-bot matches, so they finish even if your phone goes to sleep.
+- Tournaments are removed from the server when the organizer ends them, or after two weeks without use. Old tournaments from before this update can't be resumed.
+
+### Phone to phone still works
+- The old phone-to-phone matches stay as a backup: **Factions** matches, your own **Counter Lab units**, old `join=` links, and the **Phone to phone instead** button in the lobby. If the server can't be reached at all, a new match goes phone to phone by itself. Organizers can switch a tournament's matches to phone to phone in its settings (**Matches run on**).
+- vs AI, solo and the Counter Lab work without the server, as before.
+- Next: accounts with "Sign in with Google" (and Apple), and later ranked play once there are enough players for short queues.
+
+---
+
 ## 1 November 2026 – Leafblade and Hellfiend balance
 
 - **Leaf Wizard – Leafblade:** homing missile damage reduced from 150 to 100 per missile. Dash now has a 1.5-second cooldown per body between dash starts.
