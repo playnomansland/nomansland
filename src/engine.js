@@ -1537,10 +1537,16 @@ const Engine = (() => {
     // enemies the unit may attack right now, nearest first
     function validTargets(b) {
       const valid = [];
+      const counters = opts.profileCounters;
+      if (counters) counters.validTargetsCalls++;
       for (const f of sides[1 - b.side]) {
+        if (counters) counters.validTargetsBodiesScanned++;
         if (!pickable(b, f)) continue;
         const d = gap(f, b);
-        if (d <= reachTo(reachOf(b), b, f) + 0.01 && d >= b.u.minRange && inSight(b, f)) valid.push([b.u.healthiest ? (f.u.structure ? 1e9 : 0) - poolHp(f) : d, f]); // healthiest: most health first, units before structures
+        if (d <= reachTo(reachOf(b), b, f) + 0.01 && d >= b.u.minRange && inSight(b, f)) {
+          if (counters) counters.validTargetsCandidates++;
+          valid.push([b.u.healthiest ? (f.u.structure ? 1e9 : 0) - poolHp(f) : d, f]); // healthiest: most health first, units before structures
+        }
       }
       valid.sort((p, q) => b.u.backline ? q[0] - p[0] : p[0] - q[0]);
       return valid.map(v => v[1]);
