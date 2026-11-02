@@ -11069,17 +11069,20 @@ Floors.floor = (() => {
       if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
       g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
       const t = still ? 0 : (now - t0) / 1000;
-      const R = Math.max(20, Math.min(40, W / 14)), x = R * 1.25, y = H * 0.62;
-      const tip = x + R * 0.9, reach = Math.min(W - tip - 6, (H - y - 4) / Math.sin(30 * Math.PI / 180)), half = (22 + 3 * Math.sin(t * 9)) * Math.PI / 180;
+      const R = Math.max(27, Math.min(40, W / 14)), x = R * 1.25, y = H * 0.62;
+      // the picture (when ready): its feet just under y; the fire comes out of the staff's tip (at 86% across, 42% down the picture: the middle of the staff)
+      const ph = Math.min(R * 4.4, H * 0.7), pw = wiz.pic ? ph * wiz.pic.width / wiz.pic.height : 0, px = x - pw * 0.5, py = y + R * 1.3 - ph;
+      const tip = wiz.pic ? px + pw * 0.86 : x + R * 0.9, ty = wiz.pic ? py + ph * 0.42 : y;
+      const reach = Math.min(W - tip - 6, (Math.min(ty, H - ty) - 4) / Math.sin(30 * Math.PI / 180)), half = (22 + 3 * Math.sin(t * 9)) * Math.PI / 180;
       const len = reach * (0.92 + 0.08 * Math.sin(t * 13) * Math.sin(t * 5.3));
       // the cone: the board's fire colours, in two layers that flicker against each other
       for (const [k, a] of [[1, 0.85], [0.7, 0.9]]) {
-        const grd = g.createRadialGradient(tip, y, 0, tip, y, len * k);
+        const grd = g.createRadialGradient(tip, ty, 0, tip, ty, len * k);
         grd.addColorStop(0, `rgba(255,245,170,${a})`); grd.addColorStop(0.35, `rgba(255,190,70,${a * 0.85})`);
         grd.addColorStop(0.75, `rgba(255,110,30,${a * 0.55})`); grd.addColorStop(1, 'rgba(255,60,10,0)');
-        g.fillStyle = grd; g.beginPath(); g.moveTo(tip, y);
+        g.fillStyle = grd; g.beginPath(); g.moveTo(tip, ty);
         const hh = half * k * (1 + 0.12 * Math.sin(t * 17 + k * 3));
-        g.arc(tip, y, len * k, -hh, hh); g.closePath(); g.fill();
+        g.arc(tip, ty, len * k, -hh, hh); g.closePath(); g.fill();
       }
       // sparks blown out along the cone
       if (!still && wiz.sparks.length < 40) for (let i = 0; i < 2; i++) wiz.sparks.push({ a: (Math.random() * 2 - 1) * half * 0.9, d: R * 0.3, v: reach * (0.9 + Math.random() * 0.8), s: 1.5 + Math.random() * 2.5 });
@@ -11087,16 +11090,44 @@ Floors.floor = (() => {
       for (const p of wiz.sparks) {
         const f = p.d / reach; g.globalAlpha = 1 - f;
         g.fillStyle = f < 0.4 ? '#FFF3B0' : '#FF9A3C';
-        g.beginPath(); g.arc(tip + Math.cos(p.a) * p.d, y + Math.sin(p.a) * p.d, p.s * (1 - f * 0.5), 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.arc(tip + Math.cos(p.a) * p.d, ty + Math.sin(p.a) * p.d, p.s * (1 - f * 0.5), 0, Math.PI * 2); g.fill();
       }
       g.globalAlpha = 1;
-      // the wizard, bobbing with the recoil
-      const bob = Math.sin(t * 20) * R * 0.04;
-      g.fillStyle = 'rgba(255,140,40,0.35)'; g.beginPath(); g.arc(x, y + bob, R * 1.6, 0, Math.PI * 2); g.fill();
-      Shapes.body(g, 'flame', x + bob, y, R, 1, '#b95018', Art.css('--you') || '#4FA3FF');
+      // the wizard: the 3D board's Flame Wizard model, rendered once as a still picture (the 2D shape until it's ready, or if 3D can't start)
+      if (wiz.pic) g.drawImage(wiz.pic, px, py, pw, ph);
+      else Shapes.body(g, 'flame', x, y, R, 1, '#b95018', Art.css('--you') || '#4FA3FF');
       if (!still) wiz.raf = requestAnimationFrame(frame);
     };
     wiz.raf = requestAnimationFrame(frame);
+    if (!wiz.pic && !wiz.loading) wiz.loading = wizPic().then(c => { wiz.pic = c; if (still && wiz.on) requestAnimationFrame(frame); }, e => console.warn('No Mans Land: menu wizard stays 2D.', e));
+  }
+  // draws the Flame Wizard model (Models3D 'wizard:flame') once, standing still and turned three-quarters to the right
+  const WIZ_TURN = Math.PI * 1.75; // faces -z; this turns it three-quarters to the right, its staff on the fire's side
+  async function wizPic() {
+    await Promise.resolve(); // THREE_URL and V3D are set further down the script
+    const THREE = await import(THREE_URL);
+    if (typeof Models3D !== 'function') for (const f of ['kaykit3d', 'models3d']) await load3d(f);
+    const W = 320, H = 400, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ren = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: true, preserveDrawingBuffer: true });
+    ren.setClearColor(0x000000, 0);
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight('#cfe3ff', '#20262a', 1.6));
+    const sun = new THREE.DirectionalLight('#fff3dc', 2.4); sun.position.set(3, 6, 4); scene.add(sun);
+    const fire = new THREE.PointLight('#ff8a3d', 6, 8); fire.position.set(2, 1.6, 1); scene.add(fire); // lit by its own blast
+    const p = Models3D(THREE).parts('wizard:flame'), grp = new THREE.Group();
+    const mat = (o) => new THREE.MeshStandardMaterial(Object.assign({ flatShading: true, roughness: 0.7, metalness: 0.1 }, o));
+    if (p.tint) grp.add(new THREE.Mesh(p.tint, mat({ color: '#b95018' })));
+    if (p.team) grp.add(new THREE.Mesh(p.team, mat({ color: Art.css('--you') || '#4FA3FF' })));
+    if (p.fixed) grp.add(new THREE.Mesh(p.fixed, mat({ vertexColors: true })));
+    grp.rotation.y = WIZ_TURN;
+    scene.add(grp);
+    const bb = new THREE.Box3().setFromObject(grp), mid = bb.getCenter(new THREE.Vector3()), size = bb.getSize(new THREE.Vector3());
+    const cam = new THREE.PerspectiveCamera(30, W / H, 0.1, 100), dist = size.y / 2 / Math.tan(15 * Math.PI / 180) * 1.12;
+    cam.position.set(mid.x, mid.y + size.y * 0.25, mid.z + dist); cam.lookAt(mid);
+    ren.render(scene, cam);
+    const out = document.createElement('canvas'); out.width = W; out.height = H; out.getContext('2d').drawImage(cv, 0, 0);
+    ren.dispose(); ren.forceContextLoss();
+    return out;
   }
   // the autumn floor, full screen (repainted when the window changes size)
   function paintHomeBg() {
@@ -13314,15 +13345,17 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   try { want3d = force3d || (!force2d && localStorage.getItem(B3D_STORE) !== '2d'); } catch (e) {}
   const save3d = (on) => { try { localStorage.setItem(B3D_STORE, on ? '3d' : '2d'); } catch (e) {} };
   let starting3d = null;
+  // one load per 3D source file, shared by the board and the main menu's wizard
+  const loaded3d = {};
+  const load3d = (f) => loaded3d[f] || (loaded3d[f] = new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = `src/${f}.js?v=${V3D}`; sc.onload = ok; sc.onerror = () => { delete loaded3d[f]; no(new Error('could not load ' + f)); }; document.head.appendChild(sc); }));
   function start3d() {
     if (board3d || starting3d) return starting3d;
     return (starting3d = (async () => {
-      const load = (src) => new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = () => no(new Error('could not load ' + src)); document.head.appendChild(sc); });
       const el = document.createElement('div');
       let b = null, loaded = false;
       try {
         const THREE = await import(THREE_URL);
-        if (typeof Render3D !== 'function') for (const f of ['camera3d', 'kaykit3d', 'models3d', 'scenery3d', 'render3d']) await load(`src/${f}.js?v=${V3D}`); // V3D: a new name each build, so a browser never runs an old copy
+        if (typeof Render3D !== 'function') for (const f of ['camera3d', 'kaykit3d', 'models3d', 'scenery3d', 'render3d']) await load3d(f); // V3D: a new name each build, so a browser never runs an old copy
         loaded = true;
         if (!want3d) return; // switched back to 2D while loading
         el.className = 'board3d';

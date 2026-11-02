@@ -6,8 +6,9 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ## 2 November 2026 – Flame Wizard on the main menu
 
-- A **Flame Wizard** now stands at the left edge of the main menu, blasting its orange fire cone across the screen, with sparks flying and a big wobbling **BABABABABA** above him in a cartoon font.
+- A **Flame Wizard** now stands at the left edge of the main menu: the same 3D model as on the battlefield, turned toward you and standing still, blasting an orange fire cone from his staff across the screen, with sparks flying and a big wobbling **BABABABABA** above him in a cartoon font.
 - He slides in each time you open the main menu. He sits under the buttons, so taps go through to the menu as before.
+- If 3D can't start on a device, he shows as the 2D Flame Wizard symbol instead.
 
 ---
 
