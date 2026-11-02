@@ -57,8 +57,9 @@ A first version of **2v2**, open to developer accounts only for now.
 
 ## 2 November 2026 – Flame Wizard on the main menu
 
-- A **Flame Wizard** now stands at the left edge of the main menu: the same 3D model as on the battlefield, turned toward you and standing still, blasting an orange fire cone from his staff across the screen, with sparks flying and a big wobbling **BABABABABA** above him in a cartoon font.
-- He slides in each time you open the main menu. He sits under the buttons, so taps go through to the menu as before.
+- A **Flame Wizard** now stands at the left edge of the main menu: the same 3D model as on the battlefield, blasting an orange fire cone from his staff across the screen, with a big **BABABABABA** above him in a cartoon font.
+- It all stands still until you **tap him** (or the text): then the fire flickers, sparks fly and BABABABABA shakes for 1 second.
+- He sits under the buttons, so taps on the menu work as before.
 - If 3D can't start on a device, he shows as the 2D Flame Wizard symbol instead.
 
 ---

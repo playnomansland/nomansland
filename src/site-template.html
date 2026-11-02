@@ -468,12 +468,12 @@ html.home .app { visibility: hidden; }
 .home-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .home::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 42%, rgba(13, 19, 21, 0.05), rgba(13, 19, 21, 0.62) 78%), linear-gradient(180deg, rgba(13, 19, 21, 0.35), transparent 30%, transparent 70%, rgba(13, 19, 21, 0.5)); }
 /* The main menu's Flame Wizard (2026-11-02): at the left edge, blasting a fire cone, under the buttons (never takes taps) */
-.home-wiz { position: absolute; left: 0; bottom: calc(4vh + env(safe-area-inset-bottom, 0px)); width: min(78vw, 560px); height: min(300px, 38vh); z-index: 1; pointer-events: none; animation: wiz-in 0.7s cubic-bezier(.2,1.4,.4,1) both; }
+.home-wiz { position: absolute; left: 0; bottom: calc(4vh + env(safe-area-inset-bottom, 0px)); width: min(78vw, 560px); height: min(300px, 38vh); z-index: 1; pointer-events: none; }
 .home-wiz canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.home-wiz .baba { position: absolute; left: 6px; top: 6px; font-family: "Bangers", "Comic Sans MS", "Chalkboard SE", cursive; font-size: clamp(30px, 9vw, 64px); letter-spacing: 0.04em; line-height: 1; color: #FFD23F; -webkit-text-stroke: 2px #5A1A06; paint-order: stroke fill; text-shadow: 3px 4px 0 #A8320C, 0 0 18px rgba(255, 120, 30, 0.55); transform-origin: 30% 80%; animation: baba 0.32s ease-in-out infinite alternate; white-space: nowrap; }
-@keyframes wiz-in { from { transform: translateX(-110%); } to { transform: none; } }
+.home-wiz .baba { position: absolute; left: 6px; top: 6px; font-family: "Bangers", "Comic Sans MS", "Chalkboard SE", cursive; font-size: clamp(30px, 9vw, 64px); letter-spacing: 0.04em; line-height: 1; color: #FFD23F; -webkit-text-stroke: 2px #5A1A06; paint-order: stroke fill; text-shadow: 3px 4px 0 #A8320C, 0 0 18px rgba(255, 120, 30, 0.55); transform-origin: 30% 80%; white-space: nowrap; }
+.home-wiz.go .baba { animation: baba 0.16s ease-in-out infinite alternate; } /* only while a tap's blast plays */
 @keyframes baba { from { transform: rotate(-4deg) scale(1); } to { transform: rotate(3deg) scale(1.07) translateY(-3px); } }
-@media (prefers-reduced-motion: reduce) { .home-wiz, .home-wiz .baba { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .home-wiz.go .baba { animation: none; } }
 .home-in { position: relative; z-index: 1; height: 100%; overflow-y: auto; display: grid; grid-template-rows: auto 1fr auto; justify-items: center; padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(14px + env(safe-area-inset-bottom, 0px)); gap: 14px; }
 .home-title { width: min(100%, 860px); display: block; margin: 0 auto; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45)) drop-shadow(0 0 22px rgba(0, 0, 0, 0.35)); user-select: none; -webkit-user-drag: none; }
 .home-title.stack { display: none; }
@@ -2546,22 +2546,25 @@ html.pc .corner button span { display: inline; }
     if (on) paintHomeBg();
     homeWiz(on && home.screen !== 'welcome' && home.screen !== 'signup' && home.screen !== 'login');
   }
-  // the Flame Wizard on the main menu: its body (the board's Flame shape) and a flickering fire cone, drawn every frame while shown
-  const wiz = { on: false, raf: 0, sparks: [] };
+  // the Flame Wizard on the main menu: the 3D model as a still picture and its fire cone, frozen; a tap on him (or the text)
+  // plays the blast for 1 second (WIZ_PLAY_MS): the cone flickers, sparks fly and BABABABABA shakes, then it freezes again
+  const WIZ_PLAY_MS = 1000;
+  const wiz = { on: false, raf: 0, sparks: [], until: 0, t0: 0, hit: null, frame: null };
   function homeWiz(on) {
     const box = $('home-wiz');
     if (on === wiz.on) return;
     wiz.on = on; box.hidden = !on;
     if (!on) { cancelAnimationFrame(wiz.raf); wiz.raf = 0; return; }
-    box.style.animation = 'none'; void box.offsetWidth; box.style.animation = ''; // slide in again each time the menu opens
-    const cv = $('home-wiz-cv'), g = cv.getContext('2d'), t0 = performance.now();
+    const cv = $('home-wiz-cv'), g = cv.getContext('2d');
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const frame = (now) => {
       if (!wiz.on) return;
       const r = cv.getBoundingClientRect(), W = Math.round(r.width), H = Math.round(r.height), dpr = Math.min(2, window.devicePixelRatio || 1);
       if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
       g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-      const t = still ? 0 : (now - t0) / 1000;
+      const playing = !still && now < wiz.until, t = playing ? (now - wiz.t0) / 1000 : 0;
+      if (!playing) wiz.sparks = [];
+      box.classList.toggle('go', playing);
       const R = Math.max(27, Math.min(40, W / 14)), x = R * 1.25, y = H * 0.62;
       // the picture (when ready): its feet just under y; the fire comes out of the staff's tip (at 86% across, 42% down the picture: the middle of the staff)
       const ph = Math.min(R * 4.4, H * 0.7), pw = wiz.pic ? ph * wiz.pic.width / wiz.pic.height : 0, px = x - pw * 0.5, py = y + R * 1.3 - ph;
@@ -2578,7 +2581,7 @@ html.pc .corner button span { display: inline; }
         g.arc(tip, ty, len * k, -hh, hh); g.closePath(); g.fill();
       }
       // sparks blown out along the cone
-      if (!still && wiz.sparks.length < 40) for (let i = 0; i < 2; i++) wiz.sparks.push({ a: (Math.random() * 2 - 1) * half * 0.9, d: R * 0.3, v: reach * (0.9 + Math.random() * 0.8), s: 1.5 + Math.random() * 2.5 });
+      if (playing && wiz.sparks.length < 40) for (let i = 0; i < 2; i++) wiz.sparks.push({ a: (Math.random() * 2 - 1) * half * 0.9, d: R * 0.3, v: reach * (0.9 + Math.random() * 0.8), s: 1.5 + Math.random() * 2.5 });
       wiz.sparks = wiz.sparks.filter(p => (p.d += p.v / 60) < reach);
       for (const p of wiz.sparks) {
         const f = p.d / reach; g.globalAlpha = 1 - f;
@@ -2589,11 +2592,25 @@ html.pc .corner button span { display: inline; }
       // the wizard: the 3D board's Flame Wizard model, rendered once as a still picture (the 2D shape until it's ready, or if 3D can't start)
       if (wiz.pic) g.drawImage(wiz.pic, px, py, pw, ph);
       else Shapes.body(g, 'flame', x, y, R, 1, '#b95018', Art.css('--you') || '#4FA3FF');
-      if (!still) wiz.raf = requestAnimationFrame(frame);
+      const wpx = wiz.pic ? px : x - R, wpw = wiz.pic ? pw : R * 2, wpy = wiz.pic ? py : y - R * 1.4, wph = wiz.pic ? ph : R * 2.6;
+      wiz.hit = { x: r.left + wpx, y: r.top + wpy, w: wpw, h: wph }; // where a tap starts the blast (page coordinates)
+      wiz.raf = playing ? requestAnimationFrame(frame) : 0; // frozen: nothing more to draw until the next tap
     };
+    wiz.frame = frame;
     wiz.raf = requestAnimationFrame(frame);
-    if (!wiz.pic && !wiz.loading) wiz.loading = wizPic().then(c => { wiz.pic = c; if (still && wiz.on) requestAnimationFrame(frame); }, e => console.warn('No Mans Land: menu wizard stays 2D.', e));
+    if (!wiz.pic && !wiz.loading) wiz.loading = wizPic().then(c => { wiz.pic = c; if (wiz.on && !wiz.raf) wiz.raf = requestAnimationFrame(frame); }, e => console.warn('No Mans Land: menu wizard stays 2D.', e));
   }
+  // a tap on the wizard or his BABABABABA (not on a button, or with a popup open) plays the blast
+  $('home').addEventListener('click', (e) => {
+    if (!wiz.on || !wiz.frame || e.target.closest('button, a, input, select, textarea, label, .pop-back, [role="dialog"]')) return;
+    const h = wiz.hit, tb = document.querySelector('#home-wiz .baba').getBoundingClientRect();
+    const inR = (x, y, w, hh) => e.clientX >= x && e.clientX <= x + w && e.clientY >= y && e.clientY <= y + hh;
+    if (!(h && inR(h.x, h.y, h.w, h.h)) && !inR(tb.left, tb.top, tb.width, tb.height)) return;
+    const now = performance.now();
+    if (now >= wiz.until) wiz.t0 = now;
+    wiz.until = now + WIZ_PLAY_MS;
+    if (!wiz.raf) wiz.raf = requestAnimationFrame(wiz.frame);
+  });
   // draws the Flame Wizard model (Models3D 'wizard:flame') once, standing still and turned three-quarters to the right
   const WIZ_TURN = Math.PI * 1.75; // faces -z; this turns it three-quarters to the right, its staff on the fire's side
   async function wizPic() {
