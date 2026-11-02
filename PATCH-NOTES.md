@@ -4,6 +4,13 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 2 November 2026 – Flame Wizard on the main menu
+
+- A **Flame Wizard** now stands at the left edge of the main menu, blasting its orange fire cone across the screen, with sparks flying and a big wobbling **BABABABABA** above him in a cartoon font.
+- He slides in each time you open the main menu. He sits under the buttons, so taps go through to the menu as before.
+
+---
+
 ## 2 November 2026 – Ranked fixes
 
 - **Fix:** the ranked series score could reset between games (win game 1, lose game 2, and it said 0–1 instead of 1–1). The server now counts each game before it saves the match, so the score survives the pause between games.

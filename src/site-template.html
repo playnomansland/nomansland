@@ -14,7 +14,7 @@
 <title>No Mans Land</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bangers&family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
 /*BASECSS*/
 [hidden] { display: none !important; }
@@ -467,6 +467,13 @@ html.home .app { visibility: hidden; }
 .home { position: fixed; inset: 0; z-index: 4; overflow: hidden; background: #3c3b24; }
 .home-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .home::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 42%, rgba(13, 19, 21, 0.05), rgba(13, 19, 21, 0.62) 78%), linear-gradient(180deg, rgba(13, 19, 21, 0.35), transparent 30%, transparent 70%, rgba(13, 19, 21, 0.5)); }
+/* The main menu's Flame Wizard (2026-11-02): at the left edge, blasting a fire cone, under the buttons (never takes taps) */
+.home-wiz { position: absolute; left: 0; bottom: calc(4vh + env(safe-area-inset-bottom, 0px)); width: min(78vw, 560px); height: min(300px, 38vh); z-index: 1; pointer-events: none; animation: wiz-in 0.7s cubic-bezier(.2,1.4,.4,1) both; }
+.home-wiz canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.home-wiz .baba { position: absolute; left: 6px; top: 6px; font-family: "Bangers", "Comic Sans MS", "Chalkboard SE", cursive; font-size: clamp(30px, 9vw, 64px); letter-spacing: 0.04em; line-height: 1; color: #FFD23F; -webkit-text-stroke: 2px #5A1A06; paint-order: stroke fill; text-shadow: 3px 4px 0 #A8320C, 0 0 18px rgba(255, 120, 30, 0.55); transform-origin: 30% 80%; animation: baba 0.32s ease-in-out infinite alternate; white-space: nowrap; }
+@keyframes wiz-in { from { transform: translateX(-110%); } to { transform: none; } }
+@keyframes baba { from { transform: rotate(-4deg) scale(1); } to { transform: rotate(3deg) scale(1.07) translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .home-wiz, .home-wiz .baba { animation: none; } }
 .home-in { position: relative; z-index: 1; height: 100%; overflow-y: auto; display: grid; grid-template-rows: auto 1fr auto; justify-items: center; padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(14px + env(safe-area-inset-bottom, 0px)); gap: 14px; }
 .home-title { width: min(100%, 860px); display: block; margin: 0 auto; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45)) drop-shadow(0 0 22px rgba(0, 0, 0, 0.35)); user-select: none; -webkit-user-drag: none; }
 .home-title.stack { display: none; }
@@ -600,7 +607,7 @@ html.pc .corner button span { display: inline; }
   <button class="dock-tab" id="dock-toggle" aria-controls="panel" hidden></button>
 </div>
 
-<div class="home" id="home" hidden><canvas class="home-bg" id="home-bg" aria-hidden="true"></canvas><div class="home-in" id="home-in"></div></div>
+<div class="home" id="home" hidden><canvas class="home-bg" id="home-bg" aria-hidden="true"></canvas><div class="home-wiz" id="home-wiz" hidden aria-hidden="true"><canvas id="home-wiz-cv"></canvas><div class="baba">BABABABABA</div></div><div class="home-in" id="home-in"></div></div>
 
 <div class="dd" id="stats-dd" hidden role="dialog" aria-label="Damage last round"></div>
 <div class="sheet-back" id="sheet-back" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-h"></div></div>
@@ -2529,6 +2536,52 @@ html.pc .corner button span { display: inline; }
     document.documentElement.classList.toggle('home', on);
     $('home').hidden = !on;
     if (on) paintHomeBg();
+    homeWiz(on && home.screen !== 'welcome' && home.screen !== 'signup' && home.screen !== 'login');
+  }
+  // the Flame Wizard on the main menu: its body (the board's Flame shape) and a flickering fire cone, drawn every frame while shown
+  const wiz = { on: false, raf: 0, sparks: [] };
+  function homeWiz(on) {
+    const box = $('home-wiz');
+    if (on === wiz.on) return;
+    wiz.on = on; box.hidden = !on;
+    if (!on) { cancelAnimationFrame(wiz.raf); wiz.raf = 0; return; }
+    box.style.animation = 'none'; void box.offsetWidth; box.style.animation = ''; // slide in again each time the menu opens
+    const cv = $('home-wiz-cv'), g = cv.getContext('2d'), t0 = performance.now();
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const frame = (now) => {
+      if (!wiz.on) return;
+      const r = cv.getBoundingClientRect(), W = Math.round(r.width), H = Math.round(r.height), dpr = Math.min(2, window.devicePixelRatio || 1);
+      if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+      g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+      const t = still ? 0 : (now - t0) / 1000;
+      const R = Math.max(20, Math.min(40, W / 14)), x = R * 1.25, y = H * 0.62;
+      const tip = x + R * 0.9, reach = Math.min(W - tip - 6, (H - y - 4) / Math.sin(30 * Math.PI / 180)), half = (22 + 3 * Math.sin(t * 9)) * Math.PI / 180;
+      const len = reach * (0.92 + 0.08 * Math.sin(t * 13) * Math.sin(t * 5.3));
+      // the cone: the board's fire colours, in two layers that flicker against each other
+      for (const [k, a] of [[1, 0.85], [0.7, 0.9]]) {
+        const grd = g.createRadialGradient(tip, y, 0, tip, y, len * k);
+        grd.addColorStop(0, `rgba(255,245,170,${a})`); grd.addColorStop(0.35, `rgba(255,190,70,${a * 0.85})`);
+        grd.addColorStop(0.75, `rgba(255,110,30,${a * 0.55})`); grd.addColorStop(1, 'rgba(255,60,10,0)');
+        g.fillStyle = grd; g.beginPath(); g.moveTo(tip, y);
+        const hh = half * k * (1 + 0.12 * Math.sin(t * 17 + k * 3));
+        g.arc(tip, y, len * k, -hh, hh); g.closePath(); g.fill();
+      }
+      // sparks blown out along the cone
+      if (!still && wiz.sparks.length < 40) for (let i = 0; i < 2; i++) wiz.sparks.push({ a: (Math.random() * 2 - 1) * half * 0.9, d: R * 0.3, v: reach * (0.9 + Math.random() * 0.8), s: 1.5 + Math.random() * 2.5 });
+      wiz.sparks = wiz.sparks.filter(p => (p.d += p.v / 60) < reach);
+      for (const p of wiz.sparks) {
+        const f = p.d / reach; g.globalAlpha = 1 - f;
+        g.fillStyle = f < 0.4 ? '#FFF3B0' : '#FF9A3C';
+        g.beginPath(); g.arc(tip + Math.cos(p.a) * p.d, y + Math.sin(p.a) * p.d, p.s * (1 - f * 0.5), 0, Math.PI * 2); g.fill();
+      }
+      g.globalAlpha = 1;
+      // the wizard, bobbing with the recoil
+      const bob = Math.sin(t * 20) * R * 0.04;
+      g.fillStyle = 'rgba(255,140,40,0.35)'; g.beginPath(); g.arc(x, y + bob, R * 1.6, 0, Math.PI * 2); g.fill();
+      Shapes.body(g, 'flame', x + bob, y, R, 1, '#b95018', Art.css('--you') || '#4FA3FF');
+      if (!still) wiz.raf = requestAnimationFrame(frame);
+    };
+    wiz.raf = requestAnimationFrame(frame);
   }
   // the autumn floor, full screen (repainted when the window changes size)
   function paintHomeBg() {
