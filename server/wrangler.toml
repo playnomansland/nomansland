@@ -22,14 +22,14 @@ class_name = "TourRoom"
 name = "HISTORY"
 class_name = "HistoryRoom"
 
-# Accounts (step 5): a D1 database. Until this block is filled in and uncommented, /account/* answers 503
+# Accounts (step 5): the D1 database nml-accounts (on since 2026-11-02). Without this block /account/* answers 503
 # 'accounts off' and nothing else changes. The tables are made by the Worker itself (accounts.js, ensureSchema).
 # Developer mode: the secret DEV_EMAILS (set by the deploy workflow from the GitHub secret of the same name).
 # test/accounts.test.js adds a local copy of this block by itself when it is still commented out.
-# [[d1_databases]]
-# binding = "ACCOUNTS"
-# database_name = "nml-accounts"
-# database_id = "<id from the Cloudflare dashboard>"
+[[d1_databases]]
+binding = "ACCOUNTS"
+database_name = "nml-accounts"
+database_id = "fb6dc6c6-cec5-4b50-a7cc-2bb6142f586c"
 
 [[migrations]]
 tag = "v1"
