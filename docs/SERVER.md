@@ -12,7 +12,7 @@ Started 2026-11-02. The website stays on GitHub Pages; the server only handles o
 
 ## Steps
 
-1. Setup (done in code; waiting for the Cloudflare secrets): `/health`, `/selftest` (one bot round on the server), `/room/<CODE>` WebSocket rooms that relay messages, with the limits below.
+1. Setup (live since 2026-11-02 at https://nml-server.nomansland.workers.dev): `/health`, `/selftest` (one bot round on the server), `/room/<CODE>` WebSocket rooms that relay messages, with the limits below.
 2. Tournament hub on the server: `tournament.js` runs in the tournament's Room. The organizer's phone is just a screen; tournaments survive reloads. Matches still phone-to-phone for now. Old tournament history is not carried over.
 3. Server as referee: phones send actions ("buy", "place", "move", "level", "skill", "sell", "ready"), never their gold or army. The Room runs them through the Game functions (which already check gold, tiles and unlocks), runs the fight and sends both phones the replay. Hidden info is enforced by only sending each phone what it may see. PeerJS stays as a fallback until a tournament has run on the server.
 4. Match history in the server's database instead of the Google Sheet (the Sheet is exported and kept).
