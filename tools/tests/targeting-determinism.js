@@ -26,11 +26,12 @@ const settings = {
   bounds: { x0: -36, x1: 36, y0: -48, y1: 48 }
 };
 
-function runReferenceBattle(unitA, unitB) {
+function runBattle(unitA, unitB, targetingMode = 'reference') {
   const ids = new WeakMap();
   let nextId = 0;
   const targetTrace = [];
   const result = Engine.battle(unitA, unitB, settings, {
+    targetingMode,
     onTargetQuery({ attacker, caller, targets }) {
       const id = body => {
         if (!ids.has(body)) ids.set(body, nextId++);
@@ -62,12 +63,15 @@ function runReferenceBattle(unitA, unitB) {
 {
   const a = byName('Truespear');
   const b = byName('Assassin');
-  const first = runReferenceBattle(a, b);
-  const second = runReferenceBattle(a, b);
-  assert.ok(first.targetTrace.length > 0, 'the fixture must exercise validTargets');
-  assert.deepStrictEqual(second.targetTrace, first.targetTrace, 'target query order and candidate order must be deterministic');
-  assert.deepStrictEqual(second.outcome, first.outcome, 'the same engine inputs must produce the same battle outcome');
-  console.log('ok  real-engine target-query trace and outcome are deterministic');
+  const reference = runBattle(a, b, 'reference');
+  const referenceRepeat = runBattle(a, b, 'reference');
+  const indexed = runBattle(a, b, 'indexed');
+  assert.ok(reference.targetTrace.length > 0, 'the fixture must exercise validTargets');
+  assert.deepStrictEqual(referenceRepeat.targetTrace, reference.targetTrace, 'reference targeting must be deterministic');
+  assert.deepStrictEqual(referenceRepeat.outcome, reference.outcome, 'reference battle outcome must be deterministic');
+  assert.deepStrictEqual(indexed.targetTrace, reference.targetTrace, 'indexed targeting must preserve every target query and candidate order');
+  assert.deepStrictEqual(indexed.outcome, reference.outcome, 'indexed targeting must preserve the complete battle outcome');
+  console.log('ok  indexed targeting matches reference trace and outcome');
 }
 
 console.log('Targeting differential baseline tests passed.');
