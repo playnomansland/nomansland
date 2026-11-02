@@ -20,7 +20,8 @@
 // Messages out: welcome { side, key, seq }, taken, nomatch, lobby { here }, sync { phase, m (view), remaining, held, ready, nextReady,
 //               rematch, summary, ack, here }, ack { seq, ok, h }, status {...}, fight { pre, post, summary },
 //               speed { s }, forfeit { side }, full, denied { why? }, pong. welcome, lobby, sync and fight carry ranked
-//               (the series: { tags, wins, ties, games, best, done, result, forfeit }) in a ranked match.
+//               (the series: { tags, wins, ties, games, best, done, result, forfeit }) in a ranked match, and players
+//               ([side 0, side 1]: { tag, title } of a phone that sent its account session, or null).
 import { DurableObject } from 'cloudflare:workers';
 import Game from '../../src/game.js';
 import Ref from '../../src/referee.js';
@@ -80,14 +81,16 @@ export class Room extends DurableObject {
   syncMsg(ws, gone) {
     const a = this.att(ws), R = this.R, now = Date.now();
     const side = a.role === 'p' ? a.side : -1;
-    if (!R || !R.m || R.phase === 'lobby') return { t: 'lobby', here: this.here(gone), names: this.meta && this.meta.tour ? this.meta.tour.names : null, ranked: this.rankedView() };
+    if (!R || !R.m || R.phase === 'lobby') return { t: 'lobby', here: this.here(gone), names: this.meta && this.meta.tour ? this.meta.tour.names : null, ranked: this.rankedView(), players: this.playersView() };
     return {
       t: 'sync', phase: R.phase, round: R.m.round, m: Ref.viewOf(R, side), remaining: R.deadline ? R.deadline - now : 0, held: R.held,
       ready: R.ready, nextReady: R.nextReady, rematch: R.rematch, summary: R.summary, fights: R.fights,
       ack: side >= 0 ? R.seq[side] : 0, here: this.here(gone), forfeit: R.forfeit != null ? R.forfeit : null,
-      names: this.meta && this.meta.tour ? this.meta.tour.names : null, ranked: this.rankedView(),
+      names: this.meta && this.meta.tour ? this.meta.tour.names : null, ranked: this.rankedView(), players: this.playersView(),
     };
   }
+  // each side's account gamertag and title (friends' matches; null = no account)
+  playersView() { return (this.meta && this.meta.players) || null; }
   // ----- ranked play -----
   rankedView() {
     const rk = this.meta && this.meta.ranked;
@@ -264,8 +267,10 @@ export class Room extends DurableObject {
       // phones joining at once can't both take side 1 while this waits)
       const wantsRanked = d.create ? d.ranked === true : !!(this.meta && this.meta.ranked);
       let who = null, on = true;
+      // any phone with an account: its gamertag and title show on the other phone (players); never needed to play
+      if (typeof d.session === 'string' && d.session) { try { who = await sessionPlayer(this.env, d.session); } catch (e) { who = null; } }
       if (wantsRanked && !(k && this.meta && this.meta.keys.includes(k))) {
-        try { who = await sessionPlayer(this.env, d.session); if (d.create && who && !who.dev) on = await rankedOn(this.env); } catch (e) { who = null; } // developers may play while it is off
+        try { if (d.create && who && !who.dev) on = await rankedOn(this.env); } catch (e) { on = false; } // developers may play while it is off
         if (!who) { this.send(ws, { t: 'denied', why: 'account' }); return; }
         if (!on) { this.send(ws, { t: 'denied', why: 'ranked off' }); return; }
       }
@@ -285,12 +290,14 @@ export class Room extends DurableObject {
         this.meta.keys[side] = secret();
       }
       key = this.meta.keys[side];
+      if (!this.meta.players) this.meta.players = [null, null];
+      if (who) this.meta.players[side] = { tag: who.tag, title: who.title || '' };
     }
     // one socket per side: an older one of this side (a reload) is let go
     for (const s of this.players(side)) if (s !== ws) { this.setAtt(s, { role: 'x' }); try { s.close(1000, 'replaced'); } catch {} }
     this.setAtt(ws, { role: 'p', side });
     this.sent.delete(ws);
-    this.send(ws, { t: 'welcome', side, key, seq: this.R ? this.R.seq[side] : 0, version: VERSION, tour: this.meta.tour ? { names: this.meta.tour.names } : null, ranked: this.rankedView() });
+    this.send(ws, { t: 'welcome', side, key, seq: this.R ? this.R.seq[side] : 0, version: VERSION, tour: this.meta.tour ? { names: this.meta.tour.names } : null, ranked: this.rankedView(), players: this.playersView() });
     const R = this.R;
     if (R) Ref.setAway(R, side, false, now);
     // a tournament match starts by itself once both players are in

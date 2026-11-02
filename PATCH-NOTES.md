@@ -21,6 +21,7 @@ Newest first. Each entry says what changed for players; technical details live i
 - **Day 1** (purple): everyone who makes an account in this first week, up to and including Sunday 8 November. Accounts made earlier today get it too.
 - **DEV** (pink): the developer's account.
 - Pick which title shows (or none) under **Profile**.
+- In a match, **You** and **Opponent** at the top are now your **gamertags with your titles**. Against a friend online you see their name and title (if they have an account); against the AI it still says Enemy.
 - **Gamertags** can be changed **once a week** (Profile shows when you can change it next). The developer can change theirs any time. Naming a brand-new account when you sign up doesn't count.
 - When you get a new title, the main menu greets you with a **"You have received a new Title!"** pop-up. Players who already had an account see it the next time they open the main menu.
 - **Fix:** on wide computer screens the welcome screen's title and buttons sat off to the right. They're centred now.

@@ -554,6 +554,14 @@ html.pc .corner button span { display: inline; }
 .mp-mode svg { width: 15px; height: 15px; }
 .mp-mode[aria-pressed="true"] { color: var(--gold); border-color: var(--gold); }
 .sheet .mplayer { margin-top: 0; padding-top: 0; border-top: 0; }
+
+/* the HUD's names (2026-11-02): gamertag with the title under it */
+#you-name, #foe-name { display: inline-grid; gap: 1px; min-width: 0; }
+#foe-name { justify-items: end; }
+#you-name .hud-tag, #foe-name .hud-tag { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 34vw; text-transform: none; letter-spacing: 0.02em; }
+.side .lbl .ptitle { font-size: 8px; padding: 1px 6px 1px 8px; gap: 4px; letter-spacing: 0.18em; }
+.side .lbl .ptitle i { width: 4px; height: 4px; }
+.side .lbl { align-items: flex-start; }
 </style>
 <script>
 // PC or phone: a fine pointer that can hover (a mouse) and room for the board and controls side by side
@@ -783,7 +791,9 @@ html.pc .corner button span { display: inline; }
   // ---------- state ----------
   let mode = 'ai';          // ai | claude | tutorial | host | guest
   const solo = () => mode === 'ai' || mode === 'claude' || mode === 'tutorial'; // playing against the computer on this screen
-  const foeName = () => (mode === 'spec' && tour.spec ? tour.spec.foe : '') || tourFoe() || (mode === 'ai' || mode === 'tutorial' ? 'Enemy' : mode === 'claude' ? 'Claude' : 'Opponent'); // a tournament opponent by gamertag
+  // the opponent's account on a server match ({ tag, title }), if their phone has one
+  const foePlayer = () => mode === 'net' && net.players && net.players[foe()] || null;
+  const foeName = () => (mode === 'spec' && tour.spec ? tour.spec.foe : '') || tourFoe() || (foePlayer() ? foePlayer().tag : '') || (mode === 'ai' || mode === 'tutorial' ? 'Enemy' : mode === 'claude' ? 'Claude' : 'Opponent'); // a tournament opponent by gamertag
   let me = 0;               // which side of the match this screen plays (the guest is side 1)
   const foe = () => 1 - me;
   let m = null;             // match state (on the guest: a copy kept in step by the host)
@@ -1681,8 +1691,13 @@ html.pc .corner button span { display: inline; }
     }
     if (home.screen) syncHome();
     $('phase').textContent = { start: 'Ready', lobby: 'Lobby', draft: 'Draft', deploy: 'Deploy', battle: 'Battle', result: 'Result', end: 'Match over' }[phase];
-    $('foe-name').textContent = foeName();
-    $('you-name').textContent = mode === 'spec' && tour.spec ? tour.spec.host : 'You'; // spectating: the host's side is at the bottom
+    // gamertags and titles (2026-11-02): this phone's account, and the opponent's on a server match
+    const mine = mode !== 'spec' && mode !== 'tutorial' && acct ? acct : null, theirs = foePlayer();
+    const hudName = (tag, title) => `<span class="hud-tag">${esc(tag)}</span>${titleHtml(title)}`;
+    const fh = theirs ? hudName(foeName(), theirs.title) : esc(foeName());
+    const yh = mine ? hudName(mine.tag, mine.title) : esc(mode === 'spec' && tour.spec ? tour.spec.host : 'You'); // spectating: the host's side is at the bottom
+    if ($('foe-name').innerHTML !== fh) $('foe-name').innerHTML = fh;
+    if ($('you-name').innerHTML !== yh) $('you-name').innerHTML = yh;
     document.querySelector('.hud').hidden = phase === 'start' || phase === 'lobby' || phase === 'draft'; // no match yet: nothing to show
     if ((mode !== 'tutorial' && !(tutHint && phase === 'deploy')) || phase === 'battle') coach(null); // the fight speaks for itself
     syncPick(); syncMusic();
@@ -6269,7 +6284,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function srvHost(o = {}) {
     leaveNet();
     mode = 'net'; me = 0; m = null; phase = 'lobby'; bt = null; matchKind = 'standard';
-    net.wantRanked = !!o.ranked; net.ranked = o.ranked ? { tags: [acct ? acct.tag : 'You', ''], wins: [0, 0], ties: 0, games: 0, best: 3, done: false } : null;
+    net.players = null; net.wantRanked = !!o.ranked; net.ranked = o.ranked ? { tags: [acct ? acct.tag : 'You', ''], wins: [0, 0], ties: 0, games: 0, best: 3, done: false } : null;
     net.srv = true; net.create = true; net.key = ''; net.tourCode = ''; net.code = newCode();
     hud(); netStatus(); render();
     drawLobby();
@@ -6280,7 +6295,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     leaveNet();
     if (!o.watch) { mode = 'net'; me = o.side === 0 ? 0 : 1; } else mode = 'spec';
     m = null; phase = 'lobby'; bt = null; battlePre = null; deadline = 0; lastSummary = null; matchKind = 'standard';
-    net.wantRanked = false; net.ranked = null;
+    net.wantRanked = false; net.ranked = null; net.players = null;
     net.srv = true; net.create = false; net.key = o.key || ''; net.tourCode = o.tour || ''; net.code = code; net.watch = !!o.watch; net.typed = !!o.typed;
     if (!o.tour && !o.watch) { const u = new URL(location.href.split('#')[0]); u.searchParams.delete('join'); u.searchParams.set('play', code); history.replaceState(null, '', u.toString()); } // a reload comes back to it
     hud(); netStatus(); render();
@@ -6297,7 +6312,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (net.ws !== ws) return;
       net.connected = true; net.tries = 0;
       const hello = net.watch ? { watch: true } : net.tourCode ? { id: tour.myId, tkey: tour.key } : net.key ? { key: net.key } : net.create ? { create: true, ...(net.wantRanked ? { ranked: true } : {}) } : {};
-      if (acct && !net.watch && !net.tourCode && !net.key) hello.session = acct.session; // ranked matches check who this is (never in the URL)
+      if (acct && !net.watch && !net.tourCode) hello.session = acct.session; // who this is: ranked needs it, and the other phone shows the gamertag (never in the URL)
       ws.send(JSON.stringify({ t: 'hello', ...hello }));
       clearInterval(net.ping); net.ping = setInterval(() => { if (net.ws === ws && ws.readyState === 1) ws.send('{"t":"ping"}'); }, 30000);
       netStatus();
@@ -6350,6 +6365,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   function srvRecv(d) {
     if ('ranked' in d && d.t !== 'ack') net.ranked = d.ranked || null;
+    if ('players' in d && d.t !== 'ack') { net.players = d.players || null; hud(); }
     if (d.t === 'welcome') {
       net.welcomed = true;
       if (d.side >= 0) { me = d.side; net.key = d.key || net.key; net.seq = Math.max(net.seq, d.seq | 0); srvSave(); }
