@@ -595,10 +595,12 @@ html.home .app { visibility: hidden; }
 .home-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .home::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 42%, rgba(13, 19, 21, 0.05), rgba(13, 19, 21, 0.62) 78%), linear-gradient(180deg, rgba(13, 19, 21, 0.35), transparent 30%, transparent 70%, rgba(13, 19, 21, 0.5)); }
 .home-in { position: relative; z-index: 1; height: 100%; overflow-y: auto; display: grid; grid-template-rows: auto 1fr auto; justify-items: center; padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(14px + env(safe-area-inset-bottom, 0px)); gap: 14px; }
-.home-title { width: min(92vw, 860px); display: block; margin: 0 auto; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45)) drop-shadow(0 0 22px rgba(0, 0, 0, 0.35)); user-select: none; -webkit-user-drag: none; }
+.home-title { width: min(100%, 860px); display: block; margin: 0 auto; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45)) drop-shadow(0 0 22px rgba(0, 0, 0, 0.35)); user-select: none; -webkit-user-drag: none; }
 .home-title.stack { display: none; }
 @media (max-width: 640px) { .home-title.wide { display: none; } .home-title.stack { display: block; width: min(86vw, 440px); } }
-.home-mid { align-self: center; display: grid; justify-items: center; gap: 18px; width: 100%; max-width: 520px; }
+.home-mid { align-self: center; display: grid; justify-items: center; gap: 18px; width: 100%; max-width: 880px; min-width: 0; }
+.home-mid > * { max-width: 100%; }
+.home-in > * { min-width: 0; max-width: 100%; }
 .home .hbtn { border: 2px solid rgba(255, 255, 255, 0.9); background: rgba(13, 19, 21, 0.55); color: #fff; border-radius: 10px; font: 700 18px var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; padding: 12px 18px; min-height: 54px; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35); transition: transform 0.08s ease, background-color 0.15s ease; }
 .home .hbtn:hover { background: rgba(13, 19, 21, 0.72); }
 .home .hbtn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35); }

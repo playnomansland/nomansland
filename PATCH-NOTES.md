@@ -11,6 +11,7 @@ Newest first. Each entry says what changed for players; technical details live i
 - **DEV** (pink): the developer's account.
 - Pick which title shows (or none) under **Profile**.
 - When you get a new title, the main menu greets you with a **"You have received a new Title!"** pop-up. Players who already had an account see it the next time they open the main menu.
+- **Fix:** on wide computer screens the welcome screen's title and buttons sat off to the right. They're centred now.
 - **Sign in with Google** looks better: Google's own button in its dark style, as wide as the box, with a short note that the sign-in is handled by Google. It no longer jumps around while it loads.
 
 ---
