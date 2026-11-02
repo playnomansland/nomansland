@@ -657,7 +657,7 @@ html.pc .corner button span { display: inline; }
 .series { display: flex; justify-content: center; gap: 10px; align-items: baseline; font-family: var(--font-display); }
 .series b { font-size: 22px; }
 
-/* titles (2026-11-02): a small glowing banner under a gamertag */
+/* titles (2026-11-02): a small glowing banner under a username */
 .nameplate { display: inline-grid; justify-items: center; gap: 2px; line-height: 1.15; vertical-align: middle; }
 .nameplate .np-tag { font: 700 15px var(--font-display); letter-spacing: 0.03em; }
 .nameplate.big .np-tag { font-size: 22px; }
@@ -689,7 +689,7 @@ html.pc .corner button span { display: inline; }
 .mp-mode[aria-pressed="true"] { color: var(--gold); border-color: var(--gold); }
 .sheet .mplayer { margin-top: 0; padding-top: 0; border-top: 0; }
 
-/* the HUD's names (2026-11-02): gamertag with the title under it */
+/* the HUD's names (2026-11-02): username with the title under it */
 #you-name, #foe-name { display: inline-grid; gap: 1px; min-width: 0; }
 #foe-name { justify-items: end; }
 #you-name .hud-tag, #foe-name .hud-tag { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 34vw; text-transform: none; letter-spacing: 0.02em; }
@@ -9364,7 +9364,7 @@ Floors.floor = (() => {
   const solo = () => mode === 'ai' || mode === 'claude' || mode === 'tutorial'; // playing against the computer on this screen
   // the opponent's account on a server match ({ tag, title }), if their phone has one
   const foePlayer = () => mode === 'net' && net.players && net.players[foe()] || null;
-  const foeName = () => (mode === 'spec' && tour.spec ? tour.spec.foe : '') || tourFoe() || (foePlayer() ? foePlayer().tag : '') || (mode === 'ai' || mode === 'tutorial' ? 'Enemy' : mode === 'claude' ? 'Claude' : 'Opponent'); // a tournament opponent by gamertag
+  const foeName = () => (mode === 'spec' && tour.spec ? tour.spec.foe : '') || tourFoe() || (foePlayer() ? foePlayer().tag : '') || (mode === 'ai' || mode === 'tutorial' ? 'Enemy' : mode === 'claude' ? 'Claude' : 'Opponent'); // a tournament opponent by username
   let me = 0;               // which side of the match this screen plays (the guest is side 1)
   const foe = () => 1 - me;
   let m = null;             // match state (on the guest: a copy kept in step by the host)
@@ -10262,7 +10262,7 @@ Floors.floor = (() => {
     }
     if (home.screen) syncHome();
     $('phase').textContent = { start: 'Ready', lobby: 'Lobby', draft: 'Draft', deploy: 'Deploy', battle: 'Battle', result: 'Result', end: 'Match over' }[phase];
-    // gamertags and titles (2026-11-02): this phone's account, and the opponent's on a server match
+    // usernames and titles (2026-11-02): this phone's account, and the opponent's on a server match
     const mine = mode !== 'spec' && mode !== 'tutorial' && acct ? acct : null, theirs = foePlayer();
     const hudName = (tag, title) => `<span class="hud-tag">${esc(tag)}</span>${titleHtml(title)}`;
     const fh = theirs ? hudName(foeName(), theirs.title) : esc(foeName());
@@ -11051,7 +11051,7 @@ Floors.floor = (() => {
     size(); render();
   }
 
-  // ---------- titles (2026-11-02): earned on the server (accounts.js titlesOf), shown under a gamertag ----------
+  // ---------- titles (2026-11-02): earned on the server (accounts.js titlesOf), shown under a username ----------
   // day1: every account made in the first week (to Sunday 2026-11-08); dev: developer accounts. The player picks
   // which one shows (Profile). A title this phone hasn't announced yet gets the "new Title" popup on the main menu.
   const TITLES = {
@@ -11059,7 +11059,7 @@ Floors.floor = (() => {
     dev: { name: 'DEV', col: '#FF5FC4', glow: 'rgba(255, 95, 196, 0.55)' },
   };
   const titleHtml = (id, big) => TITLES[id] ? `<span class="ptitle${big ? ' big' : ''}" style="--tc:${TITLES[id].col};--tg:${TITLES[id].glow}"><i aria-hidden="true"></i>${esc(TITLES[id].name)}<i aria-hidden="true"></i></span>` : '';
-  // a gamertag with its title under it
+  // a username with its title under it
   const nameplate = (tag, title, cls = '') => `<span class="nameplate ${cls}"><span class="np-tag">${esc(tag)}</span>${titleHtml(title)}</span>`;
   const TITLES_SEEN = 'pb-titles-seen'; // { playerId: [title ids already announced on this phone] }
   function titlesUnseen() {
@@ -11228,7 +11228,7 @@ Floors.floor = (() => {
     $('w-signup').addEventListener('click', () => { home.screen = 'signup'; home.msg = ''; drawHome(); });
     $('w-guest').addEventListener('click', playAsGuest);
   }
-  // Play as guest: a guest account on the server (a gamertag of its own); without the server, straight to the menu
+  // Play as guest: a guest account on the server (a username of its own); without the server, straight to the menu
   async function playAsGuest() {
     if (home.busy) return;
     if (acct) { homeDone(); return; }
@@ -11238,16 +11238,16 @@ Floors.floor = (() => {
     if (r.status === 200) acctTake(r);
     homeDone();
   }
-  // Sign up (its own screen: a gamertag, then Google or a guest with that name) and Log in (Google)
+  // Sign up (its own screen: a username, then Google or a guest with that name) and Log in (Google)
   function drawSignIn(el) {
     const up = home.screen === 'signup';
     el.innerHTML = `<div>${titleImg()}</div><div class="home-mid">
         <div class="home-card">
           <h3>${up ? 'Sign up' : 'Log in'}</h3>
-          ${up ? `<p class="hint" style="margin:0">Pick your gamertag. Sign up with Google to keep your account on any phone or computer, or just make a guest account on this one.</p>
-            <span class="hint">Gamertag</span>
-            <input class="tour-in" id="su-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Gamertag" placeholder="2–16 letters" value="${esc(home.tag || '')}">`
-          : '<p class="hint" style="margin:0">Log in with the Google account you signed up with. You get your gamertag, match history and ranked results back on this device.</p>'}
+          ${up ? `<p class="hint" style="margin:0">Pick your username. Sign up with Google to keep your account on any phone or computer, or just make a guest account on this one.</p>
+            <span class="hint">Username</span>
+            <input class="tour-in" id="su-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Username" placeholder="2–16 letters" value="${esc(home.tag || '')}">`
+          : '<p class="hint" style="margin:0">Log in with the Google account you signed up with. You get your username, match history and ranked results back on this device.</p>'}
           <div id="acct-google" class="acct-google"></div>
           <p class="acct-trust">Sign-in is handled by Google. We never see your password or email.</p>
           ${up ? '<button class="btn" id="su-guest">Sign up as a guest instead</button>' : ''}
@@ -11261,13 +11261,13 @@ Floors.floor = (() => {
     $('si-other').addEventListener('click', () => { home.screen = up ? 'login' : 'signup'; home.msg = ''; drawHome(); });
     if ($('su-guest')) $('su-guest').addEventListener('click', async () => {
       const tag = (tagIn.value || '').trim();
-      if (tag && !cleanTagOk(tag)) { signMsg('Gamertags are 2–16 letters, digits, spaces, _ . or -.'); return; }
+      if (tag && !cleanTagOk(tag)) { signMsg('Usernames are 2–16 letters, digits, spaces, _ . or -.'); return; }
       signMsg('One moment…');
       const r = await acctCall('guest', tag ? { tag } : {});
       if (r.status !== 200) { signMsg(acctFail(r)); return; }
       acctTake(r); homeDone();
     });
-    acctUi.after = async (r) => { // Google said yes (acctGoogle): Sign up keeps the gamertag typed here
+    acctUi.after = async (r) => { // Google said yes (acctGoogle): Sign up keeps the username typed here
       const tag = up && tagIn ? tagIn.value.trim() : '';
       if (tag && cleanTagOk(tag) && r.linked === 'new') await acctCall('tag', { tag }, true).then(x => { if (x.status === 200) acctTake(x); });
       if (phase === 'start') homeDone();
@@ -11444,7 +11444,7 @@ Floors.floor = (() => {
   function openToursSheet() { // developers only (Vilhelm, 2026-11-02); joining by code or link stays open to everyone
     if (!devMode()) return;
     $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Tournaments</h3><button class="btn small" id="close">Close</button></div>
-      <p class="hint" style="margin:0">Invite friends to a tournament: brackets, gamertags, your rules. Got a tournament code? Type it under Play → Have a code.</p>
+      <p class="hint" style="margin:0">Invite friends to a tournament: brackets, usernames, your rules. Got a tournament code? Type it under Play → Have a code.</p>
       <span class="btnrow"><button class="btn primary" id="tour-new">Host a tournament</button><button class="btn" id="tour-practice">Practice vs bots</button></span>`;
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', closeSheet);
@@ -11866,8 +11866,8 @@ Floors.floor = (() => {
   }
 
   // ---------- account (server step 5) ----------
-  // A guest id and gamertag from the server, kept on this phone; "Sign in with Google" keeps it on any phone. Nothing
-  // else uses it yet: matches and tournaments still go by gamertag (linking them comes after the 2026-11-08 tournament).
+  // A guest id and username from the server, kept on this phone; "Sign in with Google" keeps it on any phone. Nothing
+  // else uses it yet: matches and tournaments still go by username (linking them comes after the 2026-11-08 tournament).
   // The session token goes only in the Authorization header. Google's script loads only when the sheet opens.
   const GOOGLE_CLIENT_ID = '732949481177-ikom5gqq07pt0sg89km9mth5d9ibfvmi.apps.googleusercontent.com';   // public OAuth client id (Google Cloud Console); empty = Google sign-in off
   const ACCT_STORE = 'phonebellum.account.v1';
@@ -11911,8 +11911,8 @@ Floors.floor = (() => {
   function acctFail(r) {
     if (r.status === 503 && r.error === 'accounts off') { acctUi.off = true; return 'Accounts aren’t switched on yet on the game server.'; }
     if (r.status === 429) return 'Too many tries from this network. Wait a while and try again.';
-    if (r.status === 429 && r.error === 'too soon') return `You can change your gamertag once a week. Next change: ${tagWhen(r.next)}.`;
-    if (r.status === 400 && r.error === 'bad tag') return 'Gamertags are 2–16 letters, digits, spaces, _ . or -.';
+    if (r.status === 429 && r.error === 'too soon') return `You can change your username once a week. Next change: ${tagWhen(r.next)}.`;
+    if (r.status === 400 && r.error === 'bad tag') return 'Usernames are 2–16 letters, digits, spaces, _ . or -.';
     if (r.status === 401 && r.error === 'google token') return 'Google sign-in didn’t go through. Try again.';
     if (r.status === 401) { acctSave(null); return 'This phone was signed out. Make a new guest or sign in with Google.'; }
     if (r.status === 503 && r.error === 'google unavailable') return 'Couldn’t check with Google just now. Try again.';
@@ -11932,7 +11932,7 @@ Floors.floor = (() => {
   const acctRename = (tag) => acctDo(async () => {
     const r = await acctCall('tag', { tag }, true);
     if (r.status !== 200) return acctFail(r);
-    acctTake(r); return 'Gamertag saved.';
+    acctTake(r); return 'Username saved.';
   });
   const acctGoogle = (credential) => acctDo(async () => {
     const r = await acctCall('google', { credential }, true);
@@ -11999,16 +11999,16 @@ Floors.floor = (() => {
       <div style="text-align:center">${nameplate(a.tag, a.title, 'big')}</div>
       ${(a.titles || []).length ? `<span class="hint">Title under your name</span>
       <div class="seg" role="group" aria-label="Title">${a.titles.map(t => `<button data-title="${t}" aria-pressed="${a.title === t}" ${dis}>${esc(TITLES[t].name)}</button>`).join('')}<button data-title="" aria-pressed="${!a.title}" ${dis}>None</button></div>` : ''}
-      <span class="hint">Your gamertag</span>
-      <span class="joinrow"><input class="tour-in" id="acct-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Your gamertag" value="${esc(a.tag)}" ${a.tagNext > now() ? 'disabled' : ''}><button class="btn" id="acct-tag-ok" ${dis} ${a.tagNext > now() ? 'disabled' : ''}>Save</button></span>
+      <span class="hint">Your username</span>
+      <span class="joinrow"><input class="tour-in" id="acct-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Your username" value="${esc(a.tag)}" ${a.tagNext > now() ? 'disabled' : ''}><button class="btn" id="acct-tag-ok" ${dis} ${a.tagNext > now() ? 'disabled' : ''}>Save</button></span>
       <p class="hint" style="margin:0">${a.dev ? 'Developer: change it any time.' : a.tagNext > now() ? `You can change it again on ${tagWhen(a.tagNext)}.` : 'You can change it once a week.'}</p>
       ${a.google ? '' : google}
       <span class="btnrow"><button class="btn" id="hist-open">Match history</button><button class="btn" id="acct-out" ${dis}>${acctUi.outSure ? 'Tap again to log out' : 'Log out'}</button></span>
-      ${acctUi.outSure && !a.google ? '<p class="hint" style="margin:0">A guest can’t log back in: sign up with Google first to keep this gamertag and your results.</p>' : ''}
+      ${acctUi.outSure && !a.google ? '<p class="hint" style="margin:0">A guest can’t log back in: sign up with Google first to keep this username and your results.</p>' : ''}
       <span class="btnrow"><button class="btn small" id="acct-del" ${dis}>${acctUi.sure ? 'Tap again to delete' : 'Delete account'}</button></span>
-      ${acctUi.sure ? '<p class="hint" style="margin:0">Deleting removes your gamertag and sign-in for good. Past match results stay, without your name.</p>' : ''}`
+      ${acctUi.sure ? '<p class="hint" style="margin:0">Deleting removes your username and sign-in for good. Past match results stay, without your name.</p>' : ''}`
     : `
-      <p class="hint" style="margin:0">No account needed to play. Make a guest to get a gamertag on this phone${GOOGLE_CLIENT_ID ? ', or sign in with Google to keep it on any phone' : ''}.</p>
+      <p class="hint" style="margin:0">No account needed to play. Make a guest to get a username on this phone${GOOGLE_CLIENT_ID ? ', or sign in with Google to keep it on any phone' : ''}.</p>
       <span class="btnrow"><button class="btn primary" id="acct-guest" ${dis}>Play as a guest</button><button class="btn" id="hist-open">Match history</button></span>
       ${google}
       ${GOOGLE_CLIENT_ID ? '' : '<p class="hint" style="margin:0">Sign in with Google is coming soon.</p>'}`;
@@ -14967,7 +14967,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (net.ws !== ws) return;
       net.connected = true; net.tries = 0;
       const hello = net.watch ? { watch: true } : net.tourCode ? { id: tour.myId, tkey: tour.key } : net.key ? { key: net.key } : net.create ? { create: true, ...(net.wantRanked ? { ranked: true } : {}) } : {};
-      if (acct && !net.watch && !net.tourCode) hello.session = acct.session; // who this is: ranked needs it, and the other phone shows the gamertag (never in the URL)
+      if (acct && !net.watch && !net.tourCode) hello.session = acct.session; // who this is: ranked needs it, and the other phone shows the username (never in the URL)
       ws.send(JSON.stringify({ t: 'hello', ...hello }));
       clearInterval(net.ping); net.ping = setInterval(() => { if (net.ws === ws && ws.readyState === 1) ws.send('{"t":"ping"}'); }, 30000);
       netStatus();
@@ -15651,7 +15651,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       <h2>${head}</h2>
       <p class="big">${body}</p>
       ${tour.problem ? `<p class="status wait">${esc(tour.problem)}</p>` : ''}
-      ${tour.role === 'player' && t.status === 'lobby' ? `<span class="hint">Your gamertag</span><span class="joinrow"><input class="tour-in" id="tour-name" maxlength="18" autocomplete="nickname" spellcheck="false" aria-label="Your gamertag" placeholder="Your gamertag" value="${esc(me0 ? me0.name : tour.myName)}"><button class="btn" id="tour-name-ok">Save</button></span>` : ''}
+      ${tour.role === 'player' && t.status === 'lobby' ? `<span class="hint">Your username</span><span class="joinrow"><input class="tour-in" id="tour-name" maxlength="18" autocomplete="nickname" spellcheck="false" aria-label="Your username" placeholder="Your username" value="${esc(me0 ? me0.name : tour.myName)}"><button class="btn" id="tour-name-ok">Save</button></span>` : ''}
       ${(() => { const d = tourBracketData(t); if (!d) return btns ? `<div class="btnrow">${btns}</div>` : '';
         if (tour.role === 'watch') return btns ? `<div class="btnrow">${btns}</div>` : ''; // the big screen has it in full, below
         return `<div class="btnrow">${btns}<button class="btn" id="tour-bracket">Bracket</button></div>`; })()}
@@ -15711,7 +15711,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (k === 'players') {
       const list = t.players.map(p => `<li class="prow"><span>${pname(p.id)}${p.dropped ? ' <small>(dropped)</small>' : ''}${p.id === t.org ? ' <small>· organizer</small>' : ''}</span>
         <span class="btnrow"><button class="btn small" data-rename="${p.id}">Rename</button>${p.dropped ? '' : `<button class="btn small" data-drop="${p.id}">${t.status === 'lobby' ? 'Remove' : 'Drop'}</button>`}</span></li>`).join('');
-      return `${t.status === 'lobby' ? `<span class="hint">Invite link (players open it and pick a gamertag):</span>
+      return `${t.status === 'lobby' ? `<span class="hint">Invite link (players open it and pick a username):</span>
         <div class="linkbox" id="tour-link">${esc(tourLink())}</div>
         <span class="btnrow">${navigator.share ? '<button class="btn primary small" id="tour-share">Share invite</button>' : ''}<button class="btn small" id="tour-copy">Copy invite</button><button class="btn small" id="tour-copy-watch">Copy big-screen link</button></span>` : ''}
         <ul class="tour-list">${list}</ul>
@@ -15816,10 +15816,10 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if ($('tour-copy')) $('tour-copy').addEventListener('click', () => { const l = tourLink(); if (navigator.clipboard) navigator.clipboard.writeText(l).then(() => { $('tour-copy').textContent = 'Copied'; }, () => {}); });
     if ($('tour-copy-watch')) $('tour-copy-watch').addEventListener('click', () => { const l = tourLink(true); if (navigator.clipboard) navigator.clipboard.writeText(l).then(() => { $('tour-copy-watch').textContent = 'Copied'; }, () => {}); });
     on('[data-watch]', (b) => tourSpectate(b.dataset.watch));
-    if ($('tour-share')) $('tour-share').addEventListener('click', () => navigator.share({ title: t.name, text: `Join ${t.name} in No Mans Land! Pick a gamertag when you're in.`, url: tourLink() }).catch(() => {}));
+    if ($('tour-share')) $('tour-share').addEventListener('click', () => navigator.share({ title: t.name, text: `Join ${t.name} in No Mans Land! Pick a username when you're in.`, url: tourLink() }).catch(() => {}));
     if (!tourOrg()) return;
     // organizer actions go to the server (Tour.apply there); the screen updates when its new state comes back
-    on('[data-rename]', (b) => { const p = Tour.player(t, b.dataset.rename); const n = p && prompt('New gamertag', p.name); if (n) tourDo('rename', { id: p.id, name: n }); });
+    on('[data-rename]', (b) => { const p = Tour.player(t, b.dataset.rename); const n = p && prompt('New username', p.name); if (n) tourDo('rename', { id: p.id, name: n }); });
     on('[data-drop]', (b) => {
       if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Sure?'; return; }
       tourDo('drop', { id: b.dataset.drop });

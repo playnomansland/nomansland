@@ -6,6 +6,9 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ## 2 November 2026 – Balance and fixes
 
+### Usernames
+- **Gamertags are now called usernames** everywhere in the game: sign-up, Profile, tournaments and match screens.
+
 ### Unit sheets
 - A unit's **stats** (bodies, health, hit, attacks per second, range, speed) now sit at the **top of its sheet**, right under its name, instead of at the bottom.
 
