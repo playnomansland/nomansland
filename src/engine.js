@@ -1335,6 +1335,7 @@ const Engine = (() => {
             const sgn = (v.wwDodges = (v.wwDodges || 0) + 1) % 2 ? 1 : -1, c = 0.7071067811865476;
             const ux = (dx - sgn * dy) * c, uy = (dy + sgn * dx) * c;
             v.x += ux * ww.step; v.y += uy * ww.step; v.hx = -dx; v.hy = -dy;
+            invalidateTargetIndex(); // a dodge can move a body that a later attacker targets
             if (g.bounds) { v.x = Math.max(g.bounds.x0, Math.min(g.bounds.x1, v.x)); v.y = Math.max(g.bounds.y0, Math.min(g.bounds.y1, v.y)); }
             v.dashing = true;
             if (v.u.windUp > 0) { v.setUp = false; v.windTarget = null; }
@@ -1780,6 +1781,7 @@ const Engine = (() => {
         const d = dist(tgt, b), keep = Math.min(d, Math.max(0.5, R(b) * 0.6));
         if (opts.record) shots.push([b.x, b.y, tgt.x, tgt.y, b.side, 0, 1, 0, 0]);
         if (d > 1e-6) { b.hx = (tgt.x - b.x) / d; b.hy = (tgt.y - b.y) / d; b.x = tgt.x - b.hx * keep; b.y = tgt.y - b.hy * keep; }
+        invalidateTargetIndex(); // flurry movement can affect later enemy target queries
         b.flurryTgt = tgt; b.lock = tgt;
       } else if (gap(tgt, b) > R(b) + 2) { b.flurryLeft = 0; return; }
       b.flurryLeft--; b.flurryT += b.u.flurry.gap;
