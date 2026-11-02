@@ -4,15 +4,14 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
-## 2 November 2026 – Accounts (coming online)
+## 2 November 2026 – Accounts
 
 - **Account** on the start screen. Tap **Play as a guest** to get your own gamertag on this phone, no sign-up needed. You can change the gamertag any time.
-- **Sign in with Google** to keep your player if you change or reset your phone: sign in on another phone and you're the same player. A guest who signs in keeps their gamertag. The button appears once Google sign-in is set up.
+- **Sign in with Google** to keep your player if you change or reset your phone: sign in on another phone and you're the same player. A guest who signs in keeps their gamertag.
 - **Sign out** on one phone leaves your other phones signed in. **Delete account** (tap twice) removes your gamertag and sign-in for good; past match results stay, without your name.
 - We never store passwords, and nothing from your Google account except an id Google gives us for it: not your email, not your name.
 - For now the account only holds your gamertag. Matches and tournaments still work exactly as before; linking them to your account comes after Sunday's tournament.
 - **Developer mode** for the game's developer: a Google account on the server's private developer list gets every feature, now and in anything added later. The Account sheet shows when it's on.
-- Until the accounts database is switched on, the sheet says accounts aren't on yet.
 
 ---
 

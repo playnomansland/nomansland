@@ -6,7 +6,7 @@ Repo: snetendare/phone-bellum, push to main. Server: https://nml-server.nomansla
 
 ## Status (end of 2026-11-02 session)
 
-Stages 1 and 2 are built, tested and pushed; accounts are switched off on the live server until Vilhelm's setup is done. Details: docs/SERVER.md, "Accounts (step 5)".
+Stages 1 and 2 are built, tested and live (switched on the same evening: D1 bound, Google client id set, DEV_EMAILS secret uploaded by the deploy). Details: docs/SERVER.md, "Accounts (step 5)".
 
 - Decisions (Vilhelm): D1 for accounts; tournaments and history do not use player ids before Sunday.
 - Server: `server/src/accounts.js` (guest, google, me, tag, signout, delete), routed in `server/src/index.js`. No D1 binding = 503 'accounts off'. Nothing in room.js, tour.js, referee.js, tournament.js or the page's 'net' mode was touched.
@@ -14,7 +14,8 @@ Stages 1 and 2 are built, tested and pushed; accounts are switched off on the li
 - Tests: `server/test/accounts.test.js` (in npm test), `tools/tests/account-ui.js`, shared setup `server/test/accounts-env.js` (local D1 via a config copy in `server/.wrangler/accounts-test.toml`, local key server, `idToken()`).
 - Developer mode (Vilhelm, 2026-11-02): his Google account gets every feature now and later. Server flag `dev` from the secret DEV_EMAILS (GitHub secret -> Cloudflare secret in the deploy workflow; the sandbox can't set GitHub secrets). Page: `devMode()`. Any future per-player lock must let developers through.
 - New address (Vilhelm, 2026-11-02): the site moves to https://playnomansland.github.io after Sunday's tournament. Vilhelm made the GitHub organization playnomansland (2026-11-02) and transfers the repo after Sunday; then rename it playnomansland.github.io, change the server's "Play at" note (server/src/index.js), drop snetendare.github.io from ALLOWED_ORIGINS some weeks later, add the new origin to the Google OAuth client, update README/docs links. Already done: playnomansland.github.io is in ALLOWED_ORIGINS. Phones' saved data (tournament keys, settings, account session) does not follow to the new address.
-- Waiting on Vilhelm (asked 2026-11-02): the D1 database id, D1 Edit on the deploy token, the Google OAuth client id, the GitHub secret DEV_EMAILS. Then: uncomment and fill the `[[d1_databases]]` block, add `GOOGLE_CLIENT_ID` to `[vars]` and to the page, push, and check `/account/guest` from the live page (WebFetch can't, it has no game Origin). The accounts tests then use the real block's binding locally (accountsConfig() skips the copy).
+- Setup done 2026-11-02 (see docs/SERVER.md). Vilhelm still to check by hand: Sign in with Google on the live site shows Developer mode.
+- Flaky: server/test/match.test.js failed once in CI ('phone and server in step', the random map and leaders match); a rerun passed and it passed locally. Look at it after Sunday (a rare phone/server difference; real phones get resynced by the server). Then: uncomment and fill the `[[d1_databases]]` block, add `GOOGLE_CLIENT_ID` to `[vars]` and to the page, push, and check `/account/guest` from the live page (WebFetch can't, it has no game Origin). The accounts tests then use the real block's binding locally (accountsConfig() skips the copy).
 - Next (stage 3, after Sunday 2026-11-08): tournament joins and match history rows carry the player id; history per player.
 
 ## Hard rule this week

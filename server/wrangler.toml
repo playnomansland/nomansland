@@ -6,6 +6,8 @@ compatibility_date = "2026-10-01"
 # Pages that may open a connection. Anything else is turned away.
 [vars]
 ALLOWED_ORIGINS = "https://snetendare.github.io,https://playnomansland.github.io,http://localhost:8766,http://127.0.0.1:8766,http://localhost:8787"
+# Google sign-in (step 5): the public OAuth client id. The server checks that Google ID tokens were made for it.
+GOOGLE_CLIENT_ID = "732949481177-ikom5gqq07pt0sg89km9mth5d9ibfvmi.apps.googleusercontent.com"
 
 # One Room per match code. SQLite-backed, so it works on the Free plan.
 [[durable_objects.bindings]]

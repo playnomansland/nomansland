@@ -11166,7 +11166,7 @@ const Render2D = (cv, view, opts = {}) => {
   // A guest id and gamertag from the server, kept on this phone; "Sign in with Google" keeps it on any phone. Nothing
   // else uses it yet: matches and tournaments still go by gamertag (linking them comes after the 2026-11-08 tournament).
   // The session token goes only in the Authorization header. Google's script loads only when the sheet opens.
-  const GOOGLE_CLIENT_ID = '';   // public OAuth client id (Google Cloud Console); empty = Google sign-in not set up yet
+  const GOOGLE_CLIENT_ID = '732949481177-ikom5gqq07pt0sg89km9mth5d9ibfvmi.apps.googleusercontent.com';   // public OAuth client id (Google Cloud Console); empty = Google sign-in off
   const ACCT_STORE = 'phonebellum.account.v1';
   let acct = null;
   try { acct = JSON.parse(localStorage.getItem(ACCT_STORE) || 'null'); } catch (e) {}
