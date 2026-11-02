@@ -64,15 +64,15 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 9 * 60 *
     const nF = (s) => s.inbox.filter((x) => x.t === 'fight').length;
     const startA = nF(a);
     for (let round = 1; round < 40; round++) {
+      const before = nF(a); // counted before deploying: on a slow machine the round's clock may run out and the server fights by itself
       const va = await syncOf(a, (x) => x.phase === 'deploy' && x.round === round && a.inbox.indexOf(x) >= a.gameStart);
       await deploySide(a, 0, va.m, r);
       b.json({ t: 'sync' }); await sleep(60);
       const vb = await syncOf(b, (x) => x.phase === 'deploy' && x.round === round && b.inbox.indexOf(x) >= b.gameStart);
       await deploySide(b, 1, vb.m, r);
-      const before = nF(a);
       a.json({ t: 'ready', v: true }); b.json({ t: 'ready', v: true });
       const f = await waitFor(() => nF(a) > before && a.inbox.filter((x) => x.t === 'fight').pop(), 60000);
-      await waitFor(() => nF(b) > before, 30000);
+      await waitFor(() => nF(b) > before, 30000).catch(() => waitFor(() => nF(b) >= nF(a), 30000));
       if (f.post.over) { assert.ok(nF(a) > startA); return f; }
       a.json({ t: 'next', round: f.summary.round }); b.json({ t: 'next', round: f.summary.round });
     }
