@@ -11,8 +11,9 @@
 //
 // Messages in:  hello { create, session } | { key } | {}, seat { a, b } (host, lobby: swap two seats), kick { seat } (host,
 //               lobby), start { settings } (host), act { seq, fn, a }, ready { v }, next { round }, rematch, forfeit,
-//               sync, ping
+//               mark { kind, lane, col, row } (a ping; 'ping' is the keep-alive), emote { id } (both to the team only), sync
 // Messages out: welcome { side, key, seq, seat, lane, host }, duolobby { seats, host, seat }, full, denied { why },
+//               mark { from, kind, lane, col, row }, emote { from, id },
 //               sync / status / fight as in a 1v1 room (server/src/room.js) for the seat's own lane, plus duo
 //               ({ seat, lane, names, here, bots, hp, ready, nextReady, mate }) and, in fight, duo.pres (both lanes before
 //               the fight, for the wide playback).
@@ -130,6 +131,18 @@ export class DuoRoom extends DurableObject {
         this.push({ force: true });
         return;
       }
+      case 'mark': { // a ping (a marker on a board) for the team: ? (a question), ! (look here), go (attack here)
+        if (inLobby || !Duo.PINGS.includes(d.kind)) return;
+        const lane = d.lane | 0, col = d.col | 0, row = d.row | 0;
+        if (lane < 0 || lane > 1 || col < 0 || col >= 20 || row < 0 || row >= 24) return;
+        this.team(seat, { t: 'mark', from: seat, kind: d.kind, lane, col, row });
+        return;
+      }
+      case 'emote': { // a quick line for the team
+        if (inLobby || !Duo.EMOTES.includes(d.id)) return;
+        this.team(seat, { t: 'emote', from: seat, id: d.id });
+        return;
+      }
       case 'kick': {
         const k = d.seat | 0;
         if (!host || !inLobby || k === seat || k < 0 || k > 3 || !this.meta.seats[k]) return;
@@ -185,6 +198,11 @@ export class DuoRoom extends DurableObject {
         return;
       }
     }
+  }
+  // to every phone on the seat's team (the sender's included, so its own ping shows the way the team sees it)
+  team(seat, msg) {
+    const sd = Duo.SEATS[seat].side, text = JSON.stringify(msg);
+    for (const s of this.sockets()) { const a = this.att(s); if (a.role === 'p' && Duo.SEATS[a.seat].side === sd) this.send(s, text); }
   }
   // the status line of each seat's lane (Ready ticks, the clock)
   status(gone) {

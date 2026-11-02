@@ -388,7 +388,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
     const { bt, me, mode, phase } = v;
     let html = '';
     if (bt && phase === 'battle') for (const sd of [me, 1 - me]) {
-      const s = bt.crippled(sd); if (!(s > 0)) continue;
+      const s = Math.max(bt.crippled(sd, 0), bt.crippled(sd, 1) || 0); if (!(s > 0)) continue; // (2v2: per board)
       const txt = sd === me ? `Your tower fell · crippled ${Math.ceil(s)} s` : `${mode === 'claude' ? 'Claude’s' : 'Enemy'} tower fell · crippled ${Math.ceil(s)} s`;
       html += `<div style="position:absolute;left:50%;top:${sd === me ? 62 : 30}%;transform:translateX(-50%);background:rgba(0,0,0,.6);padding:4px 8px;white-space:nowrap;color:${Art.teamCol(sd, me)}">${txt}</div>`;
     }
@@ -905,6 +905,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
     const now = performance.now(), dt = last ? Math.min(0.1, (now - last) / 1000) : 0.016; last = now;
     clock += dt;
     const v = view();
+    if (v.m) Game.useGrid(v.m); // the board as drawn (the page's own calls may have left another board's grid: a 2v2 picture)
     v0 = v; lastMe = v.me;
     if (v.battleCam) { const f = v.me === 1 ? -1 : 1; cam.focus(v.battleCam.k, v.battleCam.x * f, -v.battleCam.y * f); camOn = true; }
     else if (camOn) { cam.focus(0); camOn = false; }

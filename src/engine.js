@@ -765,7 +765,12 @@ const Engine = (() => {
     const sight = !ruleOn(g, 'vision') ? 1e9 : g.sight == null ? SIGHT : g.sight;
     const minSight = g.minSight == null ? MIN_SIGHT : g.minSight;
     const drift = g.drift == null ? DRIFT : g.drift;
-    const cripple = [0, 0];      // seconds left of the tower-down penalty for each side
+    // seconds left of the tower-down penalty for each side. A 2v2 fight (opts.lanes, src/duo.js) keeps one per side and
+    // board: a fallen tower only cripples its own board (cripple[side + 2 * lane]); a body made in the fight takes the
+    // board it stands on. 1v1: just the side.
+    const cripple = [0, 0, 0, 0];
+    const lanesOn = !!opts.lanes;
+    const ck = (b) => { if (!lanesOn) return b.side; if (b.lane == null) b.lane = b.x > 0 ? 1 : 0; return b.side + 2 * b.lane; };
     const downNow = [];          // sides whose tower fell this tick: crippled from the next one
     const towerDown = g.towerDown || TOWER_DOWN;
     // a body died: a fallen tower cripples its side; a body with deathBlast explodes (deathBlast % of its max health)
@@ -778,7 +783,7 @@ const Engine = (() => {
       }
       // a lesser building (Factions devtest) doesn't cripple its side. The penalty starts with the next tick, so the
       // other side's bodies still to act this tick don't get the better of it (see the end of step)
-      if (v.u.structure && !v.u.lesser) downNow.push(v.side);
+      if (v.u.structure && !v.u.lesser) downNow.push(ck(v));
       if (v.u.deathBlast > 0) {
         const dmg = v.u.hp * v.u.deathBlast / 100, rad = v.u.blastAt > 0 ? v.u.blastAt : BLAST_RADIUS;
         if (opts.record) shots.push([v.x, v.y, v.x, v.y, v.side, rad, 1, 0, 0]);
@@ -1267,7 +1272,7 @@ const Engine = (() => {
     // damage from the map itself (elf tower, toxic tiles): counts for neither side, earns no experience
     function neutralDamage(v, dmg) {
       if (v.turning || v.u.aloft || sheltered(v)) return;
-      if (cripple[v.side] > 0) dmg = dmg * (1 + towerDown.taken / 100);
+      if (cripple[ck(v)] > 0) dmg = dmg * (1 + towerDown.taken / 100);
       loseHp(v, dmg);
       if (poolHp(v) <= 1e-9) kill(null, v);
     }
@@ -1339,7 +1344,7 @@ const Engine = (() => {
       if (owner.u.bldgPct > 0 && v.u.structure) hit = hit * owner.u.bldgPct / 100; // weaker against buildings (the Assassin)
       let pct = owner.u.pctHit > 0 && !v.u.structure ? v.u.hp * owner.u.pctHit / 100 : 0;
       if (owner.sniperMark > 0 && v.marked && owner.side !== v.side) { hit = hit * (1 + owner.sniperMark / 100); pct = pct * (1 + owner.sniperMark / 100); } // Mark Bounty (sniper tower)
-      if (cripple[owner.side] > 0) { hit = hit * (1 - towerDown.attack / 100); pct = pct * (1 - towerDown.attack / 100); }
+      if (cripple[ck(owner)] > 0) { hit = hit * (1 - towerDown.attack / 100); pct = pct * (1 - towerDown.attack / 100); }
       // Shield: the whole hit is blocked, however big, and it brings no poison
       if (v.shield > 0) { v.shield--; st.blocked += hit + pct; return; }
       // ice walls (towers on the ice map): four walls, one per direction; each blocks a number of whole hits
@@ -1361,7 +1366,7 @@ const Engine = (() => {
         if (v.u.defense === 'ward') dmg = Math.min(dmg, v.u.defVal);
         if (v.u.bonusWard > 0) dmg = Math.min(dmg, v.u.bonusWard);
       }
-      if (cripple[v.side] > 0) dmg = dmg * (1 + towerDown.taken / 100);
+      if (cripple[ck(v)] > 0) dmg = dmg * (1 + towerDown.taken / 100);
       st.blocked += hit - dmg;
       const applied = Math.min(dmg, poolHp(v));
       st.dealt += applied;
@@ -1748,7 +1753,7 @@ const Engine = (() => {
       if (!tgt) return;
       b.intent = tgt;
       if (td > RAM_REACH) {
-        const mv = Math.min(td - RAM_REACH * 0.5, spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[b.side] > 0 ? 1 - towerDown.move / 100 : 1) * dt);
+        const mv = Math.min(td - RAM_REACH * 0.5, spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1) * dt);
         [b.hx, b.hy] = steer(b, tgt.x, tgt.y, (tgt.x - b.x) / td, (tgt.y - b.y) / td);
         b.x += b.hx * mv; b.y += b.hy * mv; b.moved += mv;
         if (dist(tgt, b) > RAM_REACH) return;
@@ -1761,7 +1766,7 @@ const Engine = (() => {
     const rammed = [];
 
     // share of its move speed a body walks at right now (slowed, or crippled by its fallen tower)
-    const moveMul = (b) => (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[b.side] > 0 ? 1 - towerDown.move / 100 : 1);
+    const moveMul = (b) => (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1);
 
     // a roller's turn (see ROLL_START): marches like any unit until it spots an enemy, then rolls at its target
     // gathering speed, runs over every enemy body in its path (each once per pass), carries on ROLL_PAST metres past
@@ -1980,7 +1985,7 @@ const Engine = (() => {
       if (t >= g.timeCap || !aliveCount(A) || !aliveCount(B)) { over = true; return false; }
       shots = [];
       tick++;
-      for (let k = 0; k < 2; k++) if (cripple[k] > 0) cripple[k] = Math.max(0, cripple[k] - dt);
+      for (let k = 0; k < 4; k++) if (cripple[k] > 0) cripple[k] = Math.max(0, cripple[k] - dt);
       // map tiles under the units (checked before moving, so the tile a unit starts on always counts)
       if (tiles.length) for (const b of all) {
         if (!b.alive || b.u.structure || b.u.aloft) continue;
@@ -2059,7 +2064,7 @@ const Engine = (() => {
           b.intent = was && was.alive ? was : null;
           // running through after a charge: straight on, hitting each body it runs over once
           // a Bullhead charge runs at twice its speed, hits for bull.hit and knocks each body it hits back along its path
-          const mv = Math.min(b.trampleLeft, spd(b) * (b.charging ? 2 : b.u.trampleSpeed > 0 ? b.u.trampleSpeed : 1) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[b.side] > 0 ? 1 - towerDown.move / 100 : 1) * dt);
+          const mv = Math.min(b.trampleLeft, spd(b) * (b.charging ? 2 : b.u.trampleSpeed > 0 ? b.u.trampleSpeed : 1) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1) * dt);
           const [ux, uy] = b.trampleDir;
           b.x += ux * mv; b.y += uy * mv; b.hx = ux; b.hy = uy;
           if (g.bounds) { b.x = Math.max(g.bounds.x0, Math.min(g.bounds.x1, b.x)); b.y = Math.max(g.bounds.y0, Math.min(g.bounds.y1, b.y)); }
@@ -2136,7 +2141,7 @@ const Engine = (() => {
           const p = b.guide[0], gx = p.x - b.x, gy = p.y - b.y, gd = hyp(gx, gy);
           if (gd < 1.5) { b.guide.shift(); if (!b.guide.length) b.guide = null; continue; }
           if (near && !unseen && nd <= reachTo(reachOf(b), b, near)) continue; // something in reach: stand and fight it
-          const step = spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[b.side] > 0 ? 1 - towerDown.move / 100 : 1) * dt;
+          const step = spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1) * dt;
           const [ux, uy] = steer(b, p.x, p.y, gx / gd, gy / gd);
           if (b.hx === undefined) { b.hx = ux; b.hy = uy; }
           const k = Math.min(1, TURN * dt);
@@ -2160,7 +2165,7 @@ const Engine = (() => {
           if (!wantsDash) b.dashActive = false;
           b.dashing = wantsDash && (b.dashActive || (b.dashCooldownT || 0) <= 0);
           if (b.dashing && !b.dashActive) { b.dashActive = true; b.dashCooldownT = Math.max(0, b.u.dashCooldown || 0); } // per-body cooldown, starts when the dash begins
-          const step = (b.dashing ? Math.max(DASH_SPEED, spd(b)) : spd(b)) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[b.side] > 0 ? 1 - towerDown.move / 100 : 1) * dt;
+          const step = (b.dashing ? Math.max(DASH_SPEED, spd(b)) : spd(b)) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1) * dt;
           let mv;
           // March straight ahead until an enemy comes within sight (range + SIGHT, at least MIN_SIGHT, in any
           // direction), or no enemy is left ahead, then lock on: from then on the body goes for its own nearest
@@ -2771,7 +2776,7 @@ const Engine = (() => {
       };
     }
 
-    return { step, frame, result, bodies: all, neutrals, mines: () => mines, pools: () => pools, portals: () => portals.filter(p => t >= p.t0 && t < p.t0 + p.secs), isOver: () => over, time: () => t, lastShots: () => shots, projectiles: () => projectiles, crippled: (side) => cripple[side], charm: (side, squad) => (charm[side] && charm[side][squad]) || 0,
+    return { step, frame, result, bodies: all, neutrals, mines: () => mines, pools: () => pools, portals: () => portals.filter(p => t >= p.t0 && t < p.t0 + p.secs), isOver: () => over, time: () => t, lastShots: () => shots, projectiles: () => projectiles, crippled: (side, lane) => cripple[side + 2 * (lane | 0)], charm: (side, squad) => (charm[side] && charm[side][squad]) || 0,
       objective: () => obj && { n: obj.n.slice(), lead: obj.lead, hold: obj.hold, secs: obj.secs, won: obj.won } };
   }
 

@@ -32,6 +32,7 @@ const Render2D = (cv, view, opts = {}) => {
     const r = cv.getBoundingClientRect();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     pull();
+    if (m) Game.useGrid(m); // the board as drawn (view() may have used the page's match: a 2v2 picture is wider)
     W = r.width; H = W * Game.ROWS / (win ? win.aspect : Game.COLS);
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -464,9 +465,11 @@ const Render2D = (cv, view, opts = {}) => {
     ctx.beginPath(); ctx.moveTo(0, mine); ctx.lineTo(W, mine); ctx.stroke();
     ctx.setLineDash([]); ctx.globalAlpha = 1;
     const dv = phase === 'battle' && battlePre ? battlePre : m;
-    if (dv && dv.duo) { // a 2v2 fight: where the two boards meet
-      ctx.strokeStyle = css('--muted'); ctx.globalAlpha = 0.55; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
+    if (dv && dv.duo) { // 2v2: the open strip between the two boards (symmetric, so the same for both sides), edged
+      const gx = dv.duo.cols * t, gw = dv.duo.gap * t;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)'; ctx.fillRect(gx, 0, gw, H);
+      ctx.strokeStyle = css('--muted'); ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.moveTo(gx + gw, 0); ctx.lineTo(gx + gw, H); ctx.stroke();
       ctx.globalAlpha = 1;
     }
   }
@@ -1262,9 +1265,11 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.fillRect(x - 2.5, y - 2.5, 5, 5);
     }
     // a fallen tower cripples its army for a few seconds
-    const crip = [me, foe()].filter(sd => bt.crippled(sd) > 0);
+    // (a 2v2 fight: per board, bt.crippled(side, lane); the longest of the two shows)
+    const cripOf = (sd) => Math.max(bt.crippled(sd, 0), bt.crippled(sd, 1) || 0);
+    const crip = [me, foe()].filter(sd => cripOf(sd) > 0);
     crip.forEach((sd, k) => {
-      const txt = sd === me ? `Your tower fell · crippled ${Math.ceil(bt.crippled(sd))} s` : `${mode === 'claude' ? 'Claude’s' : 'Enemy'} tower fell · crippled ${Math.ceil(bt.crippled(sd))} s`;
+      const txt = sd === me ? `${m && m.duo ? 'A tower of yours' : 'Your tower'} fell · crippled ${Math.ceil(cripOf(sd))} s` : `${mode === 'claude' ? 'Claude’s' : 'Enemy'} tower fell · crippled ${Math.ceil(cripOf(sd))} s`;
       ctx.font = `600 ${Math.max(11, Math.round(W * 0.035))}px "IBM Plex Mono", monospace`;
       const tw = ctx.measureText(txt).width + 16, th = Math.max(20, W * 0.06), x = (W - tw) / 2, y = H * (sd === me ? 0.62 : 0.32) + k * 2;
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x, y, tw, th);
@@ -1273,6 +1278,7 @@ const Render2D = (cv, view, opts = {}) => {
   }
   function draw() {
     pull();
+    if (m) Game.useGrid(m);
     if (win && m) { // a window on the wide board: draw the whole board, moved and scaled into the canvas
       const cw = W, ch = H, s0 = S;
       S = cw / (win.cols * Game.TILE);
@@ -1299,6 +1305,7 @@ const Render2D = (cv, view, opts = {}) => {
   // the tile under a point on the screen, in model coordinates (the flip is its own inverse)
   function tileAt(clientX, clientY) {
     pull();
+    if (m) Game.useGrid(m); // the board as drawn (a 2v2 picture is wider than the match in play)
     const r = cv.getBoundingClientRect();
     let x = (clientX - r.left) / r.width * Game.COLS, y = (clientY - r.top) / r.height * Game.ROWS;
     if (win) { // the window on the wide board (see draw)

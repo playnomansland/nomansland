@@ -25,10 +25,15 @@
   const MAP = 'testgrid';            // both lanes are Standard boards
   const VIEW_MAP = 'duo';            // the wide board a 2v2 fight is drawn on (Game.VIEW_MAPS)
   const OFF = 1000000;               // lane 1's squad ids inside the fight are moved by this
+  const GAP = 2;                     // open tiles between the two boards (walkable: crossing over takes a few steps)
   const HP = 2 * G.START_HP;         // each team's shared health (two lanes take damage every round)
   const BIG = 1e6;                   // a lane's health while it is resolved (the team's health is kept apart)
   const SEATS = [{ lane: 0, side: 0 }, { lane: 1, side: 0 }, { lane: 0, side: 1 }, { lane: 1, side: 1 }];
   const SEAT_NAMES = ['A1', 'A2', 'B1', 'B2'];
+  // team talk (server/src/duo.js relays them to the team only): pings on a tile, and quick lines
+  const PINGS = ['?', '!', 'go'];
+  const EMOTES = ['nice', 'help', 'sorry', 'wait', 'thanks', 'gg'];
+  const EMOTE_TEXT = { nice: 'Nice! 👍', help: 'Help me!', sorry: 'Sorry!', wait: 'Wait for me', thanks: 'Thanks!', gg: 'GG' };
   const seatOf = (lane, side) => SEATS.findIndex(s => s.lane === lane && s.side === side);
   const mateOf = (seat) => seatOf(1 - SEATS[seat].lane, SEATS[seat].side);
 
@@ -37,8 +42,11 @@
   const laneOfId = (id) => id >= OFF || id <= -OFF ? 1 : 0;
   const unmap = (id) => id >= OFF ? id - OFF : id <= -OFF ? id + OFF : id;
 
-  // how far each lane's board is moved sideways (metres): half a Standard board each way
-  function laneDx(L) { G.useGrid(MAP); return (L === 0 ? -1 : 1) * G.COLS * G.TILE / 2; }
+  // a lane's column on the wide board, and back (null: the open strip between the boards)
+  function wideCol(lane, col) { G.useGrid(MAP); return lane === 0 ? col : col + G.COLS + GAP; }
+  function laneCol(wcol) { G.useGrid(MAP); const c = G.COLS; return wcol < c ? { lane: 0, col: wcol } : wcol >= c + GAP && wcol < 2 * c + GAP ? { lane: 1, col: wcol - c - GAP } : null; }
+  // how far each lane's board is moved sideways (metres): half a Standard board and half the gap each way
+  function laneDx(L) { G.useGrid(MAP); return (L === 0 ? -1 : 1) * (G.COLS + GAP) * G.TILE / 2; }
 
   // as Referee.fight: towers, packages, tower picks and walls nobody placed are settled first
   function settle(m) {
@@ -67,10 +75,10 @@
       });
     });
     G.useGrid(MAP);
-    const half = G.COLS * G.TILE, rows = G.ROWS * G.TILE / 2;
+    const half = (2 * G.COLS + GAP) * G.TILE / 2, rows = G.ROWS * G.TILE / 2;
     g = { ...g, bounds: { x0: -half, x1: half, y0: -rows, y1: rows } };
     const ch = charm.map(c => Object.keys(c).length ? c : null);
-    return E.createBattle(A, B, g, { tiles, strikes, neutrals, charm: ch, terrain: null, objective: null, record: opts.record !== false });
+    return E.createBattle(A, B, g, { tiles, strikes, neutrals, charm: ch, terrain: null, objective: null, lanes: true, record: opts.record !== false });
   }
 
   // lane L's share of a wide fight's result, in that lane's own squad ids (as Game.resolve wants it). The winner and
@@ -133,8 +141,9 @@
     const cols = G.COLS, v = JSON.parse(JSON.stringify(pres[0]));
     v.map = { ...(v.map || {}), id: VIEW_MAP };
     v.armies = [0, 1].map(sd => (pres[0].armies[sd] || []).map(q => ({ ...q, lane: 0 }))
-      .concat((pres[1].armies[sd] || []).map(q => ({ ...q, col: q.col + cols, id: remap(1, q.id), lane: 1 }))));
-    v.duo = true;
+      .concat((pres[1].armies[sd] || []).map(q => ({ ...q, col: q.col + cols + GAP, id: remap(1, q.id), lane: 1 }))));
+    v.duo = { cols, gap: GAP }; // one board's columns, and the open columns between the boards
+    G.useGrid(VIEW_MAP); // left on the wide board: whoever draws it next reads Game.COLS
     return v;
   }
 
@@ -292,7 +301,7 @@
   const load = (o, units, matrix) => o && o.v === V ? { ...o, lanes: (o.lanes || [null, null]).map(R => R ? Ref.load(R, units, matrix) : null) } : null;
 
   const api = {
-    V, MAP, VIEW_MAP, OFF, HP, SEATS, SEAT_NAMES, seatOf, mateOf, remap, unmap, laneOfId, laneDx, settle, battle, laneResult, fight, view,
+    V, MAP, VIEW_MAP, OFF, GAP, HP, wideCol, laneCol, PINGS, EMOTES, EMOTE_TEXT, SEATS, SEAT_NAMES, seatOf, mateOf, remap, unmap, laneOfId, laneDx, settle, battle, laneResult, fight, view,
     create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, viewFor, clock, canAct, save, load, humans,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

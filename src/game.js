@@ -542,7 +542,7 @@ const Game = (() => {
   ];
   // Boards only drawn, never played or picked (not in MAPS): 'duo' is two Standard boards side by side, the field of a
   // 2v2 fight (src/duo.js). A match on it is only a picture of the fight (Duo.view).
-  const VIEW_MAPS = [{ id: 'duo', name: '2v2', short: 'Two Standard boards side by side.', text: 'Two Standard boards side by side.', plain: true, skins: true, view: true, grid: { cols: 28, rows: 18, zone: 7 } }];
+  const VIEW_MAPS = [{ id: 'duo', name: '2v2', short: 'Two Standard boards side by side.', text: 'Two Standard boards side by side.', plain: true, skins: true, view: true, grid: { cols: 30, rows: 18, zone: 7 } }]; // 14 + 2 open columns + 14 (Duo.GAP)
   const findMap = (id) => MAPS.find(x => x.id === id) || VIEW_MAPS.find(x => x.id === id);
   // Looks (skins) for the 3D board: a map with skins (the Standard and the Test Grid) can be played in any of them; the
   // others have their own look. Only how the board looks: the rules stay the map's. The match keeps the host's pick (m.skin).

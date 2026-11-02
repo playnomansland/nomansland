@@ -22,7 +22,7 @@ const newCode = () => 'D' + Math.random().toString(36).slice(2, 6).toUpperCase()
 
 setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 * 1000).unref();
 (async () => {
-  const srv = await startServer(8793, ['--var', 'DUO_ANYONE:1']);
+  const srv = await startServer(8791, ['--var', 'DUO_ANYONE:1']);
   try {
     const url = (code) => `${srv.ws}/duo/${code}`;
     async function phone(code, hello = {}) {
@@ -99,6 +99,17 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 *
     const p1b = await phone(code, { key: p1.welcome.key });
     assert.strictEqual(p1b.welcome.seat, 1);
     phones[1] = p1b;
+    // team talk: a ? ping and a quick line reach the team only ('ping' itself stays the keep-alive)
+    host.json({ t: 'mark', kind: '?', lane: 0, col: 3, row: 12 });
+    const mk = await phones[1].next('mark', 8000);
+    assert.deepStrictEqual([mk.from, mk.kind, mk.lane, mk.col, mk.row], [0, '?', 0, 3, 12]);
+    host.json({ t: 'mark', kind: 'nope', lane: 0, col: 1, row: 1 });
+    phones[1].json({ t: 'emote', id: 'help' });
+    const em = await host.next('emote', 8000);
+    assert.strictEqual(em.id, 'help');
+    await sleep(500);
+    assert.ok(!phones[3].inbox.some((x) => x.t === 'mark' || x.t === 'emote'), 'the other team hears nothing');
+    assert.strictEqual(phones[1].inbox.filter((x) => x.t === 'mark').length, 1, 'an unknown ping kind is dropped');
     // all ready: one fight
     for (const k of [0, 1, 3]) phones[k].json({ t: 'ready', v: true });
     const fights = {};
