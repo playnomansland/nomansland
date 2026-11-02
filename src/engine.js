@@ -1535,16 +1535,20 @@ const Engine = (() => {
     }
 
     // enemies the unit may attack right now, nearest first
-    function validTargets(b) {
+    function validTargets(b, caller = 'attack') {
       const valid = [];
       const counters = opts.profileCounters;
+      const callerCounters = counters && counters.byCaller && (counters.byCaller[caller] || (counters.byCaller[caller] = { calls: 0, bodiesScanned: 0, candidates: 0 }));
       if (counters) counters.validTargetsCalls++;
+      if (callerCounters) callerCounters.calls++;
       for (const f of sides[1 - b.side]) {
         if (counters) counters.validTargetsBodiesScanned++;
+        if (callerCounters) callerCounters.bodiesScanned++;
         if (!pickable(b, f)) continue;
         const d = gap(f, b);
         if (d <= reachTo(reachOf(b), b, f) + 0.01 && d >= b.u.minRange && inSight(b, f)) {
           if (counters) counters.validTargetsCandidates++;
+          if (callerCounters) callerCounters.candidates++;
           valid.push([b.u.healthiest ? (f.u.structure ? 1e9 : 0) - poolHp(f) : d, f]); // healthiest: most health first, units before structures
         }
       }
@@ -1744,7 +1748,7 @@ const Engine = (() => {
       for (let k = 1; k < b.u.turrets; k++) {
         b.tcd[k] = (b.tcd[k] || 0) - dt * atkMul(b);
         if (b.tcd[k] > 0) continue;
-        if (!valid) valid = validTargets(b);
+        if (!valid) valid = validTargets(b, 'extraTurret');
         const taken = turretTaken(b, k), tgt = valid.find(f => !taken.includes(f));
         if (!tgt) { b.tcd[k] = Math.max(b.tcd[k], -dt); b.aims[k] = null; continue; }
         b.aims[k] = tgt;
@@ -1976,7 +1980,7 @@ const Engine = (() => {
       const sp = b.u.spear;
       if (b.forgeT > 0) { b.forgeT -= dt; if (b.forgeT > 1e-9) return; b.forgeT = 0; b.spearReady = true; }
       if (!b.spearReady && (b.u.defense === 'armor' ? b.u.defVal : 0) + (b.u.bonusArmor || 0) < 1 - 1e-9) return; // no armor left to forge with
-      const valid = validTargets(b);
+      const valid = validTargets(b, 'titaniumSpear');
       if (!valid.length) return;
       if (b.spearReady) {
         const tgt = valid[0], dx = tgt.x - b.x, dy = tgt.y - b.y, d = hyp(dx, dy) || 1;
@@ -2518,7 +2522,7 @@ const Engine = (() => {
               if (along >= b.u.minRange && along <= R(b) + 0.01 && across <= PIERCE_WIDTH && along < fa) { fa = along; first = f; }
             }
             if (first) {
-              fire(b, aim(b, first, validTargets(b)), false);
+              fire(b, aim(b, first, validTargets(b, 'burstFollowup')), false);
             } else {
               const end = { x: b.x + ux * R(b), y: b.y + uy * R(b) };
               if (b.u.projSpeed > 0) fire(b, [end], false); // the projectile flies on and can still clip someone
@@ -2539,12 +2543,12 @@ const Engine = (() => {
             if (b.windT > 0) continue;
             b.windTarget = null; b.setUp = true;
             b.cd = 0; // reload starts with the first shot
-            valid = validTargets(b);
+            valid = validTargets(b, 'attackWindup');
             if (!valid.length) continue;
             primary = locked(b, valid);
           } else {
             if (b.cd > 0) continue;
-            valid = validTargets(b);
+            valid = validTargets(b, 'attack');
             if (!valid.length) continue;
             b.windTarget = locked(b, valid); b.windT = b.u.windUp; stats[b.side].winds++;
             continue;
