@@ -400,20 +400,6 @@ html.dock .bar:has(> .task:not([hidden])) > .hint { display: none; }
 @keyframes ping-ring { from { transform: scale(1); opacity: 0.9; } to { transform: scale(2.6); opacity: 0; } }
 @keyframes ping-pop { from { opacity: 0; } to { opacity: 1; } }
 .duo-row .seg.pings button { min-width: 38px; font-weight: 700; }
-/* 2v2: the teammate's board beside this one (a PC, with the open strip between) or in its place (a phone) */
-.mate-board { position: absolute; top: 0; height: 100%; }
-#wrap.duo-pc > canvas#board, #wrap.duo-pc > .board3d:not(.mate-board) { position: absolute; top: 0; height: 100%; width: calc(100% * 14 / 30); left: 0; right: auto; }
-#wrap.duo-pc > .mate-board { width: calc(100% * 14 / 30); right: 0; left: auto; }
-#wrap.duo-pc.mate-left > canvas#board, #wrap.duo-pc.mate-left > .board3d:not(.mate-board) { left: auto; right: 0; }
-#wrap.duo-pc.mate-left > .mate-board { right: auto; left: 0; }
-#wrap.duo-phone > canvas#board, #wrap.duo-phone > .board3d:not(.mate-board) { visibility: hidden; }
-#wrap.duo-phone > .mate-board { left: 0; width: 100%; }
-#wrap:not(.duo-pc):not(.duo-phone) > .mate-board, #wrap:not(.duo-pc):not(.duo-phone) > .mate-tag { display: none; }
-.mate-tag { position: absolute; top: 8px; z-index: 2; white-space: nowrap; padding: 2px 8px; border-radius: 4px; background: rgba(13, 19, 21, 0.78); color: var(--you); font: 600 12px var(--font-data); pointer-events: none; }
-#wrap.duo-pc > .mate-tag { left: calc(100% * 16 / 30 + 8px); }
-#wrap.duo-pc.mate-left > .mate-tag { left: 8px; }
-#wrap.duo-pc.mate-left > .tag-clock { left: calc(100% * 16 / 30 + 10px); }
-#wrap.duo-phone > .mate-tag { right: 8px; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
 .marks .range { fill: none; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 0.1 6; opacity: 0.9; }
 /* intent: where a squad means to go (arrows to the enemy squads it heads for, dashed straight ahead with nothing in sight yet), whom it attacks in a fight (small rings) */
 .marks .intent, .marks .intent-under { fill: none; stroke-linecap: round; }
@@ -841,7 +827,7 @@ html.pc .corner button span { display: inline; }
   const foe = () => 1 - me;
   let m = null;             // match state (on the guest: a copy kept in step by the host)
   let phase = 'start';      // start | lobby | draft | deploy | battle | result | end
-  try { if (/[?&]test\b/.test(location.search)) window.__tour = () => tour.t && JSON.parse(JSON.stringify(tour.t)); if (/[?&]test\b/.test(location.search)) window.__pb = () => ({ m, me, board3d, board, bt, phase, liveSpeed: liveSpeed.slice(), playSpeed: playSpeed(), away, timeUp, ready: ready.slice(), mate: mateMatch(), pings: duoPings.slice(), expireDeploy: () => { deadline = now() - 400; tick(); } }); } catch (e) {} // read-only peek and countdown trigger for UI tests
+  try { if (/[?&]test\b/.test(location.search)) window.__tour = () => tour.t && JSON.parse(JSON.stringify(tour.t)); if (/[?&]test\b/.test(location.search)) window.__pb = () => ({ m, me, board3d, board, bt, phase, liveSpeed: liveSpeed.slice(), playSpeed: playSpeed(), away, timeUp, ready: ready.slice(), team: m && m.team ? JSON.parse(JSON.stringify(m.team)) : null, pings: duoPings.slice(), expireDeploy: () => { deadline = now() - 400; tick(); } }); } catch (e) {} // read-only peek and countdown trigger for UI tests
   try { if (/[?&]test\b/.test(location.search)) window.__pbRedraw = () => { if (phase === 'deploy') panelDeploy(); render(); }; } catch (e) {} // UI tests that set up a board state: draw it
   let selected = null;      // unit index chosen in the shop
   let rangeOf = null;       // { side, id }: the squad last tapped on the board; its range shows as a dotted ring
@@ -1528,8 +1514,8 @@ html.pc .corner button span { display: inline; }
   const boardView = () => ({ m: lookPre() || m || menuPre(), me, phase, units, mode, bt: lookPre() ? null : bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf,
     editable: editable(), placingUnit: placingUnit(), placingElf: placingElf(), placingTower: placingTower(), placingWall: placingWall(),
     dev: m && m.dev ? { bPlacing, castMode, guideMode, guideId: guideDrag ? guideDrag.id : guideMode !== 'pick' ? guideMode : null, guide: guideDrag ? guideDrag.pts : guideMode != null && guideMode !== 'pick' ? guideDraft : null } : null,
-    battleCam: cam && cam.k > 0 ? { zoom: 1 + (CAM.zoom - 1) * cam.k, x: cam.x, y: cam.y, k: cam.k } : duoFocus(),
-    placingBuilding: placingBuilding(), win: duoWin() });
+    battleCam: cam && cam.k > 0 ? { zoom: 1 + (CAM.zoom - 1) * cam.k, x: cam.x, y: cam.y, k: cam.k } : null,
+    placingBuilding: placingBuilding(), win: null });
   const board = Render2D(cv, boardView);
   let board3d = null; // the 3D board when it's on (see "the 3D board" below)
   const size = () => (board3d || board).size();
@@ -1663,8 +1649,8 @@ html.pc .corner button span { display: inline; }
   function syncGrid() {
     Game.useGrid(m);
     const key = Game.COLS + 'x' + Game.ROWS;
-    // the board's shape on screen: a 2v2 phone window (duoWin), or both boards side by side (duoSplit)
-    const w = duoWin(), sp = duoSplit(), ar = (w ? w.aspect : sp === 'pc' ? duoFull() : Game.COLS) / Game.ROWS;
+    const ar = Game.COLS / Game.ROWS; // the board's shape on screen
+
     if (String(ar) !== arKey) { arKey = String(ar); document.documentElement.style.setProperty('--board-ar', arKey); if (key === gridKey) size(); }
     if (key === gridKey) return;
     gridKey = key;
@@ -1701,7 +1687,6 @@ html.pc .corner button span { display: inline; }
   function render() {
     syncSkins();
     syncGrid();
-    syncMate();
     syncMusic();
     cv.style.touchAction = phase === 'deploy' ? 'none' : ''; // so a finger can drag squads without scrolling the page
     if (board3d) wake3d(); else { board.draw(); boardMarks(); }
@@ -1852,7 +1837,7 @@ html.pc .corner button span { display: inline; }
     if (!m || !editable()) return null;
     if (choosingPack()) return {
       kind: 'pack', eyebrow: `Round 1 · ${esc((Game.mapOf(m) || { name: 'Standard' }).name)}`, title: 'Choose your start',
-      sub: `Free squads and a character, plus ${m.gold[me]} gold.`,
+      sub: m.packages[me].some(p => p.char) ? `Free squads and a character, plus ${m.gold[me]} gold.` : `Free squads, plus ${m.gold[me]} gold.`,
       items: m.packages[me].map((p, k) => {
         const n = {}; p.squads.forEach(ui => { n[ui] = (n[ui] || 0) + 1; });
         const c = p.char && Game.charInfo(p.char);
@@ -1874,12 +1859,12 @@ html.pc .corner button span { display: inline; }
       };
     }
     if (choosingTower()) return {
-      kind: 'tower', eyebrow: `Round ${m.round}`, title: 'Choose your tower',
-      sub: mode === 'tutorial' ? 'Your outpost becomes a real tower. It stays all match.' : 'It stays for the rest of the match.',
+      kind: 'tower', eyebrow: `Round ${m.round}`, title: net.duo && mode === 'net' ? 'Vote for your team’s tower' : 'Choose your tower',
+      sub: mode === 'tutorial' ? 'Your outpost becomes a real tower. It stays all match.' : net.duo && mode === 'net' ? 'You and your teammate share one tower for the rest of the match. If you vote differently, a coin flip decides.' : 'It stays for the rest of the match.',
       items: Game.towerChoices(m, me).map(x => ({
         key: x.id,
         art: `<canvas data-ticon="${x.id}" width="96" height="96" style="width:48px;height:48px" aria-hidden="true"></canvas>`,
-        name: esc(x.name), who: '', sub: `${x.unit.hp} hp · ${towerAttack(x.unit).range} m`,
+        name: esc(x.name), who: net.duo && m.team && m.team.vote === x.id ? 'Teammate’s vote' : '', sub: `${x.unit.hp} hp · ${towerAttack(x.unit).range} m`,
         det: mode === 'tutorial' && TUT.towers[x.id] ? `<b>${esc(x.name)}</b> · ${esc(TUT.towers[x.id])}` : `<b>${esc(x.name)}</b> · ${x.unit.hp} hp · ${(a => `${x.unit.drone ? 'drone ' : ''}hit ${a.hit} × ${a.aps}/s · ${a.range} m${a.splash ? ` · ${a.splash} m splash` : ''}`)(towerAttack(x.unit))}<br>${esc(x.text)}${(x.rounds || []).map(r => `<br><span style="color:var(--gold)">${esc(r.name)}, every round, ${r.cost} gold:</span> ${esc(r.text)}`).join('')}${x.skill ? `<br><span style="color:var(--gold)">Skill, bought separately for ${Game.TOWER_SKILL.cost} gold: ${esc(x.skill.name)}.</span> ${esc(x.skill.text)}` : ''}${x.skill2 ? `<br><span style="color:var(--gold)">Skill, bought separately for ${x.skill2.cost} gold: ${esc(x.skill2.name)}.</span> ${esc(x.skill2.text)}` : ''}${x.loan ? `<br><span style="color:var(--gold)">Loan, every round:</span> ${esc(loanText())}` : ''}${x.passive ? `<br><span style="color:var(--gold)">${esc(x.passive.name)} (always on):</span> ${esc(x.passive.text)}` : ''}${x.generals ? `<br><span style="color:var(--gold)">Mage generals, one per round, for that round's fight:</span> ${Game.MAGE_GENERALS.map(g => `<b>${esc(g.name)}</b> (${g.cost} gold): ${esc(g.text)}`).join(' ')}` : ''}`,
       })),
     };
@@ -4864,11 +4849,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const w = $('wrap').getBoundingClientRect(), T = Game.TILE, C = Game.COLS, R = Game.ROWS;
     const tile = (x, y) => [x / T + (C - 1) / 2, (R - 1) / 2 - y / T];
     if (board3d) return (x, y) => { const [c, r] = tile(x, y), [sx, sy] = board3d.screenAt(c, r, 0); return [sx - w.left, sy - w.top]; };
-    const b = cv.getBoundingClientRect(), f = me === 1, win = duoWin();
-    if (win) { // a phone's window on a 2v2 board (see Render2D's draw)
-      const t = b.width / win.cols, oy = Math.max(0, (b.height - R * t) / 2);
-      return (x, y) => { const [c, r] = tile(x, y); return [b.left - w.left + ((f ? C - 1 - c : c) - win.x + 0.5) * t, b.top - w.top + oy + ((f ? R - 1 - r : r) + 0.5) * t]; };
-    }
+    const b = cv.getBoundingClientRect(), f = me === 1;
     const at = (x, y) => { const [c, r] = tile(x, y); return [b.left - w.left + ((f ? C - 1 - c : c) + 0.5) * b.width / C, b.top - w.top + ((f ? R - 1 - r : r) + 0.5) * b.height / R]; };
     if (!(phase === 'battle' && cam && cam.k > 0)) return at;
     const z = 1 + (CAM.zoom - 1) * cam.k, o = at(cam.x, cam.y); // the 2D battle cam zooms around its focus
@@ -4883,7 +4864,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const cinematic = board3d && board3d.camera.level() >= 3; // the ground view shows no markers
     Game.useGrid(m); // the board as drawn
     let html = '';
-    if (!cinematic && m && !(matePeek && duoSplit()) && (phase === 'deploy' || phase === 'battle')) html += intentMarks(wrapMap());
+    if (!cinematic && m && (phase === 'deploy' || phase === 'battle')) html += intentMarks(wrapMap());
     if (net.duo) html += pingMarks(cinematic ? null : wrapMap());
     if (!cinematic && m && phase === 'deploy') for (const sd of [0, 1]) { // Mark Bounty: crosshairs on the marked squad
       const k = Game.markOn(m, sd) && Game.markShown(m, me, true, sd) ? Game.markOf(m, sd) : null, q = k && m.armies[1 - sd].find(x => x.id === k.squad);
@@ -5018,7 +4999,6 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         if (!want3d) return; // switched back to 2D while loading
         el.className = 'board3d';
         cv.after(el);
-        three = THREE;
         { const v0 = boardView(); if (v0.m) Game.useGrid(v0.m); } // its ground and camera are built for one grid: the one it draws
         b = Render3D(THREE, el, boardView, { onTap: boardTap, onPress: boardPress, onDrag: boardDrag, onDrop: boardDrop, onHover: boardHover, placing: () => phase === 'deploy', onInput: wake3d });
         const can = el.querySelector('canvas');
@@ -5085,7 +5065,6 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     raf3d = 0;
     if (!board3d) return;
     board3d.draw();
-    if (mateB && mateB.kind === '3d' && mateB.on) mateB.r.draw();
     boardMarks();
     meterFrame(ts);
     if (board3d && (phase === 'battle' || !board3d.still() || performance.now() < wakeUntil)) raf3d = requestAnimationFrame(frame3d);
@@ -5943,7 +5922,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // =====================================================================
   const net = { peer: null, conn: null, code: '', connected: false, retryTimer: 0, tries: 0, alive: false, specs: new Set(), // specs: spectators' connections (host)
     srv: false, ws: null, ping: 0, key: '', create: false, typed: false, welcomed: false, tourCode: '', watch: false, foeHere: false, seq: 0, pending: [], replaying: false, // a match on the game server (see srvOpen)
-    duo: false, duoInfo: null, duoPres: null, duoHost: false, duoLobby: null }; // a 2v2 match (src/duo.js, see duoHost)
+    duo: false, duoInfo: null, duoPres: null, duoTeam: null, duoHost: false, duoLobby: null }; // a 2v2 match (src/duo.js, see duoHost)
   const peerOpts = () => {
     const o = { debug: 1 };
     if (qs.get('peerhost')) { o.host = qs.get('peerhost'); o.port = +qs.get('peerport') || 9000; o.path = qs.get('peerpath') || '/'; o.secure = qs.get('peersecure') === '1'; }
@@ -5973,7 +5952,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     try { if (net.ws) net.ws.close(); } catch (e) {}
     clearInterval(net.ping);
     net.peer = null; net.conn = null; net.connected = false; net.code = ''; net.tries = 0;
-    Object.assign(net, { srv: false, ws: null, key: '', create: false, typed: false, welcomed: false, tourCode: '', watch: false, foeHere: false, seq: 0, pending: [], replaying: false, duo: false, duoInfo: null, duoPres: null, duoHost: false, duoLobby: null });
+    Object.assign(net, { srv: false, ws: null, key: '', create: false, typed: false, welcomed: false, tourCode: '', watch: false, foeHere: false, seq: 0, pending: [], replaying: false, duo: false, duoInfo: null, duoPres: null, duoTeam: null, duoHost: false, duoLobby: null });
     duoRestore(); duoPings = []; duoToast = null;
     liveSpeed = [1, 1]; // a new live match starts at 1x
     // the address bar, not qs: joinMatch puts join= back in it after the first leaveNet
@@ -6758,25 +6737,24 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
 
   // =====================================================================
-  // 2v2 (developer test, 2026-11-02; src/duo.js, server/src/duo.js). Two Standard boards side by side: each phone plays
-  // its own lane as a server match (mode 'net' with net.duo: the same deploy screen, actions and Ready as 1v1), the
-  // 2v2 room adds the seats and the teammate's lane (net.duoInfo), and the fight is played back on the wide board from
-  // both lanes as they stood (net.duoPres): m is the wide picture while it plays (Duo.view), then this lane again.
-  // Only a developer account can make a 2v2 lobby; anyone with the code (6 letters) or the link can join it.
+  // 2v2 (developer test, 2026-11-02; one shared board since 2026-11-03; src/duo.js, server/src/duo.js). One wide
+  // board (Game's 'duo' map): both players of a team deploy in the same zone and share one tower and treasury. Each
+  // phone plays its own part as a server match (mode 'net' with net.duo: the same deploy screen, actions and Ready as
+  // 1v1); its m carries the other two players' squads in m.team (the teammate's all, the other opponent's as an
+  // opponent sees them), which the board draws and the rules check tiles against. The fight is played back from both
+  // halves as they stood (net.duoPres): m is the picture of the whole fight while it plays (Duo.view), then this
+  // player's part again. Only a developer account can make a 2v2 lobby; anyone with the code (6 letters) or the link
+  // can join it.
   // =====================================================================
   const DUO_CODE_LEN = 6;
   const newDuoCode = () => newCode() + CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
   const duoLink = () => { const u = new URL(shareLink()); u.searchParams.delete('join'); u.searchParams.set('duo', net.code); return u.toString(); };
-  var duoKeep = null; // this phone's lane while the wide fight plays (m is the picture of both lanes then)
-  var duoView = null; // a phone's window on the wide board: { cols shown, half (one board's columns), full (all columns), x (first screen column), free (moved by hand) }
-  var matePeek = false; // a phone: the teammate's board in place of this one (a PC always shows both)
-  var mateB = null;     // the teammate's board: { kind: '2d' | '3d', el, r (its renderer), on, key }
-  var mateM = null, mateOf = null; // the teammate's lane as a match (made from net.duoInfo.mate when that changes)
-  var three = null;     // THREE, once the 3D board has loaded it (the teammate's 3D board uses it too)
-  var duoPings = [];   // pings showing: { from (seat), kind, lane, col, row, at }
+  var duoKeep = null;  // this phone's part while the fight plays (m is the picture of the whole fight then)
+  var duoPings = [];   // pings showing: { from (seat), kind, col, row, at }
   var pingKind = null; // the ping the next tap on the board puts down
   var duoToast = null; // a line from the team for the status bar: { text, until }
   var duoPick = -1;   // the host's first tap when swapping two seats
+  var duoVoteSeen = ''; // the tower vote already announced on this phone
   function duoHost() {
     if (!devMode()) { overlayMsg('2v2', 'Only developer accounts can make a 2v2 lobby for now. Ask a developer for the code.'); return; }
     leaveNet();
@@ -6808,7 +6786,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       return true;
     }
     if (d.t === 'mark' || d.t === 'emote') { duoTalk(d); return true; }
-    if (d.t === 'mate') { net.duoInfo = { ...(net.duoInfo || {}), mate: d.mate || null }; if (duoSplit()) { syncMate(); boardMarks(); wake3d(); } return true; } // the teammate changed their board
+    if (d.t === 'team') { // only the other two players' squads changed
+      net.duoTeam = d.team || null;
+      if (m && phase !== 'battle') { m.team = net.duoTeam; if (phase === 'deploy') panelDeploy(); render(); }
+      return true;
+    }
     if (d.t === 'duolobby') { net.duoLobby = d; net.duoHost = !!d.host; if (!m && phase === 'lobby') drawDuoLobby(); return true; }
     if (d.t === 'taken') { net.code = newDuoCode(); net.create = true; const ws = net.ws; net.ws = null; try { ws.close(); } catch (e) {} drawDuoLobby(); srvOpen(); return true; }
     if (d.t === 'nomatch' || d.t === 'full' || d.t === 'denied') {
@@ -6823,13 +6805,24 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (d.side === me && d.seat !== net.duoInfo.seat) { leaveNet(); srvForget(); overlayMsg('Your teammate left', 'Your team lost the 2v2 match.'); return true; }
       return false; // the other team left: as a forfeit in 1v1
     }
+    if (d.t === 'sync' && d.m) net.duoTeam = d.m.team || null;
     if (d.duo) {
-      const mate = d.duo.mate === undefined && net.duoInfo ? net.duoInfo.mate : d.duo.mate;
-      net.duoInfo = { ...(net.duoInfo || {}), ...d.duo, mate };
+      net.duoInfo = { ...(net.duoInfo || {}), ...d.duo };
       if (d.t === 'fight') net.duoPres = d.duo.pres || null;
+      duoVoteNews();
       netStatus(); hud();
     }
     return false;
+  }
+  // the round's tower vote, once it is settled (the team's tower)
+  function duoVoteNews() {
+    const v = net.duoInfo && net.duoInfo.vote, x = net.duoInfo;
+    if (!v || !x || x.seat == null) return;
+    const key = net.code + ':' + v.round + ':' + v.type;
+    if (duoVoteSeen === key) return;
+    duoVoteSeen = key;
+    const t = Game.towerTypeById(v.type), name = t ? t.name : v.type, mine = v.votes[x.lane], theirs = v.votes[1 - x.lane];
+    duoToastSay(mine === theirs ? `Your team’s tower: ${name}` : v.flip ? `You voted differently: a coin flip picked ${name}` : `Your team’s tower: ${name} (${mine === v.type ? 'your' : 'your teammate’s'} vote)`, 6000);
   }
   // the lobby: four seats in two teams. The host taps two seats to swap them (a player onto an empty seat moves them)
   function drawDuoLobby(problem) {
@@ -6837,7 +6830,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const seatBtn = (k) => {
       const p = seats[k];
       return `<button class="btn duo-seat${duoPick === k ? ' primary' : ''}" data-seat="${k}" ${host ? '' : 'disabled'} aria-pressed="${duoPick === k}" style="display:grid;gap:2px;min-width:0;text-align:left">
-        <span class="hint" style="margin:0">${Duo.SEAT_NAMES[k]} · lane ${Duo.SEATS[k].lane + 1}</span>
+        <span class="hint" style="margin:0">${Duo.SEAT_NAMES[k]}</span>
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p ? esc(p.tag) + (k === mine ? ' (you)' : '') + (p.here ? '' : ' · away') : '<span class="hint">Empty · AI plays</span>'}</span></button>`;
     };
     const team = (sd, name) => `<div style="display:grid;gap:6px;min-width:0"><span class="eyebrow">${name}</span>${[0, 1, 2, 3].filter(k => Duo.SEATS[k].side === sd).map(seatBtn).join('')}</div>`;
@@ -6851,7 +6844,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     </div>`);
     const link = duoLink();
     $('panel').innerHTML = `
-      <span class="hint">Two Standard boards side by side: A1 and B1 fight on the left board, A2 and B2 on the right. Each player deploys on their own board as in 1v1; in the fight units can cross to the other board. Each team shares one health of ${Duo.HP}.</span>
+      <span class="hint">One wide board. You and your teammate deploy in the same zone, each with your own gold and shop, and share one tower (you vote for its type in round ${Game.TOWER_PICK_ROUND}) and one treasury. Two columns of flank tiles on each edge. No leaders. Each team shares one health of ${Duo.HP}.</span>
       <div class="linkbox" id="link">${esc(link)}</div>
       <div class="bar">
         <span class="btnrow">
@@ -6874,151 +6867,25 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       send({ t: 'seat', a: duoPick, b: k }); duoPick = -1; drawDuoLobby();
     }));
   }
-  // the fight: both lanes on the wide board
+  // the fight: both halves of the board as they stood (m is the picture of it while it plays)
   function duoBattle() {
-    duoKeep = m; // this lane after the fight (the server's post)
-    battlePre = withUnits(Duo.view(net.duoPres)); lastPre = battlePre;
+    duoKeep = m; // this player's part after the fight (the server's post)
+    battlePre = withUnits(Duo.view(net.duoPres, net.duoInfo ? net.duoInfo.lane : 0)); lastPre = battlePre;
     m = battlePre;
     bt = Duo.battle(net.duoPres.map(withUnits));
     net.duoPres = null;
     pingKind = null;
-    // on a phone the fight starts on this player's own board (their opponent in front of them): drag sideways to look
-    // at the other board, pinch (or double tap) to see the whole field. On a PC the whole field shows.
-    duoView = duoWindow();
   }
-  function duoRestore() { duoView = null; pingKind = null; if (!duoKeep) return false; m = duoKeep; duoKeep = null; return true; }
-  // one board's columns (Standard) and the wide board's (both boards and the open strip between them)
-  const duoHalf = () => Game.MAPS.find(x => x.id === Duo.MAP).grid.cols, duoFull = () => 2 * duoHalf() + Duo.GAP;
-  // a fresh phone window over this player's own board
-  function duoWindow() {
-    const half = duoHalf(), full = duoFull(), lane = net.duoInfo ? net.duoInfo.lane : 0, c0 = lane === 0 ? 0 : half + Duo.GAP;
-    return { cols: half, half, full, x: me === 0 ? c0 : full - c0 - half, free: false };
-  }
-  // the wide board on show (the fight), else null
-  const shownWide = () => phase === 'battle' && m && m.duo ? m : null;
-  // ----- the teammate's board, beside this one (a PC) or in its place (a phone, Teammate's board) -----
-  // A board of its own: the teammate's lane as the team sees it (net.duoInfo.mate; the server sends it again on every
-  // change the teammate makes, so it is live), drawn by its own renderer (2D or 3D, as this player's board) and only
-  // to look at and ping on. This player's own board keeps working as in 1v1.
-  // 'pc' | 'phone' | null: how the two boards show now
-  function duoSplit() {
-    if (mode !== 'net' || !net.duo || !m || m.duo || !['deploy', 'result', 'end'].includes(phase) || !net.duoInfo || !net.duoInfo.mate) return null;
-    return pcLayout() ? 'pc' : matePeek ? 'phone' : null;
-  }
-  const mateLane = () => net.duoInfo ? 1 - net.duoInfo.lane : 1;
-  // the teammate's board is on the left of the screen (lane 0 is on the left of the field, as side 0 sees it)
-  const mateLeft = () => (mateLane() === 0) === (me === 0);
-  function mateMatch() {
-    const x = net.duoInfo && net.duoInfo.mate;
-    if (!x) return null;
-    if (mateOf !== x) { mateOf = x; mateM = withUnits(JSON.parse(JSON.stringify(x))); }
-    return mateM;
-  }
-  const mateView = () => ({ m: mateMatch(), me, phase: phase === 'battle' ? 'deploy' : phase, units, mode, bt: null, battlePre: null, fx: [], selected: null, moving: null, drag: null, hoverTile: null, rangeOf: null,
-    editable: false, placingUnit: null, placingElf: false, placingTower: false, placingWall: false, placingBuilding: null, dev: null, battleCam: null, placingBuilding: null, win: null });
-  function mateTap(t) {
-    if (!pingKind || !t) return;
-    const kind = pingKind;
-    pingKind = null;
-    send({ t: 'mark', kind, lane: mateLane(), col: t.col, row: t.row });
-    if (phase === 'deploy') panelDeploy();
-    render();
-  }
-  // makes, places, sizes and draws the teammate's board (called from render)
-  function syncMate() {
-    const sp = duoSplit(), wrap = $('wrap'), kind = board3d ? '3d' : '2d';
-    wrap.classList.toggle('duo-pc', sp === 'pc'); wrap.classList.toggle('duo-phone', sp === 'phone');
-    wrap.classList.toggle('mate-left', sp === 'pc' && mateLeft());
-    if (mateB && (mateB.kind !== kind || !sp)) {
-      if (mateB.kind !== kind) { try { if (mateB.r.dispose) mateB.r.dispose(); } catch (e) {} mateB.el.remove(); mateB.tag.remove(); mateB = null; }
-      else if (mateB.on) { mateB.on = false; mateB.el.hidden = true; mateB.tag.hidden = true; }
-    }
-    if (!sp) return;
-    if (!mateB) {
-      if (kind === '3d' && !three) return;
-      const el = kind === '3d' ? document.createElement('div') : document.createElement('canvas');
-      el.className = kind === '3d' ? 'board3d mate-board' : 'mate-board'; el.id = 'mate'; el.setAttribute('aria-label', 'Your teammate’s board');
-      wrap.insertBefore(el, $('clock'));
-      let r;
-      if (kind === '3d') r = Render3D(three, el, mateView, { onTap: mateTap, placing: () => false, onInput: wake3d });
-      else { r = Render2D(el, mateView); el.addEventListener('click', (ev) => mateTap(r.tileAt(ev.clientX, ev.clientY))); }
-      const tag = document.createElement('span'); tag.className = 'mate-tag'; tag.id = 'mate-tag';
-      wrap.insertBefore(tag, $('clock'));
-      mateB = { kind, el, r, on: false, key: '', tag };
-    }
-    const tagText = `${seatName(Duo.mateOf(net.duoInfo.seat))}’s board · teammate`;
-    if (mateB.tag.textContent !== tagText) mateB.tag.textContent = tagText;
-    const key = sp + (mateLeft() ? 'L' : 'R') + (wrap.getBoundingClientRect().width | 0) + 'x' + (wrap.getBoundingClientRect().height | 0);
-    if (!mateB.on) { mateB.on = true; mateB.el.hidden = false; mateB.tag.hidden = false; }
-    if (mateB.key !== key) { mateB.key = key; if (board3d) size(); requestAnimationFrame(() => { if (mateB) { mateB.r.size(); if (mateB.kind === '2d') mateB.r.draw(); } }); }
-    if (mateB.kind === '2d') mateB.r.draw();
-  }
-  // board metres on the teammate's board -> a point in #wrap (for its pings)
-  function mateMap() {
-    if (!mateB || !mateB.on) return null;
-    const w = $('wrap').getBoundingClientRect(), T = Game.TILE, C = duoHalf(), R = Game.ROWS, f = me === 1;
-    const tile = (x, y) => [x / T + (C - 1) / 2, (R - 1) / 2 - y / T];
-    if (mateB.kind === '3d') return (x, y) => { const [c, r] = tile(x, y), [sx, sy] = mateB.r.screenAt(c, r, 0); return [sx - w.left, sy - w.top]; };
-    const b = mateB.el.getBoundingClientRect();
-    return (x, y) => { const [c, r] = tile(x, y); return [b.left - w.left + ((f ? C - 1 - c : c) + 0.5) * b.width / C, b.top - w.top + ((f ? R - 1 - r : r) + 0.5) * b.height / R]; };
-  }
-  // the window the 2D board shows of the wide board on a phone (null: the whole board, as on a PC or the 3D board)
-  function duoWin() {
-    if (!duoView || pcLayout() || board3d || !shownWide()) return null;
-    return { aspect: duoView.half, cols: duoView.cols, x: Math.max(0, Math.min(duoView.full - duoView.cols, duoView.x)) };
-  }
-  // the 3D board on a phone: the camera starts over this player's own board (the battle cam's focus), until they
-  // move it themselves
-  function duoFocus() {
-    if (!duoView || pcLayout() || !board3d || duoView.free || !shownWide()) return null;
-    return { zoom: 1.6, x: (net.duoInfo && net.duoInfo.lane === 1 ? 1 : -1) * (duoView.half + Duo.GAP) * Game.TILE / 2, y: 0, k: 0.45 };
-  }
-  // gestures on the 2D wide board on a phone: one finger drags sideways, two pinch, a double tap swaps between this
-  // board and the whole field
-  {
-    const pts = new Map();
-    let pinch0 = null, lastTap = 0;
-    const live = () => !pingKind && !!duoWin();
-    const clampX = () => { duoView.x = Math.max(0, Math.min(duoView.full - duoView.cols, duoView.x)); };
-    cv.addEventListener('pointerdown', (e) => {
-      if (duoView && shownWide()) duoView.free = true;
-      if (!live()) return;
-      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch0 = { d: Math.hypot(a.x - b.x, a.y - b.y), cols: duoView.cols }; }
-      if (pts.size === 1) { const t = performance.now(); if (t - lastTap < 300) { duoView.cols = duoView.cols > duoView.half ? duoView.half : duoView.full; clampX(); render(); } lastTap = t; }
-    });
-    cv.addEventListener('pointermove', (e) => {
-      if (!live() || !pts.has(e.pointerId)) return;
-      const p = pts.get(e.pointerId), w = cv.getBoundingClientRect().width;
-      if (pts.size === 1) { duoView.x -= (e.clientX - p.x) / (w / duoView.cols); clampX(); }
-      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pts.size === 2 && pinch0) {
-        const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
-        duoView.cols = Math.max(duoView.half, Math.min(duoView.full, pinch0.cols * pinch0.d / Math.max(20, d))); clampX();
-      }
-      render();
-    });
-    const up = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch0 = null; };
-    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-  }
+  function duoRestore() { pingKind = null; if (!duoKeep) return false; m = duoKeep; duoKeep = null; if (net.duoTeam) m.team = net.duoTeam; return true; }
   // ----- team talk: pings and quick lines (to the team only) -----
   const PING_MS = 8000, PING_SYM = { '?': '?', '!': '!', go: '⚔' }, PING_NAME = { '?': 'Question', '!': 'Look here', go: 'Attack here' };
   const seatName = (k) => (net.duoInfo && net.duoInfo.names && net.duoInfo.names[k]) || Duo.SEAT_NAMES[k];
-  const boardName = (lane) => lane === 0 ? 'left board' : 'right board';
   function duoToastSay(text, ms = 4000) { duoToast = { text, until: now() + ms }; netStatus(); setTimeout(netStatus, ms + 60); }
-  // where a tap puts a ping: on the wide board (the fight, or both boards) by its column, else on this player's board
+  // a tap with a ping picked puts it on that tile
   function duoPlacePing(t) {
     const kind = pingKind;
     pingKind = null;
-    if (t) {
-      let lane = net.duoInfo ? net.duoInfo.lane : 0, col = t.col;
-      if (shownWide()) {
-        const half = duoHalf();
-        if (t.col < half) lane = 0; else if (t.col >= half + Duo.GAP) { lane = 1; col = t.col - half - Duo.GAP; }
-        else { lane = t.col < half + Duo.GAP / 2 ? 0 : 1; col = lane === 0 ? half - 1 : 0; } // the strip: the nearest board's edge
-      }
-      send({ t: 'mark', kind, lane, col, row: t.row }); // a ping ('ping' itself is the keep-alive)
-    }
+    if (t) send({ t: 'mark', kind, col: t.col, row: t.row }); // a ping ('ping' itself is the keep-alive)
     if (phase === 'deploy') panelDeploy(); else if (phase === 'battle') panelBattle();
     render();
   }
@@ -7026,17 +6893,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function pingMarks(at) {
     const t0 = now();
     duoPings = duoPings.filter(p => t0 - p.at < PING_MS);
-    if (!duoPings.length || !m) return '';
-    const wide = !!shownWide(), half = duoHalf(), lane0 = net.duoInfo ? net.duoInfo.lane : 0, mySeat = net.duoInfo ? net.duoInfo.seat : -1;
-    const sp = duoSplit(), ownOn = !!at && sp !== 'phone', mate = sp ? mateMap() : null;
+    if (!duoPings.length || !m || !at) return '';
+    const mySeat = net.duoInfo ? net.duoInfo.seat : -1;
     let html = '';
     for (const p of duoPings) {
-      let pos;
-      if (wide) { if (!ownOn) continue; const w = Game.tileToWorld(p.lane === 0 ? p.col : p.col + half + Duo.GAP, p.row); pos = at(w.x, w.y); }
-      else if (p.lane === lane0) { if (!ownOn) continue; const w = Game.tileToWorld(p.col, p.row); pos = at(w.x, w.y); } // this player's board
-      else if (mate) { Game.useGrid(Duo.MAP); const w = Game.tileToWorld(p.col, p.row); pos = mate(w.x, w.y); } // the teammate's
-      else continue;
-      const [x, y] = pos;
+      const w = Game.tileToWorld(p.col, p.row), [x, y] = at(w.x, w.y);
       html += `<g class="ping${p.from === mySeat ? ' mine' : ''}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><circle r="14"/><circle class="ring" r="14"/><text y="1">${PING_SYM[p.kind] || '?'}</text></g>`;
     }
     return html;
@@ -7044,26 +6905,24 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function duoTalk(d) {
     if (d.t === 'mark') {
       if (!Duo.PINGS.includes(d.kind)) return;
-      duoPings = duoPings.filter(p => !(p.from === d.from && p.lane === d.lane && p.col === d.col && p.row === d.row)).concat([{ from: d.from, kind: d.kind, lane: d.lane | 0, col: d.col | 0, row: d.row | 0, at: now() }]).slice(-8);
+      duoPings = duoPings.filter(p => !(p.from === d.from && p.col === d.col && p.row === d.row)).concat([{ from: d.from, kind: d.kind, col: d.col | 0, row: d.row | 0, at: now() }]).slice(-8);
       const mine = net.duoInfo && d.from === net.duoInfo.seat;
-      if (!mine) { sfx('menu'); duoToastSay(`${seatName(d.from)} pinged ${PING_SYM[d.kind]} on ${net.duoInfo && net.duoInfo.lane === d.lane ? 'your board' : 'their board'}${d.kind === '?' ? '' : ' · ' + PING_NAME[d.kind]}`); }
+      if (!mine) { sfx('menu'); duoToastSay(`${seatName(d.from)} pinged ${PING_SYM[d.kind]}${d.kind === '?' ? '' : ' · ' + PING_NAME[d.kind]}`); }
       render(); setTimeout(render, PING_MS + 60);
     } else if (d.t === 'emote' && Duo.EMOTE_TEXT[d.id]) {
       if (!(net.duoInfo && d.from === net.duoInfo.seat)) sfx('menu');
       duoToastSay(`${seatName(d.from)}: ${Duo.EMOTE_TEXT[d.id]}`);
     }
   }
-  // the 2v2 row in the panel: Both boards (deploying), the pings, and Say
+  // the 2v2 row in the panel: the pings, and Say
   function duoRow(battle) {
     return `<div class="xrow duo-row">
-      ${battle || pcLayout() ? '' : `<button class="btn small" id="duo-peek" aria-pressed="${matePeek}" ${net.duoInfo && net.duoInfo.mate ? '' : 'disabled'}>${matePeek ? 'My board' : 'Teammate’s board'}</button>`}
       <span class="seg pings" role="group" aria-label="Ping your team">${Duo.PINGS.map(k => `<button data-ping="${k}" aria-pressed="${pingKind === k}" title="${PING_NAME[k]}" aria-label="Ping: ${PING_NAME[k]}">${PING_SYM[k]}</button>`).join('')}</span>
       <button class="btn small" id="duo-say">Say…</button>
     </div>`;
   }
   function wireDuoRow() {
     const redraw = () => { if (phase === 'deploy') panelDeploy(); else if (phase === 'battle') panelBattle(); render(); };
-    if ($('duo-peek')) $('duo-peek').addEventListener('click', () => { matePeek = !matePeek; redraw(); });
     $('panel').querySelectorAll('[data-ping]').forEach(b => b.addEventListener('click', () => {
       pingKind = pingKind === b.dataset.ping ? null : b.dataset.ping;
       if (pingKind) duoToastSay(`Tap a tile to ping ${PING_SYM[pingKind]} for your team`, 2500);
@@ -7077,14 +6936,15 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       $('sheet').querySelectorAll('[data-emote]').forEach(b => b.addEventListener('click', () => { send({ t: 'emote', id: b.dataset.emote }); closeSheet(); }));
     });
   }
-  // the line above the board: which board, and how the teammate is doing
+  // the line above the board: the teammate and how they are doing
   function duoLine() {
     if (duoToast && duoToast.until > now()) return duoToast.text;
     const x = net.duoInfo;
     if (!x || x.seat == null) return `2v2 · ${net.code}`;
     const mate = Duo.mateOf(x.seat), nm = (x.names && x.names[mate]) || Duo.SEAT_NAMES[mate];
-    const st = x.bots && x.bots[mate] ? '' : x.here && !x.here[mate] ? 'away' : phase === 'deploy' ? (x.ready && x.ready[mate] ? 'ready' : 'deploying') : '';
-    return `2v2 · ${Duo.SEAT_NAMES[x.seat]} · ${x.lane === 0 ? 'left' : 'right'} board · teammate ${nm}${st ? ': ' + st : ''}`;
+    const vote = m && m.team && m.team.vote && Game.needsTowerPick(m, me) ? Game.towerTypeById(m.team.vote) : null;
+    const st = x.bots && x.bots[mate] ? '' : x.here && !x.here[mate] ? 'away' : phase === 'deploy' ? (x.ready && x.ready[mate] ? 'ready' : vote ? `voted ${vote.name}` : 'deploying') : '';
+    return `2v2 · ${Duo.SEAT_NAMES[x.seat]} · teammate ${nm}${st ? ': ' + st : ''}`;
   }
 
   function overlayMsg(head, text) {

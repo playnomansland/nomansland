@@ -16,6 +16,33 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 3 November 2026 – 2v2 on one shared board (developer test)
+
+2v2 is now played on **one big board** instead of two boards side by side. This also fixes the screen glitches: the second board that flickered, squeezed or showed the wrong size is gone.
+
+### The board
+- **One wide board (24 × 18 tiles)** for all four players. Team A deploys at the bottom, team B at the top.
+- **You and your teammate share one zone.** Place your squads anywhere in it, even right next to theirs. A tile your teammate holds is taken, just like one of your own.
+- **Double flanks:** each edge has **two columns** of flank tiles (from round 3, as in 1v1).
+- **No leaders** in 2v2: packages give free squads and gold only.
+
+### Shared tower and treasury
+- **Each team has one tower and one treasury**, in the middle of its back rows.
+- **Vote for your tower in round 3.** You and your teammate each pick a tower type from the same offer. Same pick: that's your tower. Different picks: a coin flip decides (against an AI teammate, your vote wins). You see your teammate's vote on the cards and in the bar above the board, and a line tells you which tower won.
+- **Tower upgrades are shared.** Whoever buys a tower skill, walls, Fortify or a mage general pays for it, and it works for the whole team. Only the one who bought it can take it back. The Bank's Major investment stays your own.
+- **The treasury pays both of you** when it survives a fight, and a raid on it steals from both of you.
+- A fallen tower costs the team health once.
+
+### Still your own
+- **Your own gold, shop, unlocks, skills, levels and deployments**, as in 1v1. Your teammate's squads are drawn in your colour with a small ring on their tile, so you can tell them apart.
+- **Hidden info as in 1v1:** you see your teammate's squads the moment they place them, but never what either opponent deployed this round.
+
+### Fights, health and talk
+- **One fight on the one board**, the same on every phone and PC (2D and 3D). The team's shared health is still **200**.
+- **Pings and Say…** work as before: tap **?**, **!** or **⚔**, then a tile, and your teammate sees it on the same spot of the same board.
+
+---
+
 ## 3 November 2026 – Balance study: what makes a unit strong
 
 No gameplay changes in this one: it's the groundwork for the next balance passes. Over 10,000 simulated fights in the game's own engine, plus 200 Balance Lab matches, measured how much each stat is worth in gold. Full write-up in `docs/STAT-LEVERS.md`.
@@ -116,31 +143,7 @@ The Spiders' skill tree is new:
 
 ## 2 November 2026 – 2v2 (developer test)
 
-A first version of **2v2**, open to developer accounts only for now.
-
-### How it works
-- **Two Standard boards side by side**, with a 2-tile open strip between them. A1 and B1 fight on the left board, A2 and B2 on the right. Team A is at the bottom of both boards, team B at the top.
-- **Each player deploys on their own board, just like 1v1:** your own gold, packages, leader, tower, unlocks, skills and levels. Nothing you buy is shared with your teammate.
-- **One fight for all four.** Both boards fight at once as one big field. Nothing keeps units on their own board: a squad near the middle can spot enemies on the other board and cross the strip to fight them, so you can help your teammate (or get caught from the side).
-- **A fallen tower only cripples its own board.** Your teammate's army fights on at full strength.
-- **Shared team health: 200.** After the fight each board is scored as in 1v1 (survivors deal damage, a fallen tower costs health, gold, streaks and treasuries per board), and the damage from both boards comes off your team's health. A team at 0 loses.
-- **Hidden info as in 1v1:** you never see what the enemy deployed this round. Your teammate's board is open to your team.
-- If a player leaves the match, their team loses.
-
-### Talking to your team
-- **Pings:** tap **?**, **!** or **⚔** under the board, then tap a tile. Your teammate sees it on the board with a ripple, plus a line at the top saying who pinged where. Use **?** to ask "why here?", **!** for "look here", **⚔** for "attack here". Pings fade after 8 seconds and only your team sees them. They work while deploying and during the fight.
-- **Say…** sends a quick line to your team: Nice!, Help me!, Sorry!, Wait for me, Thanks!, GG.
-- **Your teammate's board, live:** on a **PC** it sits right beside yours the whole time you deploy (with the strip between, as in the fight), and every squad your teammate places, moves or sells shows up there as they do it. Your own board works exactly as in 1v1. On a **phone** tap **Teammate's board** to look at theirs (it updates live too), then **My board** to go back. You can ping on either board.
-
-### The lobby
-- Developer section of the Play menu: **2v2 lobby**. It gives a 6-letter code and an invite link. Anyone with the link or code can join (the code box now takes 6-letter codes too).
-- Players take the first free seat. **The host sets the teams:** tap one seat, then another, to swap them (or move a player to an empty seat).
-- **Start** works with fewer than four: every empty seat, and anyone not connected when it starts, is played by the AI.
-
-### Watching the fight
-- **On a PC** you see the whole field: both boards, all four players, in 2D and 3D.
-- **On a phone** the fight opens on your own board, with your opponent in front of you. Drag sideways to look at the other board, pinch or double tap to see the whole field. (On the 3D board the camera starts over your own board.)
-- After the fight you're back on your own board for the next round. The bar above the board shows your seat, your board and how your teammate is doing.
+The first version of **2v2** (developer accounts only): two Standard boards side by side, one pair of players on each, one shared team health of 200, pings and quick lines for the team, and a lobby where the host sets the teams. On 3 November it became one shared board (see above).
 
 ---
 

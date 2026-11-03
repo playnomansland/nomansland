@@ -504,7 +504,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
     const { m, me, phase, units, drag, moving, selected, hoverTile, placingUnit, editable } = v, foe = 1 - me;
     const deploying = phase === 'deploy';
     const you = color(css('--you') || '#5CC6DF'), gold = color(css('--gold') || '#E6B84A');
-    const squad = (sq, side, fresh) => {
+    const squad = (sq, side, fresh, other) => { // other: a squad of the other pair of players on a 2v2 board (m.team)
       if (units[sq.unit].building) { // a building bought in the shop (the Altar of Build): in the middle of its block
         const u = units[sq.unit], n = Game.footprint(m, sq.unit), w = Game.recordWorld({ col: sq.col, row: sq.row, size: n }), [wx, wz] = world(f, w.x, w.y);
         bodies.push({ u: { ...u, size: n }, side, x: w.x, y: w.y, look: sq.built ? 'solid' : 'glass' });
@@ -537,7 +537,8 @@ const Render3D = (THREE, el, view, opts = {}) => {
       if (Game.isGentleman(sq)) icon('hat', wx, top + 1.1, wz, 1.1 * bs * 0.8);
       if (awake) arc(wx, wz, T * 0.42, gold, 0.85, 1, 0.07); // awakened: a gold ring on its tile
       if (Game.glutOf(sq) > 0 && u.glut) arc(wx, wz, T * 0.36, color(GLUT_COL), 0.85, Math.min(1, Game.glutOf(sq) / u.glut.max), 0.08, 24); // the Obelisk's Glut
-      if (side === me && deploying && Game.isReady(m, sq)) icon('plus', wx + (camRight.x - camDown.x) * o, top + 0.2, wz + (camRight.z - camDown.z) * o, 0.9 * bs);
+      if (side === me && !other && deploying && Game.isReady(m, sq)) icon('plus', wx + (camRight.x - camDown.x) * o, top + 0.2, wz + (camRight.z - camDown.z) * o, 0.9 * bs);
+      if (other && side === me) arc(wx, wz, T * 0.44, teamColor(side, me), 0.55, 1, 0.05); // your teammate's: a thin ring on its tile
       return [wx, wz];
     };
     // the opponent's squads from this round stay hidden until the fight; a squad they moved shows on its old tile
@@ -556,6 +557,8 @@ const Render3D = (THREE, el, view, opts = {}) => {
       if (rider) { const ru = units[rider.unit]; icon(`rider|${ru.shape}|${ru.color}|${Art.teamCol(me, me)}`, wx - camRight.x * 1.6, 1.0, wz - camRight.z * 1.6, 1.0); }
       if (moving === sq.id && deploying) { const s = tileCenter(v, sq.col, sq.row); tileSq(s.c, s.r, gold, 1, 0.08, 0, 0.02); }
     }
+    // 2v2: the other pair of players on this board (m.team): your teammate's squads, and the other opponent's as you may see them
+    for (const side of [me, foe]) for (const sq of Game.teamArmy(m, side)) if (!Game.isRider(sq)) squad(sq, side, false, true);
     // (the squad tapped last shows its range as a dotted ring drawn by the page over the board, as on the 2D board: boardMarks)
     // where things may go
     if ((selected !== null || (drag && drag.moved) || moving != null) && deploying) {

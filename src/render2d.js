@@ -464,14 +464,6 @@ const Render2D = (cv, view, opts = {}) => {
     ctx.strokeStyle = css('--you');
     ctx.beginPath(); ctx.moveTo(0, mine); ctx.lineTo(W, mine); ctx.stroke();
     ctx.setLineDash([]); ctx.globalAlpha = 1;
-    const dv = phase === 'battle' && battlePre ? battlePre : m;
-    if (dv && dv.duo) { // 2v2: the open strip between the two boards (symmetric, so the same for both sides), edged
-      const gx = dv.duo.cols * t, gw = dv.duo.gap * t;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)'; ctx.fillRect(gx, 0, gw, H);
-      ctx.strokeStyle = css('--muted'); ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.moveTo(gx + gw, 0); ctx.lineTo(gx + gw, H); ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
   }
 
   // ---------- Factions devtest: spells, arrows, the tower's tile, where things may go (on the floor, so the 3D board
@@ -603,7 +595,8 @@ const Render2D = (cv, view, opts = {}) => {
     }
   }
 
-  function drawSquad(sq, side, fresh) {
+  // other: a squad of the other pair of players on a 2v2 board (m.team): no level-up badge; a teammate's gets a small ring
+  function drawSquad(sq, side, fresh, other) {
     const u = Game.glutOf(sq) > 0 ? Engine.glutUnit(units[sq.unit], Game.glutOf(sq)) : units[sq.unit]; // the Obelisk grows with its Glut
     if (u.building) { // a building bought in the shop (the Altar of Build): drawn in the middle of its block
       const n = Game.footprint(m, sq.unit), w = Game.recordWorld({ col: sq.col, row: sq.row, size: n }), t = tilePx();
@@ -613,7 +606,7 @@ const Render2D = (cv, view, opts = {}) => {
         ctx.strokeRect(Math.min(...cs) * t + 1.5, Math.min(...rs) * t + 1.5, n * t - 3, n * t - 3); ctx.setLineDash([]);
       }
       drawBuilding(u.building, PX(w.x), PY(w.y), t, side, u.color, { built: !!sq.built, progress: sq.progress || 0, level: sq.level });
-      if (side === me && phase === 'deploy' && Game.isReady(m, sq)) {
+      if (side === me && !other && phase === 'deploy' && Game.isReady(m, sq)) {
         const br = Math.max(5, t * 0.17), bx = PX(w.x) + t * 0.75, by = PY(w.y) - t * 0.75;
         ctx.fillStyle = css('--gold'); ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = css('--bg'); ctx.lineWidth = Math.max(1.5, br * 0.3);
@@ -638,7 +631,11 @@ const Render2D = (cv, view, opts = {}) => {
       if (awake) { ctx.globalAlpha = 0.9; ctx.strokeStyle = css('--gold'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(PX(b.x), PY(b.y), r + 3, 0, Math.PI * 2); ctx.stroke(); }
     }
     ctx.globalAlpha = 1;
-    if (side === me && phase === 'deploy' && Game.isReady(m, sq)) { // ready to level up: gold plus badge
+    if (other && side === me) { // 2v2: your teammate's squad: a small hollow ring at the tile's bottom right
+      const br = Math.max(3, t * 0.1), bx = (c + 1) * t - br - 3, by = (r0 + 1) * t - br - 3;
+      ctx.strokeStyle = col; ctx.lineWidth = Math.max(1.5, br * 0.45); ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (side === me && !other && phase === 'deploy' && Game.isReady(m, sq)) { // ready to level up: gold plus badge
       const br = Math.max(5, t * 0.17), bx = (c + 1) * t - br - 2, by = r0 * t + br + 2;
       ctx.fillStyle = css('--gold'); ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = css('--bg'); ctx.lineWidth = Math.max(1.5, br * 0.3);
@@ -975,6 +972,8 @@ const Render2D = (cv, view, opts = {}) => {
         ctx.strokeRect(scol(sq.col) * t + 1, srow(sq.row) * t + 1, t - 2, t - 2);
       }
     }
+    // 2v2: the other pair of players on this board (m.team): your teammate's squads, and the other opponent's as you may see them
+    for (const side of [me, foe()]) for (const sq of Game.teamArmy(m, side)) if (!Game.isRider(sq)) drawSquad(sq, side, false, true);
     for (const side of [me, foe()]) if (towerVisible(side) && Game.towerUp(m, side)) drawTowerTile(side);
     if (Game.isDev(m)) drawLessers();
     if (Game.treasuryOn(m)) drawTreasuries();
@@ -1269,7 +1268,7 @@ const Render2D = (cv, view, opts = {}) => {
     const cripOf = (sd) => Math.max(bt.crippled(sd, 0), bt.crippled(sd, 1) || 0);
     const crip = [me, foe()].filter(sd => cripOf(sd) > 0);
     crip.forEach((sd, k) => {
-      const txt = sd === me ? `${m && m.duo ? 'A tower of yours' : 'Your tower'} fell · crippled ${Math.ceil(cripOf(sd))} s` : `${mode === 'claude' ? 'Claude’s' : 'Enemy'} tower fell · crippled ${Math.ceil(cripOf(sd))} s`;
+      const txt = sd === me ? `Your tower fell · crippled ${Math.ceil(cripOf(sd))} s` : `${mode === 'claude' ? 'Claude’s' : 'Enemy'} tower fell · crippled ${Math.ceil(cripOf(sd))} s`;
       ctx.font = `600 ${Math.max(11, Math.round(W * 0.035))}px "IBM Plex Mono", monospace`;
       const tw = ctx.measureText(txt).width + 16, th = Math.max(20, W * 0.06), x = (W - tw) / 2, y = H * (sd === me ? 0.62 : 0.32) + k * 2;
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x, y, tw, th);

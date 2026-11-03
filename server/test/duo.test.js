@@ -3,8 +3,10 @@
 //  - without a developer account (DUO_ANYONE off is checked in the code path: create without it is denied elsewhere)
 //    a phone can't make a 2v2 room; with it, the creator is the host in seat A1
 //  - three phones join and take the empty seats; the host swaps two seats; a fifth phone is turned away
-//  - the host starts with one seat left to the AI; each phone gets its own lane (side as in 1v1) and its teammate's lane
-//  - seats act on their own lane (acked with the server's fingerprint); a teammate sees it, an opponent doesn't
+//  - the host starts with one seat left to the AI; each phone gets its own part (side as in 1v1) on the 2v2 board, with
+//    the other pair of players in m.team
+//  - seats act on their own part (acked with the server's fingerprint); a teammate sees it (a 'team' message), an
+//    opponent doesn't; a teammate's tile is refused
 //  - all ready: one fight for all four, both lanes before it (duo.pres), which plays back the same in node
 //  - a reload gets the same seat back with its key
 // Run: cd server && node test/duo.test.js
@@ -59,14 +61,17 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 *
     for (const k of [0, 1, 3]) {
       const s = syncs[k], own = Duo.SEATS[k];
       assert.strictEqual(s.duo.seat, k); assert.strictEqual(s.duo.lane, own.lane);
-      assert.ok(s.m && s.duo.mate, 'own lane and the teammate lane');
-      assert.strictEqual(s.m.map.id, 'testgrid');
+      assert.ok(s.m && s.m.team && s.m.team.armies, 'own part and the other pair (m.team)');
+      assert.strictEqual(s.m.map.id, 'duo');
+      assert.ok(s.m.chars.every((c) => c == null), 'no leaders');
       assert.deepStrictEqual(s.duo.bots, [false, false, true, false]);
     }
     // each phone picks its package and places one squad in its lane
     const acted = {};
     for (const k of [0, 1, 3]) {
+      await sleep(400); // the teammate's last squad has reached this phone
       const ws = phones[k], side = Duo.SEATS[k].side, m = local(syncs[k].m);
+      m.team = [...ws.inbox].reverse().find((x) => x.t === 'team' || (x.t === 'sync' && x.m))?.team || [...ws.inbox].reverse().find((x) => x.t === 'sync' && x.m).m.team; // the other pair as they stand now
       let seq = 0;
       ws.json({ t: 'act', seq: ++seq, fn: 'choosePack', a: [0] });
       Game.choosePack(m, side, 0);
@@ -93,17 +98,24 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 *
     await sleep(600);
     const s1 = [...p1.inbox].reverse().find((x) => x.t === 'sync');
     const s3 = [...p2.inbox].reverse().find((x) => x.t === 'sync');
-    if (acted[0]) assert.ok(s1.duo.mate.armies[0].some((q) => q.col === acted[0].spot[0] && q.row === acted[0].spot[1]), 'teammate sees it');
-    if (acted[1]) assert.ok(!s3.m.armies[0].some((q) => q.col === acted[1].spot[0] && q.row === acted[1].spot[1] && q.round === acted[1].round), 'opponent does not');
+    if (acted[0]) assert.ok(s1.m.team.armies[0].some((q) => q.col === acted[0].spot[0] && q.row === acted[0].spot[1] && q.id >= Duo.OFF), 'teammate sees it');
+    if (acted[0]) assert.ok(p1.inbox.some((x) => x.t === 'team' && x.team.armies[0].some((q) => q.col === acted[0].spot[0] && q.row === acted[0].spot[1])), 'live, as a team message');
+    if (acted[1]) assert.ok(!s3.m.team.armies[0].some((q) => q.col === acted[1].spot[0] && q.row === acted[1].spot[1] && q.round === acted[1].round), 'opponent does not');
+    if (acted[0]) { // the teammate can't take that tile
+      const m1 = local(s1.m), ui = m1.armies[0][0].unit;
+      p1.json({ t: 'act', seq: 60, fn: 'place', a: [ui, acted[0].spot[0], acted[0].spot[1]] });
+      const no = await waitFor(() => p1.inbox.find((x) => x.t === 'ack' && x.seq === 60), 8000);
+      assert.ok(!no.ok, 'the teammate\'s tile is refused');
+    }
     // a reload: same seat back
     const p1b = await phone(code, { key: p1.welcome.key });
     assert.strictEqual(p1b.welcome.seat, 1);
     phones[1] = p1b;
     // team talk: a ? ping and a quick line reach the team only ('ping' itself stays the keep-alive)
-    host.json({ t: 'mark', kind: '?', lane: 0, col: 3, row: 12 });
+    host.json({ t: 'mark', kind: '?', col: 21, row: 12 });
     const mk = await phones[1].next('mark', 8000);
-    assert.deepStrictEqual([mk.from, mk.kind, mk.lane, mk.col, mk.row], [0, '?', 0, 3, 12]);
-    host.json({ t: 'mark', kind: 'nope', lane: 0, col: 1, row: 1 });
+    assert.deepStrictEqual([mk.from, mk.kind, mk.col, mk.row], [0, '?', 21, 12]);
+    host.json({ t: 'mark', kind: 'nope', col: 1, row: 1 });
     phones[1].json({ t: 'emote', id: 'help' });
     const em = await host.next('emote', 8000);
     assert.strictEqual(em.id, 'help');

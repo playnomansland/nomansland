@@ -77,7 +77,7 @@ const Game = (() => {
   const towerTypeById = (id) => [OUTPOST, ...TOWER_TYPES].find(x => x.id === id) || factionTowerById(id);
   // the types a player is offered: all of them while there are TOWER_OFFER or fewer, else a seeded draw
   function towerChoices(m, side) {
-    if (m && Array.isArray(m.towerOffer)) return m.towerOffer.map(towerTypeById).filter(Boolean); // a fixed offer (the tutorial's)
+    if (m && Array.isArray(m.towerOffer)) return (Array.isArray(m.towerOffer[0]) ? m.towerOffer[side] || [] : m.towerOffer).map(towerTypeById).filter(Boolean); // a fixed offer (the tutorial's; 2v2: one per side, the same for both lanes)
     if (m && m.factions) return factionTowers(m, side); // Factions mode: the towers of the player's own factions
     let types = TOWER_TYPES.filter(x => !(m && Array.isArray(m.offTowers) && m.offTowers.includes(x.id))); // m.offTowers: left out of this match (Standard pack)
     if (!types.length) types = TOWER_TYPES;
@@ -515,6 +515,12 @@ const Game = (() => {
       nml: Array(18).fill('..............').map((r, i) => i === 8 || i === 9 ? 'NNNNNNNNNNNNNN' : r),
       flank: Array(18).fill('F............F').map((r, i) => i === 0 || i === 17 ? 'FF..........FF' : r),
       buildings: [{ kind: 'tower', side: 0, col: 9, row: 16 }, { kind: 'tower', side: 1, col: 4, row: 1 }, { kind: 'treasury', side: 0, col: 4, row: 15 }, { kind: 'treasury', side: 1, col: 9, row: 2 }] },
+    // 2v2 (src/duo.js): one wide board both players of a team deploy on, one shared tower and treasury per team in the
+    // middle of the back rows, and two columns of flank tiles on each edge
+    duo: { format: 'nml-map', version: 1, name: '2v2', base: 'testgrid', cols: 24, rows: 18, zone: 7, symmetry: 'point',
+      tiles: Array(18).fill('.'.repeat(24)), shape: Array(18).fill('.'.repeat(24)), height: Array(18).fill('.'.repeat(24)),
+      flank: Array(18).fill('FF' + '.'.repeat(20) + 'FF'),
+      buildings: [{ kind: 'tower', side: 0, col: 12, row: 16 }, { kind: 'tower', side: 1, col: 11, row: 1 }, { kind: 'treasury', side: 0, col: 10, row: 15 }, { kind: 'treasury', side: 1, col: 13, row: 2 }] },
   };
   // A map entry for MAPS from an editor map: its grid, its towers' and treasuries' tiles (spots), its flank tiles (when
   // they differ from the game's: flankSet) and its terrain (when it has any). Rules on top come in `extra`. Maps made on
@@ -545,10 +551,11 @@ const Game = (() => {
     // deeper zones (8 rows) and only 2 rows of no man's land: the armies meet almost at once
     editorMap('rush', EDITOR_MAPS.rush, { short: 'Deep zones, only 2 rows of no man’s land: the armies meet at once.', text: 'Each zone is 14 by 8 tiles, with only 2 rows of no man’s land between them, so the armies meet almost at once. The towers stand one column further in, and the back corners are flank tiles too. A treasury pays 50 gold per fight it survives.' }), // only when picked, never random
   ];
-  // Boards only drawn, never played or picked (not in MAPS): 'duo' is two Standard boards side by side, the field of a
-  // 2v2 fight (src/duo.js). A match on it is only a picture of the fight (Duo.view).
-  const VIEW_MAPS = [{ id: 'duo', name: '2v2', short: 'Two Standard boards side by side.', text: 'Two Standard boards side by side.', plain: true, skins: true, view: true, grid: { cols: 30, rows: 18, zone: 7 } }]; // 14 + 2 open columns + 14 (Duo.GAP)
-  const findMap = (id) => MAPS.find(x => x.id === id) || VIEW_MAPS.find(x => x.id === id);
+  // Boards played only by a game mode of their own, never picked or rolled (not in MAPS): 'duo' is the 2v2 board (src/duo.js)
+  const TEAM_MAPS = [editorMap('duo', EDITOR_MAPS.duo, { short: 'One wide board for two teams of two.', text: 'One wide board: both players of a team deploy in the same zone and share one tower and one treasury. Two columns of flank tiles on each edge.', skins: true, team: true })];
+  // Boards only drawn, never played or picked (none since 2v2 became one board, 2026-11-03)
+  const VIEW_MAPS = [];
+  const findMap = (id) => MAPS.find(x => x.id === id) || TEAM_MAPS.find(x => x.id === id) || VIEW_MAPS.find(x => x.id === id);
   // Looks (skins) for the 3D board: a map with skins (the Standard and the Test Grid) can be played in any of them; the
   // others have their own look. Only how the board looks: the rules stay the map's. The match keeps the host's pick (m.skin).
   const SKINS = [{ id: 'meadow', name: 'Meadow' }, { id: 'autumn', name: 'Autumn' }, { id: 'snow', name: 'Snow' }, { id: 'frost', name: 'Darkwoods' }, { id: 'desert', name: 'Desert' }];
@@ -825,7 +832,7 @@ const Game = (() => {
     const r = rng(seed + 31337);
     const pool = MAPS.filter(x => !x.plain && x.id !== lastId);
     const roll = pool[Math.floor(r() * pool.length)];
-    const mp = MAPS.find(x => x.id === mapId) || roll; // the roll still happens, so the rest of the map rolls the same way
+    const mp = MAPS.find(x => x.id === mapId) || TEAM_MAPS.find(x => x.id === mapId) || roll; // the roll still happens, so the rest of the map rolls the same way
     const out = { id: mp.id };
     if (mp.elfTower) out.elfCol = ELF_COLS[0] + Math.floor(r() * (ELF_COLS[1] - ELF_COLS[0] + 1));
     if (mp.shrooms) {
@@ -972,7 +979,14 @@ const Game = (() => {
   }
   // the viewer is removing this mushroom tile this round (it still stands until the fight)
   const removingShroom = (m, viewer, deploying, col, row) => !!m && deploying && (m.map && m.map.removed || []).some(x => x.col === col && x.row === row && x.side === viewer && x.round === m.round);
+  // 2v2 (src/duo.js): m.team = { half, armies, vote } is the other pair of players on the same board (the server's
+  // copy, or what this player may see of it): your teammate's squads (armies[side]) take tiles as yours do, and the
+  // other opponent's squads you can see (teamSeen) hold theirs. Their ids are moved (Duo.OFF) so they never clash.
+  // half: which half of the board this player's own squads go to by default (0: the low columns).
+  const teamArmy = (m, side) => (m && m.team && m.team.armies && m.team.armies[side]) || [];
+  const teamSeen = (m, side) => teamArmy(m, side).filter(s => s.round < m.round && !hiddenFromFoe(m, s));
   const enemyHolds = (m, side, col, row) => !!m && (foeSeen(m, 1 - side).some(s => { const p = seenAt(m, s); return p.col === col && p.row === row; }) ||
+    teamSeen(m, 1 - side).some(s => { const p = seenAt(m, s); return p.col === col && p.row === row; }) ||
     (m.round > 1 && m.towers && m.towers[1 - side] && m.towers[1 - side].col === col && m.towers[1 - side].row === row));
   // the edge tiles of your zone that are the enemy's flank are reserved for them for the whole match
   const reserved = (side, col, row) => isFlank(1 - side, col, row);
@@ -1004,7 +1018,7 @@ const Game = (() => {
     !!buildingAt(m, side, col, row));
   // a building tile with room for a squad of ui
   const garrisonFree = (m, side, col, row, ui) => ui != null && !!m && !!m.units[ui] && !m.units[ui].building && hasSkillType(m, side, ui, 'overwatch') && garrisonAt(m, side, col, row) &&
-    !m.armies[side].some(s => covers(m, s, col, row));
+    !m.armies[side].some(s => covers(m, s, col, row)) && !teamArmy(m, side).some(s => covers(m, s, col, row));
   const inBuilding = (m, side, sq) => !!sq && !isRider(sq) && garrisonAt(m, side, sq.col, sq.row);
   const WATCH_SQ = -500; // watchtowers in a fight: squad ids -500, -501, ...
   const watchUnit = (hp) => E.withTraits({ name: 'Watchtower', cost: 0, bodies: 1, hp, hit: 0, aps: 1, range: 0, speed: 0, splash: 0, shape: 'square', color: '#9C7A54', structure: true, lesser: true, idle: true, kind: 'watchtower', level: 0 });
@@ -1196,9 +1210,10 @@ const Game = (() => {
     };
     if (opts && opts.late && !factions && !dev) { m.late = true; m.hp = [startHp(m), startHp(m)]; } // DEVTESTLATEGAME
     if (opts && opts.mirror && !factions) { m.mirror = true; m.packages[1] = JSON.parse(JSON.stringify(m.packages[0])); } // the same rolls for both
+    if (opts && opts.noChars) { m.noChars = true; for (const ps of m.packages) for (const p of ps) p.char = null; } // no leaders (2v2)
     m.towers = [towerSpot(m, 0), towerSpot(m, 1)];
     { // the look: the host's pick, or 'random': one of the looks from the match's seed (never the last match's again)
-      const mp = MAPS.find(x => x.id === m.map.id); let sk = opts && opts.skin;
+      const mp = findMap(m.map.id); let sk = opts && opts.skin;
       if (sk === 'random') { const pool = SKINS.filter(x => x.id !== (opts && opts.lastSkin)); sk = pool[Math.floor(rng((seed >>> 0) + 4242)() * pool.length)].id; }
       if (mp && mp.skins && SKINS.some(x => x.id === sk)) m.skin = sk;
     }
@@ -1769,7 +1784,7 @@ const Game = (() => {
   }
 
   const towerAt = (m, side, col, row) => !!(m.towers && m.towers[side] && m.towers[side].col === col && m.towers[side].row === row);
-  const occupied = (m, side, col, row) => towerAt(m, side, col, row) || treasuryAt(m, side, col, row) || elfOwnAt(m, side, col, row) || !!buildingAt(m, side, col, row) || m.armies[side].some(s => covers(m, s, col, row)) || devOccupied(m, side, col, row);
+  const occupied = (m, side, col, row) => towerAt(m, side, col, row) || treasuryAt(m, side, col, row) || elfOwnAt(m, side, col, row) || !!buildingAt(m, side, col, row) || m.armies[side].some(s => covers(m, s, col, row)) || teamArmy(m, side).some(s => covers(m, s, col, row)) || devOccupied(m, side, col, row);
   const needsTower = (m, side) => !!(m.towers && !m.towers[side]);
   // the tower can be placed (or moved) during round 1 only
   function placeTower(m, side, col, row) {
@@ -3147,7 +3162,8 @@ const Game = (() => {
       const w = Math.max(0, m.matrix[unitIdx][s.unit] || 0);
       wsum += w; csum += w * s.col;
     }
-    const target = wsum > 0 ? csum / wsum : (COLS - 1) / 2 + (r() - 0.5) * 6;
+    const half = m.team && (m.team.half === 0 || m.team.half === 1) ? m.team.half : null; // 2v2: this player's half of the shared board
+    const target = wsum > 0 ? csum / wsum : (half == null ? (COLS - 1) / 2 : (COLS - 1) * (half === 0 ? 0.25 : 0.75)) + (r() - 0.5) * 6;
     // fast melee units sometimes take a flank column, on the side of the enemy tower when it is known
     if (flankOpen(m) && u.range <= 5 && u.speed >= 6 && r() < 0.5) {
       const et = m.towers && m.towers[1 - side];
@@ -3189,7 +3205,7 @@ const Game = (() => {
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,
-    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, resolve, aiDeploy, occupied,
+    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, resolve, aiDeploy, occupied,
     GRID, useGrid,
     DEV, CAT_NAMES, LESSER_SQ, WALL_SQ, setDevData, devBuilding, devPower, devSpell, isDev, towerUp, pickCat, devOffer, pickNow, needsDevPick, devPick, undoDevPick, devShown,
     lessersOf, placedLessers, unplacedLesser, lesserAt, lesserSpotOk, placeLesser, lesserUnit, auraFor, modUnit, powersOf, devGold, devDeploys,

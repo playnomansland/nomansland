@@ -1,22 +1,23 @@
-// A 2v2 match (developer test, 2026-11-02): one Durable Object per code (/duo/<CODE>). The rules are src/duo.js
-// (two lanes, each a 1v1 match through the same Referee checks); this file is the plumbing: sockets, seats, the lobby,
-// storage and the clock (alarms).
+// A 2v2 match (developer test, 2026-11-02; one shared board since 2026-11-03): one Durable Object per code
+// (/duo/<CODE>). The rules are src/duo.js (two lanes on one board, each a 1v1 match through the same Referee checks,
+// a shared tower and treasury per team); this file is the plumbing: sockets, seats, the lobby, storage and the clock
+// (alarms).
 //
 // Who is who
 // - Only a developer account may make a 2v2 room (hello { create, session }): it becomes the host. Anyone with the code
 //   or the invite link may join (hello {}); a key gets the same seat back after a reload (hello { key }).
-// - Four seats: 0 = A1, 1 = A2 (team A), 2 = B1, 3 = B2 (team B); A1 and B1 play lane 0, A2 and B2 lane 1. A joining
+// - Four seats: 0 = A1, 1 = A2 (team A), 2 = B1, 3 = B2 (team B); A1 and B1 are lane 0, A2 and B2 lane 1. A joining
 //   phone takes the first empty seat. In the lobby the host can swap any two seats (move a player, or a player to an
 //   empty seat) and start; seats still empty when it starts are played by the AI.
 //
 // Messages in:  hello { create, session } | { key } | {}, seat { a, b } (host, lobby: swap two seats), kick { seat } (host,
 //               lobby), start { settings } (host), act { seq, fn, a }, ready { v }, next { round }, rematch, forfeit,
-//               mark { kind, lane, col, row } (a ping; 'ping' is the keep-alive), emote { id } (both to the team only), sync
+//               mark { kind, col, row } (a ping; 'ping' is the keep-alive), emote { id } (both to the team only), sync
 // Messages out: welcome { side, key, seq, seat, lane, host }, duolobby { seats, host, seat }, full, denied { why },
-//               mark { from, kind, lane, col, row }, emote { from, id }, mate { mate } (the teammate's lane changed),
-//               sync / status / fight as in a 1v1 room (server/src/room.js) for the seat's own lane, plus duo
-//               ({ seat, lane, names, here, bots, hp, ready, nextReady, mate }) and, in fight, duo.pres (both lanes before
-//               the fight, for the wide playback).
+//               mark { from, kind, col, row }, emote { from, id }, team { team } (only the other lane changed: m.team),
+//               sync / status / fight as in a 1v1 room (server/src/room.js) for the seat's own lane (sync's m carries
+//               m.team, the other lane as this seat may see it), plus duo ({ seat, lane, names, here, bots, hp, ready,
+//               nextReady, vote }) and, in fight, duo.pres (both lanes before the fight, for the playback).
 import { DurableObject } from 'cloudflare:workers';
 import Ref from '../../src/referee.js';
 import Duo from '../../src/duo.js';
@@ -32,7 +33,7 @@ export class DuoRoom extends DurableObject {
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('{"t":"ping"}', '{"t":"pong"}'));
     this.rate = new Map();
     this.sent = new Map();
-    this.mateSent = new Map(); // socket -> fingerprint of the teammate lane it last got
+    this.teamSent = new Map(); // socket -> fingerprint of the m.team it last got
     ctx.blockConcurrencyWhile(async () => {
       const { units, matrix } = builtin();
       this.meta = (await ctx.storage.get('meta')) || null; // { code, seats: [{ key, tag, title } | null x4], host: seat }
@@ -78,23 +79,23 @@ export class DuoRoom extends DurableObject {
       ready: pair(D.ready), nextReady: pair(D.nextReady), rematch: pair(D.rematch), summary: D.summary ? D.summary[own.lane] : null, fights: D.fights,
       ack: R.seq[own.side], here: pair(here.map((h, k) => h || D.bots[k])), forfeit: D.forfeit != null ? Duo.SEATS[D.forfeit].side : null,
       names: pair(this.names()), players: null, ranked: null,
-      duo: this.duoInfo(seat, here, v.mate),
+      duo: this.duoInfo(seat, here),
     };
   }
-  duoInfo(seat, here, mate) {
-    const D = this.D;
-    return { seat, lane: Duo.SEATS[seat].lane, names: this.names(), here, bots: D.bots, hp: D.hp, ready: D.ready, nextReady: D.nextReady, mate: mate || null };
+  duoInfo(seat, here) {
+    const D = this.D, sd = Duo.SEATS[seat].side;
+    return { seat, lane: Duo.SEATS[seat].lane, names: this.names(), here, bots: D.bots, hp: D.hp, ready: D.ready, nextReady: D.nextReady, vote: (D.vote && D.vote[sd]) || null };
   }
   push(opts = {}) {
     for (const s of this.sockets(opts.gone)) {
       if (this.att(s).role !== 'p') continue;
       const msg = this.syncMsg(s, opts.gone);
-      // the teammate's lane goes on its own ('mate'), so a teammate's change doesn't resend this phone's own lane
-      const mate = msg.duo ? msg.duo.mate : undefined, mk = mate === undefined ? '' : Ref.fnv(JSON.stringify(mate));
-      const key = Ref.fnv(JSON.stringify({ ...msg, remaining: 0, ack: 0, held: 0, duo: msg.duo ? { ...msg.duo, mate: null } : undefined }));
-      if (s === opts.skip) { this.sent.set(s, key); this.mateSent.set(s, mk); continue; }
-      if (opts.force || this.sent.get(s) !== key) { this.sent.set(s, key); this.mateSent.set(s, mk); this.send(s, msg); continue; }
-      if (mk && this.mateSent.get(s) !== mk) { this.mateSent.set(s, mk); this.send(s, { t: 'mate', mate }); }
+      // the other lane (m.team) goes on its own ('team'), so a teammate's change doesn't resend this phone's own lane
+      const team = msg.m ? msg.m.team : undefined, tk = team === undefined ? '' : Ref.fnv(JSON.stringify(team));
+      const key = Ref.fnv(JSON.stringify({ ...msg, remaining: 0, ack: 0, held: 0, m: msg.m ? { ...msg.m, team: null } : msg.m }));
+      if (s === opts.skip) { this.sent.set(s, key); this.teamSent.set(s, tk); continue; }
+      if (opts.force || this.sent.get(s) !== key) { this.sent.set(s, key); this.teamSent.set(s, tk); this.send(s, msg); continue; }
+      if (tk && this.teamSent.get(s) !== tk) { this.teamSent.set(s, tk); this.send(s, { t: 'team', team }); }
     }
   }
   broadcastFight(f) {
@@ -133,11 +134,11 @@ export class DuoRoom extends DurableObject {
         this.push({ force: true });
         return;
       }
-      case 'mark': { // a ping (a marker on a board) for the team: ? (a question), ! (look here), go (attack here)
+      case 'mark': { // a ping (a marker on the board) for the team: ? (a question), ! (look here), go (attack here)
         if (inLobby || !Duo.PINGS.includes(d.kind)) return;
-        const lane = d.lane | 0, col = d.col | 0, row = d.row | 0;
-        if (lane < 0 || lane > 1 || col < 0 || col >= 20 || row < 0 || row >= 24) return;
-        this.team(seat, { t: 'mark', from: seat, kind: d.kind, lane, col, row });
+        const col = d.col | 0, row = d.row | 0;
+        if (col < 0 || col >= 40 || row < 0 || row >= 40) return;
+        this.team(seat, { t: 'mark', from: seat, kind: d.kind, col, row });
         return;
       }
       case 'emote': { // a quick line for the team
@@ -169,7 +170,7 @@ export class DuoRoom extends DurableObject {
         this.send(ws, { t: 'ack', seq: Number.isInteger(d.seq) ? d.seq : 0, ok: res.ok, h: res.h || null, why: res.why || null });
         if (!res.ok) { this.sent.delete(ws); this.send(ws, this.syncMsg(ws)); if (res.why !== 'time') await this.save(); return; }
         await this.save();
-        this.push({ skip: ws }); // the teammate's mate view and the clock
+        this.push({ skip: ws }); // the others' views (the teammate's m.team, a shared tower buy, the vote) and the clock
         return;
       }
       case 'ready': {
@@ -254,7 +255,7 @@ export class DuoRoom extends DurableObject {
   }
 
   async left(ws) {
-    this.rate.delete(ws); this.sent.delete(ws);
+    this.rate.delete(ws); this.sent.delete(ws); this.teamSent.delete(ws);
     const a = this.att(ws);
     if (a.role !== 'p') return;
     if (this.atSeat(a.seat, ws).length) return;

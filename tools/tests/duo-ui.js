@@ -1,11 +1,12 @@
-// 2v2 in the browser (src/duo.js, server/src/duo.js): a developer opens a 2v2 lobby from the Developer section, two
-// friends join with the link, the host swaps two seats, the fourth seat goes to the AI, everyone picks a package and
-// places a squad on their own board, all press Ready, and the fight plays on the wide board (two Standard boards side
-// by side with a 2-tile strip between, 30 x 18 tiles) on every phone with the same result; afterwards each phone is back on its own board.
-// Also: a phone without a developer account doesn't get the button, a reload keeps the seat, a PC shows the teammate's
-// board beside its own (live, own still playable), a phone swaps to it with Teammate's board, and pings (? ! ⚔) and quick lines reach the team and only the team.
+// 2v2 in the browser (src/duo.js, server/src/duo.js; one shared board since 2026-11-03): a developer opens a 2v2 lobby
+// from the Developer section, two friends join with the link, the host swaps two seats, the fourth seat goes to the AI,
+// everyone picks a package and places a squad, all press Ready, and the fight plays on the same 24 x 18 board on every
+// phone with the same result.
+// Also: a phone without a developer account doesn't get the button, a reload keeps the seat, teammates see each
+// other's squads at once (m.team) and can't place on each other's tiles, no leaders, and pings (? ! ⚔) and quick lines
+// reach the team and only the team.
 // Needs: python3 -m http.server 8766 (repo root), cd server && npx wrangler dev --port 8798 --var DUO_ANYONE:1
-// (PB_SHOTS=dir saves screenshots of the fight)
+// (PB_SHOTS=dir saves screenshots)
 const { chromium } = require('playwright-core');
 const ctx2d = require('./board2d');
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -63,8 +64,9 @@ const DEV = { id: 'p0123456789abcdef', session: 'a'.repeat(64), tag: 'Vilhelm', 
   for (const p of [host, f1, f2]) await waitPhase(p, 'Deploy');
   let h = await peek(host), a = await peek(f1), c = await peek(f2);
   ok(h.me === 0 && a.me === 0 && c.me === 1, `sides: A1 ${h.me}, A2 ${a.me}, B2 ${c.me}`);
-  ok(h.mapId === 'testgrid' && h.cols === 14, 'each phone on its own Standard board');
-  ok(/A1 · left board · teammate/.test(h.net) && /A2 · right board/.test(a.net), 'status line: ' + h.net);
+  ok(h.mapId === 'duo' && h.cols === 24 && a.cols === 24 && c.cols === 24, 'everyone on the one 2v2 board (24 columns)');
+  ok(/A1 · teammate/.test(h.net) && /A2 · teammate/.test(a.net), 'status line: ' + h.net);
+  ok(await host.evaluate(() => window.__pb().m.packages[window.__pb().me].every(p => !p.char)), 'no leaders in the packages');
   ok(h.hp[0] === 200, 'team health 200');
   // packages and one squad each
   for (const p of [host, f1, f2]) await p.dblclick('[data-pack="0"]');
@@ -77,81 +79,47 @@ const DEV = { id: 'p0123456789abcdef', session: 'a'.repeat(64), tag: 'Vilhelm', 
   a = await peek(f1);
   ok(a.me === 0 && /A2/.test(a.net), 'friend 1 back in seat A2 after a reload');
   const D3 = process.env.PB_BOARD === '3d';
-  // a PC (friend 1, A2): both boards from the start, its own playable, its teammate's (the host's) live beside it
-  await sleep(800);
-  ok(await f1.evaluate(() => { const e = document.getElementById('mate'); return !!e && !e.hidden && e.getBoundingClientRect().width > 200; }), 'PC: the teammate\'s board shows beside its own');
-  ok(!(await f1.locator('#duo-peek').count()), 'PC: no toggle, both boards always');
-  ok(await f1.evaluate(() => { const a = (document.querySelector('#wrap > .board3d:not(.mate-board)') || document.getElementById('board')).getBoundingClientRect(), b = document.getElementById('mate').getBoundingClientRect(); return b.right <= a.left + 1 || b.left >= a.right - 1; }), 'PC: the two boards don\'t overlap');
-  if (!D3) {
-    const n0 = (await peek(f1)).armies[0];
-    await f1.evaluate(() => document.querySelector('.uc2:not([aria-disabled="true"])').click());
-    const ob = await f1.locator('#board').boundingBox();
-    for (const fy of [0.92, 0.86, 0.8]) for (const fx of [0.3, 0.5, 0.7]) { if ((await peek(f1)).armies[0] > n0) break; await f1.mouse.click(ob.x + ob.width * fx, ob.y + ob.height * fy); await sleep(200); }
-    ok((await peek(f1)).armies[0] > n0, 'PC: a squad placed by tapping its own board, beside the teammate\'s');
-  }
-  // live: the host places a squad, friend 1 sees it on the teammate's board at once
-  const before = await f1.evaluate(() => { const x = window.__pb().mate; return x ? x.armies[0].length : -1; });
-  ok(before >= 1, 'the teammate\'s board has the host\'s squad: ' + before);
-  ok(!!(await placeOne(host)), 'the host places another squad');
-  await f1.waitForFunction((n) => { const x = window.__pb().mate; return x && x.armies[0].length > n; }, before, { timeout: 8000 });
-  ok(true, 'PC: it shows on the teammate\'s board right away');
-  if (process.env.PB_SHOTS) { await sleep(1500); await f1.screenshot({ path: process.env.PB_SHOTS + '/duo-deploy-pc.png' }); }
-  // a phone (the host): Teammate's board in place of its own; a ? ping there lands on friend 1's own board
-  await host.click('#duo-peek');
-  await sleep(600);
-  ok(await host.evaluate(() => { const e = document.getElementById('mate'); return !!e && !e.hidden && e.getBoundingClientRect().width > 300; }), 'phone: Teammate\'s board fills the board');
-  if (process.env.PB_SHOTS) await host.screenshot({ path: process.env.PB_SHOTS + '/duo-peek-phone.png' });
-  await host.click('[data-ping="?"]');
-  const mb = await host.locator('#mate').boundingBox();
-  await host.mouse.click(mb.x + mb.width * 0.5, mb.y + mb.height * 0.45);
-  await f1.waitForFunction(() => /pinged \? on your board/.test(document.getElementById('net-text').textContent), null, { timeout: 8000 });
-  ok(true, 'the teammate hears of the ? ping on their board');
-  await host.click('#duo-peek'); // back to its own board
-  await sleep(400);
-  // a ! ping on the host's own board: friend 1 sees both, one on each board
+  // teammates on one board: the host's squads show for friend 1 (m.team), live
+  const teamN = (p) => p.evaluate(() => { const x = window.__pb().team; return x ? x.armies[0].length : -1; });
+  const before = await teamN(f1);
+  ok(before >= 1, 'friend 1 has the host\'s squads on the board: ' + before);
+  const placed = await placeOne(host);
+  ok(!!placed, 'the host places another squad');
+  await f1.waitForFunction((n) => { const x = window.__pb().team; return x && x.armies[0].length > n; }, before, { timeout: 8000 });
+  ok(true, 'it shows for the teammate right away');
+  ok(await f1.evaluate((t) => { const { m, me } = window.__pb(); return !Game.spotFree(m, me, t.col, t.row) && !Game.place(m, me, t.ui, t.col, t.row); }, placed), 'the teammate can\'t place on that tile');
+  ok(await f2.evaluate((t) => { const x = window.__pb().team; return !x.armies[0].some(q => q.col === t.col && q.row === t.row); }, placed), 'the other team doesn\'t see this round\'s squad');
+  if (process.env.PB_SHOTS) { await sleep(1500); await f1.screenshot({ path: process.env.PB_SHOTS + '/duo-deploy-pc.png' }); await host.screenshot({ path: process.env.PB_SHOTS + '/duo-deploy-phone.png' }); }
+  // a ! ping from the host shows for friend 1 on the same tile of the board
   await host.click('[data-ping="!"]');
-  const hb = await host.locator(D3 ? '#wrap > .board3d:not(.mate-board)' : '#board').boundingBox();
+  const hb = await host.locator(D3 ? '#wrap > .board3d' : '#board').boundingBox();
   await host.mouse.click(hb.x + hb.width * 0.5, hb.y + hb.height * 0.45);
-  // (pings last 8 s: on a slow run the ? one may be gone by now) the ! one stands on the teammate's board
-  await f1.waitForFunction(() => [...document.querySelectorAll('#marks .ping')].some(g => {
-    if (g.textContent !== '!') return false;
-    const w = document.getElementById('wrap').getBoundingClientRect(), b = document.getElementById('mate').getBoundingClientRect(), x = +g.getAttribute('transform').match(/translate\(([-\d.]+)/)[1] + w.left;
-    return x >= b.left && x <= b.right;
-  }), null, { timeout: 8000 });
-  ok(true, 'PC: the host\'s ping shows on the teammate\'s board');
-  if (process.env.PB_SHOTS) await f1.screenshot({ path: process.env.PB_SHOTS + '/duo-pings-pc.png' });
-  ok(await host.evaluate(() => document.querySelectorAll('#marks .ping.mine').length === 1), 'the host sees its own ping on its board');
+  await f1.waitForFunction(() => /pinged !/.test(document.getElementById('net-text').textContent) && document.querySelectorAll('#marks .ping').length >= 1, null, { timeout: 8000 });
+  ok(true, 'the teammate sees the ping');
+  ok(await host.waitForFunction(() => document.querySelectorAll('#marks .ping.mine').length === 1, null, { timeout: 8000 }).then(() => true, () => false), 'the host sees its own ping');
   await sleep(600);
   ok(!/pinged/.test(await f2.locator('#net-text').textContent()) && !(await f2.evaluate(() => document.querySelectorAll('#marks .ping').length)), 'the other team gets nothing');
   // a quick line
-  await f1.click('#duo-say'); await f1.click('[data-emote="help"]');
+  await f1.click('#duo-say'); await f1.evaluate(() => document.querySelector('[data-emote="help"]').click());
   await host.waitForFunction(() => /Help me!/.test(document.getElementById('net-text').textContent), null, { timeout: 8000 });
   ok(true, 'Say: Help me! reaches the teammate');
   // Ready
   for (const p of [host, f1, f2]) await p.click('#ready');
   for (const p of [host, f1, f2]) await waitPhase(p, 'Battle', 30000);
   await sleep(1500);
-  h = await peek(host); c = await peek(f2);
-  ok(h.cols === 30 && h.mapId === 'duo', 'the fight on the wide board: ' + h.cols + ' columns');
-  ok(c.cols === 30, 'on every phone');
+  h = await peek(host); c = await peek(f2); a = await peek(f1);
+  ok(h.cols === 24 && h.mapId === 'duo' && c.cols === 24 && a.cols === 24, 'the fight on the same board on every phone');
+  ok(await host.evaluate(() => { const x = window.__pb(); return x.bt.bodies.filter(b => b.squad === -2).length === 2; }), 'one tower per team in the fight');
   if (process.env.PB_SHOTS) { await host.screenshot({ path: process.env.PB_SHOTS + '/duo-host.png' }); await f1.screenshot({ path: process.env.PB_SHOTS + '/duo-a2-pc.png' }); }
   if (process.env.PB_BOARD !== '3d') {
     const ar = async (p) => { const r = await p.locator('#board').boundingBox(); return r.width / r.height; };
-    ok(Math.abs(await ar(host) - 14 / 18) < 0.05, 'phone: the fight shows its own board (14 x 18)');
-    ok(Math.abs(await ar(f1) - 30 / 18) < 0.05, 'PC: the whole field (30 x 18)');
-    // drag sideways to the other board, double tap for the whole field
-    const r = await host.locator('#board').boundingBox();
-    await host.mouse.move(r.x + r.width * 0.2, r.y + r.height / 2); await host.mouse.down(); await host.mouse.move(r.x + r.width * 0.9, r.y + r.height / 2, { steps: 5 }); await host.mouse.up();
-    if (process.env.PB_SHOTS) await host.screenshot({ path: process.env.PB_SHOTS + '/duo-host-dragged.png' });
-    await sleep(400);
-    await host.mouse.dblclick(r.x + r.width / 2, r.y + r.height / 2);
-    if (process.env.PB_SHOTS) await host.screenshot({ path: process.env.PB_SHOTS + '/duo-host-whole.png' });
+    ok(Math.abs(await ar(host) - 24 / 18) < 0.05 && Math.abs(await ar(f1) - 24 / 18) < 0.05, 'the board keeps its shape (24 x 18) on phone and PC');
   }
   // speed the rest up: play the fight to its end
   for (const p of [host, f1, f2]) await p.evaluate(() => { const x = window.__pb(); while (x.bt.step()) {} });
   for (const p of [host, f1, f2]) await waitPhase(p, 'Result', 30000).catch(() => waitPhase(p, 'Match over', 5000));
   h = await peek(host); a = await peek(f1); c = await peek(f2);
-  ok(h.cols === 14 && h.mapId === 'testgrid', 'back on the own board after the fight');
+  ok(h.cols === 24 && h.mapId === 'duo', 'still the same board after the fight');
   ok(JSON.stringify(h.hp) === JSON.stringify(c.hp) && JSON.stringify(h.hp) === JSON.stringify(a.hp), 'same team health everywhere: ' + h.hp.join(' / '));
   if (process.env.PB_SHOTS) await host.screenshot({ path: process.env.PB_SHOTS + '/duo-result.png' });
   // next round
