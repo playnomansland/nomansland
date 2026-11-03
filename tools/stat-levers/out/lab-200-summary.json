@@ -1,0 +1,809 @@
+{
+ "config": {
+  "matches": 200,
+  "seed": 710000,
+  "maxRounds": 30,
+  "map": "testgrid",
+  "mirror": false,
+  "settings": "server ranked (RANKED)",
+  "ai": "Game.aiDeploy + Game.aiLevel, refereed (src/referee.js)"
+ },
+ "summary": {
+  "matches": 200,
+  "completed": 200,
+  "unfinished": 0,
+  "wins": [
+   101,
+   99
+  ],
+  "winRate": [
+   50.5,
+   49.5
+  ],
+  "averageRounds": 8.83,
+  "averageHpRemaining": [
+   31.8,
+   32.3
+  ],
+  "damageTaken": [
+   14861,
+   15057
+  ],
+  "referee": {
+   "accepted": 18135,
+   "refused": 0,
+   "desyncs": 0,
+   "refusedBy": {}
+  },
+  "economy": {
+   "sideRounds": 3532,
+   "avgGoldAtRoundStart": 687.1,
+   "avgGoldLeftAtFight": 23,
+   "avgGoldSpentPerRound": 664.1,
+   "avgGoldEarnedPerRound": 720.2,
+   "levelUps": 5588,
+   "otherPurchases": {
+    "choosePack": 400,
+    "setTowerType": 400,
+    "buyTowerSkill": 183,
+    "buyTowerSkill2": 226,
+    "fortify": 175,
+    "buyDeploy": 128,
+    "placeMark": 71,
+    "huntMark": 139,
+    "buyMageGen": 247,
+    "spin": 147
+   }
+  },
+  "leaders": [
+   {
+    "name": "Emile",
+    "games": 42,
+    "wins": 20,
+    "winRate": 47.6
+   },
+   {
+    "name": "Zoe",
+    "games": 42,
+    "wins": 21,
+    "winRate": 50
+   },
+   {
+    "name": "Noah - The Bog",
+    "games": 41,
+    "wins": 15,
+    "winRate": 36.6
+   },
+   {
+    "name": "Enzo",
+    "games": 39,
+    "wins": 31,
+    "winRate": 79.5
+   },
+   {
+    "name": "Phil",
+    "games": 37,
+    "wins": 18,
+    "winRate": 48.6
+   },
+   {
+    "name": "Felix",
+    "games": 35,
+    "wins": 19,
+    "winRate": 54.3
+   },
+   {
+    "name": "Frickolas Cage",
+    "games": 30,
+    "wins": 14,
+    "winRate": 46.7
+   },
+   {
+    "name": "Matteo - the Gentleman",
+    "games": 30,
+    "wins": 14,
+    "winRate": 46.7
+   },
+   {
+    "name": "Mubarak - Slime Lord",
+    "games": 29,
+    "wins": 14,
+    "winRate": 48.3
+   },
+   {
+    "name": "Wilhelm",
+    "games": 29,
+    "wins": 16,
+    "winRate": 55.2
+   },
+   {
+    "name": "Yot-Yot",
+    "games": 27,
+    "wins": 11,
+    "winRate": 40.7
+   },
+   {
+    "name": "Otto - The Gambler",
+    "games": 19,
+    "wins": 7,
+    "winRate": 36.8
+   }
+  ],
+  "towers": [
+   {
+    "name": "Bank tower",
+    "games": 76,
+    "wins": 40,
+    "winRate": 52.6
+   },
+   {
+    "name": "Slime tower",
+    "games": 73,
+    "wins": 34,
+    "winRate": 46.6
+   },
+   {
+    "name": "Sniper tower",
+    "games": 71,
+    "wins": 57,
+    "winRate": 80.3
+   },
+   {
+    "name": "Mage tower",
+    "games": 64,
+    "wins": 21,
+    "winRate": 32.8
+   },
+   {
+    "name": "Keep",
+    "games": 60,
+    "wins": 35,
+    "winRate": 58.3
+   },
+   {
+    "name": "Bastion",
+    "games": 56,
+    "wins": 13,
+    "winRate": 23.2
+   }
+  ],
+  "skills": [
+   {
+    "name": "Fire Mage: Long reach",
+    "games": 201,
+    "wins": 94,
+    "winRate": 46.8
+   },
+   {
+    "name": "Fire Mage: Armor and health",
+    "games": 198,
+    "wins": 89,
+    "winRate": 44.9
+   },
+   {
+    "name": "Fire Mage: Dual Flame",
+    "games": 196,
+    "wins": 91,
+    "winRate": 46.4
+   },
+   {
+    "name": "Earth Wizard: Regeneration",
+    "games": 195,
+    "wins": 100,
+    "winRate": 51.3
+   },
+   {
+    "name": "Ember Imps: Spitfire",
+    "games": 192,
+    "wins": 90,
+    "winRate": 46.9
+   },
+   {
+    "name": "Skeleton Archers: Longbones",
+    "games": 179,
+    "wins": 79,
+    "winRate": 44.1
+   },
+   {
+    "name": "Sniper: Ranger scope",
+    "games": 159,
+    "wins": 60,
+    "winRate": 37.7
+   },
+   {
+    "name": "Earth Wizard: Stone spikes",
+    "games": 150,
+    "wins": 92,
+    "winRate": 61.3
+   },
+   {
+    "name": "Ember Imps: Flare",
+    "games": 132,
+    "wins": 61,
+    "winRate": 46.2
+   },
+   {
+    "name": "Skeleton Archers: Graverot arrows",
+    "games": 129,
+    "wins": 48,
+    "winRate": 37.2
+   },
+   {
+    "name": "Ember Imps: Awaken",
+    "games": 125,
+    "wins": 65,
+    "winRate": 52
+   },
+   {
+    "name": "Slimeshots: Long reach",
+    "games": 123,
+    "wins": 50,
+    "winRate": 40.7
+   },
+   {
+    "name": "Slimeshots: Heavy shot",
+    "games": 114,
+    "wins": 46,
+    "winRate": 40.4
+   },
+   {
+    "name": "Sniper: Deadeye",
+    "games": 110,
+    "wins": 46,
+    "winRate": 41.8
+   },
+   {
+    "name": "Goblin Swarm: AAARGH!",
+    "games": 94,
+    "wins": 42,
+    "winRate": 44.7
+   },
+   {
+    "name": "Sniper: Awaken",
+    "games": 82,
+    "wins": 25,
+    "winRate": 30.5
+   },
+   {
+    "name": "Ember Imps: Ember Mortar",
+    "games": 78,
+    "wins": 37,
+    "winRate": 47.4
+   },
+   {
+    "name": "Goblin Swarm: Tacticalness",
+    "games": 68,
+    "wins": 27,
+    "winRate": 39.7
+   },
+   {
+    "name": "Meteor Caller: Slow",
+    "games": 63,
+    "wins": 41,
+    "winRate": 65.1
+   },
+   {
+    "name": "Earth Wizard: Living armor",
+    "games": 60,
+    "wins": 15,
+    "winRate": 25
+   },
+   {
+    "name": "Sniper: Assaultgunner",
+    "games": 58,
+    "wins": 18,
+    "winRate": 31
+   },
+   {
+    "name": "Skeleton Archers: Dread rangers",
+    "games": 57,
+    "wins": 30,
+    "winRate": 52.6
+   },
+   {
+    "name": "Meteor Caller: Long reach",
+    "games": 55,
+    "wins": 40,
+    "winRate": 72.7
+   },
+   {
+    "name": "Slime Wizard: Slow",
+    "games": 35,
+    "wins": 18,
+    "winRate": 51.4
+   },
+   {
+    "name": "Goblin Swarm: More where that came from",
+    "games": 31,
+    "wins": 16,
+    "winRate": 51.6
+   },
+   {
+    "name": "Slime Wizard: Long reach",
+    "games": 29,
+    "wins": 14,
+    "winRate": 48.3
+   },
+   {
+    "name": "Ent: Forward planting",
+    "games": 23,
+    "wins": 8,
+    "winRate": 34.8
+   },
+   {
+    "name": "Wisps: Sightweavers",
+    "games": 20,
+    "wins": 9,
+    "winRate": 45
+   },
+   {
+    "name": "Wisps: Spirit walk",
+    "games": 19,
+    "wins": 9,
+    "winRate": 47.4
+   },
+   {
+    "name": "Ent: Explode on death",
+    "games": 16,
+    "wins": 8,
+    "winRate": 50
+   },
+   {
+    "name": "Steel Wizard: Heavy metal",
+    "games": 16,
+    "wins": 6,
+    "winRate": 37.5
+   },
+   {
+    "name": "Ent: Reinforced Bark",
+    "games": 15,
+    "wins": 5,
+    "winRate": 33.3
+   },
+   {
+    "name": "Wisps: Transphysical",
+    "games": 11,
+    "wins": 5,
+    "winRate": 45.5
+   },
+   {
+    "name": "Steel Wizard: Reforge",
+    "games": 10,
+    "wins": 5,
+    "winRate": 50
+   },
+   {
+    "name": "Ent: Grasping roots",
+    "games": 8,
+    "wins": 3,
+    "winRate": 37.5
+   },
+   {
+    "name": "Wisps: Shadowborn",
+    "games": 8,
+    "wins": 4,
+    "winRate": 50
+   },
+   {
+    "name": "Flame Wizard: Armor and health",
+    "games": 7,
+    "wins": 3,
+    "winRate": 42.9
+   },
+   {
+    "name": "Flame Wizard: Long reach",
+    "games": 6,
+    "wins": 3,
+    "winRate": 50
+   },
+   {
+    "name": "Steel Wizard: Shape Titanium spears",
+    "games": 6,
+    "wins": 2,
+    "winRate": 33.3
+   },
+   {
+    "name": "Brute: Berserkers",
+    "games": 2,
+    "wins": 1,
+    "winRate": 50
+   },
+   {
+    "name": "Brute: Tuff skin",
+    "games": 2,
+    "wins": 1,
+    "winRate": 50
+   },
+   {
+    "name": "Brute: Bullhead",
+    "games": 1,
+    "wins": 0,
+    "winRate": 0
+   },
+   {
+    "name": "Brute: Rampager",
+    "games": 1,
+    "wins": 1,
+    "winRate": 100
+   },
+   {
+    "name": "Frost Wizard: Deepfreeze",
+    "games": 1,
+    "wins": 1,
+    "winRate": 100
+   },
+   {
+    "name": "War Mammoth: Armor and health",
+    "games": 1,
+    "wins": 1,
+    "winRate": 100
+   },
+   {
+    "name": "Water Mage: Pool shaper",
+    "games": 1,
+    "wins": 1,
+    "winRate": 100
+   },
+   {
+    "name": "Water Mage: Waterbomb",
+    "games": 1,
+    "wins": 0,
+    "winRate": 0
+   }
+  ],
+  "unitStats": [
+   {
+    "index": 0,
+    "name": "Goblin Swarm",
+    "squadRounds": 2649,
+    "damageDealt": 150233,
+    "appearances": 2649,
+    "bought": 302,
+    "matches": 225,
+    "matchWins": 104,
+    "avgSurvival": 0.0085,
+    "avgDamagePerSquadRound": 56.7,
+    "winRateWhenFielded": 46.2
+   },
+   {
+    "index": 1,
+    "name": "Skeleton Archers",
+    "squadRounds": 4017,
+    "damageDealt": 1176276,
+    "appearances": 4017,
+    "bought": 562,
+    "matches": 319,
+    "matchWins": 159,
+    "avgSurvival": 0.1246,
+    "avgDamagePerSquadRound": 292.8,
+    "winRateWhenFielded": 49.8
+   },
+   {
+    "index": 2,
+    "name": "Ember Imps",
+    "squadRounds": 4677,
+    "damageDealt": 1346144,
+    "appearances": 4677,
+    "bought": 629,
+    "matches": 329,
+    "matchWins": 161,
+    "avgSurvival": 0.0177,
+    "avgDamagePerSquadRound": 287.8,
+    "winRateWhenFielded": 48.9
+   },
+   {
+    "index": 3,
+    "name": "Fire Mage",
+    "squadRounds": 5119,
+    "damageDealt": 4785550,
+    "appearances": 5119,
+    "bought": 860,
+    "matches": 337,
+    "matchWins": 165,
+    "avgSurvival": 0.1938,
+    "avgDamagePerSquadRound": 934.9,
+    "winRateWhenFielded": 49
+   },
+   {
+    "index": 4,
+    "name": "Sniper",
+    "squadRounds": 3837,
+    "damageDealt": 3064583,
+    "appearances": 3837,
+    "bought": 444,
+    "matches": 297,
+    "matchWins": 142,
+    "avgSurvival": 0.3576,
+    "avgDamagePerSquadRound": 798.7,
+    "winRateWhenFielded": 47.8
+   },
+   {
+    "index": 5,
+    "name": "Brute",
+    "squadRounds": 392,
+    "damageDealt": 75562,
+    "appearances": 392,
+    "bought": 42,
+    "matches": 57,
+    "matchWins": 33,
+    "avgSurvival": 0.0408,
+    "avgDamagePerSquadRound": 192.8,
+    "winRateWhenFielded": 57.9
+   },
+   {
+    "index": 6,
+    "name": "Wisps",
+    "squadRounds": 897,
+    "damageDealt": 510905,
+    "appearances": 897,
+    "bought": 68,
+    "matches": 79,
+    "matchWins": 40,
+    "avgSurvival": 0.1444,
+    "avgDamagePerSquadRound": 569.6,
+    "winRateWhenFielded": 50.6
+   },
+   {
+    "index": 7,
+    "name": "Leaf Wizard",
+    "squadRounds": 202,
+    "damageDealt": 143637,
+    "appearances": 202,
+    "bought": 22,
+    "matches": 22,
+    "matchWins": 11,
+    "avgSurvival": 0.0891,
+    "avgDamagePerSquadRound": 711.1,
+    "winRateWhenFielded": 50
+   },
+   {
+    "index": 8,
+    "name": "Earth Wizard",
+    "squadRounds": 4737,
+    "damageDealt": 4856808,
+    "appearances": 4737,
+    "bought": 603,
+    "matches": 362,
+    "matchWins": 181,
+    "avgSurvival": 0.3354,
+    "avgDamagePerSquadRound": 1025.3,
+    "winRateWhenFielded": 50
+   },
+   {
+    "index": 9,
+    "name": "Flame Wizard",
+    "squadRounds": 206,
+    "damageDealt": 231255,
+    "appearances": 206,
+    "bought": 50,
+    "matches": 36,
+    "matchWins": 16,
+    "avgSurvival": 0.0874,
+    "avgDamagePerSquadRound": 1122.6,
+    "winRateWhenFielded": 44.4
+   },
+   {
+    "index": 10,
+    "name": "Steel Wizard",
+    "squadRounds": 428,
+    "damageDealt": 393899,
+    "appearances": 428,
+    "bought": 124,
+    "matches": 76,
+    "matchWins": 37,
+    "avgSurvival": 0.1145,
+    "avgDamagePerSquadRound": 920.3,
+    "winRateWhenFielded": 48.7
+   },
+   {
+    "index": 11,
+    "name": "Slime Wizard",
+    "squadRounds": 865,
+    "damageDealt": 1514053,
+    "appearances": 865,
+    "bought": 263,
+    "matches": 148,
+    "matchWins": 71,
+    "avgSurvival": 0.2139,
+    "avgDamagePerSquadRound": 1750.4,
+    "winRateWhenFielded": 48
+   },
+   {
+    "index": 12,
+    "name": "Ether Golem",
+    "squadRounds": 0,
+    "damageDealt": 0,
+    "appearances": 0,
+    "bought": 0,
+    "matches": 0,
+    "matchWins": 0,
+    "winRateWhenFielded": null
+   },
+   {
+    "index": 13,
+    "name": "Sun Priest",
+    "squadRounds": 0,
+    "damageDealt": 0,
+    "appearances": 0,
+    "bought": 0,
+    "matches": 0,
+    "matchWins": 0,
+    "winRateWhenFielded": null
+   },
+   {
+    "index": 14,
+    "name": "Meteor Caller",
+    "squadRounds": 1336,
+    "damageDealt": 3899276,
+    "appearances": 1336,
+    "bought": 520,
+    "matches": 242,
+    "matchWins": 136,
+    "avgSurvival": 0.4543,
+    "avgDamagePerSquadRound": 2918.6,
+    "winRateWhenFielded": 56.2
+   },
+   {
+    "index": 15,
+    "name": "War Mammoth",
+    "squadRounds": 11,
+    "damageDealt": 12520,
+    "appearances": 11,
+    "bought": 6,
+    "matches": 4,
+    "matchWins": 2,
+    "avgSurvival": 0.2727,
+    "avgDamagePerSquadRound": 1138.2,
+    "winRateWhenFielded": 50
+   },
+   {
+    "index": 16,
+    "name": "Necromancer",
+    "squadRounds": 0,
+    "damageDealt": 0,
+    "appearances": 0,
+    "bought": 0,
+    "matches": 0,
+    "matchWins": 0,
+    "winRateWhenFielded": null
+   },
+   {
+    "index": 17,
+    "name": "Ent",
+    "squadRounds": 1022,
+    "damageDealt": 37265,
+    "appearances": 1022,
+    "bought": 71,
+    "matches": 92,
+    "matchWins": 41,
+    "avgSurvival": 0.0186,
+    "avgDamagePerSquadRound": 36.5,
+    "winRateWhenFielded": 44.6
+   },
+   {
+    "index": 18,
+    "name": "Slimeshots",
+    "squadRounds": 2918,
+    "damageDealt": 1644378,
+    "appearances": 2918,
+    "bought": 527,
+    "matches": 286,
+    "matchWins": 154,
+    "avgSurvival": 0.1283,
+    "avgDamagePerSquadRound": 563.5,
+    "winRateWhenFielded": 53.8
+   },
+   {
+    "index": 19,
+    "name": "Just a horse",
+    "squadRounds": 180,
+    "damageDealt": 796,
+    "appearances": 180,
+    "bought": 21,
+    "matches": 21,
+    "matchWins": 9,
+    "avgSurvival": 0,
+    "avgDamagePerSquadRound": 4.4,
+    "winRateWhenFielded": 42.9
+   },
+   {
+    "index": 20,
+    "name": "Rogue",
+    "squadRounds": 6,
+    "damageDealt": 557,
+    "appearances": 6,
+    "bought": 2,
+    "matches": 2,
+    "matchWins": 1,
+    "avgSurvival": 0,
+    "avgDamagePerSquadRound": 92.8,
+    "winRateWhenFielded": 50
+   },
+   {
+    "index": 21,
+    "name": "Spiders",
+    "squadRounds": 170,
+    "damageDealt": 16511,
+    "appearances": 170,
+    "bought": 18,
+    "matches": 18,
+    "matchWins": 12,
+    "avgSurvival": 0.0088,
+    "avgDamagePerSquadRound": 97.1,
+    "winRateWhenFielded": 66.7
+   },
+   {
+    "index": 22,
+    "name": "Truespear",
+    "squadRounds": 0,
+    "damageDealt": 0,
+    "appearances": 0,
+    "bought": 0,
+    "matches": 0,
+    "matchWins": 0,
+    "winRateWhenFielded": null
+   },
+   {
+    "index": 23,
+    "name": "Shiv",
+    "squadRounds": 188,
+    "damageDealt": 85991,
+    "appearances": 188,
+    "bought": 21,
+    "matches": 21,
+    "matchWins": 13,
+    "avgSurvival": 0.117,
+    "avgDamagePerSquadRound": 457.4,
+    "winRateWhenFielded": 61.9
+   },
+   {
+    "index": 24,
+    "name": "Water Mage",
+    "squadRounds": 46,
+    "damageDealt": 16069,
+    "appearances": 46,
+    "bought": 13,
+    "matches": 9,
+    "matchWins": 4,
+    "avgSurvival": 0.0652,
+    "avgDamagePerSquadRound": 349.3,
+    "winRateWhenFielded": 44.4
+   },
+   {
+    "index": 25,
+    "name": "Assassin",
+    "squadRounds": 0,
+    "damageDealt": 0,
+    "appearances": 0,
+    "bought": 0,
+    "matches": 0,
+    "matchWins": 0,
+    "winRateWhenFielded": null
+   },
+   {
+    "index": 26,
+    "name": "Frost Wizard",
+    "squadRounds": 48,
+    "damageDealt": 43444,
+    "appearances": 48,
+    "bought": 11,
+    "matches": 8,
+    "matchWins": 6,
+    "avgSurvival": 0.5,
+    "avgDamagePerSquadRound": 905.1,
+    "winRateWhenFielded": 75
+   },
+   {
+    "index": 27,
+    "name": "Obelisk",
+    "squadRounds": 0,
+    "damageDealt": 0,
+    "appearances": 0,
+    "bought": 0,
+    "matches": 0,
+    "matchWins": 0,
+    "winRateWhenFielded": null
+   }
+  ]
+ }
+}

@@ -16,6 +16,21 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 3 November 2026 – Balance study: what makes a unit strong
+
+No gameplay changes in this one: it's the groundwork for the next balance passes. Over 10,000 simulated fights in the game's own engine, plus 200 Balance Lab matches, measured how much each stat is worth in gold. Full write-up in `docs/STAT-LEVERS.md`.
+
+- **Health × damage is one stat.** A unit's raw power is the square root of health times damage per second, per gold. Trade them 1 : 1 in percent.
+- **Range is the strongest stat:** each metre is worth about 5% gold. A melee unit needs about twice the health and damage of a 14 m unit to break even, and in Balance Lab matches long-range squads survive fights 35% of the time against 1% for melee.
+- **Speed only helps units that have to walk.** Doubling it is worth +20% at 14 m and almost nothing for artillery.
+- **Armor and ward are counters, not power:** armor beats many small hits, ward beats a few big ones.
+- **Splash under 2.5 m does nothing**, because units always stand at least 2.45 m apart. From 3 m it's worth about +30%. Earth Wizard, Steel Wizard and Ent currently have 2 m splash.
+- **Hidden costs:** slow projectiles (about −10%) and wind-up (−16% for 1 s).
+- **A level-up is the best deal in the game:** about +50% gold's worth compared with buying more squads.
+- **A baseline unit** for future units to be measured against: 100 gold, 3 bodies, 147 health, 19 hit at 1 attack a second, 14 m range, 3 m/s. It scores even against the roster, early and late.
+
+---
+
 ## 3 November 2026 – Unit skins: the Champion Brute
 
 - **Skins are here.** A skin changes how one of your units looks, never how it plays.

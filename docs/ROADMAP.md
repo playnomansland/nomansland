@@ -39,7 +39,7 @@ Notes: the encyclopedia (start screen) is the obvious home. Older theme idea: 19
 
 ## 5. More balancing
 
-Tools: Balance Lab (`tools/balance-lab.js`, `docs/BALANCE_LAB.md`), counter table, fairness tests. Known gaps: the AI never drafts tier-5 units, leaders need `--no-mirror` runs, side bias needs more matches. Skill trees will need the AI to pick tree paths before the lab can rate them.
+Tools: Balance Lab (`tools/balance-lab.js`, `docs/BALANCE_LAB.md`), stat-lever study and pricing recipe (`tools/stat-levers/`, `docs/STAT-LEVERS.md`), counter table, fairness tests. Known gaps: the AI never drafts tier-5 units, leaders need `--no-mirror` runs, side bias needs more matches. Skill trees will need the AI to pick tree paths before the lab can rate them.
 
 ## 6. Damage types: physical and magic (idea)
 

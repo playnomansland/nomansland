@@ -1,0 +1,1606 @@
+{
+ "gold:0.5": {
+  "lever": "gold",
+  "v": 0.5,
+  "d": {},
+  "avg": -0.6413500000000001,
+  "sd": 0.39603871879617314,
+  "win": 0.07142857142857142,
+  "scores": {
+   "Goblin Swarm": -0.6804,
+   "Skeleton Archers": -0.7279,
+   "Ember Imps": -0.6871,
+   "Fire Mage": -0.8661,
+   "Sniper": -1,
+   "Brute": -0.7577,
+   "Wisps": -0.8629,
+   "Leaf Wizard": -0.298,
+   "Earth Wizard": -0.8897,
+   "Ent": -0.6456,
+   "Slimeshots": -0.8322,
+   "Just a horse": 0.6667,
+   "Spiders": -0.6307,
+   "Shiv": -0.7673
+  }
+ },
+ "gold:0.6": {
+  "lever": "gold",
+  "v": 0.6,
+  "d": {},
+  "avg": -0.5462571428571429,
+  "sd": 0.4469367943717157,
+  "win": 0.14285714285714285,
+  "scores": {
+   "Goblin Swarm": -0.5895,
+   "Skeleton Archers": -0.6375,
+   "Ember Imps": -0.6069,
+   "Fire Mage": -0.8053,
+   "Sniper": -1,
+   "Brute": -0.6943,
+   "Wisps": -0.8274,
+   "Leaf Wizard": 0.2222,
+   "Earth Wizard": -0.8897,
+   "Ent": -0.548,
+   "Slimeshots": -0.8044,
+   "Just a horse": 0.7222,
+   "Spiders": -0.4946,
+   "Shiv": -0.6944
+  }
+ },
+ "gold:0.7": {
+  "lever": "gold",
+  "v": 0.7,
+  "d": {},
+  "avg": -0.4477214285714286,
+  "sd": 0.4521105904194103,
+  "win": 0.14285714285714285,
+  "scores": {
+   "Goblin Swarm": -0.4873,
+   "Skeleton Archers": -0.5103,
+   "Ember Imps": -0.4726,
+   "Fire Mage": -0.7323,
+   "Sniper": -0.9596,
+   "Brute": -0.6077,
+   "Wisps": -0.742,
+   "Leaf Wizard": 0.3662,
+   "Earth Wizard": -0.8897,
+   "Ent": -0.4349,
+   "Slimeshots": -0.6723,
+   "Just a horse": 0.7619,
+   "Spiders": -0.3239,
+   "Shiv": -0.5636
+  }
+ },
+ "gold:0.8": {
+  "lever": "gold",
+  "v": 0.8,
+  "d": {},
+  "avg": -0.33440714285714296,
+  "sd": 0.45265353900919747,
+  "win": 0.21428571428571427,
+  "scores": {
+   "Goblin Swarm": -0.3873,
+   "Skeleton Archers": -0.3801,
+   "Ember Imps": -0.3081,
+   "Fire Mage": -0.6444,
+   "Sniper": -0.8787,
+   "Brute": -0.5029,
+   "Wisps": -0.6549,
+   "Leaf Wizard": 0.4182,
+   "Earth Wizard": -0.8607,
+   "Ent": -0.2906,
+   "Slimeshots": -0.6084,
+   "Just a horse": 0.7917,
+   "Spiders": 0.0446,
+   "Shiv": -0.4201
+  }
+ },
+ "gold:0.9": {
+  "lever": "gold",
+  "v": 0.9,
+  "d": {},
+  "avg": -0.13547857142857142,
+  "sd": 0.45802808581784504,
+  "win": 0.35714285714285715,
+  "scores": {
+   "Goblin Swarm": -0.2729,
+   "Skeleton Archers": -0.0926,
+   "Ember Imps": 0.1661,
+   "Fire Mage": -0.5513,
+   "Sniper": -0.7653,
+   "Brute": -0.3664,
+   "Wisps": -0.4774,
+   "Leaf Wizard": 0.5071,
+   "Earth Wizard": -0.6317,
+   "Ent": 0.0358,
+   "Slimeshots": -0.5487,
+   "Just a horse": 0.8148,
+   "Spiders": 0.433,
+   "Shiv": -0.1472
+  }
+ },
+ "gold:1": {
+  "lever": "gold",
+  "v": 1,
+  "d": {},
+  "avg": 0.002557142857142875,
+  "sd": 0.46358067831405836,
+  "win": 0.5,
+  "scores": {
+   "Goblin Swarm": -0.0962,
+   "Skeleton Archers": 0.1834,
+   "Ember Imps": 0.2644,
+   "Fire Mage": -0.4783,
+   "Sniper": -0.6922,
+   "Brute": -0.2164,
+   "Wisps": -0.4339,
+   "Leaf Wizard": 0.5782,
+   "Earth Wizard": -0.4575,
+   "Ent": 0.3392,
+   "Slimeshots": -0.4965,
+   "Just a horse": 0.8333,
+   "Spiders": 0.5806,
+   "Shiv": 0.1277
+  }
+ },
+ "gold:1.1": {
+  "lever": "gold",
+  "v": 1.1,
+  "d": {},
+  "avg": 0.22421428571428573,
+  "sd": 0.3984042936822968,
+  "win": 0.6428571428571429,
+  "scores": {
+   "Goblin Swarm": 0.3211,
+   "Skeleton Archers": 0.2956,
+   "Ember Imps": 0.3878,
+   "Fire Mage": -0.2418,
+   "Sniper": -0.0979,
+   "Brute": 0.2416,
+   "Wisps": -0.2855,
+   "Leaf Wizard": 0.627,
+   "Earth Wizard": -0.5388,
+   "Ent": 0.6134,
+   "Slimeshots": -0.0601,
+   "Just a horse": 0.8485,
+   "Spiders": 0.6949,
+   "Shiv": 0.3332
+  }
+ },
+ "gold:1.2": {
+  "lever": "gold",
+  "v": 1.2,
+  "d": {},
+  "avg": 0.35912142857142854,
+  "sd": 0.3462795014323615,
+  "win": 0.8571428571428571,
+  "scores": {
+   "Goblin Swarm": 0.5394,
+   "Skeleton Archers": 0.3757,
+   "Ember Imps": 0.4542,
+   "Fire Mage": -0.1809,
+   "Sniper": 0.2222,
+   "Brute": 0.4069,
+   "Wisps": 0.0134,
+   "Leaf Wizard": 0.6581,
+   "Earth Wizard": -0.3678,
+   "Ent": 0.7041,
+   "Slimeshots": 0.1792,
+   "Just a horse": 0.8889,
+   "Spiders": 0.752,
+   "Shiv": 0.3823
+  }
+ },
+ "gold:1.35": {
+  "lever": "gold",
+  "v": 1.35,
+  "d": {},
+  "avg": 0.4384357142857143,
+  "sd": 0.32609905508064535,
+  "win": 0.9285714285714286,
+  "scores": {
+   "Goblin Swarm": 0.6774,
+   "Skeleton Archers": 0.4321,
+   "Ember Imps": 0.498,
+   "Fire Mage": 0.057,
+   "Sniper": 0.3077,
+   "Brute": 0.5551,
+   "Wisps": 0.0893,
+   "Leaf Wizard": 0.6844,
+   "Earth Wizard": -0.3446,
+   "Ent": 0.7622,
+   "Slimeshots": 0.2856,
+   "Just a horse": 0.8974,
+   "Spiders": 0.7808,
+   "Shiv": 0.4557
+  }
+ },
+ "gold:1.5": {
+  "lever": "gold",
+  "v": 1.5,
+  "d": {},
+  "avg": 0.5783571428571428,
+  "sd": 0.23785852251852124,
+  "win": 1,
+  "scores": {
+   "Goblin Swarm": 0.818,
+   "Skeleton Archers": 0.5593,
+   "Ember Imps": 0.5888,
+   "Fire Mage": 0.2181,
+   "Sniper": 0.4,
+   "Brute": 0.6961,
+   "Wisps": 0.3218,
+   "Leaf Wizard": 0.741,
+   "Earth Wizard": 0.2667,
+   "Ent": 0.8499,
+   "Slimeshots": 0.2708,
+   "Just a horse": 0.9333,
+   "Spiders": 0.8522,
+   "Shiv": 0.581
+  }
+ },
+ "gold:1.75": {
+  "lever": "gold",
+  "v": 1.75,
+  "d": {},
+  "avg": 0.6605785714285713,
+  "sd": 0.21471073956296055,
+  "win": 1,
+  "scores": {
+   "Goblin Swarm": 0.9017,
+   "Skeleton Archers": 0.6309,
+   "Ember Imps": 0.6487,
+   "Fire Mage": 0.3733,
+   "Sniper": 0.4902,
+   "Brute": 0.7838,
+   "Wisps": 0.4395,
+   "Leaf Wizard": 0.7715,
+   "Earth Wizard": 0.2353,
+   "Ent": 0.9101,
+   "Slimeshots": 0.5531,
+   "Just a horse": 0.9608,
+   "Spiders": 0.8919,
+   "Shiv": 0.6573
+  }
+ },
+ "gold:2": {
+  "lever": "gold",
+  "v": 2,
+  "d": {},
+  "avg": 0.714657142857143,
+  "sd": 0.1922300694268114,
+  "win": 1,
+  "scores": {
+   "Goblin Swarm": 0.9607,
+   "Skeleton Archers": 0.6927,
+   "Ember Imps": 0.7094,
+   "Fire Mage": 0.459,
+   "Sniper": 0.5667,
+   "Brute": 0.8442,
+   "Wisps": 0.4908,
+   "Leaf Wizard": 0.8006,
+   "Earth Wizard": 0.4,
+   "Ent": 0.934,
+   "Slimeshots": 0.5244,
+   "Just a horse": 0.9667,
+   "Spiders": 0.9334,
+   "Shiv": 0.7226
+  }
+ },
+ "hp:0.7": {
+  "lever": "hp",
+  "v": 0.7,
+  "d": {
+   "hp": 101.577
+  },
+  "avg": -0.17234285714285716,
+  "sd": 0.46275140304531565,
+  "win": 0.2857142857142857,
+  "scores": {
+   "Goblin Swarm": -0.2433,
+   "Skeleton Archers": -0.3654,
+   "Ember Imps": -0.1936,
+   "Fire Mage": -0.7148,
+   "Sniper": -0.6922,
+   "Brute": -0.2164,
+   "Wisps": -0.4339,
+   "Leaf Wizard": 0.5688,
+   "Earth Wizard": -0.4575,
+   "Ent": 0.2174,
+   "Slimeshots": -0.6925,
+   "Just a horse": 0.8333,
+   "Spiders": 0.3081,
+   "Shiv": -0.3308
+  }
+ },
+ "hp:0.85": {
+  "lever": "hp",
+  "v": 0.85,
+  "d": {
+   "hp": 123.3435
+  },
+  "avg": -0.09995714285714288,
+  "sd": 0.4692660983071419,
+  "win": 0.35714285714285715,
+  "scores": {
+   "Goblin Swarm": -0.1971,
+   "Skeleton Archers": -0.2301,
+   "Ember Imps": 0.1144,
+   "Fire Mage": -0.7148,
+   "Sniper": -0.6922,
+   "Brute": -0.2164,
+   "Wisps": -0.4339,
+   "Leaf Wizard": 0.5743,
+   "Earth Wizard": -0.4575,
+   "Ent": 0.2261,
+   "Slimeshots": -0.6125,
+   "Just a horse": 0.8333,
+   "Spiders": 0.4775,
+   "Shiv": -0.0705
+  }
+ },
+ "hp:1.15": {
+  "lever": "hp",
+  "v": 1.15,
+  "d": {
+   "hp": 166.8765
+  },
+  "avg": 0.15082857142857145,
+  "sd": 0.436075246502533,
+  "win": 0.6428571428571429,
+  "scores": {
+   "Goblin Swarm": 0.1385,
+   "Skeleton Archers": 0.2714,
+   "Ember Imps": 0.3508,
+   "Fire Mage": -0.0418,
+   "Sniper": -0.6922,
+   "Brute": -0.2164,
+   "Wisps": 0.3367,
+   "Leaf Wizard": 0.581,
+   "Earth Wizard": -0.4575,
+   "Ent": 0.4702,
+   "Slimeshots": -0.4003,
+   "Just a horse": 0.8333,
+   "Spiders": 0.6441,
+   "Shiv": 0.2938
+  }
+ },
+ "hp:1.3": {
+  "lever": "hp",
+  "v": 1.3,
+  "d": {
+   "hp": 188.643
+  },
+  "avg": 0.19914285714285712,
+  "sd": 0.4384748904918465,
+  "win": 0.6428571428571429,
+  "scores": {
+   "Goblin Swarm": 0.2657,
+   "Skeleton Archers": 0.3974,
+   "Ember Imps": 0.4304,
+   "Fire Mage": -0.0418,
+   "Sniper": -0.6922,
+   "Brute": -0.2164,
+   "Wisps": 0.3402,
+   "Leaf Wizard": 0.5832,
+   "Earth Wizard": -0.4575,
+   "Ent": 0.5743,
+   "Slimeshots": -0.2243,
+   "Just a horse": 0.8333,
+   "Spiders": 0.6849,
+   "Shiv": 0.3108
+  }
+ },
+ "hp:1.5": {
+  "lever": "hp",
+  "v": 1.5,
+  "d": {
+   "hp": 217.665
+  },
+  "avg": 0.41895,
+  "sd": 0.3107537512703128,
+  "win": 0.9285714285714286,
+  "scores": {
+   "Goblin Swarm": 0.446,
+   "Skeleton Archers": 0.455,
+   "Ember Imps": 0.486,
+   "Fire Mage": 0.2291,
+   "Sniper": 0.4737,
+   "Brute": 0.4367,
+   "Wisps": 0.3437,
+   "Leaf Wizard": 0.7376,
+   "Earth Wizard": -0.4575,
+   "Ent": 0.6288,
+   "Slimeshots": 0.1265,
+   "Just a horse": 0.8748,
+   "Spiders": 0.7197,
+   "Shiv": 0.3652
+  }
+ },
+ "hit:0.7": {
+  "lever": "hit",
+  "v": 0.7,
+  "d": {
+   "hit": 13.2048
+  },
+  "avg": -0.2979214285714286,
+  "sd": 0.438220419388905,
+  "win": 0.14285714285714285,
+  "scores": {
+   "Goblin Swarm": -0.0999,
+   "Skeleton Archers": -0.3794,
+   "Ember Imps": -0.3943,
+   "Fire Mage": -0.6126,
+   "Sniper": -0.7962,
+   "Brute": -0.5532,
+   "Wisps": -0.4992,
+   "Leaf Wizard": 0.4897,
+   "Earth Wizard": -0.6659,
+   "Ent": -0.3345,
+   "Slimeshots": -0.6449,
+   "Just a horse": 0.8333,
+   "Spiders": -0.1572,
+   "Shiv": -0.3566
+  }
+ },
+ "hit:0.85": {
+  "lever": "hit",
+  "v": 0.85,
+  "d": {
+   "hit": 16.0344
+  },
+  "avg": -0.12111428571428572,
+  "sd": 0.4420540527019338,
+  "win": 0.2857142857142857,
+  "scores": {
+   "Goblin Swarm": -0.0981,
+   "Skeleton Archers": 0.1834,
+   "Ember Imps": -0.1305,
+   "Fire Mage": -0.4862,
+   "Sniper": -0.7542,
+   "Brute": -0.409,
+   "Wisps": -0.4883,
+   "Leaf Wizard": 0.5345,
+   "Earth Wizard": -0.5336,
+   "Ent": -0.0552,
+   "Slimeshots": -0.506,
+   "Just a horse": 0.8333,
+   "Spiders": 0.3552,
+   "Shiv": -0.1409
+  }
+ },
+ "hit:1.15": {
+  "lever": "hit",
+  "v": 1.15,
+  "d": {
+   "hit": 21.6936
+  },
+  "avg": 0.10515000000000001,
+  "sd": 0.43979281445114266,
+  "win": 0.5714285714285714,
+  "scores": {
+   "Goblin Swarm": -0.0944,
+   "Skeleton Archers": 0.1834,
+   "Ember Imps": 0.2644,
+   "Fire Mage": -0.36,
+   "Sniper": -0.645,
+   "Brute": 0.1883,
+   "Wisps": -0.1999,
+   "Leaf Wizard": 0.5782,
+   "Earth Wizard": -0.3733,
+   "Ent": 0.6116,
+   "Slimeshots": -0.3743,
+   "Just a horse": 0.8333,
+   "Spiders": 0.6265,
+   "Shiv": 0.2333
+  }
+ },
+ "hit:1.3": {
+  "lever": "hit",
+  "v": 1.3,
+  "d": {
+   "hit": 24.5232
+  },
+  "avg": 0.21182857142857142,
+  "sd": 0.4309764667565495,
+  "win": 0.5714285714285714,
+  "scores": {
+   "Goblin Swarm": -0.0926,
+   "Skeleton Archers": 0.1834,
+   "Ember Imps": 0.4829,
+   "Fire Mage": -0.0893,
+   "Sniper": -0.5898,
+   "Brute": 0.3991,
+   "Wisps": -0.1934,
+   "Leaf Wizard": 0.623,
+   "Earth Wizard": -0.3019,
+   "Ent": 0.7139,
+   "Slimeshots": -0.0942,
+   "Just a horse": 0.9,
+   "Spiders": 0.6967,
+   "Shiv": 0.3278
+  }
+ },
+ "hit:1.5": {
+  "lever": "hit",
+  "v": 1.5,
+  "d": {
+   "hit": 28.296
+  },
+  "avg": 0.35077142857142857,
+  "sd": 0.44006905047239286,
+  "win": 0.7142857142857143,
+  "scores": {
+   "Goblin Swarm": 1,
+   "Skeleton Archers": 0.1834,
+   "Ember Imps": 0.4829,
+   "Fire Mage": 0.0378,
+   "Sniper": -0.4394,
+   "Brute": 0.5667,
+   "Wisps": -0.1847,
+   "Leaf Wizard": 0.6345,
+   "Earth Wizard": -0.1391,
+   "Ent": 0.8116,
+   "Slimeshots": -0.0902,
+   "Just a horse": 0.9,
+   "Spiders": 0.7473,
+   "Shiv": 0.4
+  }
+ },
+ "aps:0.7": {
+  "lever": "aps",
+  "v": 0.7,
+  "d": {
+   "aps": 0.7
+  },
+  "avg": -0.28762142857142864,
+  "sd": 0.44105367373171817,
+  "win": 0.14285714285714285,
+  "scores": {
+   "Goblin Swarm": -0.4274,
+   "Skeleton Archers": -0.2904,
+   "Ember Imps": -0.3162,
+   "Fire Mage": -0.5418,
+   "Sniper": -0.7787,
+   "Brute": -0.4885,
+   "Wisps": -0.5274,
+   "Leaf Wizard": 0.5564,
+   "Earth Wizard": -0.6549,
+   "Ent": -0.3321,
+   "Slimeshots": -0.6566,
+   "Just a horse": 0.8333,
+   "Spiders": -0.0552,
+   "Shiv": -0.3472
+  }
+ },
+ "aps:0.85": {
+  "lever": "aps",
+  "v": 0.85,
+  "d": {
+   "aps": 0.85
+  },
+  "avg": -0.1375,
+  "sd": 0.44953253974068924,
+  "win": 0.2857142857142857,
+  "scores": {
+   "Goblin Swarm": -0.3016,
+   "Skeleton Archers": -0.0926,
+   "Ember Imps": 0.0932,
+   "Fire Mage": -0.5026,
+   "Sniper": -0.7192,
+   "Brute": -0.3894,
+   "Wisps": -0.5274,
+   "Leaf Wizard": 0.5564,
+   "Earth Wizard": -0.5272,
+   "Ent": -0.0847,
+   "Slimeshots": -0.5685,
+   "Just a horse": 0.8333,
+   "Spiders": 0.4047,
+   "Shiv": -0.0994
+  }
+ },
+ "aps:1.15": {
+  "lever": "aps",
+  "v": 1.15,
+  "d": {
+   "aps": 1.15
+  },
+  "avg": 0.12292142857142858,
+  "sd": 0.46468976314245153,
+  "win": 0.6428571428571429,
+  "scores": {
+   "Goblin Swarm": 0.3865,
+   "Skeleton Archers": 0.2272,
+   "Ember Imps": 0.3381,
+   "Fire Mage": -0.3661,
+   "Sniper": -0.6383,
+   "Brute": 0.0883,
+   "Wisps": -0.3694,
+   "Leaf Wizard": 0.5782,
+   "Earth Wizard": -0.4143,
+   "Ent": 0.5657,
+   "Slimeshots": -0.4245,
+   "Just a horse": 0.8667,
+   "Spiders": 0.6495,
+   "Shiv": 0.2333
+  }
+ },
+ "aps:1.3": {
+  "lever": "aps",
+  "v": 1.3,
+  "d": {
+   "aps": 1.3
+  },
+  "avg": 0.22331428571428572,
+  "sd": 0.4600259415932709,
+  "win": 0.6428571428571429,
+  "scores": {
+   "Goblin Swarm": 0.5619,
+   "Skeleton Archers": 0.3228,
+   "Ember Imps": 0.5013,
+   "Fire Mage": -0.3053,
+   "Sniper": -0.5844,
+   "Brute": 0.355,
+   "Wisps": -0.2694,
+   "Leaf Wizard": 0.5897,
+   "Earth Wizard": -0.3013,
+   "Ent": 0.6863,
+   "Slimeshots": -0.3125,
+   "Just a horse": 0.8667,
+   "Spiders": 0.7106,
+   "Shiv": 0.305
+  }
+ },
+ "aps:1.5": {
+  "lever": "aps",
+  "v": 1.5,
+  "d": {
+   "aps": 1.5
+  },
+  "avg": 0.3001785714285714,
+  "sd": 0.4641945438507613,
+  "win": 0.6428571428571429,
+  "scores": {
+   "Goblin Swarm": 0.746,
+   "Skeleton Archers": 0.4015,
+   "Ember Imps": 0.545,
+   "Fire Mage": -0.2323,
+   "Sniper": -0.5461,
+   "Brute": 0.4775,
+   "Wisps": -0.2065,
+   "Leaf Wizard": 0.623,
+   "Earth Wizard": -0.2955,
+   "Ent": 0.7783,
+   "Slimeshots": -0.1443,
+   "Just a horse": 0.9,
+   "Spiders": 0.7519,
+   "Shiv": 0.404
+  }
+ },
+ "range:-8": {
+  "lever": "range",
+  "v": -8,
+  "d": {
+   "range": 6
+  },
+  "avg": -0.4739999999999999,
+  "sd": 0.5304840862026736,
+  "win": 0.21428571428571427,
+  "scores": {
+   "Goblin Swarm": -0.4123,
+   "Skeleton Archers": -0.7728,
+   "Ember Imps": -0.6964,
+   "Fire Mage": -0.9148,
+   "Sniper": -1,
+   "Brute": -0.4914,
+   "Wisps": -0.9855,
+   "Leaf Wizard": 0.1345,
+   "Earth Wizard": -0.8897,
+   "Ent": -0.467,
+   "Slimeshots": -0.7043,
+   "Just a horse": 0.8333,
+   "Spiders": 0.3795,
+   "Shiv": -0.6491
+  }
+ },
+ "range:-4": {
+  "lever": "range",
+  "v": -4,
+  "d": {
+   "range": 10
+  },
+  "avg": -0.30400714285714286,
+  "sd": 0.49900525400080525,
+  "win": 0.21428571428571427,
+  "scores": {
+   "Goblin Swarm": -0.285,
+   "Skeleton Archers": -0.5353,
+   "Ember Imps": -0.4686,
+   "Fire Mage": -0.7053,
+   "Sniper": -0.8596,
+   "Brute": -0.3385,
+   "Wisps": -0.7694,
+   "Leaf Wizard": 0.3564,
+   "Earth Wizard": -0.8143,
+   "Ent": -0.1533,
+   "Slimeshots": -0.6401,
+   "Just a horse": 0.8333,
+   "Spiders": 0.4645,
+   "Shiv": -0.3409
+  }
+ },
+ "range:-2": {
+  "lever": "range",
+  "v": -2,
+  "d": {
+   "range": 12
+  },
+  "avg": -0.1930785714285714,
+  "sd": 0.494114055917358,
+  "win": 0.2857142857142857,
+  "scores": {
+   "Goblin Swarm": -0.2175,
+   "Skeleton Archers": -0.333,
+   "Ember Imps": -0.2383,
+   "Fire Mage": -0.5905,
+   "Sniper": -0.7922,
+   "Brute": -0.2683,
+   "Wisps": -0.7129,
+   "Leaf Wizard": 0.4782,
+   "Earth Wizard": -0.762,
+   "Ent": 0.2046,
+   "Slimeshots": -0.5765,
+   "Just a horse": 0.8333,
+   "Spiders": 0.4921,
+   "Shiv": -0.2201
+  }
+ },
+ "range:2": {
+  "lever": "range",
+  "v": 2,
+  "d": {
+   "range": 16
+  },
+  "avg": 0.16065,
+  "sd": 0.44193844715234787,
+  "win": 0.5714285714285714,
+  "scores": {
+   "Goblin Swarm": 0.1706,
+   "Skeleton Archers": 0.4219,
+   "Ember Imps": 0.4506,
+   "Fire Mage": -0.2905,
+   "Sniper": -0.3653,
+   "Brute": -0.1,
+   "Wisps": -0.0065,
+   "Leaf Wizard": 0.6564,
+   "Earth Wizard": -0.562,
+   "Ent": 0.5288,
+   "Slimeshots": -0.4566,
+   "Just a horse": 0.8667,
+   "Spiders": 0.5989,
+   "Shiv": 0.3361
+  }
+ },
+ "range:4": {
+  "lever": "range",
+  "v": 4,
+  "d": {
+   "range": 18
+  },
+  "avg": 0.33419285714285707,
+  "sd": 0.3858532501654811,
+  "win": 0.7142857142857143,
+  "scores": {
+   "Goblin Swarm": 0.3143,
+   "Skeleton Archers": 0.6164,
+   "Ember Imps": 0.6139,
+   "Fire Mage": 0.1393,
+   "Sniper": -0.1461,
+   "Brute": -0.0625,
+   "Wisps": 0.4828,
+   "Leaf Wizard": 0.723,
+   "Earth Wizard": -0.3594,
+   "Ent": 0.6346,
+   "Slimeshots": -0.2484,
+   "Just a horse": 0.9,
+   "Spiders": 0.6219,
+   "Shiv": 0.4489
+  }
+ },
+ "range:8": {
+  "lever": "range",
+  "v": 8,
+  "d": {
+   "range": 22
+  },
+  "avg": 0.5882071428571429,
+  "sd": 0.3432655208524772,
+  "win": 0.9285714285714286,
+  "scores": {
+   "Goblin Swarm": 0.579,
+   "Skeleton Archers": 0.926,
+   "Ember Imps": 0.8254,
+   "Fire Mage": 0.5089,
+   "Sniper": 0.3,
+   "Brute": 0.2,
+   "Wisps": 0.7161,
+   "Leaf Wizard": 0.8897,
+   "Earth Wizard": -0.3852,
+   "Ent": 0.8116,
+   "Slimeshots": 0.5284,
+   "Just a horse": 0.9,
+   "Spiders": 0.7069,
+   "Shiv": 0.7281
+  }
+ },
+ "range:12": {
+  "lever": "range",
+  "v": 12,
+  "d": {
+   "range": 26
+  },
+  "avg": 0.7738785714285713,
+  "sd": 0.2440703680105726,
+  "win": 1,
+  "scores": {
+   "Goblin Swarm": 0.7357,
+   "Skeleton Archers": 1,
+   "Ember Imps": 0.9449,
+   "Fire Mage": 0.8029,
+   "Sniper": 0.5333,
+   "Brute": 0.4108,
+   "Wisps": 1,
+   "Leaf Wizard": 1,
+   "Earth Wizard": 0.1667,
+   "Ent": 0.9368,
+   "Slimeshots": 0.7047,
+   "Just a horse": 1,
+   "Spiders": 0.7404,
+   "Shiv": 0.8581
+  }
+ },
+ "speed:0.5": {
+  "lever": "speed",
+  "v": 0.5,
+  "d": {
+   "speed": 1.5
+  },
+  "avg": -0.2533928571428571,
+  "sd": 0.5706930742080016,
+  "win": 0.2857142857142857,
+  "scores": {
+   "Goblin Swarm": -0.1212,
+   "Skeleton Archers": -0.2426,
+   "Ember Imps": 0.269,
+   "Fire Mage": -0.854,
+   "Sniper": -1,
+   "Brute": -0.1981,
+   "Wisps": -0.7484,
+   "Leaf Wizard": -0.464,
+   "Earth Wizard": -0.971,
+   "Ent": 0.4472,
+   "Slimeshots": -0.6448,
+   "Just a horse": 0.8333,
+   "Spiders": 0.576,
+   "Shiv": -0.4289
+  }
+ },
+ "speed:0.75": {
+  "lever": "speed",
+  "v": 0.75,
+  "d": {
+   "speed": 2.25
+  },
+  "avg": -0.12429285714285719,
+  "sd": 0.5387375248330724,
+  "win": 0.35714285714285715,
+  "scores": {
+   "Goblin Swarm": -0.1046,
+   "Skeleton Archers": -0.0478,
+   "Ember Imps": 0.2668,
+   "Fire Mage": -0.6905,
+   "Sniper": -0.9461,
+   "Brute": -0.1952,
+   "Wisps": -0.6129,
+   "Leaf Wizard": 0.3897,
+   "Earth Wizard": -0.8491,
+   "Ent": 0.3737,
+   "Slimeshots": -0.5925,
+   "Just a horse": 0.8333,
+   "Spiders": 0.576,
+   "Shiv": -0.1409
+  }
+ },
+ "speed:1.5": {
+  "lever": "speed",
+  "v": 1.5,
+  "d": {
+   "speed": 4.5
+  },
+  "avg": 0.18455000000000002,
+  "sd": 0.34083129624493114,
+  "win": 0.7142857142857143,
+  "scores": {
+   "Goblin Swarm": -0.1077,
+   "Skeleton Archers": 0.1962,
+   "Ember Imps": 0.2151,
+   "Fire Mage": 0.0302,
+   "Sniper": 0.2333,
+   "Brute": -0.2096,
+   "Wisps": 0.0655,
+   "Leaf Wizard": 0.6782,
+   "Earth Wizard": -0.2143,
+   "Ent": 0.3403,
+   "Slimeshots": -0.3843,
+   "Just a horse": 0.8333,
+   "Spiders": 0.5714,
+   "Shiv": 0.3361
+  }
+ },
+ "speed:2": {
+  "lever": "speed",
+  "v": 2,
+  "d": {
+   "speed": 6
+  },
+  "avg": 0.24474285714285715,
+  "sd": 0.34216727679034775,
+  "win": 0.7142857142857143,
+  "scores": {
+   "Goblin Swarm": -0.1152,
+   "Skeleton Archers": 0.3231,
+   "Ember Imps": 0.207,
+   "Fire Mage": 0.0893,
+   "Sniper": 0.4667,
+   "Brute": -0.2106,
+   "Wisps": 0.1989,
+   "Leaf Wizard": 0.7448,
+   "Earth Wizard": -0.1594,
+   "Ent": 0.3679,
+   "Slimeshots": -0.3085,
+   "Just a horse": 0.8333,
+   "Spiders": 0.576,
+   "Shiv": 0.4131
+  }
+ },
+ "speed:3": {
+  "lever": "speed",
+  "v": 3,
+  "d": {
+   "speed": 9
+  },
+  "avg": 0.31137857142857145,
+  "sd": 0.35224404928274095,
+  "win": 0.7142857142857143,
+  "scores": {
+   "Goblin Swarm": -0.1258,
+   "Skeleton Archers": 0.4734,
+   "Ember Imps": 0.2863,
+   "Fire Mage": 0.1983,
+   "Sniper": 0.7,
+   "Brute": -0.2481,
+   "Wisps": 0.3655,
+   "Leaf Wizard": 0.7897,
+   "Earth Wizard": -0.0433,
+   "Ent": 0.3288,
+   "Slimeshots": -0.2528,
+   "Just a horse": 0.8333,
+   "Spiders": 0.546,
+   "Shiv": 0.508
+  }
+ },
+ "armor:2": {
+  "lever": "armor",
+  "v": 2,
+  "d": {
+   "defense": "armor",
+   "defVal": 2
+  },
+  "avg": 0.0942357142857143,
+  "sd": 0.4626193199089952,
+  "win": 0.6428571428571429,
+  "scores": {
+   "Goblin Swarm": 0.1357,
+   "Skeleton Archers": 0.3344,
+   "Ember Imps": 0.3468,
+   "Fire Mage": -0.4783,
+   "Sniper": -0.6922,
+   "Brute": -0.2164,
+   "Wisps": -0.4339,
+   "Leaf Wizard": 0.5786,
+   "Earth Wizard": -0.4575,
+   "Ent": 0.4626,
+   "Slimeshots": 0.015,
+   "Just a horse": 0.8333,
+   "Spiders": 0.6421,
+   "Shiv": 0.2491
+  }
+ },
+ "armor:4": {
+  "lever": "armor",
+  "v": 4,
+  "d": {
+   "defense": "armor",
+   "defVal": 4
+  },
+  "avg": 0.24479999999999996,
+  "sd": 0.4239186748152797,
+  "win": 0.7142857142857143,
+  "scores": {
+   "Goblin Swarm": 0.2622,
+   "Skeleton Archers": 0.4311,
+   "Ember Imps": 0.4236,
+   "Fire Mage": -0.0418,
+   "Sniper": -0.6922,
+   "Brute": -0.2164,
+   "Wisps": 0.334,
+   "Leaf Wizard": 0.5791,
+   "Earth Wizard": -0.4575,
+   "Ent": 0.4746,
+   "Slimeshots": 0.5128,
+   "Just a horse": 0.8333,
+   "Spiders": 0.679,
+   "Shiv": 0.3054
+  }
+ },
+ "armor:6": {
+  "lever": "armor",
+  "v": 6,
+  "d": {
+   "defense": "armor",
+   "defVal": 6
+  },
+  "avg": 0.3022857142857143,
+  "sd": 0.45866510636402064,
+  "win": 0.7142857142857143,
+  "scores": {
+   "Goblin Swarm": 0.4437,
+   "Skeleton Archers": 0.5364,
+   "Ember Imps": 0.4769,
+   "Fire Mage": -0.0418,
+   "Sniper": -0.6922,
+   "Brute": -0.2164,
+   "Wisps": 0.335,
+   "Leaf Wizard": 0.5796,
+   "Earth Wizard": -0.4575,
+   "Ent": 0.5762,
+   "Slimeshots": 0.8343,
+   "Just a horse": 0.8333,
+   "Spiders": 0.7123,
+   "Shiv": 0.3122
+  }
+ },
+ "armor:10": {
+  "lever": "armor",
+  "v": 10,
+  "d": {
+   "defense": "armor",
+   "defVal": 10
+  },
+  "avg": 0.3824642857142857,
+  "sd": 0.47893818510645114,
+  "win": 0.7857142857142857,
+  "scores": {
+   "Goblin Swarm": 0.6349,
+   "Skeleton Archers": 0.7656,
+   "Ember Imps": 0.621,
+   "Fire Mage": 0.2183,
+   "Sniper": -0.6922,
+   "Brute": -0.2164,
+   "Wisps": 0.3368,
+   "Leaf Wizard": 0.5805,
+   "Earth Wizard": -0.4575,
+   "Ent": 0.6667,
+   "Slimeshots": 0.8343,
+   "Just a horse": 0.8333,
+   "Spiders": 0.7887,
+   "Shiv": 0.4405
+  }
+ },
+ "armor:15": {
+  "lever": "armor",
+  "v": 15,
+  "d": {
+   "defense": "armor",
+   "defVal": 15
+  },
+  "avg": 0.4481785714285715,
+  "sd": 0.5126309591266431,
+  "win": 0.7857142857142857,
+  "scores": {
+   "Goblin Swarm": 0.8346,
+   "Skeleton Archers": 0.8716,
+   "Ember Imps": 0.8105,
+   "Fire Mage": 0.3395,
+   "Sniper": -0.6922,
+   "Brute": -0.2164,
+   "Wisps": 0.3391,
+   "Leaf Wizard": 0.5816,
+   "Earth Wizard": -0.4575,
+   "Ent": 0.7863,
+   "Slimeshots": 0.8343,
+   "Just a horse": 0.8333,
+   "Spiders": 0.8943,
+   "Shiv": 0.5155
+  }
+ },
+ "ward:20": {
+  "lever": "ward",
+  "v": 20,
+  "d": {
+   "defense": "ward",
+   "defVal": 20
+  },
+  "avg": 0.4738642857142857,
+  "sd": 0.42465718208446496,
+  "win": 0.8571428571428571,
+  "scores": {
+   "Goblin Swarm": -0.0962,
+   "Skeleton Archers": 0.1834,
+   "Ember Imps": 0.2644,
+   "Fire Mage": 0.299,
+   "Sniper": 0.9035,
+   "Brute": 0.8299,
+   "Wisps": 0.7472,
+   "Leaf Wizard": 0.8978,
+   "Earth Wizard": 0.8484,
+   "Ent": 0.5679,
+   "Slimeshots": -0.4965,
+   "Just a horse": 0.977,
+   "Spiders": 0.5806,
+   "Shiv": 0.1277
+  }
+ },
+ "ward:40": {
+  "lever": "ward",
+  "v": 40,
+  "d": {
+   "defense": "ward",
+   "defVal": 40
+  },
+  "avg": 0.3455214285714286,
+  "sd": 0.44359091704370307,
+  "win": 0.7857142857142857,
+  "scores": {
+   "Goblin Swarm": -0.0962,
+   "Skeleton Archers": 0.1834,
+   "Ember Imps": 0.2644,
+   "Fire Mage": -0.4783,
+   "Sniper": 0.8058,
+   "Brute": 0.6207,
+   "Wisps": 0.5081,
+   "Leaf Wizard": 0.8115,
+   "Earth Wizard": 0.7128,
+   "Ent": 0.3392,
+   "Slimeshots": -0.4965,
+   "Just a horse": 0.9541,
+   "Spiders": 0.5806,
+   "Shiv": 0.1277
+  }
+ },
+ "ward:80": {
+  "lever": "ward",
+  "v": 80,
+  "d": {
+   "defense": "ward",
+   "defVal": 80
+  },
+  "avg": 0.1576,
+  "sd": 0.4283852154978541,
+  "win": 0.6428571428571429,
+  "scores": {
+   "Goblin Swarm": -0.0962,
+   "Skeleton Archers": 0.1834,
+   "Ember Imps": 0.2644,
+   "Fire Mage": -0.4783,
+   "Sniper": 0.5564,
+   "Brute": -0.2164,
+   "Wisps": -0.4339,
+   "Leaf Wizard": 0.5816,
+   "Earth Wizard": 0.3829,
+   "Ent": 0.3392,
+   "Slimeshots": -0.4965,
+   "Just a horse": 0.9115,
+   "Spiders": 0.5806,
+   "Shiv": 0.1277
+  }
+ },
+ "splash:1": {
+  "lever": "splash",
+  "v": 1,
+  "d": {
+   "splash": 1
+  },
+  "avg": 0.002557142857142875,
+  "sd": 0.46358067831405836,
+  "win": 0.5,
+  "scores": {
+   "Goblin Swarm": -0.0962,
+   "Skeleton Archers": 0.1834,
+   "Ember Imps": 0.2644,
+   "Fire Mage": -0.4783,
+   "Sniper": -0.6922,
+   "Brute": -0.2164,
+   "Wisps": -0.4339,
+   "Leaf Wizard": 0.5782,
+   "Earth Wizard": -0.4575,
+   "Ent": 0.3392,
+   "Slimeshots": -0.4965,
+   "Just a horse": 0.8333,
+   "Spiders": 0.5806,
+   "Shiv": 0.1277
+  }
+ },
+ "splash:2": {
+  "lever": "splash",
+  "v": 2,
+  "d": {
+   "splash": 2
+  },
+  "avg": 0.0032571428571428773,
+  "sd": 0.4634384050832673,
+  "win": 0.5,
+  "scores": {
+   "Goblin Swarm": -0.0864,
+   "Skeleton Archers": 0.1834,
+   "Ember Imps": 0.2644,
+   "Fire Mage": -0.4783,
+   "Sniper": -0.6922,
+   "Brute": -0.2164,
+   "Wisps": -0.4339,
+   "Leaf Wizard": 0.5782,
+   "Earth Wizard": -0.4575,
+   "Ent": 0.3392,
+   "Slimeshots": -0.4965,
+   "Just a horse": 0.8333,
+   "Spiders": 0.5806,
+   "Shiv": 0.1277
+  }
+ },
+ "splash:3": {
+  "lever": "splash",
+  "v": 3,
+  "d": {
+   "splash": 3
+  },
+  "avg": 0.4098,
+  "sd": 0.36587188624279016,
+  "win": 0.8571428571428571,
+  "scores": {
+   "Goblin Swarm": 0.9956,
+   "Skeleton Archers": 0.524,
+   "Ember Imps": 0.6508,
+   "Fire Mage": 0.0969,
+   "Sniper": -0.1844,
+   "Brute": 0.1667,
+   "Wisps": 0.1483,
+   "Leaf Wizard": 0.6115,
+   "Earth Wizard": -0.2776,
+   "Ent": 0.6805,
+   "Slimeshots": 0.2889,
+   "Just a horse": 0.8333,
+   "Spiders": 0.7186,
+   "Shiv": 0.4841
+  }
+ },
+ "splash:4": {
+  "lever": "splash",
+  "v": 4,
+  "d": {
+   "splash": 4
+  },
+  "avg": 0.6125214285714284,
+  "sd": 0.3143452360032822,
+  "win": 1,
+  "scores": {
+   "Goblin Swarm": 1,
+   "Skeleton Archers": 0.6208,
+   "Ember Imps": 0.8208,
+   "Fire Mage": 0.1332,
+   "Sniper": 0.1333,
+   "Brute": 0.6,
+   "Wisps": 0.2978,
+   "Leaf Wizard": 0.7,
+   "Earth Wizard": 0.2,
+   "Ent": 0.9943,
+   "Slimeshots": 0.5275,
+   "Just a horse": 1,
+   "Spiders": 0.9954,
+   "Shiv": 0.5522
+  }
+ },
+ "splash:5": {
+  "lever": "splash",
+  "v": 5,
+  "d": {
+   "splash": 5
+  },
+  "avg": 0.6714857142857144,
+  "sd": 0.2808640770834148,
+  "win": 1,
+  "scores": {
+   "Goblin Swarm": 1,
+   "Skeleton Archers": 0.6927,
+   "Ember Imps": 0.9311,
+   "Fire Mage": 0.309,
+   "Sniper": 0.2333,
+   "Brute": 0.6658,
+   "Wisps": 0.4494,
+   "Leaf Wizard": 0.7,
+   "Earth Wizard": 0.2,
+   "Ent": 1,
+   "Slimeshots": 0.5837,
+   "Just a horse": 1,
+   "Spiders": 1,
+   "Shiv": 0.6358
+  }
+ },
+ "projSpeed:15": {
+  "lever": "projSpeed",
+  "v": 15,
+  "d": {
+   "projSpeed": 15
+  },
+  "avg": -0.15773571428571428,
+  "sd": 0.4716715603758053,
+  "win": 0.2857142857142857,
+  "scores": {
+   "Goblin Swarm": -0.1993,
+   "Skeleton Archers": -0.4154,
+   "Ember Imps": -0.154,
+   "Fire Mage": -0.5661,
+   "Sniper": -0.7518,
+   "Brute": -0.3029,
+   "Wisps": -0.5855,
+   "Leaf Wizard": 0.423,
+   "Earth Wizard": -0.4808,
+   "Ent": 0.2483,
+   "Slimeshots": -0.6285,
+   "Just a horse": 0.8333,
+   "Spiders": 0.5576,
+   "Shiv": -0.1862
+  }
+ },
+ "projSpeed:30": {
+  "lever": "projSpeed",
+  "v": 30,
+  "d": {
+   "projSpeed": 30
+  },
+  "avg": -0.09254285714285714,
+  "sd": 0.4608143269013574,
+  "win": 0.35714285714285715,
+  "scores": {
+   "Goblin Swarm": -0.2304,
+   "Skeleton Archers": -0.3029,
+   "Ember Imps": 0.1069,
+   "Fire Mage": -0.427,
+   "Sniper": -0.7057,
+   "Brute": -0.2164,
+   "Wisps": -0.5565,
+   "Leaf Wizard": 0.523,
+   "Earth Wizard": -0.4692,
+   "Ent": 0.2426,
+   "Slimeshots": -0.5804,
+   "Just a horse": 0.8333,
+   "Spiders": 0.5576,
+   "Shiv": -0.0705
+  }
+ },
+ "projSpeed:60": {
+  "lever": "projSpeed",
+  "v": 60,
+  "d": {
+   "projSpeed": 60
+  },
+  "avg": -0.04490714285714285,
+  "sd": 0.4601717776537145,
+  "win": 0.42857142857142855,
+  "scores": {
+   "Goblin Swarm": -0.2608,
+   "Skeleton Archers": -0.0801,
+   "Ember Imps": 0.1794,
+   "Fire Mage": -0.4661,
+   "Sniper": -0.6922,
+   "Brute": -0.2164,
+   "Wisps": -0.4549,
+   "Leaf Wizard": 0.5564,
+   "Earth Wizard": -0.4692,
+   "Ent": 0.3231,
+   "Slimeshots": -0.5325,
+   "Just a horse": 0.8333,
+   "Spiders": 0.5622,
+   "Shiv": 0.0891
+  }
+ },
+ "windUp:0.5": {
+  "lever": "windUp",
+  "v": 0.5,
+  "d": {
+   "windUp": 0.5
+  },
+  "avg": -0.18173571428571425,
+  "sd": 0.4872318113692948,
+  "win": 0.2857142857142857,
+  "scores": {
+   "Goblin Swarm": -0.2554,
+   "Skeleton Archers": -0.3705,
+   "Ember Imps": -0.079,
+   "Fire Mage": -0.7148,
+   "Sniper": -0.7653,
+   "Brute": -0.3289,
+   "Wisps": -0.6565,
+   "Leaf Wizard": 0.4782,
+   "Earth Wizard": -0.5156,
+   "Ent": 0.2576,
+   "Slimeshots": -0.6365,
+   "Just a horse": 0.8333,
+   "Spiders": 0.4645,
+   "Shiv": -0.2554
+  }
+ },
+ "windUp:1": {
+  "lever": "windUp",
+  "v": 1,
+  "d": {
+   "windUp": 1
+  },
+  "avg": -0.28064285714285714,
+  "sd": 0.4993182276354225,
+  "win": 0.2857142857142857,
+  "scores": {
+   "Goblin Swarm": -0.3335,
+   "Skeleton Archers": -0.5103,
+   "Ember Imps": -0.2924,
+   "Fire Mage": -0.7931,
+   "Sniper": -0.8518,
+   "Brute": -0.3693,
+   "Wisps": -0.771,
+   "Leaf Wizard": 0.3564,
+   "Earth Wizard": -0.6375,
+   "Ent": 0.1598,
+   "Slimeshots": -0.6844,
+   "Just a horse": 0.8333,
+   "Spiders": 0.3875,
+   "Shiv": -0.4227
+  }
+ },
+ "windUp:2": {
+  "lever": "windUp",
+  "v": 2,
+  "d": {
+   "windUp": 2
+  },
+  "avg": -0.4401928571428571,
+  "sd": 0.5016505947715938,
+  "win": 0.21428571428571427,
+  "scores": {
+   "Goblin Swarm": -0.5766,
+   "Skeleton Archers": -0.6426,
+   "Ember Imps": -0.5609,
+   "Fire Mage": -0.9513,
+   "Sniper": -0.9596,
+   "Brute": -0.4741,
+   "Wisps": -0.8839,
+   "Leaf Wizard": 0.1448,
+   "Earth Wizard": -0.6924,
+   "Ent": -0.2061,
+   "Slimeshots": -0.8044,
+   "Just a horse": 0.8333,
+   "Spiders": 0.2438,
+   "Shiv": -0.6327
+  }
+ },
+ "bodies:1": {
+  "lever": "bodies",
+  "v": 1,
+  "d": {
+   "bodies": 1,
+   "hp": 435.33,
+   "hit": 56.592
+  },
+  "avg": 0.16580714285714282,
+  "sd": 0.4261626591946281,
+  "win": 0.7142857142857143,
+  "scores": {
+   "Goblin Swarm": -0.2417,
+   "Skeleton Archers": 0.2015,
+   "Ember Imps": 0.3498,
+   "Fire Mage": 0.2877,
+   "Sniper": 0.0623,
+   "Brute": -0.0984,
+   "Wisps": 0.0449,
+   "Leaf Wizard": 0.6345,
+   "Earth Wizard": -0.8955,
+   "Ent": 0.6416,
+   "Slimeshots": 0.1237,
+   "Just a horse": 0.8162,
+   "Spiders": 0.5381,
+   "Shiv": -0.1434
+  }
+ },
+ "bodies:2": {
+  "lever": "bodies",
+  "v": 2,
+  "d": {
+   "bodies": 2,
+   "hp": 217.665,
+   "hit": 28.296
+  },
+  "avg": 0.13587857142857143,
+  "sd": 0.4667466017606363,
+  "win": 0.5,
+  "scores": {
+   "Goblin Swarm": 0.7734,
+   "Skeleton Archers": -0.2293,
+   "Ember Imps": -0.1357,
+   "Fire Mage": 0.0045,
+   "Sniper": 0.3535,
+   "Brute": -0.0298,
+   "Wisps": -0.3565,
+   "Leaf Wizard": 0.6345,
+   "Earth Wizard": -0.8346,
+   "Ent": 0.5368,
+   "Slimeshots": -0.0843,
+   "Just a horse": 0.8162,
+   "Spiders": 0.5606,
+   "Shiv": -0.107
+  }
+ },
+ "bodies:6": {
+  "lever": "bodies",
+  "v": 6,
+  "d": {
+   "bodies": 6,
+   "hp": 72.555,
+   "hit": 9.432
+  },
+  "avg": 0.0828142857142857,
+  "sd": 0.4873554758037693,
+  "win": 0.5714285714285714,
+  "scores": {
+   "Goblin Swarm": 0.452,
+   "Skeleton Archers": -0.2396,
+   "Ember Imps": -0.424,
+   "Fire Mage": -0.56,
+   "Sniper": 0.5,
+   "Brute": -0.4632,
+   "Wisps": -0.3259,
+   "Leaf Wizard": 0.6,
+   "Earth Wizard": 0.2,
+   "Ent": 0.3213,
+   "Slimeshots": -0.6309,
+   "Just a horse": 0.9167,
+   "Spiders": 0.5144,
+   "Shiv": 0.2986
+  }
+ },
+ "bodies:12": {
+  "lever": "bodies",
+  "v": 12,
+  "d": {
+   "bodies": 12,
+   "hp": 36.278,
+   "hit": 4.716
+  },
+  "avg": 0.08893571428571431,
+  "sd": 0.5586229569308839,
+  "win": 0.5714285714285714,
+  "scores": {
+   "Goblin Swarm": -0.1995,
+   "Skeleton Archers": -0.2855,
+   "Ember Imps": -0.6189,
+   "Fire Mage": -0.657,
+   "Sniper": 0.7417,
+   "Brute": -0.5691,
+   "Wisps": 0.425,
+   "Leaf Wizard": 0.7167,
+   "Earth Wizard": 0.4583,
+   "Ent": 0.2718,
+   "Slimeshots": -0.7158,
+   "Just a horse": 0.9583,
+   "Spiders": 0.327,
+   "Shiv": 0.3921
+  }
+ }
+}

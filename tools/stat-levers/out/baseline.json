@@ -1,0 +1,22 @@
+{
+ "all": {
+  "bodies": 3,
+  "range": 14,
+  "speed": 3,
+  "aps": 1,
+  "splash": 0,
+  "projSpeed": 0,
+  "hp": 146.63,
+  "hit": 19.061
+ },
+ "early": {
+  "bodies": 3,
+  "range": 14,
+  "speed": 3,
+  "aps": 1,
+  "splash": 0,
+  "projSpeed": 0,
+  "hp": 145.11,
+  "hit": 18.864
+ }
+}
