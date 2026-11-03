@@ -45,9 +45,9 @@ Spatial grids that skip work the full scans do for nothing, and must give **bit-
 - Units with `noTower` always take the full scan (`othersThan` caches its answer at its first call each tick).
 - Anything that moves a body out of turn calls `invalidateTargetIndex()` (knockback, charges, teleporting towers, carrier releases, Wind Walk, Death Flurry), which also drops the movement grids.
 
-Default is still the reference full scan everywhere (game, server, page). Measured on Goblin Swarm v Skeleton Archers (same machine, run side by side): reference 77 s, indexed 26 s.
+On: the counter tables (`tools/counter-table.js` and the page's Counter Lab, `matrixGen`). Off (reference full scan): real matches, the server referee, the page's fights, the lab's matches; they gain nothing (small armies: 35 s either way for 7 lab matches). Measured on Goblin Swarm v Skeleton Archers (same machine, side by side): reference 77 s, indexed 26 s. Both shipped tables rebuilt with `--full` on the fast paths came out cell-for-cell identical (378 + 91 battles, 2 min 51 s on 2 cores).
 
-Checks: `node tools/tests/fast-paths.js` hashes every body's position, health, heading and state on every tick in both modes, over real AI matches on all 7 maps plus mechanic fixtures (`--matrix`: every counter-table pair too, slow). `tools/tests/targeting-determinism.js` compares the target-query traces.
+Checks: `node tools/tests/fast-paths.js` hashes every body's position, health, heading and state on every tick in both modes, over real AI matches on all 7 maps, 2v2 fights on the wide field (up to ~200 bodies) and mechanic fixtures (`--matrix`: every counter-table pair too, slow). `tools/tests/targeting-determinism.js` compares the target-query traces.
 
 Profiling: `node tools/profile-matchup-matrix.js --mode indexed` (CI: run the workflow by hand with *profile* ticked).
 
