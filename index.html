@@ -3476,12 +3476,14 @@ const Engine = (() => {
           }
         }
         const rg = b.u.hover > 0 ? Math.min(R(b), b.u.hover) : R(b); // hover: an airship flies in closer than its range
-        // an arrow drawn by the player (Factions devtest): b.guide = [{ x, y }, ...]. The body walks the points in turn,
-        // standing to fight only enemies already in its own range, then fights as usual from the last point on.
+        // an arrow drawn by the player: b.guide = [{ x, y }, ...] (the Factions devtest's paths, and a melee squad's
+        // direction arrow: game.js AIM, with b.guideT its time to get there). The body walks the points in turn, sight
+        // and awareness off, standing to fight only enemies already in its own range, then fights as usual from the last point on.
         if (b.guide && b.guide.length) {
           const p = b.guide[0], gx = p.x - b.x, gy = p.y - b.y, gd = hyp(gx, gy);
-          if (gd < 1.5) { b.guide.shift(); if (!b.guide.length) b.guide = null; continue; }
+          if (gd < 1.5) { b.guide.shift(); if (!b.guide.length) { b.guide = null; b.guideT = null; } continue; }
           if (near && !unseen && nd <= reachTo(reachOf(b), b, near)) continue; // something in reach: stand and fight it
+          if (b.guideT != null && (b.guideT -= dt) <= 0) { b.guide = null; b.guideT = null; continue; } // a direction arrow it can't finish (game.js AIM): fight as usual
           const step = spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1) * dt;
           const [ux, uy] = steer(b, p.x, p.y, gx / gd, gy / gd);
           if (b.hx === undefined) { b.hx = ux; b.hy = uy; }
@@ -4006,7 +4008,7 @@ const Engine = (() => {
         v.convert = { side: v.side, squad: v.squad, xp: v.xp, dealt: v.dealt || 0 }; // what it earned for its old squad
         v.side = 1 - v.side; v.squad = CONVERT_SQUAD; v.xp = 0; v.dealt = 0; v.turning = false;
         v.windTarget = null; v.windT = 0; v.setUp = false; v.firing = -1; v.burstLeft = 0; v.trampleLeft = 0; v.trampled = null;
-        v.spinTarget = null; v.aims = null; v.lock = null; v.intent = null; v.march = null; v.guide = null; v.goal = null; v.spreadTo = null; v.engaged = false; v.holdT = 0; v.avenge = null; v.delay = 0; v.band = null; v.hidden = false;
+        v.spinTarget = null; v.aims = null; v.lock = null; v.intent = null; v.march = null; v.guide = null; v.guideT = null; v.goal = null; v.spreadTo = null; v.engaged = false; v.holdT = 0; v.avenge = null; v.delay = 0; v.band = null; v.hidden = false;
         v.slowT = 0; v.slowMove = 0; v.slowAtk = 0; v.shrinkT = 0; v.shrinkM = 0; v.kids = null; v.stunT = 0; v.frenzy = 0; v.flow = 0; v.knives = null; v.atkN = 0; v.forgeT = 0; v.spearReady = false;
         v.burn = null; v.web = null; v.webs = 0; v.kills = 0; v.flurryLeft = 0; v.flurryTgt = null; v.rootTgt = null; v.rootedBy = null; v.hunt = null; v.bullN = 0; v.charging = false; v.inside = null; v.missileT = 0; v.roarSpd = 0; v.roarAtk = 0; v.frost = null; v.frozenT = 0; v.beamAims = null; v.stormCd = 0; v.aimedAt = 0; v.wwDodges = 0; v.watchT = 0;
         sides[v.side].push(v); stats[v.side].totalHp += v.hp;
@@ -6024,6 +6026,11 @@ const Game = (() => {
       const dis = isDev(m) && m.units[sq.unit].disguise ? m.units.find(x => x.name === m.units[sq.unit].disguise) : null; // devtest: a disguise, until its first attack
       if (dis) { const mask = { name: dis.name, shape: dis.shape, color: dis.color, bodies: dis.bodies, range: dis.range }; for (const x of b) x.mask = mask; }
       if (isDev(m) && sq.guide && sq.guide.length && !isRider(sq)) for (const x of b) x.guide = sq.guide.map(p => tileToWorld(p.col, p.row)); // devtest: the squad's arrow
+      else if (sq.aim && canAim(m, side, sq)) { // a melee squad's direction arrow (AIM): every body walks it, keeping its place in the formation
+        const dx = sq.aim.dc * TILE, dy = -sq.aim.dr * TILE, secs = Math.max(AIM.minSecs, AIM.slack * Math.sqrt(dx * dx + dy * dy) / Math.max(0.1, u.speed));
+        const cl = (v, lo, hi) => Math.max(lo + 1, Math.min(hi - 1, v));
+        for (const x of b) { x.guide = [{ x: cl(x.x + dx, BOUNDS.x0 + XOFF, BOUNDS.x1 + XOFF), y: cl(x.y + dy, BOUNDS.y0, BOUNDS.y1) }]; x.guideT = secs; }
+      }
       if (markOn(m, side)) for (const x of b) x.sniperMark = MARK.hit; // Mark Bounty: all its units hunt the mark (since 2026-11-03; Snipers only before)
       if (markOn(m, 1 - side) && markOf(m, 1 - side).squad === sq.id) for (const x of b) x.marked = true;
       if (preyOn(m, side, sq.id)) for (const x of b) x.prey = true; // a Hunter's mark (the Sniper's Awaken skill)
@@ -6309,7 +6316,7 @@ const Game = (() => {
     const two = (a, x) => { const o = Array.isArray(a) ? a.slice() : [null, null]; o[fo] = x; return o; };
     v.armies = two(m.armies, foeSeen(m, fo).map(s => {
       const p = seenAt(m, s), q = { ...s, col: p.col, row: p.row, level: seenLevel(m, s) };
-      delete q.from; delete q.movedRound; delete q.soldRound;
+      delete q.from; delete q.movedRound; delete q.soldRound; delete q.aim; // (its direction arrow shows in the fight)
       if (!seenAwake(m, s)) delete q.awaken;
       if (q.charmGiven === now) { delete q.charm; delete q.charmGiven; }
       return q;
@@ -7110,6 +7117,50 @@ const Game = (() => {
     return true;
   }
 
+  // ---- direction arrows: a melee squad walks its arrow before it looks for a fight ----
+  // A melee squad (base range up to AIM.melee m) may get an arrow from its tile, at most AIM.maxTiles tiles long, in
+  // any gamemode, for free. In the fight its bodies walk the arrow first, each keeping its place in the formation: sight
+  // and awareness are off until they reach its end, so they walk past enemies they would have turned to, and only stand
+  // to fight one already in their reach (it walks on once that one is gone). From the end on they fight as usual. A walk
+  // that can't get there (a wall, a crowd) gives up after AIM.slack times the time it should take (at least AIM.minSecs
+  // s, time spent fighting not counted).
+  // sq.aim = { dc, dr }: the end in tiles from the squad's tile (so it moves with the squad). Kept from round to round
+  // until cleared; the opponent doesn't see it before the fight (Referee.hide, seenBy).
+  const AIM = { maxTiles: 5, melee: 5, slack: 2.5, minSecs: 4 };
+  const canAim = (m, side, sq) => {
+    if (!sq || isRider(sq) || !m.armies[side].includes(sq)) return false;
+    const u = m.units[sq.unit];
+    return !!u && !u.building && !u.stay && !u.idle && u.speed > 0 && u.range <= AIM.melee;
+  };
+  // the end the arrow (dc, dr) from sq really gets: at most AIM.maxTiles long, on the board; null when that's no arrow
+  function aimFit(sq, dc, dr) {
+    dc = Math.round(+dc) || 0; dr = Math.round(+dr) || 0;
+    const len = Math.sqrt(dc * dc + dr * dr);
+    if (len > AIM.maxTiles) { dc = Math.round(dc * AIM.maxTiles / len); dr = Math.round(dr * AIM.maxTiles / len); }
+    while (dc * dc + dr * dr > AIM.maxTiles * AIM.maxTiles) { if (Math.abs(dc) >= Math.abs(dr)) dc -= Math.sign(dc); else dr -= Math.sign(dr); }
+    dc = Math.max(-sq.col, Math.min(COLS - 1 - sq.col, dc)); dr = Math.max(-sq.row, Math.min(ROWS - 1 - sq.row, dr));
+    return dc || dr ? { dc, dr } : null;
+  }
+  function setAim(m, side, sqId, dc, dr) {
+    const sq = m.armies[side].find(s => s.id === sqId);
+    if (!canAim(m, side, sq)) return false;
+    const a = aimFit(sq, dc, dr);
+    if (!a) return false;
+    if (sq.aim && sq.aim.dc === a.dc && sq.aim.dr === a.dr) return false;
+    sq.aim = a;
+    return true;
+  }
+  function clearAim(m, side, sqId) {
+    const sq = m.armies[side].find(s => s.id === sqId);
+    if (!sq || !sq.aim) return false;
+    delete sq.aim;
+    return true;
+  }
+  // the tile an arrow drawn from sq to (col, row) would end on (cut down as setAim does), or null
+  const aimTo = (m, sq, col, row) => { const a = sq && aimFit(sq, col - sq.col, row - sq.row); return a ? { col: sq.col + a.dc, row: sq.row + a.dr } : null; };
+  // the tile its arrow ends on (for the page), or null
+  const aimEnd = (m, sq) => sq && sq.aim ? { col: Math.max(0, Math.min(COLS - 1, sq.col + sq.aim.dc)), row: Math.max(0, Math.min(ROWS - 1, sq.row + sq.aim.dr)) } : null; // (on the board: a squad moved since keeps its arrow)
+
   // ---- disguise ----
   // a unit with "disguise": "Unit name" looks like that unit to its opponent: on the board, in its sheet, and in the
   // fight until its first attack. The unit index viewer is shown for side's unit ui.
@@ -7371,7 +7422,7 @@ const Game = (() => {
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,
-    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, resolve, aiDeploy, occupied,
+    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, AIM, canAim, setAim, clearAim, aimEnd, aimTo, resolve, aiDeploy, occupied,
     GRID, useGrid,
     DEV, CAT_NAMES, LESSER_SQ, WALL_SQ, setDevData, devBuilding, devPower, devSpell, isDev, towerUp, pickCat, devOffer, pickNow, needsDevPick, devPick, undoDevPick, devShown,
     lessersOf, placedLessers, unplacedLesser, lesserAt, lesserSpotOk, placeLesser, lesserUnit, auraFor, modUnit, powersOf, devGold, devDeploys,
@@ -7429,6 +7480,7 @@ if (typeof module !== 'undefined') module.exports = Game;
     buyMageGen: 's', undoMageGen: '?s', buyTround: 's', undoTround: 's',
     giveCharm: 'i', undoCharm: 'i', buyAltar: 's', undoAltar: 's', bribe: '', undoBribe: '',
     buyElfOwn: 'ii', undoElfOwn: '', removeShroom: 'ii', undoRemoveShroom: 'ii',
+    setAim: 'iii', clearAim: 'i',
     buyBuilding: 'iiii', buyBuildingSkill: 'xs', undoBuildingSkill: 'x', levelBuilding: 'x', undoLevelBuilding: 'x',
   };
   const okArg = (k, v) => k === 'i' ? Number.isInteger(v) && Math.abs(v) < 1e6
@@ -7457,7 +7509,7 @@ if (typeof module !== 'undefined') module.exports = Game;
     s.armies[h] = G.foeSeen(s, h).map(q => { // a squad sold this round still shows; a squad moved this round shows on its old tile
       delete q.soldRound; delete q.outRound;
       if (q.from && q.movedRound === round) { q.col = q.from.col; q.row = q.from.row; if (q.from.in != null) q.in = q.from.in; else delete q.in; }
-      delete q.from; delete q.movedRound; delete q.luckMove;
+      delete q.from; delete q.movedRound; delete q.luckMove; delete q.aim; // a direction arrow shows in the fight
       if (q.charmGiven === round) { delete q.charm; delete q.charmGiven; } // Matteo's first stack, given this round
       if (q.awaken === round) delete q.awaken; // an awakening bought this round
       if (q.prey) { const p = G.preyShown(s, -2, true, h, q); if (p == null) delete q.prey; else q.prey = { squad: p, round: Math.min(q.prey.round, round - 1) }; } // a Hunter's mark moved this round shows where it was
@@ -8773,6 +8825,7 @@ const Art = (() => {
 // screen shows right now:
 //   { m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf,
 //     editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev }
+// aim: { id, end } while a melee squad's direction arrow is being set (end: the tile under the finger, or null); see aimFloor.
 // dev (Factions devtest only): { bPlacing, castMode, guideMode, guideId, guide }: the building being placed, the spell being
 // cast, and the arrow being drawn (guide: its points so far, for squad guideId).
 // fx: short-lived battle effects as plain data (shots, flames, bolts, heals, deaths), in board metres.
@@ -8790,8 +8843,8 @@ const Art = (() => {
 const Render2D = (cv, view, opts = {}) => {
   let ctx = cv.getContext('2d'); // swapped for a moment while drawing map thumbnails (thumb)
   let m = null, me = 0, phase = 'start', units = [], mode = 'ai', bt = null, battlePre = null, fx = [], battleCam = null, win = null;
-  let selected = null, moving = null, drag = null, hoverTile = null, rangeOf = null, editable = false, placingUnit = null, placingElf = false, placingTower = false, placingWall = false, dev = null, placingBuilding = null;
-  const pull = () => { ({ m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf, editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev, win = null } = view()); };
+  let selected = null, moving = null, drag = null, hoverTile = null, rangeOf = null, editable = false, placingUnit = null, placingElf = false, placingTower = false, placingWall = false, dev = null, placingBuilding = null, aim = null;
+  const pull = () => { ({ m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf, editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev, aim = null, win = null } = view()); };
   // win (a 2v2 fight on a phone): { aspect, cols, x } the canvas is shaped for `aspect` columns, shows `cols` of them
   // (zoomed out up to the whole wide board) and starts at screen column x; the board sits in the middle top to bottom
   const foe = () => 1 - me;
@@ -9214,6 +9267,7 @@ const Render2D = (cv, view, opts = {}) => {
       }
     }
     if (v && v.dev) devFloor(v, plain);
+    if (v && !plain && phase === 'deploy') aimFloor(v);
     if (plain) return;
     if (v && v.buff) for (const side of [0, 1]) { // Zoe's buff tiles: a gold tile with a star
       if (!charVisible(side)) continue;
@@ -9281,6 +9335,18 @@ const Render2D = (cv, view, opts = {}) => {
       for (let row = 0; row < Game.ROWS; row++) for (let c = 0; c < Game.COLS; c++) if (Game.castSpotOk(v, me, sp, c, row)) ctx.strokeRect(scol(c) * t + 4, srow(row) * t + 4, t - 8, t - 8);
     }
     ctx.globalAlpha = 1;
+  }
+  // melee squads' direction arrows (Game.AIM), yours only: each squad's, and while one is being set (aim: { id, end })
+  // how far it may go (a dashed ring of AIM.maxTiles tiles) and the arrow to the tile under the finger, cut down as it will be
+  function aimFloor(v) {
+    const draft = aim && v.armies[me].find(q => q.id === aim.id);
+    for (const sq of v.armies[me]) if (sq.aim && sq !== draft && Game.canAim(v, me, sq)) drawArrow(v, sq, [Game.aimEnd(v, sq)], 0.75);
+    if (!draft) return;
+    const t = tilePx(), cx = (scol(draft.col) + 0.5) * t, cy = (srow(draft.row) + 0.5) * t;
+    ctx.strokeStyle = css('--you'); ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.arc(cx, cy, Game.AIM.maxTiles * t, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const end = aim.end ? Game.aimTo(v, draft, aim.end.col, aim.end.row) : Game.aimEnd(v, draft);
+    if (end) drawArrow(v, draft, [end], 1);
   }
   // a squad's arrow: from its tile through its points, with a head at the end, and the squad's speed written along
   // its longest leg
@@ -10373,6 +10439,9 @@ Floors.floor = (() => {
   // Factions devtest: placing (or moving) a building (its key), casting a spell (its id), drawing a squad's arrow
   // ('pick': choose the squad; else its id, with the points so far in guideDraft; guideDrag while dragging one out)
   let bPlacing = null, castMode = null, guideMode = null, guideDraft = [], guideDrag = null;
+  // a melee squad's direction arrow (Game.AIM): aimMode is the id of the squad getting one (the next tap sets its end);
+  // aimDrag { id, end } while one is dragged out of it
+  let aimMode = null, aimDrag = null;
   let moving = null;        // id of the older squad picked to move
   // the unit being placed or moved right now (some units may use extra tiles, e.g. Forward planting)
   function placingUnit() {
@@ -11028,6 +11097,7 @@ Floors.floor = (() => {
     editable: editable(), placingUnit: placingUnit(), placingElf: placingElf(), placingTower: placingTower(), placingWall: placingWall(),
     dev: m && m.dev ? { bPlacing, castMode, guideMode, guideId: guideDrag ? guideDrag.id : guideMode !== 'pick' ? guideMode : null, guide: guideDrag ? guideDrag.pts : guideMode != null && guideMode !== 'pick' ? guideDraft : null } : null,
     battleCam: cam && cam.k > 0 ? { zoom: 1 + (CAM.zoom - 1) * cam.k, x: cam.x, y: cam.y, k: cam.k } : null,
+    aim: phase === 'deploy' && aimMode != null ? { id: aimMode, end: aimDrag ? aimDrag.end : hoverTile } : null,
     placingBuilding: placingBuilding(), win: null });
   const board = Render2D(cv, boardView);
   let board3d = null; // the 3D board when it's on (see "the 3D board" below)
@@ -11107,7 +11177,7 @@ Floors.floor = (() => {
   function stopTask() {
     if (guideMode != null && guideMode !== 'pick' && guideDraft.length && m && editable()) Game.setGuide(m, me, guideMode, guideDraft); // the ✕ finishes an arrow
     selected = null; moveMode = false; moving = null; charmMode = false; elfPlacing = false; wallPlacing = false; fortPlacing = false; markPicking = false; huntPicking = null;
-    bPlacing = null; castMode = null; guideMode = null; guideDraft = []; guideDrag = null;
+    bPlacing = null; castMode = null; guideMode = null; guideDraft = []; guideDrag = null; aimMode = null; aimDrag = null;
     if (phase === 'deploy') panelDeploy();
     render();
   }
@@ -11818,12 +11888,13 @@ Floors.floor = (() => {
       if (castMode) hint = `Tap a tile to cast ${esc((Game.devSpell(castMode) || {}).name || 'the spell')}${(Game.devSpell(castMode) || {}).kind === 'zone' ? ' (its top left corner on your screen)' : ''}. Tap anywhere it can't go to cancel.`;
       if (guideMode === 'pick') hint = 'Tap one of your squads, or drag from it to draw its path.';
       else if (guideMode != null) hint = `Tap tiles for its path (${guideDraft.length} of ${Game.DEV.guidePoints}), or drag from the squad. ✕ when done.`;
+      if (aimMode != null) hint = `Direction: tap where it walks first (up to ${Game.AIM.maxTiles} tiles), or drag from the squad. Until it gets there it ignores enemies, except ones in reach.`;
       if (placingBuilding()) hint = `Tap a tile in your zone for your ${esc(buildingName(placingBuilding().id))}.`;
       if (placingTower()) hint = 'Tap a gold tile to place your tower.';
     }
     // Only hints about what the next tap does (or why it can't) stay on the panel; the rest (tips, this round's
     // news) go to the Help sheet, whose button turns gold while there's news not read yet this round.
-    const devTask = bPlacing != null || castMode != null || guideMode != null;
+    const devTask = bPlacing != null || castMode != null || guideMode != null || aimMode != null; // (aimMode: every gamemode)
     const inline = !can || placingTower() || placingElf() || placingWall() || placingBuilding() || choosingTower() || choosingPack() || devPicking() || devTask || moveMode || (charmMode && Game.canGiveCharm(m, me))
       || (selected !== null && !canBuy(selected)) ? hint : '';
     helpTip = inline ? '' : hint;
@@ -11961,7 +12032,7 @@ Floors.floor = (() => {
     if (!editable() || !undoSnap || undoSnap.key !== undoKey()) return;
     Referee.restoreSide(m, me, JSON.parse(undoSnap.state));
     if (mode === 'net') srvAct('undoAll', []);
-    selected = null; moveMode = false; moving = null; charmMode = false; elfPlacing = false; wallPlacing = false; fortPlacing = false; markPicking = false; huntPicking = null; bPlacing = null; castMode = null; guideMode = null; guideDraft = []; guideDrag = null; rangeOf = null;
+    selected = null; moveMode = false; moving = null; charmMode = false; elfPlacing = false; wallPlacing = false; fortPlacing = false; markPicking = false; huntPicking = null; bPlacing = null; castMode = null; guideMode = null; guideDraft = []; guideDrag = null; aimMode = null; aimDrag = null; rangeOf = null;
     closeSheet(); changed();
   }
   function changed() {
@@ -14149,6 +14220,12 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function boardPress(t) {
     if (pingKind) return false; // 2v2: a ping goes down on the tap
     if (!t || phase !== 'deploy' || !m || !editable() || choosingPack() || placingTower()) return false;
+    if (aimMode != null) { // a direction arrow: drag it out of the squad getting it
+      const gs = Game.squadAt(m, me, t.col, t.row);
+      if (!gs || gs.id !== aimMode) return false;
+      aimDrag = { id: gs.id, end: { col: t.col, row: t.row }, moved: false };
+      return true;
+    }
     if (guideMode != null) { // devtest: drag an arrow out of one of your squads
       const gs = Game.squadAt(m, me, t.col, t.row);
       if (!gs || !Game.canGuide(m, me, gs) || (guideMode !== 'pick' && guideMode !== gs.id)) return false;
@@ -14168,12 +14245,25 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     return true;
   }
   function boardDrag(t) {
+    if (aimDrag && t) { if (t.col !== aimDrag.end.col || t.row !== aimDrag.end.row) { aimDrag.end = { col: t.col, row: t.row }; aimDrag.moved = true; render(); } return; }
     if (guideDrag && t) { const l = guideDrag.pts[guideDrag.pts.length - 1]; if (t.col !== l.col || t.row !== l.row) { guideDrag.pts.push({ col: t.col, row: t.row }); render(); } return; }
     if (drag && drag.denied) { if (t && !drag.tried && (t.col !== drag.over.col || t.row !== drag.over.row)) { drag.tried = true; sfx('nope'); } return; } // can't move it (no gold, or already moved one)
     if (drag && t && (t.col !== drag.over.col || t.row !== drag.over.row)) { drag.over = t; drag.moved = true; render(); }
   }
   // the drag ends on tile t (null: the last tile it was over); ended is false when it was cancelled
   function boardDrop(t, ended) {
+    if (aimDrag) {
+      if (ended) boardDrag(t);
+      const ad = aimDrag; aimDrag = null;
+      if (ended && ad.moved) { // dragged out: that's the arrow
+        dragEndAt = performance.now();
+        const sq = m.armies[me].find(q => q.id === ad.id), end = sq && Game.aimTo(m, sq, ad.end.col, ad.end.row);
+        aimMode = null;
+        if (end && editable() && Game.setAim(m, me, sq.id, end.col - sq.col, end.row - sq.row)) { changed(); return; }
+        panelDeploy();
+      }
+      render(); return; // a press without a drag: the tap that follows (on the squad) cancels
+    }
     if (guideDrag) {
       if (ended) boardDrag(t);
       const gd = guideDrag; guideDrag = null;
@@ -14212,7 +14302,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   cv.addEventListener('pointerup', () => boardDrop(null, true));
   cv.addEventListener('pointercancel', () => boardDrop(null, false));
   cv.addEventListener('pointermove', (ev) => {
-    if (drag || guideDrag) { boardDrag(tileAt(ev)); return; }
+    if (drag || guideDrag || aimDrag) { boardDrag(tileAt(ev)); return; }
     if (ev.pointerType === 'mouse') boardHover(tileAt(ev));
   });
   cv.addEventListener('pointerleave', () => boardHover(null));
@@ -14264,6 +14354,12 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     }
     if (placingTower()) { if (editable() && Game.placeTower(m, me, t.col, t.row)) changed(); return; }
     if (placingElf()) { if (editable() && Game.buyElfOwn(m, me, t.col, t.row)) { elfPlacing = false; changed(); } else if (!Game.elfOwnSpotOk(m, me, t.col, t.row)) { elfPlacing = false; render(); hud(); panelDeploy(); } return; }
+    if (aimMode != null) { // a direction arrow: this tile is its end (cut down to its most), the squad's own tile cancels
+      const sq = m.armies[me].find(q => q.id === aimMode), end = sq && Game.aimTo(m, sq, t.col, t.row);
+      aimMode = null; aimDrag = null;
+      if (end && editable() && Game.setAim(m, me, sq.id, end.col - sq.col, end.row - sq.row)) changed(); else { panelDeploy(); render(); }
+      return;
+    }
     if (!placingWall() && !placingBuilding() && !moveMode && !charmMode && !Game.isDev(m)) { // Overwatch: a squad goes into one of your buildings, or one in it opens its sheet first (the building's on the next tap)
       if (selected !== null && editable() && Game.garrisonFree(m, me, t.col, t.row, selected)) {
         const sq = Game.place(m, me, selected, t.col, t.row);
@@ -14603,8 +14699,15 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (!it) { watchSq = null; return ''; }
       from = it.from;
     } else if (phase === 'deploy') {
+      if (aimMode != null) return ''; // setting a direction arrow: the floor shows it
       const ask = intentAsk();
       if (!ask) return '';
+      const asq = ask.q.id != null && m.armies[me].find(s => s.id === ask.q.id);
+      if (asq && asq.aim && Game.canAim(m, me, asq)) { // a direction arrow: the floor shows it; a squad dragged elsewhere takes it along
+        if (ask.q.col == null || (ask.col === asq.col && ask.row === asq.row)) return '';
+        const n = Game.footprint(m, ask.unit), a0 = Game.tileToWorld(ask.col + (n - 1) / 2, ask.row + (n - 1) / 2), b0 = Game.tileToWorld(ask.col + asq.aim.dc + (n - 1) / 2, ask.row + asq.aim.dr + (n - 1) / 2);
+        return arrowSvg(at(a0.x, a0.y), at(b0.x, b0.y), teamCol(me), { short: 0 });
+      }
       const r = intentFor(ask.q, false);
       if (!r || !r.moves) return '';
       const n = Game.footprint(m, ask.unit);
@@ -14749,7 +14852,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // It falls back to the 2D board when it can't start (no WebGL), when the phone drops the WebGL context, and when
   // fights run under 20 fps at low quality (slower fights step the quality down first), with one line on the board.
   const THREE_URL = './vendor/three.module.min.js'; // the artifact build points this at jsDelivr
-  const V3D = 'ca9facedef'; // the 3D code's version (src/build.js puts a hash of it here)
+  const V3D = '9591f1235d'; // the 3D code's version (src/build.js puts a hash of it here)
   const B3D_STORE = 'phone-bellum-board';
   const force2d = /[?&]board=2d\b/.test(location.search);
   const force3d = !force2d && (/[?&]board=3d\b/.test(location.search) || window.PB_FORCE3D === true);
@@ -15480,6 +15583,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         if (sq.round < m.round && editable()) btns.push(`<button class="btn" data-act="sell">Sell · ${Game.sellValue(m, sq)} gold</button>`);
         if (editable() && Game.canGuide(m, me, sq)) btns.push(`<button class="btn" data-act="guide">${sq.guide ? 'Redraw path' : 'Draw path'}</button>`);
         if (editable() && sq.guide) btns.push(`<button class="btn" data-act="unguide">Clear path</button>`);
+        if (editable() && Game.canAim(m, me, sq)) btns.push(`<button class="btn" data-act="aim">${sq.aim ? 'Change direction' : 'Set direction'}</button>`);
+        if (editable() && sq.aim) btns.push(`<button class="btn" data-act="unaim">Clear direction</button>`);
         if (btns.length) lvl += `<div style="display:flex;gap:8px;flex-wrap:wrap">${btns.join('')}</div>`;
         else if (next) lvl += `<p class="hint" style="margin:0">Earns XP by dealing and taking damage.</p>`;
       }
@@ -15530,7 +15635,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       <p class="role" style="margin:0">${ROLES[u.name] && !customSet ? ROLES[u.name] : customSet ? `From a Counter Lab roster · ${Game.unitCostOf(base)} gold` : ''}</p>
       ${[u.trait, u.trait2, u.trait3, u.trait4].filter(x => x && x.name).map(x => `<p style="margin:0"><b style="color:var(--gold)">Trait: ${esc(x.name)}</b>${x.text ? ` · ${esc(x.text)}` : ''}</p>`).join('')}
       ${lvl}
-      ${sq && m && side === me && phase === 'deploy' && !Game.isRider(sq) && !units[i].building ? (() => { const w = intentWords(intentFor({ id: sq.id }, true)); return w ? `<p class="hint" style="margin:0"><b style="color:var(--you)">Intent:</b> ${w}</p>` : ''; })() : ''}
+      ${sq && m && side === me && phase === 'deploy' && sq.aim && Game.canAim(m, me, sq) ? `<p class="hint" style="margin:0"><b style="color:var(--you)">Direction:</b> walks its arrow first, ignoring enemies except ones in reach, then fights as usual.</p>` : ''}
+      ${sq && m && side === me && phase === 'deploy' && !Game.isRider(sq) && !units[i].building && !(sq.aim && Game.canAim(m, me, sq)) ? (() => { const w = intentWords(intentFor({ id: sq.id }, true)); return w ? `<p class="hint" style="margin:0"><b style="color:var(--you)">Intent:</b> ${w}</p>` : ''; })() : ''}
       ${sq && m && !compact ? (() => { const q = side === me ? sq : Game.seenAt(m, sq); return shroomBlock(q.col, q.row); })() : ''}
       ${tr.length ? `<div class="traits">${tr.map(x => `<span>${x}</span>`).join('')}</div>` : ''}
       ${skillBlock(i, side, sq)}
@@ -15562,6 +15668,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     on('move-undo', () => { if (editable() && Game.undoMove(m, me)) after(); });
     on('guide', () => { if (!editable()) return; closeSheet(); stopTask(); guideMode = sq.id; guideDraft = []; panelDeploy(); render(); });
     on('unguide', () => { if (editable() && Game.clearGuide(m, me, sq.id)) after(); });
+    on('aim', () => { if (!editable()) return; closeSheet(); stopTask(); aimMode = sq.id; panelDeploy(); render(); });
+    on('unaim', () => { if (editable() && Game.clearAim(m, me, sq.id)) after(); });
     on('sell', (btn) => {
       if (!btn.dataset.sure) { btn.dataset.sure = '1'; btn.textContent = `Tap again to sell for ${Game.sellValue(m, sq)}`; btn.classList.add('primary'); return; }
       if (editable() && Game.sell(m, me, sq.id)) { closeSheet(); changed(); }
@@ -15889,7 +15997,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       s.armies[0] = Game.foeSeen(s, 0).map(q => { // a squad sold this round still shows; a squad moved this round shows on its old tile
         delete q.soldRound; delete q.outRound;
         if (q.from && q.movedRound === m.round) { q.col = q.from.col; q.row = q.from.row; }
-        delete q.from; delete q.movedRound; delete q.luckMove;
+        delete q.from; delete q.movedRound; delete q.luckMove; delete q.aim; // a direction arrow shows in the fight
         if (q.charmGiven === m.round) { delete q.charm; delete q.charmGiven; } // Matteo's first stack, given this round
         if (q.awaken === m.round) delete q.awaken; // an awakening bought this round
         if (q.prey) { const p = Game.preyShown(s, -2, true, 0, q); if (p == null) delete q.prey; else q.prey = { squad: p, round: Math.min(q.prey.round, m.round - 1) }; } // a Hunter's mark moved this round shows where it was

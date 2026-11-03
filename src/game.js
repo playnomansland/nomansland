@@ -1880,6 +1880,11 @@ const Game = (() => {
       const dis = isDev(m) && m.units[sq.unit].disguise ? m.units.find(x => x.name === m.units[sq.unit].disguise) : null; // devtest: a disguise, until its first attack
       if (dis) { const mask = { name: dis.name, shape: dis.shape, color: dis.color, bodies: dis.bodies, range: dis.range }; for (const x of b) x.mask = mask; }
       if (isDev(m) && sq.guide && sq.guide.length && !isRider(sq)) for (const x of b) x.guide = sq.guide.map(p => tileToWorld(p.col, p.row)); // devtest: the squad's arrow
+      else if (sq.aim && canAim(m, side, sq)) { // a melee squad's direction arrow (AIM): every body walks it, keeping its place in the formation
+        const dx = sq.aim.dc * TILE, dy = -sq.aim.dr * TILE, secs = Math.max(AIM.minSecs, AIM.slack * Math.sqrt(dx * dx + dy * dy) / Math.max(0.1, u.speed));
+        const cl = (v, lo, hi) => Math.max(lo + 1, Math.min(hi - 1, v));
+        for (const x of b) { x.guide = [{ x: cl(x.x + dx, BOUNDS.x0 + XOFF, BOUNDS.x1 + XOFF), y: cl(x.y + dy, BOUNDS.y0, BOUNDS.y1) }]; x.guideT = secs; }
+      }
       if (markOn(m, side)) for (const x of b) x.sniperMark = MARK.hit; // Mark Bounty: all its units hunt the mark (since 2026-11-03; Snipers only before)
       if (markOn(m, 1 - side) && markOf(m, 1 - side).squad === sq.id) for (const x of b) x.marked = true;
       if (preyOn(m, side, sq.id)) for (const x of b) x.prey = true; // a Hunter's mark (the Sniper's Awaken skill)
@@ -2165,7 +2170,7 @@ const Game = (() => {
     const two = (a, x) => { const o = Array.isArray(a) ? a.slice() : [null, null]; o[fo] = x; return o; };
     v.armies = two(m.armies, foeSeen(m, fo).map(s => {
       const p = seenAt(m, s), q = { ...s, col: p.col, row: p.row, level: seenLevel(m, s) };
-      delete q.from; delete q.movedRound; delete q.soldRound;
+      delete q.from; delete q.movedRound; delete q.soldRound; delete q.aim; // (its direction arrow shows in the fight)
       if (!seenAwake(m, s)) delete q.awaken;
       if (q.charmGiven === now) { delete q.charm; delete q.charmGiven; }
       return q;
@@ -2966,6 +2971,50 @@ const Game = (() => {
     return true;
   }
 
+  // ---- direction arrows: a melee squad walks its arrow before it looks for a fight ----
+  // A melee squad (base range up to AIM.melee m) may get an arrow from its tile, at most AIM.maxTiles tiles long, in
+  // any gamemode, for free. In the fight its bodies walk the arrow first, each keeping its place in the formation: sight
+  // and awareness are off until they reach its end, so they walk past enemies they would have turned to, and only stand
+  // to fight one already in their reach (it walks on once that one is gone). From the end on they fight as usual. A walk
+  // that can't get there (a wall, a crowd) gives up after AIM.slack times the time it should take (at least AIM.minSecs
+  // s, time spent fighting not counted).
+  // sq.aim = { dc, dr }: the end in tiles from the squad's tile (so it moves with the squad). Kept from round to round
+  // until cleared; the opponent doesn't see it before the fight (Referee.hide, seenBy).
+  const AIM = { maxTiles: 5, melee: 5, slack: 2.5, minSecs: 4 };
+  const canAim = (m, side, sq) => {
+    if (!sq || isRider(sq) || !m.armies[side].includes(sq)) return false;
+    const u = m.units[sq.unit];
+    return !!u && !u.building && !u.stay && !u.idle && u.speed > 0 && u.range <= AIM.melee;
+  };
+  // the end the arrow (dc, dr) from sq really gets: at most AIM.maxTiles long, on the board; null when that's no arrow
+  function aimFit(sq, dc, dr) {
+    dc = Math.round(+dc) || 0; dr = Math.round(+dr) || 0;
+    const len = Math.sqrt(dc * dc + dr * dr);
+    if (len > AIM.maxTiles) { dc = Math.round(dc * AIM.maxTiles / len); dr = Math.round(dr * AIM.maxTiles / len); }
+    while (dc * dc + dr * dr > AIM.maxTiles * AIM.maxTiles) { if (Math.abs(dc) >= Math.abs(dr)) dc -= Math.sign(dc); else dr -= Math.sign(dr); }
+    dc = Math.max(-sq.col, Math.min(COLS - 1 - sq.col, dc)); dr = Math.max(-sq.row, Math.min(ROWS - 1 - sq.row, dr));
+    return dc || dr ? { dc, dr } : null;
+  }
+  function setAim(m, side, sqId, dc, dr) {
+    const sq = m.armies[side].find(s => s.id === sqId);
+    if (!canAim(m, side, sq)) return false;
+    const a = aimFit(sq, dc, dr);
+    if (!a) return false;
+    if (sq.aim && sq.aim.dc === a.dc && sq.aim.dr === a.dr) return false;
+    sq.aim = a;
+    return true;
+  }
+  function clearAim(m, side, sqId) {
+    const sq = m.armies[side].find(s => s.id === sqId);
+    if (!sq || !sq.aim) return false;
+    delete sq.aim;
+    return true;
+  }
+  // the tile an arrow drawn from sq to (col, row) would end on (cut down as setAim does), or null
+  const aimTo = (m, sq, col, row) => { const a = sq && aimFit(sq, col - sq.col, row - sq.row); return a ? { col: sq.col + a.dc, row: sq.row + a.dr } : null; };
+  // the tile its arrow ends on (for the page), or null
+  const aimEnd = (m, sq) => sq && sq.aim ? { col: Math.max(0, Math.min(COLS - 1, sq.col + sq.aim.dc)), row: Math.max(0, Math.min(ROWS - 1, sq.row + sq.aim.dr)) } : null; // (on the board: a squad moved since keeps its arrow)
+
   // ---- disguise ----
   // a unit with "disguise": "Unit name" looks like that unit to its opponent: on the board, in its sheet, and in the
   // fight until its first attack. The unit index viewer is shown for side's unit ui.
@@ -3227,7 +3276,7 @@ const Game = (() => {
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,
-    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, resolve, aiDeploy, occupied,
+    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, AIM, canAim, setAim, clearAim, aimEnd, aimTo, resolve, aiDeploy, occupied,
     GRID, useGrid,
     DEV, CAT_NAMES, LESSER_SQ, WALL_SQ, setDevData, devBuilding, devPower, devSpell, isDev, towerUp, pickCat, devOffer, pickNow, needsDevPick, devPick, undoDevPick, devShown,
     lessersOf, placedLessers, unplacedLesser, lesserAt, lesserSpotOk, placeLesser, lesserUnit, auraFor, modUnit, powersOf, devGold, devDeploys,

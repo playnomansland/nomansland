@@ -3073,12 +3073,14 @@ const Engine = (() => {
           }
         }
         const rg = b.u.hover > 0 ? Math.min(R(b), b.u.hover) : R(b); // hover: an airship flies in closer than its range
-        // an arrow drawn by the player (Factions devtest): b.guide = [{ x, y }, ...]. The body walks the points in turn,
-        // standing to fight only enemies already in its own range, then fights as usual from the last point on.
+        // an arrow drawn by the player: b.guide = [{ x, y }, ...] (the Factions devtest's paths, and a melee squad's
+        // direction arrow: game.js AIM, with b.guideT its time to get there). The body walks the points in turn, sight
+        // and awareness off, standing to fight only enemies already in its own range, then fights as usual from the last point on.
         if (b.guide && b.guide.length) {
           const p = b.guide[0], gx = p.x - b.x, gy = p.y - b.y, gd = hyp(gx, gy);
-          if (gd < 1.5) { b.guide.shift(); if (!b.guide.length) b.guide = null; continue; }
+          if (gd < 1.5) { b.guide.shift(); if (!b.guide.length) { b.guide = null; b.guideT = null; } continue; }
           if (near && !unseen && nd <= reachTo(reachOf(b), b, near)) continue; // something in reach: stand and fight it
+          if (b.guideT != null && (b.guideT -= dt) <= 0) { b.guide = null; b.guideT = null; continue; } // a direction arrow it can't finish (game.js AIM): fight as usual
           const step = spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1) * dt;
           const [ux, uy] = steer(b, p.x, p.y, gx / gd, gy / gd);
           if (b.hx === undefined) { b.hx = ux; b.hy = uy; }
@@ -3603,7 +3605,7 @@ const Engine = (() => {
         v.convert = { side: v.side, squad: v.squad, xp: v.xp, dealt: v.dealt || 0 }; // what it earned for its old squad
         v.side = 1 - v.side; v.squad = CONVERT_SQUAD; v.xp = 0; v.dealt = 0; v.turning = false;
         v.windTarget = null; v.windT = 0; v.setUp = false; v.firing = -1; v.burstLeft = 0; v.trampleLeft = 0; v.trampled = null;
-        v.spinTarget = null; v.aims = null; v.lock = null; v.intent = null; v.march = null; v.guide = null; v.goal = null; v.spreadTo = null; v.engaged = false; v.holdT = 0; v.avenge = null; v.delay = 0; v.band = null; v.hidden = false;
+        v.spinTarget = null; v.aims = null; v.lock = null; v.intent = null; v.march = null; v.guide = null; v.guideT = null; v.goal = null; v.spreadTo = null; v.engaged = false; v.holdT = 0; v.avenge = null; v.delay = 0; v.band = null; v.hidden = false;
         v.slowT = 0; v.slowMove = 0; v.slowAtk = 0; v.shrinkT = 0; v.shrinkM = 0; v.kids = null; v.stunT = 0; v.frenzy = 0; v.flow = 0; v.knives = null; v.atkN = 0; v.forgeT = 0; v.spearReady = false;
         v.burn = null; v.web = null; v.webs = 0; v.kills = 0; v.flurryLeft = 0; v.flurryTgt = null; v.rootTgt = null; v.rootedBy = null; v.hunt = null; v.bullN = 0; v.charging = false; v.inside = null; v.missileT = 0; v.roarSpd = 0; v.roarAtk = 0; v.frost = null; v.frozenT = 0; v.beamAims = null; v.stormCd = 0; v.aimedAt = 0; v.wwDodges = 0; v.watchT = 0;
         sides[v.side].push(v); stats[v.side].totalHp += v.hp;
