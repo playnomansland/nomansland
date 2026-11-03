@@ -4,6 +4,14 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 3 November 2026 – Faster Counter Lab
+
+- **Counter Lab tables build faster.** Big swarm fights (Goblin Swarm, Skeleton Archers and the like) now simulate up to about 3× faster, so a custom unit set's counter table is ready sooner on your phone.
+- **Every fight plays out exactly as before:** same targets, same moves, same winner. Only the work the game skipped changed, not the rules.
+- Behind the scenes: the Balance Lab (our test bench for bot-vs-bot matches) now drafts with the same counter table as the real game, and starts in seconds instead of half an hour.
+
+---
+
 ## 3 November 2026 – Spiders rework, sniper tower, Snow storm
 
 ### Spiders (rework)

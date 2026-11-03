@@ -5745,7 +5745,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     // enough gold per side that even the priciest unit fields a full squad
     const g = { ...MATRIX_SETTINGS, budget: Engine.fairBudget(us.map(u => u.cost), MATRIX_SETTINGS.budget), ...(rules ? { rules } : {}) };
     for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
-      const r = Engine.battle(us[i], us[j], g);
+      const r = Engine.battle(us[i], us[j], g, { targetingMode: 'indexed' }); // fast paths: the same battles, quicker for swarms
       out[i][j] = +r.score.toFixed(3); out[j][i] = -out[i][j];
       yield [++done, total];
     }

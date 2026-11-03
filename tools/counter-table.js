@@ -4,6 +4,7 @@
 // Fast path: each output file keeps a signature per unit (its battle stats, display text left out) and one for the
 // engine and settings. A pair whose two units and engine are unchanged keeps its old score, so a text-only change
 // runs no battles and a change to one unit only re-runs that unit's row. The battles left run on every CPU core.
+// Battles run on the engine's fast paths (targetingMode 'indexed': identical results, see tools/tests/fast-paths.js).
 // --full: ignore the saved scores and run every battle.
 const fs = require('fs'), crypto = require('crypto'), os = require('os'), path = require('path');
 const { Worker, isMainThread, parentPort, workerData } = require('worker_threads');
@@ -11,7 +12,7 @@ const E = require('../src/engine.js');
 const G = { distance: 42, spacing: 3.5, minDmgPct: 15, timeCap: 60, dt: 0.05, sight: 15, minSight: 18, drift: 15, flameReach: 1.2 };
 if (!isMainThread) { // a worker: run its share of the battles
   const { bu, g, pairs } = workerData;
-  parentPort.postMessage(pairs.map(([i, j]) => +E.battle(bu[i], bu[j], g).score.toFixed(3)));
+  parentPort.postMessage(pairs.map(([i, j]) => +E.battle(bu[i], bu[j], g, { targetingMode: 'indexed' }).score.toFixed(3)));
   return;
 }
 const read = (f) => JSON.parse(fs.readFileSync(f, 'utf8'));

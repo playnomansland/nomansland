@@ -63,6 +63,32 @@ for (const map of maps) for (let k = 0; k < perMap; k++) {
   console.log('ok', map, 'seed', seed, '-', runs.reference.res.rounds, 'rounds');
 }
 console.log('game matches: ' + battles + ' battles, ' + steps + ' steps identical; reference ' + (refMs / 1000).toFixed(1) + ' s, indexed ' + (fastMs / 1000).toFixed(1) + ' s');
+// 2v2: both lanes fight as one battle on the wide field (src/duo.js), the biggest fights in the game. The lanes
+// grow round by round through their own 1v1 fights; each round the 2v2 battle is run in both modes.
+const Ref = require('../../src/referee.js'), Duo = require('../../src/duo.js');
+let duoBattles = 0, duoBodies = 0;
+for (const seed of QUICK ? [41] : [41, 42, 43]) {
+  const lane = (s) => Ref.newMatch(prepared.units, prepared.matrix, Ref.cleanSettings({ map: 'testgrid' }, prepared.units), s);
+  const lanes = [lane(seed), lane(seed + 1000)];
+  for (let r = 0; r < (QUICK ? 8 : 12) && lanes.every(m => !m.over); r++) {
+    for (const m of lanes) for (const sd of [0, 1]) { if (r === 0) Game.choosePack(m, sd, 0); Game.aiDeploy(m, sd); }
+    const runs = {};
+    for (const mode of ['reference', 'indexed']) {
+      forced = mode; log = [];
+      const bt = Duo.battle(lanes, { record: false });
+      while (bt.step()) {}
+      runs[mode] = { log, out: bt.result() };
+      duoBodies = Math.max(duoBodies, bt.bodies.length);
+    }
+    const where = firstDiff(runs.reference.log, runs.indexed.log);
+    assert.strictEqual(where, null, '2v2 seed ' + seed + ' round ' + (r + 1) + ': fast paths differ at ' + where);
+    assert.strictEqual(runs.indexed.out.winner, runs.reference.out.winner);
+    duoBattles++;
+    forced = 'reference'; log = [];
+    for (const m of lanes) { const bt = Game.startBattle(m); while (bt.step()) {} Game.resolve(m, bt.result()); }
+  }
+}
+console.log('2v2 battles: ' + duoBattles + ' identical (up to ' + duoBodies + ' bodies)');
 Engine.createBattle = realCreate;
 
 // Counter-table battles (Engine.battle, one unit against another): mechanic fixtures, or every pair with --matrix.
