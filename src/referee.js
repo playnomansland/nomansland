@@ -178,6 +178,7 @@
       offTowers: strs(x.offTowers, id => G.TOWER_TYPES.some(t => t.id === id)),
       packOptions: [2, 3, 4, 5].includes(x.packOptions) ? x.packOptions : 3,
       mirror: x.mirror === true,
+      late: x.late === true, // DEVTESTLATEGAME
       deploy1: Number.isInteger(x.deploy1) && x.deploy1 >= 15 && x.deploy1 <= 600 ? x.deploy1 : FIRST_DEPLOY_SECONDS,
       deploy: Number.isInteger(x.deploy) && x.deploy >= 15 && x.deploy <= 600 ? x.deploy : DEPLOY_SECONDS,
       next: Number.isInteger(x.next) && x.next >= 3 && x.next <= 120 ? x.next : 20,
@@ -187,7 +188,7 @@
   function newMatch(units, matrix, s, seed, lastMap) {
     const off = units.map((u, i) => s.offUnits.includes(u.name) ? i : -1).filter(i => i >= 0);
     return G.createMatch(units, matrix, seed >>> 0, s.map || null, lastMap || null, s.offChars,
-      { skin: s.skin || null, offUnits: off, offTowers: s.offTowers, mirror: s.mirror, packOptions: s.packOptions });
+      { skin: s.skin || null, offUnits: off, offTowers: s.offTowers, mirror: s.mirror, packOptions: s.packOptions, late: s.late });
   }
 
   // ----- the refereed match -----

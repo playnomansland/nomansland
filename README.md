@@ -62,6 +62,13 @@ Online play runs on our own server (Cloudflare Workers + Durable Objects) in `se
 - Team talk: `mark { kind: ?, !, go, lane, col, row }` and `emote { id }` (`Duo.PINGS`, `Duo.EMOTES`), relayed by the room to the sender's team only ('ping' is the keep-alive). The page keeps pings 8 s (`pingMarks` in boardMarks) and shows lines in the status bar.
 - Tests: `node tools/tests/duo.js` (headless), `server/test/duo.test.js` (in npm test), `tools/tests/duo-ui.js` (browser; http.server 8766 and wrangler dev on 8798 with DUO_ANYONE).
 
+## DEVTESTLATEGAME (developer test)
+
+- Developer menu: DEVTESTLATEGAME vs Friend (the game server referees it; the friend only needs the link or code) or vs AI. A normal Standard match plus two rules (`Game.LATE`): each player starts with `START_HP + LATE.hp` health (130), and nobody can have more than `LATE.cap` (5) squads of one unit type of tier `LATE.tier` (3) or higher. Each type has its own cap, so 5 Flame Wizards and 5 Frost Wizards at once is fine.
+- Match option `late: true` (`Game.createMatch` opts, Referee `cleanSettings` setting `late`, the page's `lateGame` flag in `matchOpts` and `srvSettings`). Sets `m.late`. `Game.startHp(m)`, `capped`, `capCount` (every squad of that type in the army: bought, package, gifts), `capFull`. `place` refuses a squad over the cap, so the server refuses it too; the AI skips capped types. Ignored for Factions and the devtest.
+- Page: capped shop cards show `n/5` and grey out at 5; the health bars use `Game.startHp`. Selling or taking a squad back frees a slot.
+- Test: `node tools/tests/late-game.js` (headless, about a minute: the cap, the referee setting, 12 AI-vs-AI matches never over the cap).
+
 ## Tournaments (invite only)
 
 - **Start screen → Host a tournament.** The game server keeps the tournament (`server/src/tour.js`, one Durable Object per tournament code, WebSocket `/tour/<CODE>`; the rules are `src/tournament.js`, global `Tour`, which runs in node and on the server). The organizer's phone gets a secret key when creating it and sends organizer actions as `{ t: 'org', op, a }` (`tourDo` → `Tour.apply` on the server); each player gets their own key on joining (ids are public, keys never are). The tournament goes on when the organizer's phone closes. Players join with `?tour=CODE` or the 4-letter code; `?tour=CODE&watch=1` is the big-screen view. `?server=URL` points the page at another game server (tests use a local one).

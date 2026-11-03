@@ -16,6 +16,16 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 3 November 2026 – DEVTESTLATEGAME (developer test mode)
+
+A new test mode in the Developer menu, for trying out the late game with friends:
+- **Play it vs a friend or vs the AI.** DEVTESTLATEGAME → vs Friend gives you a link and code like a normal friend match (the game server referees it, and your friend doesn't need developer access). vs AI is there for quick tries.
+- **130 health each** (30 more than a normal match), so matches last longer and reach the big armies.
+- **At most 5 squads of the same tier 3 or tier 4 unit.** For example: at most 5 Flame Wizards, but you can have 5 Frost Wizards at the same time, and the same goes for each tier 4 unit. Shop cards for those units show how many you have (like 3/5) and grey out at 5. Selling a squad, or taking back one you just placed, frees a spot.
+- Normal and ranked matches are unchanged.
+
+---
+
 ## 3 November 2026 – 3D board for everyone
 
 - **Everybody starts on the 3D board.** If your phone or computer had been stuck on 2D (from an older version, or because 3D once ran too slowly), it switches to 3D the next time you open the game. This happens once: if you then pick 2D in Settings, it stays 2D.

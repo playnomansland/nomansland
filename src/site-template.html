@@ -313,6 +313,7 @@ html.dock .panel.shut > .bar:last-child { margin-top: 0; padding-top: 0; }
 .uc2 .c { font: 13px var(--font-data); color: var(--gold); margin-top: 2px; }
 .uc2 .c.free { color: var(--win, #6FD08C); }
 .uc2 .st { position: absolute; top: 3px; right: 5px; font: 10px var(--font-data); color: var(--gold); }
+.uc2 .cap { position: absolute; top: 3px; left: 5px; font: 10px var(--font-data); color: var(--muted); }
 .uc2[aria-disabled="true"] { opacity: 0.45; }
 .uc2[aria-pressed="true"] { transform: translateY(-5px); border-color: var(--gold); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45); }
 .uc2.lift { opacity: 0.3; }
@@ -1411,7 +1412,8 @@ html.pc .corner button span { display: inline; }
   // what a new match takes from the menu: units, leaders and towers left out, and the rules of a Counter Lab roster
   const matchOff = () => packOn() && packUnits() >= 2 ? units.map((u, i) => SP.units.includes(u.name) ? -1 : i).filter(i => i >= 0) : packNow() === 'standard' ? [] : offIdx();
   const matchChars = () => packOn() ? Game.CHARACTERS.map(c => c.id).filter(id => !SP.chars.includes(id)) : packNow() === 'standard' ? STD_OFF_CHARS.slice() : offChars;
-  const matchOpts = () => ({ skin: skinPick || null, lastSkin: (m && m.skin) || null, offUnits: matchOff(), offTowers: packOn() ? SP.offTowers : [], rules: customSet && rawSet.rules && typeof rawSet.rules === 'object' ? rawSet.rules : null });
+  let lateGame = false; // DEVTESTLATEGAME (developer menu): the next match gets more health and the tier 3+ squad cap (Game.LATE)
+  const matchOpts = () => ({ late: lateGame, skin: skinPick || null, lastSkin: (m && m.skin) || null, offUnits: matchOff(), offTowers: packOn() ? SP.offTowers : [], rules: customSet && rawSet.rules && typeof rawSet.rules === 'object' ? rawSet.rules : null });
   const packNote = () => packOn()
     ? `${packUnits()} units, ${SP.chars.length} leaders, ${packTowers().length} towers. The best way to start.`
     : packNow() === 'standard' ? `All ${units.length} units, ${Game.CHARACTERS.length - STD_OFF_CHARS.length} leaders and ${Game.TOWER_TYPES.length} towers. What ranked is played with.`
@@ -1722,9 +1724,9 @@ html.pc .corner button span { display: inline; }
   // ---------- HUD ----------
   function hud() {
     const v = phase === 'battle' && battlePre ? battlePre : m;
-    const hpMe = v ? v.hp[me] : Game.START_HP, hpFoe = v ? v.hp[foe()] : Game.START_HP;
+    const hpMe = v ? v.hp[me] : Game.startHp(v), hpFoe = v ? v.hp[foe()] : Game.startHp(v);
     $('hp-you').textContent = hpMe; $('hp-foe').textContent = hpFoe;
-    const hpFull = net.duo && mode === 'net' ? Duo.HP : Game.START_HP; // 2v2: the team's shared health
+    const hpFull = net.duo && mode === 'net' ? Duo.HP : Game.startHp(v); // 2v2: the team's shared health
     $('hpbar-you').style.width = Math.min(100, hpMe / hpFull * 100) + '%';
     $('hpbar-foe').style.width = Math.min(100, hpFoe / hpFull * 100) + '%';
     $('round').textContent = v ? v.round : 1;
@@ -2066,6 +2068,7 @@ html.pc .corner button span { display: inline; }
     const u = units[i], free = Game.freeLeft(m, me).filter(x => x === i).length, stars = Engine.SLOTS.filter(k => Game.hasSkill(m, me, i, k)).length;
     return `<button class="uc2" data-i="${i}" style="--tier:${tierColor(tierOf(i))}" aria-pressed="${selected === i}" aria-disabled="${disabled}" aria-label="${esc(u.name)}, ${free ? `${free} free` : `${Game.shopCost(m, me, i)} gold`}">
       ${stars ? `<span class="st">${'★'.repeat(stars)}</span>` : ''}
+      ${Game.capped(m, i) ? `<span class="cap" aria-label="${Game.capCount(m, me, i)} of ${Game.LATE.cap} squads">${Game.capCount(m, me, i)}/${Game.LATE.cap}</span>` : ''}
       <span class="ic" style="color:${u.color}">${Shapes.svg(u.shape, 30)}</span>
       <span class="n">${esc(u.name)}</span>
       <span class="c${free ? ' free' : ''}">${free ? `Free ×${free}` : Game.shopCost(m, me, i)}</span></button>`;
@@ -2148,7 +2151,7 @@ html.pc .corner button span { display: inline; }
     if (p) { clearTimeout(p.t); if (p.el) p.el.classList.remove('lift'); if (p.pan) cardDone = performance.now(); } // a sideways mouse drag ends without a tap
     if (!d) return;
     cardDone = performance.now(); hoverTile = null;
-    if (ok && d.t && m && phase === 'deploy' && editable() && (Game.canPlaceAt(m, me, d.t.col, d.t.row, d.i) || Game.boardable(m, me, d.t.col, d.t.row, d.i))) { selected = d.i; tapTile(d.t, null); }
+    if (ok && d.t && m && phase === 'deploy' && editable() && !Game.capFull(m, me, d.i) && (Game.canPlaceAt(m, me, d.t.col, d.t.row, d.i) || Game.boardable(m, me, d.t.col, d.t.row, d.i))) { selected = d.i; tapTile(d.t, null); }
     else if (ok && d.t) sfx('nope');
     if (selected === d.i && d.prev !== d.i) selected = d.prev;
     if (phase === 'deploy') panelDeploy();
@@ -2236,12 +2239,12 @@ html.pc .corner button span { display: inline; }
     const locked = (i) => !Game.isUnlocked(m, me, i);
     const canUnlock = (i) => locked(i) && g >= Game.unlockCost(m, i, me); // a locked card shows gold when it can be unlocked now
     const freeN = (i) => Game.freeLeft(m, me).filter(x => x === i).length;
-    const canBuy = (i) => can && !choosingPack() && !choosingTower() && !devPicking() && !placingTower() && (freeN(i) > 0 || (!locked(i) && g >= price(i) && left > 0));
+    const canBuy = (i) => can && !choosingPack() && !choosingTower() && !devPicking() && !placingTower() && !Game.capFull(m, me, i) && (freeN(i) > 0 || (!locked(i) && g >= price(i) && left > 0));
     let hint;
     if (!can) hint = mode === 'claude' && claude.fightWaiting ? 'Waiting for Claude.' : timeUp ? 'Time’s up.' : 'You’re ready.';
     else {
       hint = selected !== null
-        ? (canBuy(selected) ? `Tap a tile in your zone${Game.flankOpen(m) ? ' or a flank tile in theirs' : ''} to place ${esc(units[selected].name)}.` : left <= 0 ? 'No deployments left this round.' : `Not enough gold for ${esc(units[selected].name)}.`)
+        ? (canBuy(selected) ? `Tap a tile in your zone${Game.flankOpen(m) ? ' or a flank tile in theirs' : ''} to place ${esc(units[selected].name)}.` : Game.capFull(m, me, selected) ? `${Game.LATE.cap} squads of ${esc(units[selected].name)} is the most you can have.` : left <= 0 ? 'No deployments left this round.' : `Not enough gold for ${esc(units[selected].name)}.`)
         : (fresh ? 'Drag a squad to move it.' : 'Pick a unit, then tap a tile in your zone.');
       if (left <= 0 && selected === null) hint = Game.deployBuyable(m, me) ? `No deployments left. +1 costs ${Game.deployCost(m, me)}.` : 'No deployments left.';
       if (readyN && selected === null) hint = `${readyN} squad${readyN === 1 ? '' : 's'} ready to level up.`;
@@ -2516,7 +2519,7 @@ html.pc .corner button span { display: inline; }
     tutHint = '';
     leaveNet();
     if (claude.ctl) { claude.ctl.abort(); claude.ctl = null; } claude.busy = false;
-    mode = 'ai'; me = 0; phase = 'start'; m = null; bt = null; battlePre = null; deadline = 0; resultShownAt = 0;
+    mode = 'ai'; me = 0; phase = 'start'; m = null; bt = null; battlePre = null; deadline = 0; resultShownAt = 0; lateGame = false;
     draft = null; clearTimeout(draftTimer); restoreSet();
     hud(); netStatus(); $('clock').textContent = '';
     if (tour.role && !tour.menu) { showTour(); return; } // in a tournament: its screen is the menu
@@ -2891,6 +2894,7 @@ html.pc .corner button span { display: inline; }
       ${devMode() ? `<details class="settings"><summary>Developer<span>more modes</span></summary><div class="settings-body">
         <div class="bar"><span class="hint">${factionsReady() ? 'Factions: draft two factions each.' : 'Factions mode: coming soon.'}</span><button class="btn small" id="factions-ai" ${factionsReady() ? '' : 'disabled'}>Factions vs AI</button></div>
         <div class="bar"><span class="hint">${devReady() ? 'Buildings, Powers and spells on the big board.' : 'No factions yet.'}</span><button class="btn small" id="devtest-ai" ${devReady() ? '' : 'disabled'}>Factions – devtest</button></div>
+        <div class="bar"><span class="hint">DEVTESTLATEGAME: ${Game.START_HP + Game.LATE.hp} health each, at most ${Game.LATE.cap} squads of any one tier 3 or tier 4 unit.</span><span class="btnrow"><button class="btn small" id="late-friend">vs Friend</button><button class="btn small" id="late-ai">vs AI</button></span></div>
         <div class="bar"><span class="hint">2v2: two boards side by side. Invite three players, set the teams.</span><button class="btn small" id="duo-new">2v2 lobby</button></div>
         ${TEST ? `<div class="bar"><span class="hint">Level-up cost (test setting)</span><div class="seg" role="group" aria-label="Level-up cost">${[50, 75].map(c => `<button data-c="${c}" aria-pressed="${Game.CONFIG.levelCostPerTier === c}">${c} gold</button>`).join('')}</div></div>` : ''}
         <div class="bar"><span class="hint">${customSet ? `Your ${units.length} Counter Lab units` : `${units.length} built-in units`}${reportDb ? '. Matches are saved for Claude to review.' : ''}</span>
@@ -2903,8 +2907,8 @@ html.pc .corner button span { display: inline; }
     const close = () => { home.pop = false; drawHome(); };
     $('pop-close').addEventListener('click', close);
     $('pop-back').addEventListener('click', (e) => { if (e.target === $('pop-back')) close(); });
-    $('friend').addEventListener('click', () => { matchKind = 'standard'; if (ranked()) rankedHost(); else hostLobby(); });
-    $('go').addEventListener('click', () => { if (ranked()) return; matchKind = 'standard'; startAiMatch(); });
+    $('friend').addEventListener('click', () => { matchKind = 'standard'; lateGame = false; if (ranked()) rankedHost(); else hostLobby(); });
+    $('go').addEventListener('click', () => { if (ranked()) return; matchKind = 'standard'; lateGame = false; startAiMatch(); });
     root.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
       home.mode = b.dataset.mode === 'ranked' && rankedAllowed() ? 'ranked' : 'normal';
       try { localStorage.setItem(MODE_STORE, home.mode); } catch (e) {}
@@ -2913,6 +2917,8 @@ html.pc .corner button span { display: inline; }
     if ($('factions-ai')) $('factions-ai').addEventListener('click', () => { matchKind = 'factions'; startAiMatch(); });
     if ($('devtest-ai')) $('devtest-ai').addEventListener('click', () => { matchKind = 'devtest'; startAiMatch(); });
     if ($('duo-new')) $('duo-new').addEventListener('click', () => duoHost());
+    if ($('late-friend')) $('late-friend').addEventListener('click', () => { matchKind = 'standard'; lateGame = true; hostLobby(); });
+    if ($('late-ai')) $('late-ai').addEventListener('click', () => { matchKind = 'standard'; lateGame = true; startAiMatch(); });
     if ($('vs-claude')) $('vs-claude').addEventListener('click', startClaudeMatch);
     if ($('load-units')) $('load-units').addEventListener('click', openLoader);
     if ($('tour-new')) $('tour-new').addEventListener('click', () => tourCreate());
@@ -4254,7 +4260,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (!f[0].length || !f[1].length) return false;
     const lethal = [0, 1].some(i => battlePre.hp[i] - (lastSummary.dmg[i] || 0) <= 0);
     const hp = f.map(a => a.reduce((t, b) => t + b.hp, 0));
-    const low = [0, 1].some(i => battlePre.hp[i] < Game.START_HP * CAM.lowHp);
+    const low = [0, 1].some(i => battlePre.hp[i] < Game.startHp(battlePre) * CAM.lowHp);
     return lethal || low || (battlePre.round >= CAM.round && Math.min(hp[0], hp[1]) >= Math.max(hp[0], hp[1]) * CAM.close);
   }
   // the battle cam's focus: the middle of everything still fighting, followed smoothly
@@ -5984,6 +5990,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const rk = srv && net.ranked;
     overlay(`<div class="card">
       ${rk ? `<span class="eyebrow" style="color:var(--gold)">Ranked · best of 3</span>${here && rk.tags[1] ? `<p class="big vs-row" style="margin:0">${nameplate(rk.tags[0], (rk.titles || [])[0])}<span>vs</span>${nameplate(rk.tags[1], (rk.titles || [])[1])}</p>` : ''}` : ''}
+      ${lateGame && !rk ? `<span class="eyebrow" style="color:var(--gold)">DEVTESTLATEGAME · ${Game.START_HP + Game.LATE.hp} health · max ${Game.LATE.cap} per tier 3/4 unit</span>` : ''}
       <span class="eyebrow">Match code</span>
       <span class="code" aria-label="Match code">${net.code}</span>
       <p class="status ${here ? '' : 'wait'}" id="lobby-status">${problem ? esc(problem) : here ? 'Your friend is here!' : ((srv ? net.connected : net.peer && net.peer.open) ? 'Waiting for your friend to open the link' : 'Setting up the match')}</p>
@@ -6568,7 +6575,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   function srvRetry() { clearTimeout(net.retryTimer); net.tries++; net.retryTimer = setTimeout(() => { if (net.alive && !net.ws) srvOpen(); }, Math.min(8000, 600 * net.tries)); }
   // the match settings from this phone's menu (map, look, units, leaders and towers left out)
-  const srvSettings = () => ({ map: curMap() || '', skin: skinPick || '', offUnits: matchOff().map(i => units[i].name), offChars: matchChars().slice(), offTowers: packOn() ? SP.offTowers.slice() : [] });
+  const srvSettings = () => ({ map: curMap() || '', skin: skinPick || '', offUnits: matchOff().map(i => units[i].name), offChars: matchChars().slice(), offTowers: packOn() ? SP.offTowers.slice() : [], late: lateGame });
   // one of this phone's own actions (a Game call that worked): to the server, and kept until it says it has it
   function srvAct(fn, a) {
     net.seq++;

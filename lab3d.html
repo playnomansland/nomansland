@@ -3521,6 +3521,8 @@ const Game = (() => {
   // Shutdown: breaking an opponent's streak of SHUTDOWN.from+ round wins pays SHUTDOWN.gold, +SHUTDOWN.step per win past that.
   const CARRY_CAP = 500, SHUTDOWN = { from: 3, gold: 100, step: 50 };
   const shutdownGold = (streak) => streak >= SHUTDOWN.from ? SHUTDOWN.gold + SHUTDOWN.step * (streak - SHUTDOWN.from) : 0;
+  // DEVTESTLATEGAME (developer mode, friends or AI): more health, and at most `cap` squads of any one unit type of tier `tier` or higher
+  const LATE = { hp: 30, cap: 5, tier: 3 };
   const TOWER_FALL_HP = 10; // a player whose tower falls in a fight loses this much health too, but a round never costs more than MAX_ROUND_DMG in all
   const SQUAD_COST = 100;
   const SETTINGS = { dt: 0.05, timeCap: 60, spacing: 3.5, minDmgPct: 15, absorbXp: 1, armorXp: 0.5, sight: 15, minSight: 18, drift: 15, flameReach: 1.2 }; // sight: metres beyond range a unit notices an enemy (at least minSight), drift: it leans toward one this much further out. flameReach: flame cones reach 1.2x the unit's range
@@ -4702,6 +4704,7 @@ const Game = (() => {
       dev: dev ? { picks: [[], []], buildings: [[], []], casts: [], nextKey: 1 } : null, // the Factions devtest (see DEV)
       offTowers: !factions && opts && Array.isArray(opts.offTowers) ? opts.offTowers.filter(id => TOWER_TYPES.some(x => x.id === id)) : [], // tower types left out (Standard pack)
     };
+    if (opts && opts.late && !factions && !dev) { m.late = true; m.hp = [startHp(m), startHp(m)]; } // DEVTESTLATEGAME
     if (opts && opts.mirror && !factions) { m.mirror = true; m.packages[1] = JSON.parse(JSON.stringify(m.packages[0])); } // the same rolls for both
     m.towers = [towerSpot(m, 0), towerSpot(m, 1)];
     { // the look: the host's pick, or 'random': one of the looks from the match's seed (never the last match's again)
@@ -4794,6 +4797,11 @@ const Game = (() => {
   const isTier1 = (m, ui) => unitCostOf(m.units[ui]) === Math.min(...m.units.map(unitCostOf));
   // tiers by squad price: the cheapest price in the roster is tier 1, the next one tier 2, and so on
   const tierOf = (units, ui) => [...new Set(units.map(unitCostOf))].sort((a, b) => a - b).indexOf(unitCostOf(units[ui])) + 1;
+  // DEVTESTLATEGAME: a player's health at the start, and the cap on squads of one tier 3+ unit type (squads on the board, gifts and package squads too)
+  const startHp = (m) => START_HP + (m && m.late ? LATE.hp : 0);
+  const capped = (m, ui) => !!(m && m.late) && tierOf(m.units, ui) >= LATE.tier;
+  const capCount = (m, side, ui) => m.armies[side].filter(s => s.unit === ui).length;
+  const capFull = (m, side, ui) => capped(m, ui) && capCount(m, side, ui) >= LATE.cap;
   // side (optional): that player's price, so Emile's tier 1 unlocks are free and Phil's tier 4 ones cheaper
   const unlockCost = (m, ui, side) => {
     const base = Math.max(0, Math.round(+m.units[ui].unlock || 0)), ch = side != null ? charOf(m, side) : null;
@@ -5297,6 +5305,7 @@ const Game = (() => {
     if (!canPlaceAt(m, side, col, row, unitIdx)) return null;
     if (needsTower(m, side)) return null; // the tower goes down first
     if (!isUnlocked(m, side, unitIdx)) return null;
+    if (capFull(m, side, unitIdx)) return null; // DEVTESTLATEGAME: at most LATE.cap squads of a tier 3+ unit type
     const into = boardable(m, side, col, row, unitIdx); // a carrier with room: the new squad rides inside
     if (!spotFree(m, side, col, row, unitIdx) && !into) return null;
     const ride = into ? { in: into.id } : {};
@@ -6614,7 +6623,7 @@ const Game = (() => {
       const budget = m.gold[side] - reserve;
       let best = -1, bs = -Infinity;
       m.units.forEach((u, i) => {
-        if (isOff(m, i, side)) return;
+        if (isOff(m, i, side) || capFull(m, side, i)) return;
         if (u.building && ((own[i] || 0) >= 1 || m.round < 3)) return; // a building (Altar of Build): one, from round 3
         const extra = isUnlocked(m, side, i) ? 0 : unlockCost(m, i, side); // a locked unit costs its unlock on top
         if (shopCost(m, side, i) + extra > budget) return;
@@ -6671,7 +6680,7 @@ const Game = (() => {
 
   const api = {
     MAX_ROUND_DMG, TIER_DMG, bankBusy, seenAt, charShown, towerTypeShown, altarShown, elfOwnShown, shroomShown, removingShroom, movedId, canMove, moveSquad, undoMove,
-    COLS, ROWS, TILE, ZONE, START_HP, START_GOLD, INCOME, incomeFor, LOSER_BONUS, LOSER_BONUS_ROUND, TOWER_FALL_HP, CARRY_CAP, SHUTDOWN, shutdownGold, CREDIT_LINE, loanTerms, treasurySteal, SQUAD_COST, SETTINGS, XP_STEPS, xpNeeded, unitCostOf,
+    COLS, ROWS, TILE, ZONE, START_HP, LATE, startHp, capped, capCount, capFull, START_GOLD, INCOME, incomeFor, LOSER_BONUS, LOSER_BONUS_ROUND, TOWER_FALL_HP, CARRY_CAP, SHUTDOWN, shutdownGold, CREDIT_LINE, loanTerms, treasurySteal, SQUAD_COST, SETTINGS, XP_STEPS, xpNeeded, unitCostOf,
     levelCost, isReady, levelUp, undoLevel, levelAllPlan, levelAll, upgradeOffer, seenLevel, aiLevel, AI, CONFIG,
     deploysAllowed, deploysLeft, deployedThisRound, canBuyDeploy, buyDeploy, refundDeploy, musterOn, deployBuyable,
     PACKAGE, allPackages, packOf, needsPack, freeLeft, choosePack, ensurePack,
