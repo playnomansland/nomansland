@@ -3864,7 +3864,8 @@ html.pc .corner button span { display: inline; }
       if (u.stunHit > 0) t.push(`every hit stuns for ${u.stunHit} s (not towers)`);
       else if (u.pellets > 1) t.push(`shotgun ${u.pellets}`);
       if (u.spinUp > 0) t.push(`spin-up ${u.spinUp}%/s on one target, up to 3x attack speed, starts over when it switches target`);
-      if (u.spinHit > 0) t.push(`damage spin-up ${u.spinHit}%/s on one target, up to 3x hit size, starts over when it switches target`);
+      if (u.spinHit > 0) t.push(`damage spin-up ${u.spinHit}%/s on one target, up to ${u.spinHitCap > 0 ? u.spinHitCap : 3}x hit size, starts over when it switches target`);
+      if (u.lockOn > 0) t.push(`takes ${u.lockOn} s to lock onto each new target after its first`);
       if (u.pierce > 0) t.push(`pierce ${u.pierce}`);
       if (u.projSpeed > 0) t.push(`projectile ${u.projSpeed} m/s`);
       if (u.minRange > 0) t.push(`min range ${u.minRange} m`);
@@ -5655,7 +5656,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const chip = (txt, col) => `<span class="chip" style="color:${col};border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px">${txt}</span>`;
     const cb = Game.constructBuff(m, side), k = 1 + Engine.LEVEL_BONUS * (b.level || 0), cur = mine ? Game.bskillOf(m, me, key) : null;
     const made = (u) => { const armor = (u.defense === 'armor' ? u.defVal : 0) + (mine ? cb.armor : 0), shield = (u.shield || 0) + (mine ? cb.shield : 0);
-      return `${r2(u.hp * k)} health${armor ? ` · ${r2(armor)} armor` : ''}${shield ? ` · shield ${shield}` : ''} · hit ${r2(u.hit * k)}${u.turrets > 1 ? ` ×${u.turrets} at once` : ''} × ${r2(u.aps * (1 + (mine ? cb.aps : 0) / 100))}/s${u.spinCap > 1 ? ` (winds up to ${r2(u.aps * u.spinCap)}/s)` : ''} · ${r2(u.range)} m${u.splash ? ` · ${r2(u.splash)} m splash` : ''} · speed ${r2(u.speed)}`; };
+      return `${r2(u.hp * k)} health${armor ? ` · ${r2(armor)} armor` : ''}${shield ? ` · shield ${shield}` : ''} · hit ${r2(u.hit * k)}${u.spinHit > 0 ? ` (ramps to ${r2(u.hit * k * (u.spinHitCap > 0 ? u.spinHitCap : 3))})` : ''}${u.turrets > 1 ? ` ×${u.turrets} at once` : ''} × ${r2(u.aps * (1 + (mine ? cb.aps : 0) / 100))}/s${u.spinCap > 1 ? ` (winds up to ${r2(u.aps * u.spinCap)}/s)` : ''} · ${r2(u.range)} m${u.splash ? ` · ${r2(u.splash)} m splash` : ''} · speed ${r2(u.speed)}`; };
     const rows = Game.buildingSkills(id).map(sk => {
       let act = '';
       if (mine && cur === sk.id) act = chip('This round', 'var(--gold)') + (live ? ` <button class="btn small" data-bskill-undo="${esc(key)}">Undo</button>` : '');
@@ -5996,6 +5997,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     else if (u.pellets > 1) tr.push(`Shotgun ${u.pellets}`);
     if (u.spinUp > 0) tr.push(`Spin-up ${u.spinUp}%/s`);
     if (u.spinHit > 0) tr.push(`Damage spin-up ${u.spinHit}%/s`);
+    if (u.lockOn > 0) tr.push(`Lock-on ${u.lockOn} s`);
     if (u.pierce > 0) tr.push(`Pierce ${u.pierce}`);
     if (u.projSpeed > 0) tr.push(`Bolts ${u.projSpeed} m/s`);
     if (u.minRange > 0) tr.push(`Min range ${u.minRange} m`);

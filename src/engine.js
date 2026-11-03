@@ -1,6 +1,6 @@
 // ===== Battle engine (shared by headless tests and the page) =====
 const Engine = (() => {
-  const TRAIT_DEFAULTS = { burst: 1, pellets: 1, spinUp: 0, spinHit: 0, pierce: 0, projSpeed: 0, minRange: 0, charge: 1, knockback: 0, windUp: 0, flame: 0, trample: 0, chargeStun: 0, chargeCd: 0, trampleRun: 0, trampleSpeed: 0, stomp: 0, levelHp: 0, deathBlast: 0, pctHit: 0, ram: 0, noFlank: 0, carrier: 0, noPack: 0, roll: 0 };
+  const TRAIT_DEFAULTS = { burst: 1, pellets: 1, spinUp: 0, spinHit: 0, pierce: 0, projSpeed: 0, minRange: 0, charge: 1, knockback: 0, windUp: 0, flame: 0, trample: 0, chargeStun: 0, chargeCd: 0, trampleRun: 0, trampleSpeed: 0, stomp: 0, levelHp: 0, deathBlast: 0, pctHit: 0, ram: 0, noFlank: 0, carrier: 0, noPack: 0, roll: 0, lockOn: 0, spinHitCap: 0 };
   const BURST_GAP = 0.15;      // seconds between shots in a burst
   const SHOTGUN_COS = Math.sqrt(3) / 2; // pellets spread 30 degrees to each side of the target (cos 30)
   // Only + - * / and sqrt from here on: those give identical results in every browser,
@@ -1944,7 +1944,7 @@ const Engine = (() => {
       }
       const opening = b.u.firstHit > 0 && !b.firstDone ? 1 + b.u.firstHit / 100 : 1; // Shadowborn: the first attack of the fight hits harder
       b.firstDone = true;
-      const hit = (b.u.hit * (charged ? b.u.charge : 1) * (b.u.spinHit > 0 ? Math.min(SPIN_CAP, 1 + b.u.spinHit / 100 * Math.max(0, b.firing)) : 1) + (b.auraHit || 0)) * opening; // an ally's aura adds to every hit
+      const hit = (b.u.hit * (charged ? b.u.charge : 1) * (b.u.spinHit > 0 ? Math.min(b.u.spinHitCap > 0 ? b.u.spinHitCap : SPIN_CAP, 1 + b.u.spinHit / 100 * Math.max(0, b.firing)) : 1) + (b.auraHit || 0)) * opening; // an ally's aura adds to every hit
       // trample: a charged hit doesn't stop the unit; it runs on through its target and over every body in its path
       if (charged && b.u.trample > 0 && targets.length && !targets.flame) {
         const tgt = targets[0], dx = tgt.x - b.x, dy = tgt.y - b.y, d = hyp(dx, dy);
@@ -2840,7 +2840,12 @@ const Engine = (() => {
         // and the ramp starts over when it has to switch
         if (b.u.spinUp > 0 || b.u.spinHit > 0) {
           if (b.spinTarget && b.spinTarget.alive && valid.includes(b.spinTarget)) primary = b.spinTarget;
-          else { b.spinTarget = primary; b.firing = 0; }
+          else {
+            const had = b.spinHad; b.spinTarget = primary; b.firing = 0;
+            // lockOn: after its first target it takes this long to lock onto a new one (the ramp starts after it)
+            if (b.u.lockOn > 0 && had) { b.firing = -1; b.cd = Math.max(b.cd, b.u.lockOn); continue; }
+          }
+          b.spinHad = true;
         }
         // with extra turrets, the main attack doesn't aim at an enemy another turret is on; with no one else, it waits
         if (b.u.turrets > 1) {

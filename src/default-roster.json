@@ -513,7 +513,7 @@
       "name": "Bullhead",
       "cost": 150,
       "params": {
-        "every": 3,
+        "every": 5,
         "hit": 100,
         "push": 6,
         "armor": 4,
@@ -1443,7 +1443,7 @@
       "burst": 1,
       "pellets": 1,
       "spinUp": 0,
-      "pierce": 5,
+      "pierce": 3,
       "projSpeed": 35,
       "minRange": 0,
       "charge": 1,
@@ -1687,7 +1687,7 @@
       "burst": 1,
       "pellets": 1,
       "spinUp": 50,
-      "spinHit": 50,
+      "spinHit": 175,
       "pierce": 0,
       "projSpeed": 0,
       "minRange": 0,
@@ -1716,7 +1716,7 @@
       "cost": 500,
       "bodies": 1,
       "hp": 2800,
-      "hit": 38,
+      "hit": 15,
       "aps": 2,
       "range": 18,
       "speed": 3,
@@ -1725,7 +1725,9 @@
       "skills": [
         "split",
         "shrink"
-      ]
+      ],
+      "spinHitCap": 8,
+      "lockOn": 0.5
     },
     {
       "burst": 3,

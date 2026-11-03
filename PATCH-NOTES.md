@@ -16,6 +16,24 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 4 November 2026 – Balance: Sun Priest, Earth Wizard, Bullhead
+
+### Sun Priest: slow to switch, deadly once locked on
+- The beam now **starts weak and ramps hard**: hit 15 (was 38), growing 175% a second on the same target up to **8× (120 a hit)** (was 50% a second up to 3×). Its attack speed still winds up to 3×. Against one big target it reaches about the same damage as before, a little later.
+- **Lock-on:** after its first target, it takes **0.5 s to lock onto each new one**, and the ramp starts over after that.
+- Together: a goblin now takes **about a second** instead of half a shot, so swarms and archers are its counter, while giants (Brute, Ether Golem, War Mammoth) still melt. Split beam still helps it against crowds, but much less than before.
+
+### Earth Wizard
+- **Pierce 3** (was 5): each shot goes through 3 bodies behind its target instead of 5.
+
+### Brute: Bullhead
+- **Longer charge cooldown:** it charges on its **1st, 6th, 11th...** attack (was every 3rd: 1st, 4th, 7th...), about every 4.5 s instead of every 2.7 s.
+
+### Developer
+- Two new unit fields, also in Counter Lab: **Lock-on (s)** and **Damage spin-up top (×)**.
+
+---
+
 ## 3 November 2026 – Puzzles, tower perks, a stealth fix and a fairer leaderboard
 
 ### New: Tutorial puzzles (replace the tutorial)

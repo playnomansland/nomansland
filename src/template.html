@@ -395,6 +395,8 @@ textarea { min-height: 110px; resize: vertical; font-size: 12px; }
     ['pellets', 'Shotgun pellets', 1, 'Pellets fired at once into a 60° cone, each at a different body. 1 = normal.'],
     ['spinUp', 'Spin-up (%/s)', 5, 'Attack speed gained per second of hitting the same target, up to 3×. Starts over when the unit switches target.'],
     ['spinHit', 'Damage spin-up (%/s)', 5, 'Hit size gained per second of hitting the same target, up to 3×. Starts over when the unit switches target. Bigger hits lose less to armor.'],
+    ['spinHitCap', 'Damage spin-up top (×)', 1, 'Highest hit size the damage spin-up reaches. 0 = 3×.'],
+    ['lockOn', 'Lock-on (s)', 0.1, 'After its first target, the unit waits this long before attacking each new target, and the spin-up starts after it. 0 = none.'],
     ['pierce', 'Pierce', 1, 'Extra bodies a shot passes through behind its target.'],
     ['projSpeed', 'Projectile speed (m/s)', 5, '0 = instant hit. Slower shots can be dodged.'],
     ['minRange', 'Minimum range (m)', 1, 'Can’t hit anything closer than this.'],
