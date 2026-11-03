@@ -24,6 +24,7 @@
 //   /account/skin    { skin, worn } (auth) -> { player }  (wear or take off a skin the player owns; see SKINS below)
 //   /account/invite  (auth, Google accounts) -> { code, friends, rewarded }  (this player's invite link; see INVITE below)
 //   /account/discord { code, redirect } (auth) -> { player }  (Discord check for the BABABABA title; see DISCORD below)
+//   /account/puzzle  { k, army } (auth)  -> { player, won, solved }  (a tutorial puzzle's fight, replayed here; see PUZZLE below)
 // guest, google and me also take { invite: CODE }: a new account made through a friend's invite link (INVITE).
 //
 // Month end (2026-11-03): the Worker's hourly cron (wrangler.toml [triggers], index.js scheduled) calls awardLegends,
@@ -34,6 +35,10 @@
 // (index.js -> leaderboard) reads it. Players need an account (a guest is enough) to play ranked: the phone sends its
 // session in the match's hello message (never in the URL) and the Room checks it with sessionPlayer.
 import { json, secret } from './limits.js';
+import Game from '../../src/game.js';
+import Ref from '../../src/referee.js';
+import puzzleData from './puzzle-data.cjs';
+const { PUZZLES, builtin } = puzzleData;
 
 export const ACCOUNT = {
   SESSION_DAYS: 30,
@@ -65,6 +70,8 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS referrals_inviter ON referrals (inviter)`,
   // Discord (2026-11-03): which Discord user gave which player the BABABABA title (one player per Discord user)
   `CREATE TABLE IF NOT EXISTS discord (subject TEXT PRIMARY KEY, player TEXT NOT NULL UNIQUE, created INTEGER NOT NULL)`,
+  // tutorial puzzles (2026-11-03): one row per puzzle a player has solved (k = its index in src/puzzles.json)
+  `CREATE TABLE IF NOT EXISTS puzzles (player TEXT NOT NULL, k INTEGER NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (player, k))`,
 ];
 let schemaReady = null;
 function ensureSchema(db) {
@@ -73,7 +80,8 @@ function ensureSchema(db) {
     // players.tag_changed (2026-11-02): when the gamertag was last changed (one change a week; developers any time)
     // players.legend (2026-11-03): how many months the player ended in the top 5 (counted from 'awards')
     // players.online (2026-11-03): online matches the player finished (countOnline); players.discord: when the Discord check passed
-    .then(() => Promise.all(['title TEXT', 'tag_changed INTEGER', 'legend INTEGER', 'online INTEGER', 'discord INTEGER'].map((c) => db.prepare('ALTER TABLE players ADD COLUMN ' + c).run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }))))
+    // players.initiate (2026-11-03): when the last tutorial puzzle was solved (the Initiate title)
+    .then(() => Promise.all(['title TEXT', 'tag_changed INTEGER', 'legend INTEGER', 'online INTEGER', 'discord INTEGER', 'initiate INTEGER'].map((c) => db.prepare('ALTER TABLE players ADD COLUMN ' + c).run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }))))
     .catch((e) => { schemaReady = null; throw e; });
   return schemaReady;
 }
@@ -84,8 +92,9 @@ function ensureSchema(db) {
 //   dev   "DEV" (pink): developer accounts (the server's dev column)
 //   legend "Legend" (gold, 2026-11-03): ended a month in the top 5 of the leaderboard (players.legend > 0). Kept for good.
 //   bababa "BABABABA" (orange, 2026-11-03): joined the game's Discord server, checked with Discord (players.discord).
+//   initiate "Initiate" (light blue, 2026-11-03): solved every tutorial puzzle (players.initiate; see PUZZLE below).
 // The player picks which one shows (players.title); none picked = the first earned one in the order DEV, Legend,
-// BABABABA, Day 1.
+// BABABABA, Initiate, Day 1.
 // Gamertags: one change a week (TAG_EVERY), any time for developers. Naming a brand-new account (in its first
 // TAG_FRESH, e.g. sign-up's gamertag after Google) doesn't count.
 export const TAG_EVERY = 7 * 24 * 3600e3;
@@ -97,6 +106,7 @@ export function titlesOf(p) {
   if (p && p.dev) out.push('dev');
   if (p && p.legend > 0) out.push('legend');
   if (p && p.discord) out.push('bababa');
+  if (p && p.initiate) out.push('initiate');
   if (p && p.created < DAY1_END) out.push('day1');
   return out;
 }
@@ -355,7 +365,7 @@ export async function sessionPlayer(env, token) {
   await ensureSchema(db);
   const s = await db.prepare(`SELECT s.player, s.expires, p.tag, p.deleted, p.dev FROM sessions s JOIN players p ON p.id = s.player WHERE s.hash = ?`).bind(await sha256(token)).first();
   if (!s || s.expires < Date.now() || s.deleted) return null;
-  const p = await db.prepare('SELECT created, dev, title, legend, discord FROM players WHERE id = ?').bind(s.player).first();
+  const p = await db.prepare('SELECT created, dev, title, legend, discord, initiate FROM players WHERE id = ?').bind(s.player).first();
   let skins = [];
   try { skins = await wornSkins(db, s.player, !!s.dev); } catch (e) { skins = []; } // a look only: never in the way of playing
   return { id: s.player, tag: s.tag || 'Player', dev: !!s.dev, title: titleShown(p), skins };
@@ -382,7 +392,7 @@ export async function recordSeries(env, ids, winner) {
 // the board (the leader in wins gets the full 75); the win share counts a tie as half a win. Then wins, then fewest
 // losses. score is 0 to 100. Deleted accounts drop off.
 export const BOARD_WEIGHTS = { wins: 0.75, share: 0.25 };
-const BOARD_SQL = `WITH b AS (SELECT p.id, p.tag, p.created, p.dev, p.title, p.legend, p.discord, r.w, r.t, r.l FROM ranked r JOIN players p ON p.id = r.player
+const BOARD_SQL = `WITH b AS (SELECT p.id, p.tag, p.created, p.dev, p.title, p.legend, p.discord, p.initiate, r.w, r.t, r.l FROM ranked r JOIN players p ON p.id = r.player
     WHERE p.deleted IS NULL AND (r.w + r.t + r.l) > 0), top AS (SELECT MAX(w) AS mw FROM b)
   SELECT b.*, 100.0 * (${BOARD_WEIGHTS.wins} * (CASE WHEN top.mw > 0 THEN b.w * 1.0 / top.mw ELSE 0 END)
     + ${BOARD_WEIGHTS.share} * (b.w + 0.5 * b.t) * 1.0 / (b.w + b.t + b.l)) AS score
@@ -440,9 +450,9 @@ export async function leaderboard(env, cors) {
 }
 
 async function playerOut(db, id) {
-  const p = await db.prepare('SELECT id, tag, created, dev, title, tag_changed, legend, discord FROM players WHERE id = ?').bind(id).first();
+  const p = await db.prepare('SELECT id, tag, created, dev, title, tag_changed, legend, discord, initiate FROM players WHERE id = ?').bind(id).first();
   const logins = await db.prepare('SELECT provider FROM logins WHERE player = ?').bind(id).all();
-  return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google'), dev: !!p.dev, titles: titlesOf(p), title: titleShown(p), tagNext: tagNext(p) > Date.now() ? tagNext(p) : 0, skins: await skinsOf(db, id, !!p.dev), discord: !!p.discord };
+  return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google'), dev: !!p.dev, titles: titlesOf(p), title: titleShown(p), tagNext: tagNext(p) > Date.now() ? tagNext(p) : 0, skins: await skinsOf(db, id, !!p.dev), discord: !!p.discord, puzzles: (await db.prepare('SELECT k FROM puzzles WHERE player = ? ORDER BY k').bind(id).all()).results.map((r) => r.k) };
 }
 
 // Developer mode: a Google account whose verified email is in the secret DEV_EMAILS (comma separated; a Cloudflare
@@ -455,12 +465,41 @@ function isDevEmail(claims, env) {
   return list.includes(claims.email.trim().toLowerCase());
 }
 
+// ---------- tutorial puzzles: the Initiate title (2026-11-03) ----------
+// The page's puzzles (src/puzzles.json, PUZZLES there too) are one fight each against an army in plain sight. A win
+// is saved on the phone, and sent here as the player's army: { k, army: [[unit name, col, row], ...] }. The server sets
+// the fight up exactly as the page's startPuzzle does (the built-in units on the Old standard board, the enemy's
+// squads as if from an earlier round, the puzzle's gold and shop) and plays it with the same referee, so a phone can't
+// claim a win it didn't get. One row per solved puzzle (table 'puzzles'); solving the last one sets players.initiate.
+export const PUZZLE = { title: 'initiate', count: PUZZLES.length, maxArmy: 12 };
+export function puzzleWon(k, army) {
+  const P = PUZZLES[k];
+  if (!P || !Array.isArray(army) || army.length > PUZZLE.maxArmy) return false;
+  const { units, matrix } = builtin();
+  const ix = (n) => units.findIndex((u) => u.name === n);
+  const m = Game.createMatch(units, matrix, 1, 'standard');
+  m.packages = [[], []];
+  for (const n of P.shop) m.unlocks[0][ix(n)] = 1;
+  for (const [n] of P.foe) m.unlocks[1][ix(n)] = 1;
+  m.gold = [P.gold, 9999];
+  for (const [n, c, r] of P.foe) { const q = Game.place(m, 1, ix(n), c, r); if (!q) return false; q.round = 0; }
+  for (const a of army) {
+    if (!Array.isArray(a) || a.length !== 3 || typeof a[0] !== 'string' || !P.shop.includes(a[0])) return false;
+    const c = a[1], r = a[2];
+    if (!Number.isInteger(c) || !Number.isInteger(r)) return false;
+    if (!Game.place(m, 0, ix(a[0]), c, r)) return false;   // not in the zone, no gold, a taken tile
+  }
+  if (!m.armies[0].length) return false;
+  const f = Ref.fight(m);
+  return f.summary.winner === 0 && !f.summary.timeout;
+}
+
 // ---------- the route handler ----------
 export async function handleAccount(request, env, cors) {
   const db = env.ACCOUNTS;
   if (!db) return json({ error: 'accounts off' }, 503, cors);
   const route = new URL(request.url).pathname.replace(/^\/account\/?/, '').replace(/\/$/, '');
-  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title', 'skin', 'invite', 'discord'].includes(route)) return json({ error: 'not found' }, 404, cors);
+  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title', 'skin', 'invite', 'discord', 'puzzle'].includes(route)) return json({ error: 'not found' }, 404, cors);
   if (request.method !== 'POST') return json({ error: 'method' }, 405, cors);
 
   let body = {};
@@ -524,7 +563,7 @@ export async function handleAccount(request, env, cors) {
 
     if (route === 'title') {
       const t = typeof body.title === 'string' ? body.title : '';
-      const p = await db.prepare('SELECT created, dev, legend, discord FROM players WHERE id = ?').bind(me.player).first();
+      const p = await db.prepare('SELECT created, dev, legend, discord, initiate FROM players WHERE id = ?').bind(me.player).first();
       if (t && !titlesOf(p).includes(t)) return json({ error: 'not your title' }, 400, cors);
       await db.prepare('UPDATE players SET title = ? WHERE id = ?').bind(t || 'none', me.player).run();
       return json({ player: await playerOut(db, me.player) }, 200, cors);
@@ -565,6 +604,22 @@ export async function handleAccount(request, env, cors) {
         db.prepare('UPDATE players SET discord = COALESCE(discord, ?) WHERE id = ?').bind(now, me.player),
       ]);
       return json({ player: await playerOut(db, me.player) }, 200, cors);
+    }
+    if (route === 'puzzle') {
+      const k = Number.isInteger(body.k) ? body.k : -1;
+      if (k < 0 || k >= PUZZLE.count) return json({ error: 'no such puzzle' }, 400, cors);
+      const had = await db.prepare('SELECT 1 FROM puzzles WHERE player = ? AND k = ?').bind(me.player, k).first();
+      let won = !!had;
+      if (!had) {
+        try { won = puzzleWon(k, body.army); } catch (e) { console.warn('puzzle', e && e.message); won = false; }
+        if (won) {
+          await db.prepare('INSERT OR IGNORE INTO puzzles (player, k, created) VALUES (?, ?, ?)').bind(me.player, k, now).run();
+          const n = await db.prepare('SELECT COUNT(*) AS n FROM puzzles WHERE player = ?').bind(me.player).first();
+          if (n && n.n >= PUZZLE.count) await db.prepare('UPDATE players SET initiate = COALESCE(initiate, ?) WHERE id = ?').bind(now, me.player).run();
+        }
+      }
+      const out = await playerOut(db, me.player);
+      return json({ player: out, won, solved: out.puzzles }, 200, cors);
     }
     if (route === 'me') {
       try { await grantSkins(env, now); } catch (e) { console.warn('skins', e && e.message); }

@@ -1,16 +1,13 @@
-// Headless check of the tutorial puzzles (PUZZLES in src/site-template.html): each puzzle's answer wins the fight from
+// Headless check of the tutorial puzzles (src/puzzles.json): each puzzle's answer wins the fight from
 // most placements in the zone, and the tempting wrong answers lose. The fights are set up the way startPuzzle does
 // (Old standard board, the enemy's squads as if from an earlier round) and played by the referee's fight().
 // Run from the repo root: node tools/tests/puzzles.js. After changing these units' stats, run it again.
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
 const Engine = require('../../src/engine.js');
 const Game = require('../../src/game.js');
 const Ref = require('../../src/referee.js');
 const { units, matrix } = require('../../server/src/prepare-units.cjs')(Engine, require('../../src/demo-units.json'));
-const src = fs.readFileSync(path.join(__dirname, '../../src/site-template.html'), 'utf8');
-const PUZZLES = eval(src.match(/const PUZZLES = (\[[\s\S]*?\n  \]);/)[1]);
+const PUZZLES = require('../../src/puzzles.json');
 const ix = (n) => { const i = units.findIndex((u) => u.name === n); assert.ok(i >= 0, n); return i; };
 
 function fight(P, mine) {

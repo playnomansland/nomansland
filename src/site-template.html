@@ -523,8 +523,10 @@ html.pc .corner button span { display: inline; }
 .home .mplayer { background: rgba(13, 19, 21, 0.62); border-color: rgba(255, 255, 255, 0.25); }
 /* rewards (2026-11-03): the card on the main menu (a picture of each reward) and the Rewards sheet */
 .rewards { width: min(100%, 520px); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rewards #rw-puzzles { grid-column: 1 / -1; }
 .rewards button { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; text-align: left; padding: 6px 10px 6px 6px; border: 1px solid rgba(79, 216, 196, 0.6); background: rgba(13, 19, 21, 0.68); color: #fff; border-radius: 12px; min-height: 64px; font: inherit; }
 .rewards #rw-discord { border-color: rgba(255, 138, 42, 0.65); }
+.rewards #rw-puzzles { border-color: rgba(127, 211, 255, 0.65); }
 .rewards button b { display: block; font: 700 13px var(--font-display); letter-spacing: 0.04em; }
 .rewards button small { display: block; font-size: 11px; opacity: 0.85; line-height: 1.25; }
 .rewards button.done small { color: var(--gold); opacity: 1; }
@@ -533,7 +535,7 @@ html.pc .corner button span { display: inline; }
 .rw-pic em { position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%); font: 700 8px var(--font-display); font-style: normal; letter-spacing: 0.14em; text-transform: uppercase; background: #2A9D96; color: #fff; padding: 1px 5px; border-radius: 4px; }
 .rw-pic .ptitle { font-size: 7px; letter-spacing: 0.12em; padding: 2px 5px; gap: 3px; }
 .rw-pic .ptitle i { width: 3px; height: 3px; }
-@media (max-width: 380px) { .rewards button { grid-template-columns: 1fr; justify-items: center; text-align: center; } }
+@media (max-width: 380px) { .rewards button { grid-template-columns: 1fr; justify-items: center; text-align: center; } .rewards #rw-puzzles { grid-template-columns: auto minmax(0, 1fr); text-align: left; justify-items: start; } }
 .rewards-sheet { display: grid; gap: 14px; }
 .rewards-sheet .joinrow { display: flex; gap: 8px; width: 100%; }
 .rewards-sheet .joinrow input { flex: 1; min-width: 0; width: auto; font-size: 13px; }
@@ -2607,15 +2609,16 @@ html.pc .corner button span { display: inline; }
   // ---------- titles (2026-11-02): earned on the server (accounts.js titlesOf), shown under a username ----------
   // day1: every account made in the first week (to Sunday 2026-11-08); dev: developer accounts; legend (2026-11-03):
   // ended a month in the top 5 of the leaderboard (kept for good); bababa (2026-11-03): joined the game's Discord
-  // server, checked with Discord (see "rewards"). The player picks
-  // which one shows (Profile). A title this phone hasn't announced yet gets the "new Title" popup on the main menu.
+  // server, checked with Discord (see "rewards"); initiate (2026-11-03): solved every tutorial puzzle (the server
+  // replays each win, see "tutorial puzzles"). The player picks which one shows (Profile). A title this phone hasn't announced yet gets the "new Title" popup on the main menu.
   const TITLES = {
     day1: { name: 'Day 1', col: '#B67CFF', glow: 'rgba(182, 124, 255, 0.55)' },
     dev: { name: 'DEV', col: '#FF5FC4', glow: 'rgba(255, 95, 196, 0.55)' },
     legend: { name: 'Legend', col: '#FFC83D', glow: 'rgba(255, 200, 61, 0.6)' },
     bababa: { name: 'BABABABA', col: '#FF8A2A', glow: 'rgba(255, 138, 42, 0.6)' },
+    initiate: { name: 'Initiate', col: '#7FD3FF', glow: 'rgba(127, 211, 255, 0.6)' },
   };
-  const TITLE_WHY = { day1: 'Day 1: you were here in the very first week.', dev: 'DEV: you make this game.', legend: 'Legend: you ended a month in the top 5 of the leaderboard.', bababa: 'BABABABA: you joined the No Mans Land Discord.' };
+  const TITLE_WHY = { day1: 'Day 1: you were here in the very first week.', dev: 'DEV: you make this game.', legend: 'Legend: you ended a month in the top 5 of the leaderboard.', bababa: 'BABABABA: you joined the No Mans Land Discord.', initiate: 'Initiate: you solved every puzzle.' };
   const titleHtml = (id, big) => TITLES[id] ? `<span class="ptitle${big ? ' big' : ''}" style="--tc:${TITLES[id].col};--tg:${TITLES[id].glow}"><i aria-hidden="true"></i>${esc(TITLES[id].name)}<i aria-hidden="true"></i></span>` : '';
   // a username with its title under it
   const nameplate = (tag, title, cls = '') => `<span class="nameplate ${cls}"><span class="np-tag">${esc(tag)}</span>${titleHtml(title)}</span>`;
@@ -3537,7 +3540,8 @@ html.pc .corner button span { display: inline; }
     if (r.discord !== undefined) rw.discord = r.discord && typeof r.discord.clientId === 'string' ? r.discord : null;
     if (!r.player) return;
     acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, dev: !!r.player.dev, titles: Array.isArray(r.player.titles) ? r.player.titles.filter(t => TITLES[t]) : [], title: TITLES[r.player.title] ? r.player.title : '', tagNext: +r.player.tagNext || 0,
-      skins: Array.isArray(r.player.skins) ? r.player.skins.filter(k => k && Shapes.SKINS[k.id]).map(k => ({ id: k.id, worn: !!k.worn })) : [], discord: !!r.player.discord, session: r.session || acct.session, ts: now() });
+      skins: Array.isArray(r.player.skins) ? r.player.skins.filter(k => k && Shapes.SKINS[k.id]).map(k => ({ id: k.id, worn: !!k.worn })) : [], discord: !!r.player.discord, puzzles: Array.isArray(r.player.puzzles) ? r.player.puzzles.filter(k => Number.isInteger(k)) : [], session: r.session || acct.session, ts: now() });
+    puzzleSync();
   }
   function acctFail(r) {
     if (r.status === 503 && r.error === 'accounts off') { acctUi.off = true; return 'Accounts aren’t switched on yet on the game server.'; }
@@ -3683,12 +3687,14 @@ html.pc .corner button span { display: inline; }
   const inviteLink = (code) => location.origin + location.pathname + '?invite=' + code;
   // the card under PLAY: a picture of each reward, tap for the sheet
   function rewardsCard() {
-    const golem = ownsSkin(INVITE_SKIN), dc = !!(acct && acct.discord);
+    const golem = ownsSkin(INVITE_SKIN), dc = !!(acct && acct.discord), init = hasInitiate();
     return `<div class="rewards" role="group" aria-label="Rewards">
       <button id="rw-invite" class="${golem ? 'done' : ''}"><span class="rw-pic"><img src="${skinPic(INVITE_SKIN)}" alt="" width="56" height="56"><em>Limited</em></span>
         <span><b>Invite a friend</b><small>${golem ? 'Aquamarine Golem: yours!' : 'Get the Aquamarine Golem skin'}</small></span></button>
       <button id="rw-discord" class="${dc ? 'done' : ''}"><span class="rw-pic">${titleHtml('bababa')}</span>
         <span><b>Join our Discord</b><small>${dc ? 'BABABABA title: yours!' : 'Get the orange BABABABA title'}</small></span></button>
+      <button id="rw-puzzles" class="${init ? 'done' : ''}"><span class="rw-pic">${titleHtml('initiate')}</span>
+        <span><b>Solve the puzzles</b><small>${init ? 'Initiate title: yours!' : `Get the Initiate title (${puzSolvedAll().length}/${PUZZLES.length} solved)`}</small></span></button>
     </div>`;
   }
   function rewardsDraw() {
@@ -3714,6 +3720,13 @@ html.pc .corner button span { display: inline; }
           : !a ? '<p class="hint" style="margin:0">Make an account first (a guest is enough).</p>'
           : !dc ? '<p class="hint" style="margin:0">The Discord server opens soon. Check back here!</p>'
           : `<span class="btnrow">${dc.invite ? `<a class="btn" id="rw-dc-join" href="${esc(dc.invite)}" target="_blank" rel="noopener">Join the Discord</a>` : ''}<button class="btn primary" id="rw-dc-check" ${dis} ${dc.check ? '' : 'disabled'}>I’ve joined: Check</button></span>`}
+      </section>
+      <section class="rw-sec">
+        <div class="rw-head"><div class="rw-chip">${titleHtml('initiate', true)}</div></div>
+        <p class="hint" style="margin:0">Solve all ${PUZZLES.length} puzzles (one fight each, the enemy army in plain sight) and the light blue Initiate title goes under your name. Solved: ${puzSolvedAll().length} of ${PUZZLES.length}.</p>
+        ${hasInitiate() ? '<p class="rw-got">Initiate is yours! Pick which title shows in Profile.</p>'
+          : !a ? '<p class="hint" style="margin:0">Puzzles you solve count once you have an account (a guest is enough): the game keeps them until then.</p>' : ''}
+        <button class="btn ${hasInitiate() ? '' : 'primary'}" id="rw-puz-open">${hasInitiate() ? 'Play the puzzles again' : 'Open the puzzles'}</button>
       </section>`;
     $('rw-msg').textContent = rw.msg;
     const on = (id, f) => { if ($(id)) $(id).addEventListener('click', f); };
@@ -3722,6 +3735,7 @@ html.pc .corner button span { display: inline; }
     on('rw-copy', async () => { const t = $('rw-link'); try { await navigator.clipboard.writeText(t.value); rw.msg = 'Link copied.'; } catch (e) { t.select(); rw.msg = 'Select the link and copy it.'; } $('rw-msg').textContent = rw.msg; });
     on('rw-share', () => { navigator.share({ title: 'No Mans Land', text: 'Play No Mans Land with me!', url: inviteLink(inv.code) }).catch(() => {}); });
     on('rw-dc-check', discordStart);
+    on('rw-puz-open', openPuzzles);
   }
   async function rewardsLoad() {
     if (!acct) { rewardsDraw(); return; }
@@ -3734,8 +3748,9 @@ html.pc .corner button span { display: inline; }
       if (r.status !== 200) rw.msg = acctFail(r);
     }
     rw.busy = false; rewardsDraw();
-    if (phase === 'start' && !m && home.screen === 'menu' && $('rw-invite')) { const c = document.querySelector('#home .rewards'); if (c) c.outerHTML = rewardsCard(); wireRewardsCard(); }
+    if (phase === 'start' && !m && home.screen === 'menu' && $('rw-invite')) redrawRewardsCard();
   }
+  function redrawRewardsCard() { const c = document.querySelector('#home .rewards'); if (c) { c.outerHTML = rewardsCard(); wireRewardsCard(); } }
   function openRewardsSheet(msg) {
     $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Rewards</h3><button class="btn small" id="close">Close</button></div>
       <div id="rewards" class="rewards-sheet"></div><p class="hint" id="rw-msg" aria-live="polite" style="margin:0;color:var(--gold)"></p>`;
@@ -3748,6 +3763,7 @@ html.pc .corner button span { display: inline; }
   function wireRewardsCard() {
     if ($('rw-invite')) $('rw-invite').addEventListener('click', () => openRewardsSheet());
     if ($('rw-discord')) $('rw-discord').addEventListener('click', () => openRewardsSheet());
+    if ($('rw-puzzles')) $('rw-puzzles').addEventListener('click', openPuzzles);
   }
   // Discord: off to Discord's consent screen (scopes: who you are and which servers you're in), and back
   function discordStart() {
@@ -4194,22 +4210,35 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // The enemy's squads are placed as if from an earlier round, so they show while you deploy. Each puzzle was checked
   // headlessly (tools/tests/puzzles.js): its answer wins from most placements, the tempting wrong answers lose.
   const PUZZLE_STORE = 'phonebellum.puzzles.v1';
-  const PUZZLES = [
-    { name: 'The horde', gold: 200, shop: ['Goblin Swarm', 'Sniper', 'Fire Mage', 'Brute'],
-      foe: [['Goblin Swarm', 5, 4], ['Goblin Swarm', 6, 4], ['Skeleton Archers', 5, 2]],
-      goal: 'Two Goblin Swarms and Skeleton Archers: a crowd of small bodies. You have 200 gold.',
-      hint: 'Splash hits many bodies at once. Fire Mage beats crowds.', why: 'Fire Mage’s splash hits a whole crowd with every shot.' },
-    { name: 'Two giants', gold: 300, shop: ['Fire Mage', 'Sniper', 'Goblin Swarm', 'Skeleton Archers', 'Ember Imps'],
-      foe: [['Brute', 5, 4], ['Brute', 6, 4]],
-      goal: 'Two Brutes: huge health, huge hits. You have 300 gold.',
-      hint: 'A Brute hits one body at a time. Many cheap bodies swamp it: Goblin Swarms, up front.', why: 'A Brute kills one goblin a hit while the whole swarm hits back.' },
-    { name: 'Out of reach', gold: 300, shop: ['Goblin Swarm', 'Fire Mage', 'Sniper', 'Skeleton Archers', 'Ember Imps'],
-      foe: [['Fire Mage', 5, 3], ['Fire Mage', 6, 3], ['Brute', 5, 4]],
-      goal: 'Two Fire Mages behind a Brute. Crowds melt in their splash. You have 300 gold.',
-      hint: 'Few targets, all of them single bodies: Snipers outrange Fire Mages and land one big hit each shot.', why: 'Snipers shoot from beyond the Fire Mages’ reach, and their splash finds no crowd.' },
-  ];
+  const PUZZLES = /*PUZZLES*/; // src/puzzles.json (the server checks a solved puzzle with the same file)
   let puzSolved = [];
   try { puzSolved = JSON.parse(localStorage.getItem(PUZZLE_STORE) || '[]') || []; } catch (e) { puzSolved = []; }
+  // The Initiate title (2026-11-03): solve every puzzle. The server (accounts.js PUZZLE) keeps the account's solved
+  // puzzles and gives the title; it believes no claim, it replays the fight, so each win is sent as the army that won
+  // (unit names and tiles). Wins made signed out, or that didn't reach the server, wait in PUZZLE_WINS and go with the
+  // next account answer (acctTake -> puzzleSync).
+  const PUZZLE_WINS = 'phonebellum.puzzle-wins.v1'; // { k: [[unit name, col, row], ...] } not yet counted by the server
+  let puzWins = {};
+  try { puzWins = JSON.parse(localStorage.getItem(PUZZLE_WINS) || '{}') || {}; } catch (e) { puzWins = {}; }
+  const puzSolvedAll = () => Array.from(new Set(puzSolved.concat(acct && acct.puzzles || []))).sort((a, b) => a - b); // this phone's and the account's
+  const hasInitiate = () => !!(acct && acct.titles && acct.titles.includes('initiate'));
+  let puzSyncing = false;
+  async function puzzleSync() {
+    if (puzSyncing || !acct || !acct.session || typeof acctCall !== 'function') return;
+    const todo = Object.keys(puzWins).map(Number).filter(k => PUZZLES[k] && !(acct.puzzles || []).includes(k));
+    if (!todo.length) return;
+    puzSyncing = true;
+    try {
+      for (const k of todo) {
+        const r = await acctCall('puzzle', { k, army: puzWins[k] }, true);
+        if (r.status !== 200) break; // signed out, accounts off, or the server is away: try again next time
+        delete puzWins[k];
+        try { localStorage.setItem(PUZZLE_WINS, JSON.stringify(puzWins)); } catch (e) {}
+        acctTake(r); // the account's solved list and titles (it calls back here; puzSyncing keeps it to this run)
+      }
+    } finally { puzSyncing = false; }
+    if (phase === 'start' && !m && typeof home !== 'undefined' && home.screen === 'menu') { if (!home.pop) drawHome(); else redrawRewardsCard(); }
+  }
   const puzzle = () => (mode === 'tutorial' && tut && tut.puzzle != null) ? PUZZLES[tut.puzzle] : null;
   function startPuzzle(k) {
     const P = PUZZLES[k];
@@ -4233,7 +4262,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function openPuzzles() {
     $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Tutorial puzzles</h3><button class="btn small" id="close">Close</button></div>
       <p class="hint" style="margin:0">One fight each. You see the whole enemy army; win with the gold you have.</p>
-      <div style="display:grid;gap:8px">${PUZZLES.map((P, k) => `<button class="btn" data-puz="${k}" style="display:flex;justify-content:space-between;gap:8px;text-align:left"><span><b>${k + 1}. ${esc(P.name)}</b><br><span class="hint">${esc(P.goal)}</span></span><span style="color:var(--gold)">${puzSolved.includes(k) ? '✓ Solved' : ''}</span></button>`).join('')}</div>`;
+      <p class="hint" style="margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${hasInitiate() ? 'All solved: the title is yours.' : `Solve all ${PUZZLES.length} for the title`} ${titleHtml('initiate')}</p>
+      <div style="display:grid;gap:8px">${PUZZLES.map((P, k) => `<button class="btn" data-puz="${k}" style="display:flex;justify-content:space-between;gap:8px;text-align:left"><span><b>${k + 1}. ${esc(P.name)}</b><br><span class="hint">${esc(P.goal)}</span></span><span style="color:var(--gold)">${puzSolvedAll().includes(k) ? '✓ Solved' : ''}</span></button>`).join('')}</div>`;
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', closeSheet);
     $('sheet').querySelectorAll('[data-puz]').forEach(b => b.addEventListener('click', () => startPuzzle(+b.dataset.puz)));
@@ -4242,6 +4272,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function puzResult(sum) {
     const P = puzzle(), k = tut.puzzle, won = sum.winner === me && !sum.timeout;
     if (won && !puzSolved.includes(k)) { puzSolved.push(k); try { localStorage.setItem(PUZZLE_STORE, JSON.stringify(puzSolved)); } catch (e) {} }
+    if (won && !(acct && (acct.puzzles || []).includes(k))) { // the winning army, for the server to replay
+      puzWins[k] = m.armies[me].map(q => [units[q.unit].name, q.col, q.row]);
+      try { localStorage.setItem(PUZZLE_WINS, JSON.stringify(puzWins)); } catch (e) {}
+      puzzleSync();
+    }
     const more = k + 1 < PUZZLES.length;
     if (won) coach(`<b>Solved!</b> ${esc(P.why)}`, [['Main menu', showStart], ...(more ? [['Next puzzle', () => startPuzzle(k + 1), true]] : [['Play vs AI', () => { matchKind = 'standard'; startAiMatch(); }, true]])]);
     else coach(`<b>Not this time.</b> ${tut.hint ? esc(P.hint) : 'Look at what they have, and what beats it.'}`, [['Main menu', showStart], ...(tut.hint ? [] : [['Hint', () => { const h = tut.hint = true; coach(`<b>Hint:</b> ${esc(P.hint)}`, [['Try again', () => { startPuzzle(k); tut.hint = h; panelDeploy(); }, true]]); }]]), ['Try again', () => { const h = tut.hint; startPuzzle(k); tut.hint = h; panelDeploy(); }, true]]);

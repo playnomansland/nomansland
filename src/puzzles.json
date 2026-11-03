@@ -1,0 +1,29 @@
+[
+  {
+    "name": "The horde",
+    "gold": 200,
+    "shop": ["Goblin Swarm","Sniper","Fire Mage","Brute"],
+    "foe": [["Goblin Swarm",5,4],["Goblin Swarm",6,4],["Skeleton Archers",5,2]],
+    "goal": "Two Goblin Swarms and Skeleton Archers: a crowd of small bodies. You have 200 gold.",
+    "hint": "Splash hits many bodies at once. Fire Mage beats crowds.",
+    "why": "Fire Mage’s splash hits a whole crowd with every shot."
+  },
+  {
+    "name": "Two giants",
+    "gold": 300,
+    "shop": ["Fire Mage","Sniper","Goblin Swarm","Skeleton Archers","Ember Imps"],
+    "foe": [["Brute",5,4],["Brute",6,4]],
+    "goal": "Two Brutes: huge health, huge hits. You have 300 gold.",
+    "hint": "A Brute hits one body at a time. Many cheap bodies swamp it: Goblin Swarms, up front.",
+    "why": "A Brute kills one goblin a hit while the whole swarm hits back."
+  },
+  {
+    "name": "Out of reach",
+    "gold": 300,
+    "shop": ["Goblin Swarm","Fire Mage","Sniper","Skeleton Archers","Ember Imps"],
+    "foe": [["Fire Mage",5,3],["Fire Mage",6,3],["Brute",5,4]],
+    "goal": "Two Fire Mages behind a Brute. Crowds melt in their splash. You have 300 gold.",
+    "hint": "Few targets, all of them single bodies: Snipers outrange Fire Mages and land one big hit each shot.",
+    "why": "Snipers shoot from beyond the Fire Mages’ reach, and their splash finds no crowd."
+  }
+]

@@ -6,6 +6,7 @@
 //  - the reward (the Aquamarine Ether Golem skin, worn) comes once the friend has finished an online match AND
 //    signed in with Google, whichever happens last; given once however many friends come
 //  - Discord: not in the server -> 403 'not in server'; a member gets the BABABABA title; one Discord user, one player
+//  - Puzzles: /account/puzzle replays the fight; only a real win counts; all three solved -> the Initiate title
 // Run: cd server && node test/invites.test.js (also in npm test)
 const assert = require('assert');
 const http = require('http');
@@ -154,7 +155,29 @@ function fakeDiscord() {
     assert.deepStrictEqual([(await call('discord', { code: 'in-111', redirect }, I.session)).status], [409], 'one Discord user, one player');
     assert.strictEqual((await call('title', { title: 'bababa' }, I.session)).status, 400, 'not earned: can\'t pick it');
     assert.strictEqual((await call('discord', { code: 'in-111', redirect }, guest.session)).status, 200, 'checking again is fine');
-    console.log('invites and discord: all checks passed');
+
+    // ----- Puzzles: the Initiate title (the server replays the fight) -----
+    const puz = (k, army, s = I.session) => call('puzzle', { k, army }, s);
+    assert.strictEqual((await puz(9, [])).status, 400, 'no such puzzle');
+    let r = await puz(0, [['Sniper', 5, 12], ['Sniper', 6, 12]]);
+    assert.deepStrictEqual([r.status, r.won, r.solved], [200, false, []], 'Snipers lose The horde: not solved');
+    r = await puz(0, [['Fire Mage', 5, 2]]);
+    assert.strictEqual(r.won, false, 'a tile outside the zone is refused');
+    r = await puz(0, [['Ent', 5, 12]]);
+    assert.strictEqual(r.won, false, 'a unit the puzzle does not sell');
+    r = await puz(0, [['Fire Mage', 5, 12], ['Fire Mage', 6, 12]]);
+    assert.deepStrictEqual([r.won, r.solved, r.player.puzzles], [true, [0], [0]], 'Fire Mages win The horde');
+    assert.ok(!r.player.titles.includes('initiate'), 'one puzzle is not the title');
+    r = await puz(0, [['Sniper', 5, 12]]);
+    assert.deepStrictEqual([r.won, r.solved], [true, [0]], 'a solved puzzle stays solved');
+    r = await puz(1, [['Goblin Swarm', 5, 10], ['Goblin Swarm', 6, 10], ['Goblin Swarm', 4, 10]]);
+    assert.deepStrictEqual([r.won, r.solved], [true, [0, 1]], 'Goblins beat Two giants');
+    r = await puz(2, [['Sniper', 3, 15], ['Sniper', 5, 15], ['Sniper', 7, 15]]);
+    assert.deepStrictEqual([r.won, r.solved], [true, [0, 1, 2]], 'Snipers beat Out of reach');
+    assert.ok(r.player.titles.includes('initiate'), 'all three: Initiate');
+    assert.strictEqual((await call('title', { title: 'initiate' }, I.session)).player.title, 'initiate', 'and it can be shown');
+    assert.strictEqual((await call('title', { title: 'initiate' }, guest.session)).status, 400, 'not earned: can\'t pick it');
+    console.log('invites, discord and puzzles: all checks passed');
   } finally { srv.stop(); dc.close(); }
   process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -25,6 +25,7 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
   - **Out of reach:** two Fire Mages behind a Brute, 300 gold.
 - Stuck? **Hint** on the coach line. A loss offers the hint and **Try again**; a win is saved as solved and takes you to the next puzzle.
 - The **✕** on the puzzle's line only hides it so you can see the board; the **Puzzle** button brings it back. Leave through the menu.
+- **Solve all three and you earn the light blue Initiate title.** It goes under your name like the other titles (pick which one shows in Profile), and the Rewards card on the main menu counts your solved puzzles. Puzzles solved before you had an account count once you make one, so nothing is lost. The game server replays every win itself, so the title can't be faked.
 
 ### Towers
 - **Bastion: March order.** One **free move every round**. No button to press: just drag an older squad and the free move is used first (before the paid one). Its sheet says *Move · free*.
