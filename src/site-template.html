@@ -550,6 +550,10 @@ html.pc .corner button span { display: inline; }
 .lb th { font: 600 11px var(--font-display); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 .lb tr.me td { color: var(--gold); }
 .lb td.num { font-family: var(--font-data); }
+.lb tr.legend td:first-child { color: #FFC83D; font-weight: 700; text-shadow: 0 0 8px rgba(255, 200, 61, 0.55); }
+.lb tr.cut td { border-bottom: 1px dashed rgba(255, 200, 61, 0.6); }
+.lb-legend { margin: 0; padding: 8px 10px; border: 1px solid rgba(255, 200, 61, 0.45); border-radius: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lb-legend .hint { margin: 0; flex: 1 1 180px; }
 .series { display: flex; justify-content: center; gap: 10px; align-items: baseline; font-family: var(--font-display); }
 .series b { font-size: 22px; }
 
@@ -2529,12 +2533,15 @@ html.pc .corner button span { display: inline; }
   }
 
   // ---------- titles (2026-11-02): earned on the server (accounts.js titlesOf), shown under a username ----------
-  // day1: every account made in the first week (to Sunday 2026-11-08); dev: developer accounts. The player picks
+  // day1: every account made in the first week (to Sunday 2026-11-08); dev: developer accounts; legend (2026-11-03):
+  // ended a month in the top 5 of the leaderboard (kept for good). The player picks
   // which one shows (Profile). A title this phone hasn't announced yet gets the "new Title" popup on the main menu.
   const TITLES = {
     day1: { name: 'Day 1', col: '#B67CFF', glow: 'rgba(182, 124, 255, 0.55)' },
     dev: { name: 'DEV', col: '#FF5FC4', glow: 'rgba(255, 95, 196, 0.55)' },
+    legend: { name: 'Legend', col: '#FFC83D', glow: 'rgba(255, 200, 61, 0.6)' },
   };
+  const TITLE_WHY = { day1: 'Day 1: you were here in the very first week.', dev: 'DEV: you make this game.', legend: 'Legend: you ended a month in the top 5 of the leaderboard.' };
   const titleHtml = (id, big) => TITLES[id] ? `<span class="ptitle${big ? ' big' : ''}" style="--tc:${TITLES[id].col};--tg:${TITLES[id].glow}"><i aria-hidden="true"></i>${esc(TITLES[id].name)}<i aria-hidden="true"></i></span>` : '';
   // a username with its title under it
   const nameplate = (tag, title, cls = '') => `<span class="nameplate ${cls}"><span class="np-tag">${esc(tag)}</span>${titleHtml(title)}</span>`;
@@ -2814,7 +2821,7 @@ html.pc .corner button span { display: inline; }
           <span class="eyebrow">${titlesUnseen().length > 1 ? 'New titles' : 'New title'}</span>
           <h3 id="title-h">You have received a new Title!</h3>
           <div class="tp-list">${titlesUnseen().map(t => titleHtml(t, true)).join('')}</div>
-          <p class="hint" style="margin:0">${titlesUnseen().map(t => t === 'day1' ? 'Day 1: you were here in the very first week.' : t === 'dev' ? 'DEV: you make this game.' : '').join(' ')} It shows under your name. Change it any time in Profile.</p>
+          <p class="hint" style="margin:0">${titlesUnseen().map(t => TITLE_WHY[t] || '').join(' ')} It shows under your name. Change it any time in Profile.</p>
           <button class="hbtn gold" id="title-ok">Nice!</button>
         </div></div>` : ''}`;
     wirePlayer();
@@ -2962,9 +2969,17 @@ html.pc .corner button span { display: inline; }
     home.rankedOn = !!j.on; home.board = j;
     const pct = (r) => Math.round((r.w + r.t / 2) / Math.max(1, r.w + r.t + r.l) * 100);
     $('lb-msg').textContent = (j.rows.length ? 'Ranked best-of-3 series. Win share counts a tie as half a win.' : 'No ranked results yet. Play a ranked match against a friend to get on the board.') + (j.on ? '' : ' Ranked is switched off right now.');
+    // Legend (2026-11-03): the top 5 when the month ends (Stockholm time) get the gold title
+    const lg = j.legend && j.legend.top ? j.legend : null;
+    if (lg) {
+      const left = Math.max(0, (lg.ends - Date.now()) / 864e5);
+      const when = left >= 1 ? `${Math.floor(left)} day${Math.floor(left) === 1 ? '' : 's'} left this month.` : left * 24 >= 1 ? `${Math.floor(left * 24)} hours left this month.` : 'The month ends within the hour.';
+      $('lb-msg').insertAdjacentHTML('afterend', `<div class="lb-legend">${titleHtml('legend')}<p class="hint">Top ${lg.top} when the month ends earn the gold Legend title, theirs to keep. ${when}</p></div>`);
+    }
     if (!j.rows.length) return;
+    const top = lg ? lg.top : 0;
     $('lb').innerHTML = `<table class="lb"><thead><tr><th>#</th><th>Player</th><th>W</th><th>T</th><th>L</th><th>Win %</th></tr></thead><tbody>
-      ${j.rows.map((r, i) => `<tr class="${acct && r.id === acct.id ? 'me' : ''}"><td class="num">${i + 1}</td><td>${nameplate(r.tag, r.title, 'row')}</td><td class="num">${r.w}</td><td class="num">${r.t}</td><td class="num">${r.l}</td><td class="num">${pct(r)}%</td></tr>`).join('')}
+      ${j.rows.map((r, i) => `<tr class="${[acct && r.id === acct.id ? 'me' : '', i < top ? 'legend' : '', i === top - 1 && j.rows.length > top ? 'cut' : ''].join(' ').trim()}"><td class="num">${i + 1}</td><td>${nameplate(r.tag, r.title, 'row')}</td><td class="num">${r.w}</td><td class="num">${r.t}</td><td class="num">${r.l}</td><td class="num">${pct(r)}%</td></tr>`).join('')}
       </tbody></table>`;
   }
 

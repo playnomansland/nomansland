@@ -4,6 +4,14 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 3 November 2026 – Legend title
+
+- **New title: Legend** (gold). Finish a month in the **top 5 of the leaderboard** and it's yours to keep. Months follow Swedish time, so November ends at midnight on 30 November.
+- The leaderboard shows how many days are left this month, marks the top 5 in gold and draws a line under 5th place.
+- Pick it in Profile like any other title. If you haven't picked one, Legend shows before Day 1.
+
+---
+
 ## 2 November 2026 – 2v2 (developer test)
 
 A first version of **2v2**, open to developer accounts only for now.

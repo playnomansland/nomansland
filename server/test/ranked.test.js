@@ -6,6 +6,7 @@
 //  - games are counted, rematch plays the next game, a decided series goes to GET /leaderboard once, a rematch after
 //    that starts a new series, and leaving (forfeit) loses the series
 //  - a normal friend's match is unchanged (no ranked field, the creator's settings count)
+//  - month end (Legend title, 2026-11-03): the cron gives the top of the board the Legend title (LEGEND_NOW = December)
 // Run: cd server && node test/ranked.test.js (also in npm test)
 const assert = require('assert');
 const { open, sleep, waitFor } = require('./harness.js');
@@ -23,7 +24,7 @@ const newCode = () => 'R' + Math.random().toString(36).slice(2, 6).toUpperCase()
 setTimeout(() => { console.error('test timed out'); process.exit(1); }, 9 * 60 * 1000).unref();
 
 (async () => {
-  const srv = await startAccounts(8793, { DEV_EMAILS: 'dev@example.com', ACCOUNT_TAG_FRESH_MS: 0 });
+  const srv = await startAccounts(8793, { DEV_EMAILS: 'dev@example.com', ACCOUNT_TAG_FRESH_MS: 0, LEGEND_NOW: Date.parse('2026-12-01T00:07:00Z') }, ['--test-scheduled']);
   const call = async (route, body, token) => {
     const headers = { 'content-type': 'application/json', Origin: ORIGIN };
     if (token) headers.Authorization = 'Bearer ' + token;
@@ -196,6 +197,20 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 9 * 60 *
     assert.strictEqual(nv.m.map.id, 'cavern', 'the creator\'s settings count');
     assert.strictEqual(nv.ranked, null);
     na.close(); nb.close();
+
+    // ----- month end: the Legend title -----
+    const lb3 = await board();
+    assert.strictEqual(lb3.legend.top, 5, 'the board says how many get Legend');
+    assert.ok(lb3.legend.ends > Date.now(), 'and when the month ends');
+    assert.ok(!(await call('me', {}, A.session)).player.titles.includes('legend'), 'no Legend before the month ends');
+    const cron = await fetch(`${srv.base}/__scheduled?cron=7+*+*+*+*`);
+    assert.ok(cron.ok, 'the cron runs');
+    const meA = await waitFor(async () => { const x = await call('me', {}, A.session); return x.player.titles.includes('legend') && x; }, 8000);
+    assert.deepStrictEqual(meA.player.titles, ['legend', 'day1'], 'Alpha is a Legend');
+    assert.ok((await call('me', {}, B.session)).player.titles.includes('legend'), 'so is Bravo (top 5 of 2)');
+    assert.ok(!(await call('me', {}, C.session)).player.titles.includes('legend'), 'not someone off the board');
+    assert.strictEqual((await call('title', { title: 'legend' }, A.session)).player.title, 'legend', 'Legend can be picked');
+    assert.strictEqual((await board()).rows.find((q) => q.id === A.player.id).title, 'legend', 'and shows on the board');
 
     console.log('ranked: all checks passed');
     srv.stop(); process.exit(0);

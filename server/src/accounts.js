@@ -22,6 +22,9 @@
 //   /account/title   { title } (auth)   -> { player }  (shows one of the player's titles under the gamertag; '' = none)
 //   /account/ranked  { on } (auth, developer only) -> { on }  (switches ranked play on or off for everyone)
 //
+// Month end (2026-11-03): the Worker's hourly cron (wrangler.toml [triggers], index.js scheduled) calls awardLegends,
+// which gives the top LEGEND.top of the leaderboard the gold Legend title once a month has ended (Stockholm time).
+//
 // Ranked play (2026-11-02): a ranked friend's match is a best of 3 refereed by the Room (room.js). When a series is
 // decided the Room calls recordSeries, which adds a win, tie or loss to each player's row in 'ranked'. GET /leaderboard
 // (index.js -> leaderboard) reads it. Players need an account (a guest is enough) to play ranked: the phone sends its
@@ -48,13 +51,16 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS hits (k TEXT PRIMARY KEY, start INTEGER NOT NULL, n INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS ranked (player TEXT PRIMARY KEY, w INTEGER NOT NULL DEFAULT 0, t INTEGER NOT NULL DEFAULT 0, l INTEGER NOT NULL DEFAULT 0, updated INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS config (k TEXT PRIMARY KEY, v TEXT)`,
+  // titles won (2026-11-03): one row per player, title and period ('legend', '2026-11'), place = leaderboard rank
+  `CREATE TABLE IF NOT EXISTS awards (player TEXT NOT NULL, title TEXT NOT NULL, period TEXT NOT NULL, place INTEGER, created INTEGER NOT NULL, PRIMARY KEY (player, title, period))`,
 ];
 let schemaReady = null;
 function ensureSchema(db) {
   if (!schemaReady) schemaReady = db.batch(SCHEMA.map((s) => db.prepare(s)))
     // players.title (2026-11-02): the title picked to show; added to a table that may already exist
     // players.tag_changed (2026-11-02): when the gamertag was last changed (one change a week; developers any time)
-    .then(() => Promise.all(['title TEXT', 'tag_changed INTEGER'].map((c) => db.prepare('ALTER TABLE players ADD COLUMN ' + c).run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }))))
+    // players.legend (2026-11-03): how many months the player ended in the top 5 (counted from 'awards')
+    .then(() => Promise.all(['title TEXT', 'tag_changed INTEGER', 'legend INTEGER'].map((c) => db.prepare('ALTER TABLE players ADD COLUMN ' + c).run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }))))
     .catch((e) => { schemaReady = null; throw e; });
   return schemaReady;
 }
@@ -63,7 +69,8 @@ function ensureSchema(db) {
 // Shown under a gamertag. Earned, never bought; decided here from the player's row:
 //   day1  "Day 1" (purple): every account made in the first week, up to the end of Sunday 2026-11-08 (Stockholm time)
 //   dev   "DEV" (pink): developer accounts (the server's dev column)
-// The player picks which one shows (players.title); none picked = the newest earned one (DEV before Day 1).
+//   legend "Legend" (gold, 2026-11-03): ended a month in the top 5 of the leaderboard (players.legend > 0). Kept for good.
+// The player picks which one shows (players.title); none picked = the first earned one in the order DEV, Legend, Day 1.
 // Gamertags: one change a week (TAG_EVERY), any time for developers. Naming a brand-new account (in its first
 // TAG_FRESH, e.g. sign-up's gamertag after Google) doesn't count.
 export const TAG_EVERY = 7 * 24 * 3600e3;
@@ -73,6 +80,7 @@ export const DAY1_END = Date.UTC(2026, 10, 8, 23, 0, 0); // Monday 2026-11-09 00
 export function titlesOf(p) {
   const out = [];
   if (p && p.dev) out.push('dev');
+  if (p && p.legend > 0) out.push('legend');
   if (p && p.created < DAY1_END) out.push('day1');
   return out;
 }
@@ -189,7 +197,7 @@ export async function sessionPlayer(env, token) {
   await ensureSchema(db);
   const s = await db.prepare(`SELECT s.player, s.expires, p.tag, p.deleted, p.dev FROM sessions s JOIN players p ON p.id = s.player WHERE s.hash = ?`).bind(await sha256(token)).first();
   if (!s || s.expires < Date.now() || s.deleted) return null;
-  const p = await db.prepare('SELECT created, dev, title FROM players WHERE id = ?').bind(s.player).first();
+  const p = await db.prepare('SELECT created, dev, title, legend FROM players WHERE id = ?').bind(s.player).first();
   return { id: s.player, tag: s.tag || 'Player', dev: !!s.dev, title: titleShown(p) };
 }
 // Ranked play is on unless a developer switched it off (config 'ranked' = 'off'). No database: off.
@@ -210,6 +218,45 @@ export async function recordSeries(env, ids, winner) {
   const col = (sd) => winner === -1 ? 't' : winner === sd ? 'w' : 'l';
   await db.batch([row(ids[0], col(0)), row(ids[1], col(1))]);
 }
+// The leaderboard's order: win share (a tie counts as half a win), then wins, then fewest losses. Deleted accounts drop off.
+const BOARD_SQL = `SELECT p.id, p.tag, p.created, p.dev, p.title, p.legend, r.w, r.t, r.l FROM ranked r JOIN players p ON p.id = r.player
+  WHERE p.deleted IS NULL AND (r.w + r.t + r.l) > 0 ORDER BY (r.w + 0.5 * r.t) * 1.0 / (r.w + r.t + r.l) DESC, r.w DESC, r.l ASC`;
+
+// ---------- Legend: the top 5 when a month ends (2026-11-03) ----------
+// Months are Stockholm months ('2026-11'). LEGEND.first is the first month that counts (ranked play began 2026-11-02).
+// Run by the hourly cron: once the clock is past a month's end and that month hasn't been awarded (config
+// 'legend_month'), the top LEGEND.top of the leaderboard as it stands get an 'awards' row and players.legend is
+// recounted. Safe to run any number of times: the rows are keyed by player and month. The board itself isn't reset.
+export const LEGEND = { top: 5, first: '2026-11' };
+const stockholm = (t) => {
+  const o = {};
+  for (const x of new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Stockholm', year: 'numeric', month: 'numeric', hour: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(t))) o[x.type] = +x.value;
+  return o;
+};
+export const monthKey = (t) => { const s = stockholm(t); return s.year + '-' + String(s.month).padStart(2, '0'); };
+const prevKey = (k) => { const [y, m] = k.split('-').map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`; };
+// when the month that t is in ends: 00:00 on the 1st of the next month in Stockholm (UTC midnight there is 01:00 or 02:00)
+export function monthEnd(t) {
+  const s = stockholm(t), at = Date.UTC(s.month === 12 ? s.year + 1 : s.year, s.month % 12, 1);
+  return at - stockholm(at).hour * 3600e3;
+}
+export async function awardLegends(env, now = Date.now()) {
+  const db = env.ACCOUNTS;
+  if (!db) return null;
+  await ensureSchema(db);
+  const month = prevKey(monthKey(now));
+  if (month < LEGEND.first) return null;
+  const done = await db.prepare(`SELECT v FROM config WHERE k = 'legend_month'`).first();
+  if (done && done.v >= month) return null;
+  const top = (await db.prepare(`${BOARD_SQL} LIMIT ?`).bind(LEGEND.top).all()).results;
+  await db.batch([
+    ...top.map((r, i) => db.prepare(`INSERT OR IGNORE INTO awards (player, title, period, place, created) VALUES (?, 'legend', ?, ?, ?)`).bind(r.id, month, i + 1, now)),
+    ...top.map((r) => db.prepare(`UPDATE players SET legend = (SELECT COUNT(*) FROM awards WHERE player = ?1 AND title = 'legend') WHERE id = ?1`).bind(r.id)),
+    db.prepare(`INSERT OR REPLACE INTO config (k, v) VALUES ('legend_month', ?)`).bind(month),
+  ]);
+  return { month, players: top.map((r) => r.id) };
+}
+
 // GET /leaderboard: every ranked player with a name, best first (win share, then wins, then fewest losses). Deleted
 // accounts drop off. Ties count as half a win in the share.
 export async function leaderboard(env, cors) {
@@ -218,9 +265,8 @@ export async function leaderboard(env, cors) {
   try {
     await ensureSchema(db);
     const on = await rankedOn(env);
-    const res = await db.prepare(`SELECT p.id, p.tag, p.created, p.dev, p.title, r.w, r.t, r.l FROM ranked r JOIN players p ON p.id = r.player WHERE p.deleted IS NULL AND (r.w + r.t + r.l) > 0
-      ORDER BY (r.w + 0.5 * r.t) * 1.0 / (r.w + r.t + r.l) DESC, r.w DESC, r.l ASC LIMIT 200`).all();
-    return json({ on, rows: res.results.map((r) => ({ id: r.id, tag: r.tag || 'Player', title: titleShown(r), w: r.w, t: r.t, l: r.l })) }, 200, { ...cors, 'cache-control': 'no-store' });
+    const res = await db.prepare(`${BOARD_SQL} LIMIT 200`).all();
+    return json({ on, legend: { top: LEGEND.top, ends: monthEnd(Date.now()) }, rows: res.results.map((r) => ({ id: r.id, tag: r.tag || 'Player', title: titleShown(r), w: r.w, t: r.t, l: r.l })) }, 200, { ...cors, 'cache-control': 'no-store' });
   } catch (e) {
     console.warn('leaderboard', e && e.message);
     return json({ error: 'leaderboard unavailable' }, 503, cors);
@@ -228,7 +274,7 @@ export async function leaderboard(env, cors) {
 }
 
 async function playerOut(db, id) {
-  const p = await db.prepare('SELECT id, tag, created, dev, title, tag_changed FROM players WHERE id = ?').bind(id).first();
+  const p = await db.prepare('SELECT id, tag, created, dev, title, tag_changed, legend FROM players WHERE id = ?').bind(id).first();
   const logins = await db.prepare('SELECT provider FROM logins WHERE player = ?').bind(id).all();
   return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google'), dev: !!p.dev, titles: titlesOf(p), title: titleShown(p), tagNext: tagNext(p) > Date.now() ? tagNext(p) : 0 };
 }
@@ -308,7 +354,7 @@ export async function handleAccount(request, env, cors) {
 
     if (route === 'title') {
       const t = typeof body.title === 'string' ? body.title : '';
-      const p = await db.prepare('SELECT created, dev FROM players WHERE id = ?').bind(me.player).first();
+      const p = await db.prepare('SELECT created, dev, legend FROM players WHERE id = ?').bind(me.player).first();
       if (t && !titlesOf(p).includes(t)) return json({ error: 'not your title' }, 400, cors);
       await db.prepare('UPDATE players SET title = ? WHERE id = ?').bind(t || 'none', me.player).run();
       return json({ player: await playerOut(db, me.player) }, 200, cors);

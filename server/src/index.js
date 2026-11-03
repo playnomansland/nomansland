@@ -12,8 +12,9 @@
 //   GET /history/<MATCH>   -> one match's rounds (<ROOM>-<seed>, or a bare room code for that room's newest match)
 //   GET /leaderboard       -> ranked players with wins, ties and losses, and whether ranked play is on (accounts.js)
 //   POST /account/<route>  -> accounts (step 5; guest, me, google, tag, signout, delete): see accounts.js
+// Cron (wrangler.toml [triggers], hourly): month end, the Legend title for the leaderboard's top 5 (accounts.js awardLegends)
 import { json } from './limits.js';
-import { handleAccount, leaderboard } from './accounts.js';
+import { handleAccount, leaderboard, awardLegends } from './accounts.js';
 import { VERSION } from './version.js';
 export { Room } from './room.js';
 export { TourRoom } from './tour.js';
@@ -29,6 +30,11 @@ function allowedOrigin(request, env) {
 }
 
 export default {
+  // LEGEND_NOW (ms) is for tests only: it stands in for the clock, so a test can end a month.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(awardLegends(env, +env.LEGEND_NOW || event.scheduledTime).then((r) => { if (r) console.log('legend', r.month, r.players.length); })
+      .catch((e) => console.warn('legend', e && e.message)));
+  },
   async fetch(request, env) {
     const url = new URL(request.url);
     const cors = allowedOrigin(request, env) ? { 'access-control-allow-origin': request.headers.get('Origin'), vary: 'Origin' } : {};

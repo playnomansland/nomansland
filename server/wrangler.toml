@@ -38,6 +38,10 @@ binding = "ACCOUNTS"
 database_name = "nml-accounts"
 database_id = "fb6dc6c6-cec5-4b50-a7cc-2bb6142f586c"
 
+# Hourly cron (UTC, at :07): month end, the gold Legend title for the leaderboard's top 5 (accounts.js awardLegends).
+[triggers]
+crons = ["7 * * * *"]
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
