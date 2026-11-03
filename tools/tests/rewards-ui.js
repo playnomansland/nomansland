@@ -42,7 +42,7 @@ function fakeDiscord() {
 
 (async () => {
   const dc = await fakeDiscord();
-  const srv = await startAccounts(8796, { DISCORD_CLIENT_ID: 'cid123', DISCORD_CLIENT_SECRET: 'shh', DISCORD_GUILD_ID: GUILD, DISCORD_INVITE: 'https://discord.gg/nml', DISCORD_API: `http://127.0.0.1:${dc.address().port}` });
+  const srv = await startAccounts(8788, { DISCORD_CLIENT_ID: 'cid123', DISCORD_CLIENT_SECRET: 'shh', DISCORD_GUILD_ID: GUILD, DISCORD_INVITE: 'https://discord.gg/nml', DISCORD_API: `http://127.0.0.1:${dc.address().port}` });
   const BASE = `http://127.0.0.1:8766/rewards-test.html`;
   const PAGE = `${BASE}?test&server=${srv.base}`;
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome' });
@@ -79,7 +79,7 @@ function fakeDiscord() {
     await I.click('#close');
 
     // ----- the friend -----
-    const F = await phone('friend', `${PAGE}&invite=${code}&welcome`);
+    let F = await phone('friend', `${PAGE}&invite=${code}&welcome`);
     ok(!/invite=/.test(F.url()), 'the code is dropped from the URL: ' + F.url());
     ok((await F.evaluate(() => window.__rewards().invitePending)) === code, 'and kept on the phone');
     ok(await F.locator('.home-invited').count() === 1, 'the welcome screen says a friend invited you');
@@ -88,7 +88,11 @@ function fakeDiscord() {
     await F.click('#w-guest');
     await F.waitForFunction(() => window.__acct().acct, null, { timeout: 10000 }).catch(async () => console.log('friend:', await F.evaluate(() => document.querySelector('#home-in').innerText.slice(0, 300))));
     ok((await F.evaluate(() => window.__rewards().invitePending)) === '', 'sent with the new guest, then dropped');
-    await F.goto(PAGE, { waitUntil: 'domcontentloaded' }); // the test layout from here on (no Stay logged in question)
+    { // the test layout from here on (no Stay logged in question), in a new tab of the same phone
+      const F2 = await F.context().newPage();
+      F2.on('pageerror', e => { console.log('[friend] PAGE ERROR', e.message); fails++; });
+      await F2.goto(PAGE, { waitUntil: 'domcontentloaded' }); await F.close(); F = F2;
+    }
     await I.click('#rw-invite'); await idle(I);
     ok(/Needs Google sign-in/.test(await sheet(I)) && /Needs an online match/.test(await sheet(I)), 'the friend shows in the inviter\'s list: ' + (await sheet(I)).slice(-120));
     await I.click('#close');

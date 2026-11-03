@@ -44,7 +44,7 @@ function fakeDiscord() {
 
 (async () => {
   const dc = await fakeDiscord();
-  const srv = await startAccounts(8795, { ACCOUNT_TAG_FRESH_MS: 0, DISCORD_CLIENT_ID: 'cid', DISCORD_CLIENT_SECRET: 'shh', DISCORD_GUILD_ID: GUILD,
+  const srv = await startAccounts(8792, { ACCOUNT_TAG_FRESH_MS: 0, DISCORD_CLIENT_ID: 'cid', DISCORD_CLIENT_SECRET: 'shh', DISCORD_GUILD_ID: GUILD,
     DISCORD_INVITE: 'https://discord.gg/test', DISCORD_API: `http://127.0.0.1:${dc.address().port}` });
   const call = async (route, body, token) => {
     const headers = { 'content-type': 'application/json', Origin: ORIGIN };
