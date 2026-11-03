@@ -58,7 +58,7 @@ A new **Rewards** card sits on the main menu, right under Play, with a picture o
 ### Join the Discord: the BABABABA title
 - **An orange BABABABA title** under your name for everyone who joins the No Mans Land Discord.
 - **How:** open Rewards, tap **Join the Discord**, then **I've joined: Check**. Discord asks you to let the game see who you are and which servers you're in; the title is yours as soon as it confirms. Pick which title shows in Profile.
-- The Discord check switches on as soon as the server is set up.
+- **Join here:** https://discord.gg/TBpDKSBWsY
 
 ---
 

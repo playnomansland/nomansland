@@ -11,9 +11,9 @@ GOOGLE_CLIENT_ID = "732949481177-ikom5gqq07pt0sg89km9mth5d9ibfvmi.apps.googleuse
 # Discord (2026-11-03): the BABABABA title for players in the game's Discord server (accounts.js DISCORD). Off until
 # DISCORD_CLIENT_ID and DISCORD_GUILD_ID are set here and DISCORD_CLIENT_SECRET is a Cloudflare secret (the deploy
 # workflow puts the GitHub secret of that name there). DISCORD_INVITE: the server's invite link, shown on the page.
-DISCORD_CLIENT_ID = ""
-DISCORD_GUILD_ID = ""
-DISCORD_INVITE = ""
+DISCORD_CLIENT_ID = "1567300349285502978"
+DISCORD_GUILD_ID = "1566427821184655380"
+DISCORD_INVITE = "https://discord.gg/TBpDKSBWsY"
 
 # One Room per match code. SQLite-backed, so it works on the Free plan.
 [[durable_objects.bindings]]
