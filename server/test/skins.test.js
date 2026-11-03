@@ -45,9 +45,9 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 *
 
     // a developer has every skin, off until worn
     const dev = await call('google', { credential: idToken({ email: 'dev@example.com', email_verified: true }) });
-    assert.deepStrictEqual(dev.player.skins, [{ id: 'brute-champion', worn: false }], 'a developer has it, off');
+    assert.deepStrictEqual(dev.player.skins, [{ id: 'brute-champion', worn: false }, { id: 'golem-aquamarine', worn: false }], 'a developer has every skin, off');
     const devOn = await call('skin', { skin: 'brute-champion', worn: true }, dev.session);
-    assert.deepStrictEqual(devOn.player.skins, [{ id: 'brute-champion', worn: true }], 'and can wear it');
+    assert.deepStrictEqual(devOn.player.skins, [{ id: 'brute-champion', worn: true }, { id: 'golem-aquamarine', worn: false }], 'and can wear it');
 
     // switching off and on
     assert.deepStrictEqual((await call('skin', { skin: 'brute-champion', worn: false }, A.session)).player.skins, [{ id: 'brute-champion', worn: false }], 'off');

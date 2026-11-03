@@ -415,6 +415,8 @@ const Shapes = (() => {
   // this phone's own from its account, the opponent's from the server (net.players), so nobody can claim one they don't own.
   const SKINS = {
     'brute-champion': { unit: 'Brute', name: 'Champion', text: 'A crowned Brute in gold armour with a great hammer and a cape.', model: 'brute:champion', pic: 'img/skins/brute-champion.png' },
+    // limited: only for inviting a friend (server accounts.js INVITE)
+    'golem-aquamarine': { unit: 'Ether Golem', name: 'Aquamarine', text: 'An Ether Golem cut from sea-green crystal, with crystal spires and a white-hot core.', model: 'golem:aquamarine', pic: 'img/skins/golem-aquamarine.png', limited: true },
   };
   let worn = [{}, {}]; // per side: unit name -> skin
   function useSkins(lists) {
@@ -8906,6 +8908,33 @@ const Models3D = (THREE) => {
         P(box(0.38, 0.75, 0.38), 'tint', [sd * 1.05, 1.3, -0.1], [0.2, 0, sd * -0.15]),
         P(ball(0.34), STONE, [sd * 1.1, 0.8, -0.25])]),
       P(cone(0.12, 0.4, 4), ETHER, [-0.6, 2.7, 0.3]), P(cone(0.12, 0.4, 4), ETHER, [0.6, 2.55, 0.35], [Math.PI, 0, 0])],
+    // the Ether Golem's Aquamarine skin (2026-11-03, Shapes.SKINS; the invite-a-friend reward): the same hunched build cut
+    // from sea-green crystal, pale facets catching the light, crystal spires growing from its back and shoulders,
+    // silver bands, a white-hot core and eye. Its colours are its own (no unit tint); the sash keeps the team colour.
+    'golem:aquamarine': () => {
+      const AQ = '#4FD8C4', AQ2 = '#2A9D96', AQ3 = '#A8F5E8', SILVER = '#DDE6EE', CORE = '#F4FFFD';
+      const gem = (r, h) => new THREE.OctahedronGeometry(r, 0).scale(1, h, 1);
+      return [
+        P(box(0.42, 0.75, 0.42), AQ2, [-0.32, 0.38, 0]), P(box(0.42, 0.75, 0.42), AQ2, [0.32, 0.38, 0]),
+        P(box(0.5, 0.1, 0.5), SILVER, [-0.32, 0.72, 0]), P(box(0.5, 0.1, 0.5), SILVER, [0.32, 0.72, 0]),
+        P(new THREE.DodecahedronGeometry(0.72, 0), AQ, [0, 1.45, 0], [0, 0.3, 0], [1.15, 0.95, 0.85]),
+        P(gem(0.42, 1.2), AQ3, [0, 1.5, -0.42], [0, 0.4, 0], [1, 1, 0.5]), // a pale facet on the chest
+        P(box(1.3, 0.14, 0.9), 'team', [0, 1.0, 0]),
+        P(ball(0.2), CORE, [0, 1.5, -0.66]),
+        P(new THREE.DodecahedronGeometry(0.3, 0), AQ, [0, 2.2, -0.12], [0.2, 0.4, 0], [0.95, 0.8, 0.9]),
+        P(box(0.34, 0.06, 0.04), CORE, [0, 2.24, -0.38]),
+        P(cyl(0.34, 0.36, 0.08, 8), SILVER, [0, 2.0, -0.1]), // a silver collar
+        ...[-1, 1].flatMap(sd => [
+          P(gem(0.3, 1.0), AQ, [sd * 0.95, 1.85, 0], [0, 0.6, 0]),
+          P(gem(0.13, 3.4), AQ3, [sd * 1.0, 2.35, 0.1], [0, 0, sd * -0.25]), // shoulder spire
+          P(gem(0.09, 3.2), AQ, [sd * 0.78, 2.25, 0.32], [0.2, 0, sd * -0.5]),
+          P(box(0.38, 0.75, 0.38), AQ2, [sd * 1.05, 1.3, -0.1], [0.2, 0, sd * -0.15]),
+          P(cyl(0.24, 0.24, 0.1, 6), SILVER, [sd * 1.05, 1.5, -0.12], [0.2, 0, sd * -0.15]),
+          P(gem(0.3, 1.1), AQ, [sd * 1.1, 0.8, -0.25], [0, 0.5, 0])]),
+        // crystal spires along the back
+        P(gem(0.16, 3.2), AQ, [0, 2.15, 0.5], [-0.35, 0, 0]), P(gem(0.12, 3.0), AQ3, [-0.35, 2.0, 0.55], [-0.3, 0, 0.3]), P(gem(0.12, 3.0), AQ3, [0.35, 2.0, 0.55], [-0.3, 0, -0.3]),
+        P(gem(0.1, 2.4), CORE, [-0.6, 2.75, 0.3]), P(gem(0.1, 2.4), CORE, [0.6, 2.6, 0.35])];
+    },
     // Sun Priest: a robe and a stole, a gold crown, a sun halo with rays behind the head, a staff with a bright orb
     sunPriest: () => [
       P(cone(0.62, 1.6, 8), 'tint', [0, 0.8, 0]),

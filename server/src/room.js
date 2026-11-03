@@ -28,7 +28,7 @@ import Ref from '../../src/referee.js';
 import { LIMITS, json, readMessage, secret } from './limits.js';
 import { builtin } from './units.js';
 import { roundRow, forfeitRow } from './history.js';
-import { sessionPlayer, rankedOn, recordSeries } from './accounts.js';
+import { sessionPlayer, rankedOn, recordSeries, countOnline } from './accounts.js';
 import { VERSION } from './version.js';
 
 const KEEP_MS = 24 * 3600 * 1000; // a match nobody touched for a day is deleted
@@ -232,6 +232,7 @@ export class Room extends DurableObject {
       }
       case 'forfeit': {
         if (!R || !Ref.forfeit(R, side)) return;
+        if (this.meta) this.meta.left = { seed: R.seed, side }; // who left this match (countOnline)
         this.tally(side);
         await this.save();
         const text = JSON.stringify({ t: 'forfeit', side, ranked: this.rankedView() });
@@ -295,6 +296,8 @@ export class Room extends DurableObject {
       key = this.meta.keys[side];
       if (!this.meta.players) this.meta.players = [null, null];
       if (who) this.meta.players[side] = { tag: who.tag, title: who.title || '', skins: who.skins || [] }; // skins: looks only (Shapes.SKINS)
+      if (!this.meta.pids) this.meta.pids = [null, null];
+      if (who) this.meta.pids[side] = who.id; // kept on the server only (countOnline: invite a friend)
     }
     // one socket per side: an older one of this side (a reload) is let go
     for (const s of this.players(side)) if (s !== ws) { this.setAtt(s, { role: 'x' }); try { s.close(1000, 'replaced'); } catch {} }
@@ -340,9 +343,16 @@ export class Room extends DurableObject {
     await this.ctx.storage.setAlarm(now + KEEP_MS);
   }
 
-  // a tournament match that is over: the result goes to the tournament, once
+  // a tournament match that is over: the result goes to the tournament, once. A friend's match that is over counts
+  // as an online match for each player's account (accounts.js countOnline: invite a friend), once per match.
   async ended() {
     const R = this.R, t = this.meta && this.meta.tour;
+    if (R && R.m && R.m.over && !t && this.meta && this.meta.pids && this.meta.onlineCounted !== R.seed) {
+      this.meta.onlineCounted = R.seed;
+      await this.save();
+      const run = countOnline(this.env, this.meta.pids.slice(), this.meta.left && this.meta.left.seed === R.seed ? this.meta.left.side : null, R.fights).catch((e) => console.warn('online count', e && e.message));
+      try { this.ctx.waitUntil(run); } catch {}
+    }
     if (!R || !R.m || !R.m.over || !t || t.reported) return;
     const keys = t.keys; // [side 0's key in the tournament ('a' or 'b'), side 1's]
     const winner = R.m.winner === 0 ? keys[0] : R.m.winner === 1 ? keys[1] : 'draw';

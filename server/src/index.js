@@ -11,7 +11,7 @@
 //   GET /history?limit=&before= -> saved rounds of server matches, newest first, paged (HistoryRoom, step 4)
 //   GET /history/<MATCH>   -> one match's rounds (<ROOM>-<seed>, or a bare room code for that room's newest match)
 //   GET /leaderboard       -> ranked players with wins, ties and losses, and whether ranked play is on (accounts.js)
-//   POST /account/<route>  -> accounts (step 5; guest, me, google, tag, signout, delete): see accounts.js
+//   POST /account/<route>  -> accounts (step 5; guest, me, google, tag, signout, delete, title, skin, ranked, invite, discord): see accounts.js
 // Cron (wrangler.toml [triggers], hourly): month end, the Legend title for the leaderboard's top 5 (accounts.js awardLegends),
 // and skins given to a gamertag (accounts.js grantSkins)
 import { json } from './limits.js';

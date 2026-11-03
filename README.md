@@ -53,6 +53,10 @@ Frozen Peak's hailstorm and altar of ice are switched off for now (`iceOff` on t
 
 Online play runs on our own server (Cloudflare Workers + Durable Objects) in `server/`: tournaments (step 2), the referee of live matches (step 3) match history (step 4: every round of every server match, `server/src/history.js`, read with `GET /history`) and accounts (step 5: guests and Sign in with Google, `server/src/accounts.js`, a D1 database; switched off until the database is bound). Plan, security and accounts: [docs/SERVER.md](docs/SERVER.md). Local: `cd server && npm i && npm run dev`; test: `npm test`.
 
+## Rewards (2026-11-03)
+
+The main menu's Rewards card (pictures of both rewards) opens the Rewards sheet. **Invite a friend:** a Google account gets an invite link (`?invite=CODE`); a friend who makes a new account through it, signs in with Google and finishes an online match (3+ fights, without leaving) gives the inviter the limited Aquamarine Ether Golem skin, once. **Discord:** Join, then Check (Discord OAuth2: is the player in our server?) gives the orange BABABABA title. The Discord check is off until `DISCORD_CLIENT_ID` / `DISCORD_GUILD_ID` (wrangler.toml) and the `DISCORD_CLIENT_SECRET` GitHub secret are set. Server side and setup: [docs/SERVER.md](docs/SERVER.md) "Invite a friend" and "Discord". Checks: `server/test/invites.test.js`, `node tools/tests/rewards-ui.js`.
+
 ## 2v2 (developer test)
 
 - One shared board since 2026-11-03 (before: two Standard boards side by side). Game map `duo` (`Game.TEAM_MAPS`, made from `EDITOR_MAPS.duo`; never offered or rolled as a 1v1 map): 24 x 18, zone 7, two flank columns on each edge (`flankSet`), one tower and one treasury per team in the middle of the back rows. No leaders (match option `noChars`: packages without a character).

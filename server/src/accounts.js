@@ -22,6 +22,9 @@
 //   /account/title   { title } (auth)   -> { player }  (shows one of the player's titles under the gamertag; '' = none)
 //   /account/ranked  { on } (auth, developer only) -> { on }  (switches ranked play on or off for everyone)
 //   /account/skin    { skin, worn } (auth) -> { player }  (wear or take off a skin the player owns; see SKINS below)
+//   /account/invite  (auth, Google accounts) -> { code, friends, rewarded }  (this player's invite link; see INVITE below)
+//   /account/discord { code, redirect } (auth) -> { player }  (Discord check for the BABABABA title; see DISCORD below)
+// guest, google and me also take { invite: CODE }: a new account made through a friend's invite link (INVITE).
 //
 // Month end (2026-11-03): the Worker's hourly cron (wrangler.toml [triggers], index.js scheduled) calls awardLegends,
 // which gives the top LEGEND.top of the leaderboard the gold Legend title once a month has ended (Stockholm time).
@@ -56,6 +59,12 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS awards (player TEXT NOT NULL, title TEXT NOT NULL, period TEXT NOT NULL, place INTEGER, created INTEGER NOT NULL, PRIMARY KEY (player, title, period))`,
   // unit skins (2026-11-03): src 'grant' = owned; 'dev' = only a developer's on/off choice for a skin they have as a developer
   `CREATE TABLE IF NOT EXISTS skins (player TEXT NOT NULL, skin TEXT NOT NULL, src TEXT NOT NULL, worn INTEGER NOT NULL DEFAULT 1, created INTEGER NOT NULL, PRIMARY KEY (player, skin))`,
+  // invite a friend (2026-11-03): each Google account's own invite code, and one row per friend who came through one
+  `CREATE TABLE IF NOT EXISTS invites (code TEXT PRIMARY KEY, player TEXT NOT NULL UNIQUE, created INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS referrals (friend TEXT PRIMARY KEY, inviter TEXT NOT NULL, created INTEGER NOT NULL, played INTEGER, done INTEGER)`,
+  `CREATE INDEX IF NOT EXISTS referrals_inviter ON referrals (inviter)`,
+  // Discord (2026-11-03): which Discord user gave which player the BABABABA title (one player per Discord user)
+  `CREATE TABLE IF NOT EXISTS discord (subject TEXT PRIMARY KEY, player TEXT NOT NULL UNIQUE, created INTEGER NOT NULL)`,
 ];
 let schemaReady = null;
 function ensureSchema(db) {
@@ -63,7 +72,8 @@ function ensureSchema(db) {
     // players.title (2026-11-02): the title picked to show; added to a table that may already exist
     // players.tag_changed (2026-11-02): when the gamertag was last changed (one change a week; developers any time)
     // players.legend (2026-11-03): how many months the player ended in the top 5 (counted from 'awards')
-    .then(() => Promise.all(['title TEXT', 'tag_changed INTEGER', 'legend INTEGER'].map((c) => db.prepare('ALTER TABLE players ADD COLUMN ' + c).run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }))))
+    // players.online (2026-11-03): online matches the player finished (countOnline); players.discord: when the Discord check passed
+    .then(() => Promise.all(['title TEXT', 'tag_changed INTEGER', 'legend INTEGER', 'online INTEGER', 'discord INTEGER'].map((c) => db.prepare('ALTER TABLE players ADD COLUMN ' + c).run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }))))
     .catch((e) => { schemaReady = null; throw e; });
   return schemaReady;
 }
@@ -73,7 +83,9 @@ function ensureSchema(db) {
 //   day1  "Day 1" (purple): every account made in the first week, up to the end of Sunday 2026-11-08 (Stockholm time)
 //   dev   "DEV" (pink): developer accounts (the server's dev column)
 //   legend "Legend" (gold, 2026-11-03): ended a month in the top 5 of the leaderboard (players.legend > 0). Kept for good.
-// The player picks which one shows (players.title); none picked = the first earned one in the order DEV, Legend, Day 1.
+//   bababa "BABABABA" (orange, 2026-11-03): joined the game's Discord server, checked with Discord (players.discord).
+// The player picks which one shows (players.title); none picked = the first earned one in the order DEV, Legend,
+// BABABABA, Day 1.
 // Gamertags: one change a week (TAG_EVERY), any time for developers. Naming a brand-new account (in its first
 // TAG_FRESH, e.g. sign-up's gamertag after Google) doesn't count.
 export const TAG_EVERY = 7 * 24 * 3600e3;
@@ -84,6 +96,7 @@ export function titlesOf(p) {
   const out = [];
   if (p && p.dev) out.push('dev');
   if (p && p.legend > 0) out.push('legend');
+  if (p && p.discord) out.push('bababa');
   if (p && p.created < DAY1_END) out.push('day1');
   return out;
 }
@@ -100,7 +113,8 @@ export function titleShown(p) {
 // config 'grant:<skin>:<tag>' records that it is done, so someone who takes the name later gets nothing. Developers have
 // every skin (off until they wear it). Owned skins are worn by default; POST /account/skin { skin, worn } switches one.
 // A match's Room puts the worn skins of each side in its players list (sessionPlayer), so the other phone draws them.
-export const SKINS = ['brute-champion'];
+// Owned = a row with src 'grant' (SKIN_GRANTS) or 'invite' (INVITE: the reward for inviting a friend).
+export const SKINS = ['brute-champion', 'golem-aquamarine'];
 export const SKIN_GRANTS = [{ skin: 'brute-champion', tag: 'Gubbolas Cage' }];
 let grantsDone = false;
 export async function grantSkins(env, now = Date.now()) {
@@ -123,10 +137,116 @@ export async function grantSkins(env, now = Date.now()) {
 // the skins a player owns, [{ id, worn }]: granted rows, plus every skin for a developer
 async function skinsOf(db, id, dev) {
   const rows = (await db.prepare('SELECT skin, src, worn FROM skins WHERE player = ?').bind(id).all()).results;
-  return SKINS.filter((k) => dev || rows.some((r) => r.skin === k && r.src === 'grant'))
+  return SKINS.filter((k) => dev || rows.some((r) => r.skin === k && r.src !== 'dev'))
     .map((k) => { const r = rows.find((x) => x.skin === k); return { id: k, worn: r ? !!r.worn : !dev }; });
 }
 const wornSkins = async (db, id, dev) => (await skinsOf(db, id, dev)).filter((k) => k.worn).map((k) => k.id);
+
+// ---------- invite a friend (2026-11-03) ----------
+// A Google-signed account (a confirmed account; guests can't invite) gets an invite code: the link ?invite=CODE.
+// A friend who opens it and makes a NEW account (guest or Google, sent as { invite } with guest, google or me) is
+// tied to the inviter in 'referrals', once. "New" = made in the last INVITE.claimMs and no online match finished
+// yet, so an old account can't be counted as invited. The reward, the limited Aquamarine Ether Golem skin, goes to
+// the inviter once a friend has (1) signed in with Google (a confirmed account too, so one person can't farm it with
+// throwaway guests) and (2) finished an online match (countOnline: a server match against another phone that
+// lasted at least INVITE.minFights fights and that the friend didn't leave). Settled (settleReferral) whenever
+// either happens last; given once per inviter, however many friends come.
+export const INVITE = { skin: 'golem-aquamarine', claimMs: 24 * 3600e3, minFights: 3, len: 6, letters: 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' };
+const cleanInvite = (c) => (typeof c === 'string' && new RegExp(`^[${INVITE.letters}]{${INVITE.len}}$`).test(c.toUpperCase()) ? c.toUpperCase() : null);
+function newInviteCode() {
+  const a = new Uint8Array(INVITE.len); crypto.getRandomValues(a);
+  return [...a].map((b) => INVITE.letters[b % INVITE.letters.length]).join('');
+}
+const hasGoogle = async (db, id) => !!(await db.prepare(`SELECT 1 FROM logins WHERE player = ? AND provider = 'google'`).bind(id).first());
+async function inviteCodeOf(db, id, now) {
+  const r = await db.prepare('SELECT code FROM invites WHERE player = ?').bind(id).first();
+  if (r) return r.code;
+  for (let i = 0; i < 5; i++) {
+    const code = newInviteCode();
+    const ok = await db.prepare('INSERT OR IGNORE INTO invites (code, player, created) VALUES (?, ?, ?) RETURNING code').bind(code, id, now).first();
+    if (ok) return ok.code;
+    const again = await db.prepare('SELECT code FROM invites WHERE player = ?').bind(id).first(); // made at the same moment by another request
+    if (again) return again.code;
+  }
+  throw new Error('no invite code');
+}
+// ties a new account to the inviter behind code; returns true when it did
+async function claimInvite(db, friend, code, now) {
+  code = cleanInvite(code);
+  if (!code) return false;
+  const inv = await db.prepare('SELECT i.player FROM invites i JOIN players p ON p.id = i.player WHERE i.code = ? AND p.deleted IS NULL').bind(code).first();
+  if (!inv || inv.player === friend) return false;
+  const f = await db.prepare('SELECT created, online, deleted FROM players WHERE id = ?').bind(friend).first();
+  if (!f || f.deleted || now - f.created > INVITE.claimMs || f.online > 0) return false;
+  if (!(await hasGoogle(db, inv.player))) return false;
+  const r = await db.prepare('INSERT OR IGNORE INTO referrals (friend, inviter, created) VALUES (?, ?, ?) RETURNING friend').bind(friend, inv.player, now).first();
+  return !!r;
+}
+// gives the reward if this friend's referral is now complete (see INVITE)
+async function settleReferral(db, friend, now) {
+  const r = await db.prepare('SELECT inviter, played, done FROM referrals WHERE friend = ?').bind(friend).first();
+  if (!r || r.done || !r.played) return false;
+  if (!(await hasGoogle(db, friend)) || !(await hasGoogle(db, r.inviter))) return false;
+  const inv = await db.prepare('SELECT deleted FROM players WHERE id = ?').bind(r.inviter).first();
+  if (!inv || inv.deleted) return false;
+  await db.batch([
+    db.prepare('UPDATE referrals SET done = ? WHERE friend = ? AND done IS NULL').bind(now, friend),
+    db.prepare(`INSERT INTO skins (player, skin, src, worn, created) VALUES (?1, ?2, 'invite', 1, ?3) ON CONFLICT (player, skin) DO UPDATE SET src = CASE WHEN src = 'dev' THEN 'invite' ELSE src END`).bind(r.inviter, INVITE.skin, now),
+  ]);
+  return true;
+}
+// Called by a match Room when an online match ends. players: [side 0's player id or null, side 1's]; left: the side
+// that forfeited, or null; fights: fights played. A side counts when it has an account, didn't leave, the other phone
+// isn't the same player, and the match lasted INVITE.minFights fights.
+export async function countOnline(env, players, left, fights) {
+  const db = env.ACCOUNTS;
+  if (!db || !Array.isArray(players) || !(fights >= INVITE.minFights)) return;
+  await ensureSchema(db);
+  const now = Date.now();
+  for (const sd of [0, 1]) {
+    const id = players[sd];
+    if (!id || left === sd || players[1 - sd] === id) continue;
+    await db.batch([
+      db.prepare('UPDATE players SET online = COALESCE(online, 0) + 1 WHERE id = ?').bind(id),
+      db.prepare('UPDATE referrals SET played = ? WHERE friend = ? AND played IS NULL').bind(now, id),
+    ]);
+    await settleReferral(db, id, now);
+  }
+}
+async function inviteOut(db, id, now) {
+  const code = await inviteCodeOf(db, id, now);
+  const rows = (await db.prepare(`SELECT r.friend, r.played, r.done, p.tag, p.deleted FROM referrals r JOIN players p ON p.id = r.friend WHERE r.inviter = ? ORDER BY r.created DESC LIMIT 50`).bind(id).all()).results;
+  const friends = [];
+  for (const r of rows) if (!r.deleted) friends.push({ tag: r.tag || 'Player', google: await hasGoogle(db, r.friend), played: !!r.played, done: !!r.done });
+  const own = await db.prepare(`SELECT 1 FROM skins WHERE player = ? AND skin = ? AND src = 'invite'`).bind(id, INVITE.skin).first();
+  return { code, friends, rewarded: !!own, skin: INVITE.skin, minFights: INVITE.minFights };
+}
+
+// ---------- Discord: the BABABABA title (2026-11-03) ----------
+// The player joins the game's Discord server, then lets the page ask Discord who they are (OAuth2, scopes identify and
+// guilds; the page sends the one-time code here). The server swaps the code for a token (with DISCORD_CLIENT_SECRET,
+// a Cloudflare secret), reads the user and their servers, and gives the title only if DISCORD_GUILD_ID is one of them.
+// One Discord user gives the title to one player (table 'discord'). Discord's token is used once and never stored.
+// Off (503 'discord off') until DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET and DISCORD_GUILD_ID are all set.
+// DISCORD_INVITE (the server's invite link) is passed on to the page by /account/me. DISCORD_API is for tests only.
+export const DISCORD = { title: 'bababa', api: 'https://discord.com/api/v10' };
+const discordOn = (env) => !!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET && env.DISCORD_GUILD_ID);
+const discordApi = (env) => (env.DISCORD_API && /^http:\/\/127\.0\.0\.1:\d+$/.test(env.DISCORD_API) ? env.DISCORD_API : DISCORD.api);
+const discordInfo = (env) => (env.DISCORD_CLIENT_ID && env.DISCORD_GUILD_ID ? { clientId: env.DISCORD_CLIENT_ID, invite: env.DISCORD_INVITE || '', check: discordOn(env) } : null);
+async function discordCheck(env, code, redirect) {
+  const api = discordApi(env);
+  const tok = await fetch(`${api}/oauth2/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: redirect, client_id: env.DISCORD_CLIENT_ID, client_secret: env.DISCORD_CLIENT_SECRET }) });
+  if (!tok.ok) return { error: 'discord code' };
+  const t = await tok.json();
+  if (!t || typeof t.access_token !== 'string') return { error: 'discord code' };
+  const auth = { Authorization: 'Bearer ' + t.access_token };
+  const [u, g] = await Promise.all([fetch(`${api}/users/@me`, { headers: auth }), fetch(`${api}/users/@me/guilds`, { headers: auth })]);
+  if (!u.ok || !g.ok) return { error: 'discord unavailable' };
+  const user = await u.json(), guilds = await g.json();
+  if (!user || typeof user.id !== 'string' || !/^\d{1,24}$/.test(user.id)) return { error: 'discord unavailable' };
+  return { subject: user.id, member: Array.isArray(guilds) && guilds.some((x) => x && String(x.id) === String(env.DISCORD_GUILD_ID)) };
+}
 
 const enc = new TextEncoder();
 async function sha256(s) {
@@ -235,7 +355,7 @@ export async function sessionPlayer(env, token) {
   await ensureSchema(db);
   const s = await db.prepare(`SELECT s.player, s.expires, p.tag, p.deleted, p.dev FROM sessions s JOIN players p ON p.id = s.player WHERE s.hash = ?`).bind(await sha256(token)).first();
   if (!s || s.expires < Date.now() || s.deleted) return null;
-  const p = await db.prepare('SELECT created, dev, title, legend FROM players WHERE id = ?').bind(s.player).first();
+  const p = await db.prepare('SELECT created, dev, title, legend, discord FROM players WHERE id = ?').bind(s.player).first();
   let skins = [];
   try { skins = await wornSkins(db, s.player, !!s.dev); } catch (e) { skins = []; } // a look only: never in the way of playing
   return { id: s.player, tag: s.tag || 'Player', dev: !!s.dev, title: titleShown(p), skins };
@@ -259,7 +379,7 @@ export async function recordSeries(env, ids, winner) {
   await db.batch([row(ids[0], col(0)), row(ids[1], col(1))]);
 }
 // The leaderboard's order: win share (a tie counts as half a win), then wins, then fewest losses. Deleted accounts drop off.
-const BOARD_SQL = `SELECT p.id, p.tag, p.created, p.dev, p.title, p.legend, r.w, r.t, r.l FROM ranked r JOIN players p ON p.id = r.player
+const BOARD_SQL = `SELECT p.id, p.tag, p.created, p.dev, p.title, p.legend, p.discord, r.w, r.t, r.l FROM ranked r JOIN players p ON p.id = r.player
   WHERE p.deleted IS NULL AND (r.w + r.t + r.l) > 0 ORDER BY (r.w + 0.5 * r.t) * 1.0 / (r.w + r.t + r.l) DESC, r.w DESC, r.l ASC`;
 
 // ---------- Legend: the top 5 when a month ends (2026-11-03) ----------
@@ -314,9 +434,9 @@ export async function leaderboard(env, cors) {
 }
 
 async function playerOut(db, id) {
-  const p = await db.prepare('SELECT id, tag, created, dev, title, tag_changed, legend FROM players WHERE id = ?').bind(id).first();
+  const p = await db.prepare('SELECT id, tag, created, dev, title, tag_changed, legend, discord FROM players WHERE id = ?').bind(id).first();
   const logins = await db.prepare('SELECT provider FROM logins WHERE player = ?').bind(id).all();
-  return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google'), dev: !!p.dev, titles: titlesOf(p), title: titleShown(p), tagNext: tagNext(p) > Date.now() ? tagNext(p) : 0, skins: await skinsOf(db, id, !!p.dev) };
+  return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google'), dev: !!p.dev, titles: titlesOf(p), title: titleShown(p), tagNext: tagNext(p) > Date.now() ? tagNext(p) : 0, skins: await skinsOf(db, id, !!p.dev), discord: !!p.discord };
 }
 
 // Developer mode: a Google account whose verified email is in the secret DEV_EMAILS (comma separated; a Cloudflare
@@ -334,7 +454,7 @@ export async function handleAccount(request, env, cors) {
   const db = env.ACCOUNTS;
   if (!db) return json({ error: 'accounts off' }, 503, cors);
   const route = new URL(request.url).pathname.replace(/^\/account\/?/, '').replace(/\/$/, '');
-  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title', 'skin'].includes(route)) return json({ error: 'not found' }, 404, cors);
+  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title', 'skin', 'invite', 'discord'].includes(route)) return json({ error: 'not found' }, 404, cors);
   if (request.method !== 'POST') return json({ error: 'method' }, 405, cors);
 
   let body = {};
@@ -355,6 +475,7 @@ export async function handleAccount(request, env, cors) {
       if (!tag) return json({ error: 'bad tag' }, 400, cors);
       const id = newPlayerId();
       await db.prepare('INSERT INTO players (id, tag, created, seen) VALUES (?, ?, ?, ?)').bind(id, tag, now, now).run();
+      if (body.invite) await claimInvite(db, id, body.invite, now);
       const session = await newSession(db, id);
       if (Math.random() < 0.05) await db.prepare('DELETE FROM hits WHERE start < ?').bind(now - DAY).run();
       return json({ player: await playerOut(db, id), session }, 200, cors);
@@ -385,6 +506,9 @@ export async function handleAccount(request, env, cors) {
       // the guest session that signed in is done either way; the phone gets a session for the signed-in player
       if (me) await db.prepare('DELETE FROM sessions WHERE hash = ?').bind(me.hash).run();
       await db.prepare('UPDATE players SET seen = ?, dev = ? WHERE id = ?').bind(now, isDevEmail(claims, env) ? 1 : 0, id).run();
+      // invite a friend: a new account through a link, and a friend who now has a confirmed account may complete it
+      if (body.invite && linked !== 'existing') await claimInvite(db, id, body.invite, now);
+      await settleReferral(db, id, now);
       const session = await newSession(db, id);
       return json({ player: await playerOut(db, id), session, linked }, 200, cors);
     }
@@ -394,7 +518,7 @@ export async function handleAccount(request, env, cors) {
 
     if (route === 'title') {
       const t = typeof body.title === 'string' ? body.title : '';
-      const p = await db.prepare('SELECT created, dev, legend FROM players WHERE id = ?').bind(me.player).first();
+      const p = await db.prepare('SELECT created, dev, legend, discord FROM players WHERE id = ?').bind(me.player).first();
       if (t && !titlesOf(p).includes(t)) return json({ error: 'not your title' }, 400, cors);
       await db.prepare('UPDATE players SET title = ? WHERE id = ?').bind(t || 'none', me.player).run();
       return json({ player: await playerOut(db, me.player) }, 200, cors);
@@ -412,9 +536,34 @@ export async function handleAccount(request, env, cors) {
       if (typeof body.on === 'boolean') await db.prepare(`INSERT OR REPLACE INTO config (k, v) VALUES ('ranked', ?)`).bind(body.on ? 'on' : 'off').run();
       return json({ on: await rankedOn(env) }, 200, cors);
     }
+    if (route === 'invite') {
+      if (!(await hasGoogle(db, me.player))) return json({ error: 'google needed' }, 403, cors);
+      return json(await inviteOut(db, me.player, now), 200, cors);
+    }
+    if (route === 'discord') {
+      if (!discordOn(env)) return json({ error: 'discord off' }, 503, cors);
+      const code = typeof body.code === 'string' && /^[\w-]{6,128}$/.test(body.code) ? body.code : '';
+      const redirect = typeof body.redirect === 'string' && body.redirect.length < 300 ? body.redirect : '';
+      let okRedirect = false;
+      try { const u = new URL(redirect); okRedirect = (env.ALLOWED_ORIGINS || '').split(',').map((x) => x.trim()).includes(u.origin) && !u.search && !u.hash; } catch (e) {}
+      if (!code || !okRedirect) return json({ error: 'bad request' }, 400, cors);
+      let r;
+      try { r = await discordCheck(env, code, redirect); } catch (e) { r = { error: 'discord unavailable' }; }
+      if (r.error) return json({ error: r.error }, r.error === 'discord code' ? 401 : 503, cors);
+      if (!r.member) return json({ error: 'not in server', invite: env.DISCORD_INVITE || '' }, 403, cors);
+      const used = await db.prepare('SELECT d.player FROM discord d JOIN players p ON p.id = d.player WHERE d.subject = ? AND p.deleted IS NULL').bind(r.subject).first();
+      if (used && used.player !== me.player) return json({ error: 'discord used' }, 409, cors);
+      await db.batch([
+        db.prepare('DELETE FROM discord WHERE player = ? OR subject = ?').bind(me.player, r.subject), // a deleted account's old row, or this player's earlier one
+        db.prepare('INSERT INTO discord (subject, player, created) VALUES (?, ?, ?)').bind(r.subject, me.player, now),
+        db.prepare('UPDATE players SET discord = COALESCE(discord, ?) WHERE id = ?').bind(now, me.player),
+      ]);
+      return json({ player: await playerOut(db, me.player) }, 200, cors);
+    }
     if (route === 'me') {
       try { await grantSkins(env, now); } catch (e) { console.warn('skins', e && e.message); }
-      const out = { player: await playerOut(db, me.player), rankedOn: await rankedOn(env) };
+      if (body.invite) { try { await claimInvite(db, me.player, body.invite, now); } catch (e) { console.warn('invite', e && e.message); } }
+      const out = { player: await playerOut(db, me.player), rankedOn: await rankedOn(env), discord: discordInfo(env) };
       const lastRotation = me.expires - ACCOUNT.SESSION_DAYS * DAY;
       if (now - lastRotation > (+env.ACCOUNT_ROTATE_MS || ACCOUNT.ROTATE_MS)) {   // the setting is for tests
         out.session = await newSession(db, me.player);

@@ -16,6 +16,23 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 3 November 2026 – Rewards: invite a friend, join the Discord
+
+A new **Rewards** card sits on the main menu, right under Play, with a picture of each reward. Tap it to see how to get them.
+
+### Invite a friend: the Aquamarine Ether Golem
+- **A limited skin** you can only get by inviting a friend: an Ether Golem cut from sea-green crystal, with crystal spires and a white-hot core. Looks only, never stats; you see it on the 3D board, and so do your opponents in online matches.
+- **How:** sign in with Google, open Rewards and send your **invite link** (Copy or Share). Your friend opens it, makes a **new account** and **signs in with Google**, then **finishes an online match** (3 or more fights, against anyone, without leaving). Then the skin is yours.
+- The sheet shows every friend who used your link and what they still need to do. The skin comes once, however many friends you bring.
+- A friend who opens your link sees a "A friend invited you!" note on the welcome screen.
+
+### Join the Discord: the BABABABA title
+- **An orange BABABABA title** under your name for everyone who joins the No Mans Land Discord.
+- **How:** open Rewards, tap **Join the Discord**, then **I've joined: Check**. Discord asks you to let the game see who you are and which servers you're in; the title is yours as soon as it confirms. Pick which title shows in Profile.
+- The Discord check switches on as soon as the server is set up.
+
+---
+
 ## 3 November 2026 – 2v2 on one shared board (developer test)
 
 2v2 is now played on **one big board** instead of two boards side by side. This also fixes the screen glitches: the second board that flickered, squeezed or showed the wrong size is gone.

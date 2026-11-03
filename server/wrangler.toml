@@ -8,6 +8,12 @@ compatibility_date = "2026-10-01"
 ALLOWED_ORIGINS = "https://snetendare.github.io,https://playnomansland.github.io,http://localhost:8766,http://127.0.0.1:8766,http://localhost:8787"
 # Google sign-in (step 5): the public OAuth client id. The server checks that Google ID tokens were made for it.
 GOOGLE_CLIENT_ID = "732949481177-ikom5gqq07pt0sg89km9mth5d9ibfvmi.apps.googleusercontent.com"
+# Discord (2026-11-03): the BABABABA title for players in the game's Discord server (accounts.js DISCORD). Off until
+# DISCORD_CLIENT_ID and DISCORD_GUILD_ID are set here and DISCORD_CLIENT_SECRET is a Cloudflare secret (the deploy
+# workflow puts the GitHub secret of that name there). DISCORD_INVITE: the server's invite link, shown on the page.
+DISCORD_CLIENT_ID = ""
+DISCORD_GUILD_ID = ""
+DISCORD_INVITE = ""
 
 # One Room per match code. SQLite-backed, so it works on the Free plan.
 [[durable_objects.bindings]]

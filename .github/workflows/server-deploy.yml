@@ -3,6 +3,7 @@
 #   CLOUDFLARE_API_TOKEN  - an API token made from the "Edit Cloudflare Workers" template
 #   CLOUDFLARE_ACCOUNT_ID - the Cloudflare account id
 # Optional: DEV_EMAILS - comma-separated Google emails that get developer mode (put into a Cloudflare secret).
+#           DISCORD_CLIENT_SECRET - the Discord app's client secret, for the BABABABA title (also a Cloudflare secret).
 # Without them the tests still run and the deploy step is skipped.
 name: Server deploy
 
@@ -51,6 +52,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DEV_EMAILS: ${{ secrets.DEV_EMAILS }}
+          DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "Cloudflare secrets not set yet: skipping deploy."
@@ -59,3 +61,4 @@ jobs:
           npx wrangler deploy
           # developer accounts (docs/SERVER.md, Accounts): kept as a Cloudflare secret, never in the repo
           if [ -n "$DEV_EMAILS" ]; then printf '%s' "$DEV_EMAILS" | npx wrangler secret put DEV_EMAILS; fi
+          if [ -n "$DISCORD_CLIENT_SECRET" ]; then printf '%s' "$DISCORD_CLIENT_SECRET" | npx wrangler secret put DISCORD_CLIENT_SECRET; fi

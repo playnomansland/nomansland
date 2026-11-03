@@ -647,6 +647,38 @@ html.pc .corner button span { display: inline; }
 .tiles button svg { width: 22px; height: 22px; }
 .tiles button.hot { border-color: var(--gold); color: var(--gold); }
 .home .mplayer { background: rgba(13, 19, 21, 0.62); border-color: rgba(255, 255, 255, 0.25); }
+/* rewards (2026-11-03): the card on the main menu (a picture of each reward) and the Rewards sheet */
+.rewards { width: min(100%, 520px); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rewards button { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; text-align: left; padding: 6px 10px 6px 6px; border: 1px solid rgba(79, 216, 196, 0.6); background: rgba(13, 19, 21, 0.68); color: #fff; border-radius: 12px; min-height: 64px; font: inherit; }
+.rewards #rw-discord { border-color: rgba(255, 138, 42, 0.65); }
+.rewards button b { display: block; font: 700 13px var(--font-display); letter-spacing: 0.04em; }
+.rewards button small { display: block; font-size: 11px; opacity: 0.85; line-height: 1.25; }
+.rewards button.done small { color: var(--gold); opacity: 1; }
+.rw-pic { position: relative; display: grid; place-items: center; width: 56px; height: 52px; }
+.rw-pic img { width: 56px; height: 56px; filter: drop-shadow(0 0 8px rgba(79, 216, 196, 0.65)); }
+.rw-pic em { position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%); font: 700 8px var(--font-display); font-style: normal; letter-spacing: 0.14em; text-transform: uppercase; background: #2A9D96; color: #fff; padding: 1px 5px; border-radius: 4px; }
+.rw-pic .ptitle { font-size: 7px; letter-spacing: 0.12em; padding: 2px 5px; gap: 3px; }
+.rw-pic .ptitle i { width: 3px; height: 3px; }
+@media (max-width: 380px) { .rewards button { grid-template-columns: 1fr; justify-items: center; text-align: center; } }
+.rewards-sheet { display: grid; gap: 14px; }
+.rewards-sheet .joinrow { display: flex; gap: 8px; width: 100%; }
+.rewards-sheet .joinrow input { flex: 1; min-width: 0; width: auto; font-size: 13px; }
+.rewards-sheet a.btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.rw-sec { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.03); }
+.rw-head { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; }
+.rw-head img { filter: drop-shadow(0 0 12px rgba(79, 216, 196, 0.6)); }
+.rw-head h4 { margin: 2px 0 4px; font: 700 18px var(--font-display); }
+.rw-chip { grid-column: 1 / -1; display: grid; place-items: center; padding: 6px 0; }
+.rw-steps { margin: 0; padding-left: 22px; display: grid; gap: 4px; font-size: 14px; }
+.rw-steps li.ok::marker { color: var(--gold); }
+.rw-steps li.ok { color: var(--gold); }
+.rw-got { margin: 0; color: var(--gold); font-weight: 600; }
+.rw-friends { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rw-friends li { display: grid; gap: 2px; padding: 6px 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.05); }
+.rw-friends span { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
+.rw-friends i { font-style: normal; opacity: 0.75; }
+.rw-friends i.ok { color: var(--gold); opacity: 1; }
+.home-invited { margin: 0; max-width: 420px; text-align: center; color: #A8F5E8; font-size: 14px; text-shadow: 0 1px 2px #000; }
 .pop-back { position: absolute; inset: 0; z-index: 2; background: rgba(8, 11, 12, 0.55); display: grid; place-items: center; padding: 16px; overflow-y: auto; }
 .pop-back.auto { position: relative; inset: auto; background: none; padding: 0; overflow: visible; } /* the UI tests: in the page's flow, so the menu stays clickable */
 .pop { width: min(100%, 460px); max-height: calc(100dvh - 32px); overflow-y: auto; background: rgba(21, 33, 37, 0.97); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55); animation: popin 0.16s ease-out; }
@@ -994,6 +1026,8 @@ const Shapes = (() => {
   // this phone's own from its account, the opponent's from the server (net.players), so nobody can claim one they don't own.
   const SKINS = {
     'brute-champion': { unit: 'Brute', name: 'Champion', text: 'A crowned Brute in gold armour with a great hammer and a cape.', model: 'brute:champion', pic: 'img/skins/brute-champion.png' },
+    // limited: only for inviting a friend (server accounts.js INVITE)
+    'golem-aquamarine': { unit: 'Ether Golem', name: 'Aquamarine', text: 'An Ether Golem cut from sea-green crystal, with crystal spires and a white-hot core.', model: 'golem:aquamarine', pic: 'img/skins/golem-aquamarine.png', limited: true },
   };
   let worn = [{}, {}]; // per side: unit name -> skin
   function useSkins(lists) {
@@ -12009,14 +12043,16 @@ Floors.floor = (() => {
 
   // ---------- titles (2026-11-02): earned on the server (accounts.js titlesOf), shown under a username ----------
   // day1: every account made in the first week (to Sunday 2026-11-08); dev: developer accounts; legend (2026-11-03):
-  // ended a month in the top 5 of the leaderboard (kept for good). The player picks
+  // ended a month in the top 5 of the leaderboard (kept for good); bababa (2026-11-03): joined the game's Discord
+  // server, checked with Discord (see "rewards"). The player picks
   // which one shows (Profile). A title this phone hasn't announced yet gets the "new Title" popup on the main menu.
   const TITLES = {
     day1: { name: 'Day 1', col: '#B67CFF', glow: 'rgba(182, 124, 255, 0.55)' },
     dev: { name: 'DEV', col: '#FF5FC4', glow: 'rgba(255, 95, 196, 0.55)' },
     legend: { name: 'Legend', col: '#FFC83D', glow: 'rgba(255, 200, 61, 0.6)' },
+    bababa: { name: 'BABABABA', col: '#FF8A2A', glow: 'rgba(255, 138, 42, 0.6)' },
   };
-  const TITLE_WHY = { day1: 'Day 1: you were here in the very first week.', dev: 'DEV: you make this game.', legend: 'Legend: you ended a month in the top 5 of the leaderboard.' };
+  const TITLE_WHY = { day1: 'Day 1: you were here in the very first week.', dev: 'DEV: you make this game.', legend: 'Legend: you ended a month in the top 5 of the leaderboard.', bababa: 'BABABABA: you joined the No Mans Land Discord.' };
   const titleHtml = (id, big) => TITLES[id] ? `<span class="ptitle${big ? ' big' : ''}" style="--tc:${TITLES[id].col};--tg:${TITLES[id].glow}"><i aria-hidden="true"></i>${esc(TITLES[id].name)}<i aria-hidden="true"></i></span>` : '';
   // a username with its title under it
   const nameplate = (tag, title, cls = '') => `<span class="nameplate ${cls}"><span class="np-tag">${esc(tag)}</span>${titleHtml(title)}</span>`;
@@ -12200,6 +12236,7 @@ Floors.floor = (() => {
           <div><button class="hbtn" id="w-guest" ${home.busy ? 'disabled' : ''}>Play as guest</button></div>
         </div>
         <p class="home-msg" id="home-msg" aria-live="polite">${esc(home.msg)}</p>
+        ${invitePending() ? '<p class="home-invited">A friend invited you! Sign up with Google and finish an online match together, and they get a limited skin.</p>' : ''}
       </div><div></div>`;
     $('w-login').addEventListener('click', () => { home.screen = 'login'; home.msg = ''; drawHome(); });
     $('w-signup').addEventListener('click', () => { home.screen = 'signup'; home.msg = ''; drawHome(); });
@@ -12276,6 +12313,7 @@ Floors.floor = (() => {
         </div>
       </div>
       <div class="home-foot">
+        ${rewardsCard()}
         <div class="tiles">
           <button id="tutorial" class="${newcomer ? 'hot' : ''}">${HICON.school}Tutorial</button>
           <button id="how">${HICON.help}How to play</button>
@@ -12321,6 +12359,8 @@ Floors.floor = (() => {
     if ($('tutorial-new')) $('tutorial-new').addEventListener('click', startTutorial);
     $('lb-open').addEventListener('click', openLeaderboard);
     if ($('tours-open')) $('tours-open').addEventListener('click', openToursSheet);
+    wireRewardsCard();
+    if (discordBack && !discordBack.done && acct) discordFinish();
     if ($('resume')) $('resume').addEventListener('click', () => resumeHost(resume));
     if ($('net-resume')) $('net-resume').addEventListener('click', () => netBack.duo ? duoJoin(netBack.code, netBack.key) : srvJoin(netBack.code, { key: netBack.key, side: netBack.side }));
     if ($('tour-back')) $('tour-back').addEventListener('click', () => { tour.menu = false; showStart(); });
@@ -12883,6 +12923,25 @@ Floors.floor = (() => {
   try { acct = JSON.parse(localStorage.getItem(ACCT_STORE) || sessionStorage.getItem(ACCT_STORE) || 'null'); } catch (e) {}
   if (!(acct && /^p[0-9a-f]{16}$/.test(acct.id) && /^[0-9a-f]{64}$/.test(acct.session))) acct = null;
   const acctUi = { busy: false, msg: '', off: false, sure: false, gsi: null, after: null, outSure: false };
+  // ---------- rewards (2026-11-03): invite a friend -> the limited Aquamarine Ether Golem skin; join the Discord ->
+  // the orange BABABABA title. Both are decided by the server (accounts.js INVITE and DISCORD); the page only asks.
+  // A friend's link is ?invite=CODE: this phone keeps the code (INVITE_STORE) and acctCall sends it with the next
+  // guest, google or me call, so the account made through the link is tied to the friend (only a new one counts).
+  // Discord: the page sends the player to Discord's own consent screen; Discord comes back to this page with
+  // ?code=&state= (state checked against DISCORD_STATE in sessionStorage) and the server checks the code.
+  const rw = { discord: null, invite: null, busy: false, msg: '' };
+  const INVITE_STORE = 'pb-invite', INVITE_RE = /^[A-HJKMNP-Z2-9]{6}$/, DISCORD_STATE = 'pb-discord-state';
+  const invitePending = () => { try { const v = JSON.parse(localStorage.getItem(INVITE_STORE) || 'null'); return v && INVITE_RE.test(v.code) && now() - v.ts < 14 * 864e5 ? v.code : ''; } catch (e) { return ''; } };
+  const urlDrop = (...keys) => { const u = new URL(location.href.split('#')[0]); keys.forEach(k => { u.searchParams.delete(k); qs.delete(k); }); history.replaceState(null, '', location.pathname + (u.searchParams.toString() ? '?' + u.searchParams : '')); };
+  { const c = (qs.get('invite') || '').toUpperCase(); if (qs.has('invite')) { if (INVITE_RE.test(c)) { try { localStorage.setItem(INVITE_STORE, JSON.stringify({ code: c, ts: now() })); } catch (e) {} } urlDrop('invite'); } }
+  const discordBack = (() => { // Discord sent the player back here
+    if (!qs.has('state') || !(qs.has('code') || qs.has('error'))) return null;
+    let want = ''; try { want = sessionStorage.getItem(DISCORD_STATE) || ''; sessionStorage.removeItem(DISCORD_STATE); } catch (e) {}
+    const back = want && qs.get('state') === want ? { code: qs.get('code') || '', error: qs.get('error') || '' } : null;
+    urlDrop('code', 'state', 'error', 'error_description', 'guild_id', 'permissions');
+    return back;
+  })();
+  const discordRedirect = () => location.origin + location.pathname;
   // Developer mode: the server marks a player as a developer (its DEV_EMAILS secret); the page only reads the flag.
   // Anything ever locked or gated per player checks devMode() and lets developers through. For server-side gates the
   // server checks its own flag; this copy is for the page.
@@ -12895,20 +12954,24 @@ Floors.floor = (() => {
     } catch (e) {}
   }
   async function acctCall(route, body, withSession) {
+    const inv = (route === 'guest' || route === 'google' || route === 'me') && invitePending();
+    if (inv) body = { ...(body || {}), invite: inv }; // a friend's invite link (rewards): tried once, then dropped
     const headers = { 'content-type': 'application/json' };
     if (withSession && acct) headers.Authorization = 'Bearer ' + acct.session;
     let res;
     try { res = await fetch(`${SERVER_URL}/account/${route}`, { method: 'POST', headers, body: JSON.stringify(body || {}) }); }
     catch (e) { return { status: 0 }; }
     let j = {}; try { j = await res.json(); } catch (e) {}
+    if (inv && res.status === 200) { try { localStorage.removeItem(INVITE_STORE); } catch (e) {} }
     return { status: res.status, ...j };
   }
   // keeps the phone's copy in step with an answer that carries a player (and maybe a new session)
   function acctTake(r) {
     if (typeof r.rankedOn === 'boolean' && typeof home !== 'undefined') home.rankedOn = r.rankedOn;
+    if (r.discord !== undefined) rw.discord = r.discord && typeof r.discord.clientId === 'string' ? r.discord : null;
     if (!r.player) return;
     acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, dev: !!r.player.dev, titles: Array.isArray(r.player.titles) ? r.player.titles.filter(t => TITLES[t]) : [], title: TITLES[r.player.title] ? r.player.title : '', tagNext: +r.player.tagNext || 0,
-      skins: Array.isArray(r.player.skins) ? r.player.skins.filter(k => k && Shapes.SKINS[k.id]).map(k => ({ id: k.id, worn: !!k.worn })) : [], session: r.session || acct.session, ts: now() });
+      skins: Array.isArray(r.player.skins) ? r.player.skins.filter(k => k && Shapes.SKINS[k.id]).map(k => ({ id: k.id, worn: !!k.worn })) : [], discord: !!r.player.discord, session: r.session || acct.session, ts: now() });
   }
   function acctFail(r) {
     if (r.status === 503 && r.error === 'accounts off') { acctUi.off = true; return 'Accounts aren’t switched on yet on the game server.'; }
@@ -13047,6 +13110,101 @@ Floors.floor = (() => {
     acctRefresh();
   }
   if (qs.has('test')) window.__acct = () => ({ acct, ui: acctUi, google: acctGoogle, dev: devMode() });
+
+  // ---------- rewards sheet and the main menu's rewards card (2026-11-03; state and links: see rw above) ----------
+  const INVITE_SKIN = 'golem-aquamarine';
+  const ownsSkin = (id) => !!(acct && !acct.dev && (acct.skins || []).some(k => k.id === id)) || !!(rw.invite && rw.invite.rewarded);
+  const inviteLink = (code) => location.origin + location.pathname + '?invite=' + code;
+  // the card under PLAY: a picture of each reward, tap for the sheet
+  function rewardsCard() {
+    const golem = ownsSkin(INVITE_SKIN), dc = !!(acct && acct.discord);
+    return `<div class="rewards" role="group" aria-label="Rewards">
+      <button id="rw-invite" class="${golem ? 'done' : ''}"><span class="rw-pic"><img src="${skinPic(INVITE_SKIN)}" alt="" width="56" height="56"><em>Limited</em></span>
+        <span><b>Invite a friend</b><small>${golem ? 'Aquamarine Golem: yours!' : 'Get the Aquamarine Golem skin'}</small></span></button>
+      <button id="rw-discord" class="${dc ? 'done' : ''}"><span class="rw-pic">${titleHtml('bababa')}</span>
+        <span><b>Join our Discord</b><small>${dc ? 'BABABABA title: yours!' : 'Get the orange BABABABA title'}</small></span></button>
+    </div>`;
+  }
+  function rewardsDraw() {
+    const el = $('rewards'); if (!el) return;
+    const a = acct, inv = rw.invite, dc = rw.discord, dis = rw.busy ? 'disabled' : '';
+    const golem = ownsSkin(INVITE_SKIN);
+    const step = (ok, t) => `<li class="${ok ? 'ok' : ''}">${t}</li>`;
+    const friends = inv && inv.friends.length ? `<span class="hint">Friends who used your link</span><ul class="rw-friends">${inv.friends.map(f => `<li><b>${esc(f.tag)}</b><span>${f.done ? '<i class="ok">Reward earned</i>' : `${f.google ? '<i class="ok">Google ✓</i>' : '<i>Needs Google sign-in</i>'}${f.played ? '<i class="ok">Online match ✓</i>' : '<i>Needs an online match</i>'}`}</span></li>`).join('')}</ul>` : '';
+    el.innerHTML = `
+      <section class="rw-sec">
+        <div class="rw-head"><img src="${skinPic(INVITE_SKIN)}" alt="" width="96" height="96"><div><span class="eyebrow" style="color:#4FD8C4">Limited skin</span><h4>Aquamarine Ether Golem</h4><p class="hint" style="margin:0">${esc(Shapes.SKINS[INVITE_SKIN].text)}</p></div></div>
+        <ol class="rw-steps">${step(inv && inv.code, 'Send a friend your invite link.')}${step(inv && inv.friends.length, 'They make a new account through it and sign in with Google.')}${step(golem, `They finish an online match (${inv ? inv.minFights : 3}+ fights, against anyone, without leaving).`)}</ol>
+        ${golem ? '<p class="rw-got">The Aquamarine Golem is yours! Your Ether Golems wear it; switch it off any time in Profile.</p>' : ''}
+        ${!a || !a.google ? `<p class="hint" style="margin:0">Invites come from confirmed accounts: sign in with Google to get your link.</p><button class="btn primary" id="rw-signin">${a ? 'Sign in with Google in Profile' : 'Make an account'}</button>`
+          : inv && inv.code ? `<span class="joinrow"><input class="tour-in" id="rw-link" readonly value="${esc(inviteLink(inv.code))}" aria-label="Your invite link"><button class="btn" id="rw-copy">Copy</button></span>
+            ${navigator.share ? '<button class="btn primary" id="rw-share">Share link</button>' : ''}${friends}`
+          : `<p class="hint" style="margin:0">${rw.busy ? 'Getting your link…' : 'Couldn’t get your link.'}</p>${rw.busy ? '' : '<button class="btn" id="rw-again">Try again</button>'}`}
+      </section>
+      <section class="rw-sec">
+        <div class="rw-head"><div class="rw-chip">${titleHtml('bababa', true)}</div></div>
+        <p class="hint" style="margin:0">Join the No Mans Land Discord server, then tap Check: Discord tells the game you’re in, and the orange BABABABA title goes under your name.</p>
+        ${a && a.discord ? '<p class="rw-got">BABABABA is yours! Pick which title shows in Profile.</p>'
+          : !a ? '<p class="hint" style="margin:0">Make an account first (a guest is enough).</p>'
+          : !dc ? '<p class="hint" style="margin:0">The Discord server opens soon. Check back here!</p>'
+          : `<span class="btnrow">${dc.invite ? `<a class="btn" id="rw-dc-join" href="${esc(dc.invite)}" target="_blank" rel="noopener">Join the Discord</a>` : ''}<button class="btn primary" id="rw-dc-check" ${dis} ${dc.check ? '' : 'disabled'}>I’ve joined: Check</button></span>`}
+      </section>`;
+    $('rw-msg').textContent = rw.msg;
+    const on = (id, f) => { if ($(id)) $(id).addEventListener('click', f); };
+    on('rw-signin', () => { if (acct) openAccountSheet(); else { closeSheet(true); home.screen = 'signup'; home.msg = ''; drawHome(); } });
+    on('rw-again', rewardsLoad);
+    on('rw-copy', async () => { const t = $('rw-link'); try { await navigator.clipboard.writeText(t.value); rw.msg = 'Link copied.'; } catch (e) { t.select(); rw.msg = 'Select the link and copy it.'; } $('rw-msg').textContent = rw.msg; });
+    on('rw-share', () => { navigator.share({ title: 'No Mans Land', text: 'Play No Mans Land with me!', url: inviteLink(inv.code) }).catch(() => {}); });
+    on('rw-dc-check', discordStart);
+  }
+  async function rewardsLoad() {
+    if (!acct) { rewardsDraw(); return; }
+    rw.busy = true; rewardsDraw();
+    const me = await acctCall('me', {}, true);
+    if (me.status === 200) acctTake(me);
+    if (acct && acct.google) {
+      const r = await acctCall('invite', {}, true);
+      rw.invite = r.status === 200 && typeof r.code === 'string' ? { code: r.code, friends: Array.isArray(r.friends) ? r.friends : [], rewarded: !!r.rewarded, minFights: +r.minFights || 3 } : null;
+      if (r.status !== 200) rw.msg = acctFail(r);
+    }
+    rw.busy = false; rewardsDraw();
+    if (phase === 'start' && !m && home.screen === 'menu' && $('rw-invite')) { const c = document.querySelector('#home .rewards'); if (c) c.outerHTML = rewardsCard(); wireRewardsCard(); }
+  }
+  function openRewardsSheet(msg) {
+    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Rewards</h3><button class="btn small" id="close">Close</button></div>
+      <div id="rewards" class="rewards-sheet"></div><p class="hint" id="rw-msg" aria-live="polite" style="margin:0;color:var(--gold)"></p>`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', closeSheet);
+    rw.msg = msg || '';
+    rewardsDraw();
+    rewardsLoad();
+  }
+  function wireRewardsCard() {
+    if ($('rw-invite')) $('rw-invite').addEventListener('click', () => openRewardsSheet());
+    if ($('rw-discord')) $('rw-discord').addEventListener('click', () => openRewardsSheet());
+  }
+  // Discord: off to Discord's consent screen (scopes: who you are and which servers you're in), and back
+  function discordStart() {
+    const dc = rw.discord;
+    if (!dc || !dc.check || !acct) return;
+    const state = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+    try { sessionStorage.setItem(DISCORD_STATE, state); } catch (e) {}
+    const u = new URL('https://discord.com/oauth2/authorize');
+    u.search = new URLSearchParams({ client_id: dc.clientId, response_type: 'code', scope: 'identify guilds', redirect_uri: discordRedirect(), state }).toString();
+    location.href = u.toString();
+  }
+  async function discordFinish() {
+    const b = discordBack; b.done = true;
+    if (b.error || !b.code) { openRewardsSheet('Discord check cancelled.'); return; }
+    if (!acct) { openRewardsSheet('Log in first, then check again.'); return; }
+    const r = await acctCall('discord', { code: b.code, redirect: discordRedirect() }, true);
+    if (r.status === 200) { acctTake(r); drawHome(); return; } // the "new Title" popup takes it from here
+    openRewardsSheet(r.error === 'not in server' ? 'Discord says you aren’t in the No Mans Land server yet. Join it, then check again.'
+      : r.error === 'discord used' ? 'That Discord account already gave the title to another player.'
+      : r.error === 'discord code' ? 'Discord didn’t confirm. Try the check again.'
+      : r.error === 'discord off' ? 'The Discord check isn’t switched on yet.' : acctFail(r));
+  }
+  if (qs.has('test')) window.__rewards = () => ({ rw, discordBack, invitePending: invitePending(), open: openRewardsSheet });
 
   // ---------- flow: vs Claude ----------
   // Only inside Claude: the page asks Claude (on the player's own account) for its move each round.
@@ -14416,7 +14574,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // It falls back to the 2D board when it can't start (no WebGL), when the phone drops the WebGL context, and when
   // fights run under 20 fps at low quality (slower fights step the quality down first), with one line on the board.
   const THREE_URL = './vendor/three.module.min.js'; // the artifact build points this at jsDelivr
-  const V3D = '4db29f6a65'; // the 3D code's version (src/build.js puts a hash of it here)
+  const V3D = 'a15717c1c5'; // the 3D code's version (src/build.js puts a hash of it here)
   const B3D_STORE = 'phone-bellum-board';
   const force2d = /[?&]board=2d\b/.test(location.search);
   const force3d = !force2d && (/[?&]board=3d\b/.test(location.search) || window.PB_FORCE3D === true);
