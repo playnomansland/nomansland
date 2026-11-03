@@ -1346,8 +1346,20 @@ const Engine = (() => {
     const side = (x, k) => Array.isArray(x) ? makeArmy(x, k, g) : makeSide(x, k, g);
     const bt = createBattle(side(uA, 0), side(uB, 1), g, opts);
     const frames = [];
-    while (bt.step()) if (opts.record) frames.push(bt.frame());
+    let steps = 0;
+    const progressEvery = Number.isInteger(opts.progressEvery) && opts.progressEvery > 0 ? opts.progressEvery : 0;
+    while (true) {
+      const running = bt.step();
+      steps++;
+      if (typeof opts.onStep === 'function') opts.onStep(bt); // opt-in, for the fast-path differential test
+      if (!running) break;
+      if (opts.record) frames.push(bt.frame());
+      if (progressEvery && typeof opts.onProgress === 'function' && steps % progressEvery === 0) {
+        opts.onProgress({ steps, time: bt.time() });
+      }
+    }
     const r = bt.result();
+    if (progressEvery && typeof opts.onProgress === 'function') opts.onProgress({ steps, time: bt.time(), complete: true });
     if (opts.record) frames.push(bt.frame(true));
     r.frames = frames;
     r.shapes = bt.bodies.map(b => b.u.shape || "circle");
@@ -1434,6 +1446,7 @@ const Engine = (() => {
       if (v.u.structure && v.u.teleport && !v.teleported) {
         v.teleported = true; v.alive = true; v.hp = 1; v.diedTick = undefined; v.poison = null; v.bleed = null;
         v.x = v.u.teleport.x; v.y = v.u.teleport.y;
+        invalidateTargetIndex();
         return;
       }
       // a lesser building (Factions devtest) doesn't cripple its side. The penalty starts with the next tick, so the
@@ -1461,6 +1474,7 @@ const Engine = (() => {
           const [ox, oy] = SPAWN_SPOTS[k++ % SPAWN_SPOTS.length], fwd = v.side === 0 ? 1 : -1;
           r.boarded = false; r.alive = true; r.carrier = null;
           r.x = v.x + ox * g.spacing * 0.5; r.y = v.y + oy * fwd * g.spacing * 0.5;
+          invalidateTargetIndex();
         }
       }
       // Spawn on death: new bodies take its place (they join at the end of this tick).
@@ -1989,6 +2003,7 @@ const Engine = (() => {
             const sgn = (v.wwDodges = (v.wwDodges || 0) + 1) % 2 ? 1 : -1, c = 0.7071067811865476;
             const ux = (dx - sgn * dy) * c, uy = (dy + sgn * dx) * c;
             v.x += ux * ww.step; v.y += uy * ww.step; v.hx = -dx; v.hy = -dy;
+            invalidateTargetIndex(); // a dodge can move a body that a later attacker targets
             if (g.bounds) { v.x = Math.max(g.bounds.x0, Math.min(g.bounds.x1, v.x)); v.y = Math.max(g.bounds.y0, Math.min(g.bounds.y1, v.y)); }
             v.dashing = true;
             if (v.u.windUp > 0) { v.setUp = false; v.windTarget = null; }
@@ -2075,7 +2090,7 @@ const Engine = (() => {
         // big hits on small bodies push the full distance; on big bodies barely at all
         const push = owner.u.knockback * Math.min(1, hit / v.u.hp);
         const dx = v.x - fromX, dy = v.y - fromY, d = hyp(dx, dy) || 1;
-        const knock = () => { v.x += dx / d * push; v.y += dy / d * push; };
+        const knock = () => { v.x += dx / d * push; v.y += dy / d * push; invalidateTargetIndex(); };
         if (healLater) hitsLater.push(knock); else knock();
       }
     }
@@ -2227,16 +2242,220 @@ const Engine = (() => {
       if (v.alive && poolHp(v) < before) bleedOn(p.owner, v, p.bleed); // a shield or a dodge stops the bleed too
     }
 
+    // Experimental broad-phase target index. Exact targeting filters remain in validTargets.
+    // Rebuilt at the start of each attack phase; exceptional in-phase target movement invalidates it.
+    const TARGET_CELL = 8;
+    let targetIndex = null;
+    let targetIndexDirty = true;
+    function invalidateTargetIndex() { targetIndexDirty = true; moveGrid[0] = moveGrid[1] = null; }
+    function buildTargetIndex() {
+      const bySide = [new Map(), new Map()];
+      const order = [new Map(), new Map()];
+      for (let side = 0; side < 2; side++) {
+        const bodies = sides[side];
+        for (let i = 0; i < bodies.length; i++) {
+          const body = bodies[i];
+          order[side].set(body, i);
+          const cx = Math.floor(body.x / TARGET_CELL), cy = Math.floor(body.y / TARGET_CELL);
+          const key = cx + ',' + cy;
+          let bucket = bySide[side].get(key);
+          if (!bucket) bySide[side].set(key, bucket = []);
+          bucket.push(body);
+        }
+      }
+      const maxBarrierRadius = [0, 1].map(side => {
+        let radius = 0;
+        for (const body of sides[side]) if (body.u.barrier > 0) {
+          const hx = body.u.barrier, hy = body.u.barrierY > 0 ? body.u.barrierY : body.u.barrier;
+          radius = Math.max(radius, hyp(hx, hy));
+        }
+        return radius;
+      });
+      targetIndex = { bySide, order, maxBarrierRadius };
+      targetIndexDirty = false;
+    }
+    function indexedTargets(side, x, y, reach) {
+      if (!targetIndex || targetIndexDirty) buildTargetIndex();
+      const radius = reach + 4 * Math.abs(heightRange) + targetIndex.maxBarrierRadius[side] + 0.01;
+      const buckets = targetIndex.bySide[side], found = [], seen = new Set();
+      const minX = Math.floor((x - radius) / TARGET_CELL), maxX = Math.floor((x + radius) / TARGET_CELL);
+      const minY = Math.floor((y - radius) / TARGET_CELL), maxY = Math.floor((y + radius) / TARGET_CELL);
+      for (let cy = minY; cy <= maxY; cy++) for (let cx = minX; cx <= maxX; cx++) {
+        const bucket = buckets.get(cx + ',' + cy);
+        if (!bucket) continue;
+        for (const body of bucket) if (!seen.has(body)) { seen.add(body); found.push(body); }
+      }
+      // Preserve the original sides[] order for stable-sort tie breaking.
+      const order = targetIndex.order[side];
+      found.sort((a, b) => order.get(a) - order.get(b));
+      return found;
+    }
+
+    // Fast paths (opts.targetingMode === 'indexed'): spatial grids that must give exactly the reference results.
+    // tools/tests/targeting-determinism.js and tools/tests/fast-paths.js compare them with the full scans.
+    // Bodies whose own unit ignores the tower (u.noTower) always take the full scan: pickable's othersThan caches
+    // its answer at its first call each tick, so skipping a call could change when that happens.
+    const fastPaths = opts.targetingMode === 'indexed';
+    const cellKey = (cx, cy) => (cx + 32768) * 65536 + (cy + 32768);
+    // Movement: the nearest enemy each body walks to. One grid per side, of its living bodies' indices, rebuilt
+    // when the side's array grows, when a half of the movement loop starts, or when something moves a body out of
+    // turn (invalidateTargetIndex: knockback, teleports, carrier releases, dodges).
+    const MOVE_CELL = 8;
+    const moveGrid = [null, null];
+    function moveGridFor(s) {
+      const arr = sides[s];
+      let mg = moveGrid[s];
+      if (mg && mg.len === arr.length) return mg;
+      const cells = new Map();
+      let mb = 0;
+      for (let i = 0; i < arr.length; i++) {
+        const f = arr[i];
+        if (!f.alive) continue;
+        if (f.u.barrier > 0) mb = Math.max(mb, hyp(halfX(f), halfY(f)));
+        const k = cellKey(Math.floor(f.x / MOVE_CELL), Math.floor(f.y / MOVE_CELL));
+        const bucket = cells.get(k);
+        if (bucket) bucket.push(i); else cells.set(k, [i]);
+      }
+      return moveGrid[s] = { cells, len: arr.length, mb };
+    }
+    const nearIdx = [];
+    let nearFound = null, nearDist = Infinity;
+    // the nearest enemy b can see, as the full scan in step() finds it (same order, same ties). False: not settled
+    // within the search radius, the caller does the full scan (it also finds the nearest unseen one then).
+    function nearestSeen(b) {
+      const s = 1 - b.side, arr = sides[s], mg = moveGridFor(s);
+      for (let R = 12; R <= 48; R *= 2) {
+        nearIdx.length = 0;
+        const x0 = Math.floor((b.x - R) / MOVE_CELL), x1 = Math.floor((b.x + R) / MOVE_CELL);
+        const y0 = Math.floor((b.y - R) / MOVE_CELL), y1 = Math.floor((b.y + R) / MOVE_CELL);
+        if (!(x1 - x0 < 64 && y1 - y0 < 64)) return false;
+        for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
+          const bucket = mg.cells.get(cellKey(cx, cy));
+          if (bucket) for (let k = 0; k < bucket.length; k++) nearIdx.push(bucket[k]);
+        }
+        nearIdx.sort((p, q) => p - q);
+        let near = null, nd = Infinity;
+        for (let k = 0; k < nearIdx.length; k++) {
+          const f = arr[nearIdx[k]];
+          if (!pickable(b, f)) continue;
+          const d = gap(f, b);
+          if (d < nd && inSight(b, f)) { nd = d; near = f; }
+        }
+        // anything not gathered stands more than R away (centre to centre), so its edge more than R - mb away
+        if (near && nd < R - mg.mb - 1e-6) { nearFound = near; nearDist = nd; return true; }
+      }
+      return false;
+    }
+    // Separation between allies: the pairs in exactly the reference order (i, then j > i), skipping only pairs too
+    // far apart to touch. Positions change as pairs are pushed apart, so the grid follows every move and a body's
+    // candidate list is gathered again whenever it has moved more than SEP slack since the list was made.
+    function separatePair(a, c, minSep) {
+      if (a.u.barrier > 0 || c.u.barrier > 0) return; // a side's own units walk through its walls
+      const dx = c.x - a.x, dy = c.y - a.y;
+      const d = hyp(dx, dy);
+      // structures and bodies still waiting to start (flank squads) don't budge: the other body moves the whole way
+      const fa = a.u.structure || a.u.anchored || a.delay > 0, fc = c.u.structure || c.u.anchored || c.delay > 0;
+      if (fa && fc) return;
+      const ka = fa ? 0 : fc ? 2 : 1, kc = fc ? 0 : fa ? 2 : 1;
+      if (d < minSep && (a.u.structure || c.u.structure)) {
+        // a body walking into its own tower slides around it instead of being pushed straight back (it got
+        // stuck behind it): out to minSep, then sideways by as much as it had walked in, toward where it heads
+        // (with no lean either way, toward the middle of the board)
+        const s = a.u.structure ? a : c, w = s === a ? c : a;
+        let rx = w.x - s.x, ry = w.y - s.y, rl = d;
+        if (rl < 1e-9) { rx = s.x > 0 ? -1 : 1; ry = 0; rl = 1; }
+        rx /= rl; ry /= rl;
+        let tx = -ry, ty = rx;
+        const lean = tx * (w.hx || 0) + ty * (w.hy || 0);
+        if (lean < 0 || (lean < 1e-6 && tx * (s.x > 0 ? -1 : 1) < 0)) { tx = -tx; ty = -ty; }
+        const slide = minSep - (d < 1e-9 ? 0 : d);
+        w.x = s.x + rx * minSep + tx * slide; w.y = s.y + ry * minSep + ty * slide;
+      } else if (d > 0 && d < minSep) {
+        const push = (minSep - d) / 2;
+        a.x -= dx / d * push * ka; a.y -= dy / d * push * ka;
+        c.x += dx / d * push * kc; c.y += dy / d * push * kc;
+      } else if (d === 0) {
+        a.x -= minSep / 2 * ka; c.x += minSep / 2 * kc;
+      }
+    }
+    const sepOk = (b) => b.alive && !b.u.aloft && !sheltered(b);
+    function separateSideRef(arr, minSep) {
+      for (let i = 0; i < arr.length; i++) {
+        const a = arr[i]; if (!sepOk(a)) continue;
+        for (let j = i + 1; j < arr.length; j++) { const c = arr[j]; if (sepOk(c)) separatePair(a, c, minSep); }
+      }
+    }
+    function separateSideFast(arr, minSep) {
+      const cell = minSep * 2, slack = minSep, reach = minSep + slack;
+      const cells = new Map(), keyOf = new Array(arr.length);
+      const place = (i) => {
+        const b = arr[i], k = cellKey(Math.floor(b.x / cell), Math.floor(b.y / cell));
+        if (k === keyOf[i]) return;
+        if (keyOf[i] !== undefined) { const old = cells.get(keyOf[i]); old.splice(old.indexOf(i), 1); }
+        keyOf[i] = k;
+        const bucket = cells.get(k);
+        if (bucket) bucket.push(i); else cells.set(k, [i]);
+      };
+      for (let i = 0; i < arr.length; i++) if (sepOk(arr[i])) place(i);
+      const cand = [];
+      const gather = (x, y, after) => {
+        cand.length = 0;
+        const x0 = Math.floor((x - reach) / cell), x1 = Math.floor((x + reach) / cell);
+        const y0 = Math.floor((y - reach) / cell), y1 = Math.floor((y + reach) / cell);
+        for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
+          const bucket = cells.get(cellKey(cx, cy));
+          if (bucket) for (let k = 0; k < bucket.length; k++) if (bucket[k] > after) cand.push(bucket[k]);
+        }
+        cand.sort((p, q) => p - q);
+      };
+      for (let i = 0; i < arr.length; i++) {
+        const a = arr[i]; if (keyOf[i] === undefined) continue;
+        let qx = a.x, qy = a.y;
+        gather(qx, qy, i);
+        let last = i; // the last j paired with a
+        for (let k = 0; k < cand.length; k++) {
+          if (hyp(a.x - qx, a.y - qy) > slack) { // it has been pushed far: gather again from where it stands
+            qx = a.x; qy = a.y;
+            gather(qx, qy, last); k = -1; continue;
+          }
+          const j = cand[k], c = arr[j], ax = a.x, ay = a.y, cx = c.x, cy = c.y;
+          last = j;
+          separatePair(a, c, minSep);
+          if (a.x !== ax || a.y !== ay) place(i);
+          if (c.x !== cx || c.y !== cy) place(j);
+        }
+      }
+    }
+
     // enemies the unit may attack right now, nearest first
-    function validTargets(b) {
+    function validTargets(b, caller = 'attack') {
       const valid = [];
-      for (const f of sides[1 - b.side]) {
+      const counters = opts.profileCounters;
+      const callerCounters = counters && counters.byCaller && (counters.byCaller[caller] || (counters.byCaller[caller] = { calls: 0, bodiesScanned: 0, candidates: 0 }));
+      if (counters) counters.validTargetsCalls++;
+      if (callerCounters) callerCounters.calls++;
+      const foes = fastPaths && !b.u.noTower
+        ? indexedTargets(1 - b.side, b.x, b.y, reachOf(b))
+        : sides[1 - b.side];
+      for (const f of foes) {
+        if (counters) counters.validTargetsBodiesScanned++;
+        if (callerCounters) callerCounters.bodiesScanned++;
         if (!pickable(b, f)) continue;
         const d = gap(f, b);
-        if (d <= reachTo(reachOf(b), b, f) + 0.01 && d >= b.u.minRange && inSight(b, f)) valid.push([b.u.healthiest ? (f.u.structure ? 1e9 : 0) - poolHp(f) : d, f]); // healthiest: most health first, units before structures
+        if (d <= reachTo(reachOf(b), b, f) + 0.01 && d >= b.u.minRange && inSight(b, f)) {
+          if (counters) counters.validTargetsCandidates++;
+          if (callerCounters) callerCounters.candidates++;
+          valid.push([b.u.healthiest ? (f.u.structure ? 1e9 : 0) - poolHp(f) : d, f]); // healthiest: most health first, units before structures
+        }
       }
       valid.sort((p, q) => b.u.backline ? q[0] - p[0] : p[0] - q[0]);
-      return valid.map(v => v[1]);
+      const targets = valid.map(v => v[1]);
+      // Opt-in trace for differential targeting tests. No trace allocation or ID bookkeeping
+      // occurs during normal battles.
+      if (typeof opts.onTargetQuery === 'function') {
+        opts.onTargetQuery({ attacker: b, caller, targets });
+      }
+      return targets;
     }
 
     // the enemy a body attacks: once it has picked one it stays on it until it dies, hides or leaves its reach,
@@ -2412,6 +2631,7 @@ const Engine = (() => {
         const d = dist(tgt, b), keep = Math.min(d, Math.max(0.5, R(b) * 0.6));
         if (opts.record) shots.push([b.x, b.y, tgt.x, tgt.y, b.side, 0, 1, 0, 0]);
         if (d > 1e-6) { b.hx = (tgt.x - b.x) / d; b.hy = (tgt.y - b.y) / d; b.x = tgt.x - b.hx * keep; b.y = tgt.y - b.hy * keep; }
+        invalidateTargetIndex(); // flurry movement can affect later enemy target queries
         b.flurryTgt = tgt; b.lock = tgt;
       } else if (gap(tgt, b) > R(b) + 2) { b.flurryLeft = 0; return; }
       b.flurryLeft--; b.flurryT += b.u.flurry.gap;
@@ -2432,7 +2652,7 @@ const Engine = (() => {
       for (let k = 1; k < b.u.turrets; k++) {
         b.tcd[k] = (b.tcd[k] || 0) - dt * atkMul(b);
         if (b.tcd[k] > 0) continue;
-        if (!valid) valid = validTargets(b);
+        if (!valid) valid = validTargets(b, 'extraTurret');
         const taken = turretTaken(b, k), tgt = valid.find(f => !taken.includes(f));
         if (!tgt) { b.tcd[k] = Math.max(b.tcd[k], -dt); b.aims[k] = null; continue; }
         b.aims[k] = tgt;
@@ -2664,7 +2884,7 @@ const Engine = (() => {
       const sp = b.u.spear;
       if (b.forgeT > 0) { b.forgeT -= dt; if (b.forgeT > 1e-9) return; b.forgeT = 0; b.spearReady = true; }
       if (!b.spearReady && (b.u.defense === 'armor' ? b.u.defVal : 0) + (b.u.bonusArmor || 0) < 1 - 1e-9) return; // no armor left to forge with
-      const valid = validTargets(b);
+      const valid = validTargets(b, 'titaniumSpear');
       if (!valid.length) return;
       if (b.spearReady) {
         const tgt = valid[0], dx = tgt.x - b.x, dy = tgt.y - b.y, d = hyp(dx, dy) || 1;
@@ -2726,8 +2946,9 @@ const Engine = (() => {
       const order = turnOrder(), nFirst = sides[first].length;
       let stepsOut = false;
       for (const a of sides[first]) { a.mvX = a.x; a.mvY = a.y; }
+      moveGrid[0] = moveGrid[1] = null;
       for (let i = 0; i < order.length; i++) {
-        if (i === nFirst) { stepsOut = true; for (const a of sides[first]) { const x = a.x, y = a.y; a.x = a.mvX; a.y = a.mvY; a.mvX = x - a.mvX; a.mvY = y - a.mvY; } }
+        if (i === nFirst) { moveGrid[0] = moveGrid[1] = null; stepsOut = true; for (const a of sides[first]) { const x = a.x, y = a.y; a.x = a.mvX; a.y = a.mvY; a.mvX = x - a.mvX; a.mvY = y - a.mvY; } }
         const b = order[i];
         if (!b.alive || b.delay > 0) continue;
         b.dashing = false;
@@ -2772,7 +2993,7 @@ const Engine = (() => {
             if (opts.record) shots.push([b.x, b.y, f.x, f.y, b.side, 1, 1, 0, 0]);
             hurt(b, f, tHit, b.x, b.y);
             if (b.charging && knockOn && f.alive && !f.u.structure && !f.u.anchored && !f.u.barrier && !f.u.unstoppable) {
-              f.x += ux * b.u.bull.push; f.y += uy * b.u.bull.push;
+              f.x += ux * b.u.bull.push; f.y += uy * b.u.bull.push; invalidateTargetIndex();
               if (g.bounds) { f.x = Math.max(g.bounds.x0, Math.min(g.bounds.x1, f.x)); f.y = Math.max(g.bounds.y0, Math.min(g.bounds.y1, f.y)); }
             }
           }
@@ -2805,7 +3026,8 @@ const Engine = (() => {
         // the nearest enemy it can see; with none in sight (walls in the way), the nearest it can't (unseen): it walks
         // on round to it but doesn't stop, engage or build for it until it sees it
         let near = null, nd = Infinity, hid = null, hd = Infinity;
-        for (const f of foes) {
+        if (fastPaths && !b.u.noTower && nearestSeen(b)) { near = nearFound; nd = nearDist; }
+        else for (const f of foes) {
           if (!pickable(b, f)) continue;
           const d = gap(f, b);
           if (!inSight(b, f)) { if (d < hd) { hd = d; hid = f; } } else if (d < nd) { nd = d; near = f; }
@@ -2973,40 +3195,7 @@ const Engine = (() => {
       // separation between allies
       const minSep = g.spacing * 0.7;
       for (let s = 0; s < 2; s++) {
-        const arr = sides[s];
-        for (let i = 0; i < arr.length; i++) {
-          const a = arr[i]; if (!a.alive || a.u.aloft || sheltered(a)) continue;
-          for (let j = i + 1; j < arr.length; j++) {
-            const c = arr[j]; if (!c.alive || c.u.aloft || sheltered(c)) continue;
-            if (a.u.barrier > 0 || c.u.barrier > 0) continue; // a side's own units walk through its walls
-            const dx = c.x - a.x, dy = c.y - a.y;
-            const d = hyp(dx, dy);
-            // structures and bodies still waiting to start (flank squads) don't budge: the other body moves the whole way
-            const fa = a.u.structure || a.u.anchored || a.delay > 0, fc = c.u.structure || c.u.anchored || c.delay > 0;
-            if (fa && fc) continue;
-            const ka = fa ? 0 : fc ? 2 : 1, kc = fc ? 0 : fa ? 2 : 1;
-            if (d < minSep && (a.u.structure || c.u.structure)) {
-              // a body walking into its own tower slides around it instead of being pushed straight back (it got
-              // stuck behind it): out to minSep, then sideways by as much as it had walked in, toward where it heads
-              // (with no lean either way, toward the middle of the board)
-              const s = a.u.structure ? a : c, w = s === a ? c : a;
-              let rx = w.x - s.x, ry = w.y - s.y, rl = d;
-              if (rl < 1e-9) { rx = s.x > 0 ? -1 : 1; ry = 0; rl = 1; }
-              rx /= rl; ry /= rl;
-              let tx = -ry, ty = rx;
-              const lean = tx * (w.hx || 0) + ty * (w.hy || 0);
-              if (lean < 0 || (lean < 1e-6 && tx * (s.x > 0 ? -1 : 1) < 0)) { tx = -tx; ty = -ty; }
-              const slide = minSep - (d < 1e-9 ? 0 : d);
-              w.x = s.x + rx * minSep + tx * slide; w.y = s.y + ry * minSep + ty * slide;
-            } else if (d > 0 && d < minSep) {
-              const push = (minSep - d) / 2;
-              a.x -= dx / d * push * ka; a.y -= dy / d * push * ka;
-              c.x += dx / d * push * kc; c.y += dy / d * push * kc;
-            } else if (d === 0) {
-              a.x -= minSep / 2 * ka; c.x += minSep / 2 * kc;
-            }
-          }
-        }
+        if (fastPaths && minSep > 0) separateSideFast(sides[s], minSep); else separateSideRef(sides[s], minSep);
       }
       // walls: an enemy body that walked into one is put back out at its nearest edge
       for (const w of barriers) {
@@ -3184,6 +3373,7 @@ const Engine = (() => {
       // wins a trade just by being processed first (side 0 used to win one-shot duels like Sniper vs Sniper); the sides
       // take turns going first (see first). Likewise a stun or slow that lands during the attacks only counts from the
       // next tick (atkStun, atkSlow: as they were when the attacks began), and heals wait for the end (healLater)
+      targetIndex = null; targetIndexDirty = true; // movement phase has finished for this tick
       const attackers = turnOrder();
       for (const b of attackers) { b.atkStun = b.stunT > 0; b.atkSlow = b.slowT > 0 ? b.slowAtk : 0; }
       healLater = [];
@@ -3230,7 +3420,7 @@ const Engine = (() => {
               if (along >= b.u.minRange && along <= R(b) + 0.01 && across <= PIERCE_WIDTH && along < fa) { fa = along; first = f; }
             }
             if (first) {
-              fire(b, aim(b, first, validTargets(b)), false);
+              fire(b, aim(b, first, validTargets(b, 'burstFollowup')), false);
             } else {
               const end = { x: b.x + ux * R(b), y: b.y + uy * R(b) };
               if (b.u.projSpeed > 0) fire(b, [end], false); // the projectile flies on and can still clip someone
@@ -3251,12 +3441,12 @@ const Engine = (() => {
             if (b.windT > 0) continue;
             b.windTarget = null; b.setUp = true;
             b.cd = 0; // reload starts with the first shot
-            valid = validTargets(b);
+            valid = validTargets(b, 'attackWindup');
             if (!valid.length) continue;
             primary = locked(b, valid);
           } else {
             if (b.cd > 0) continue;
-            valid = validTargets(b);
+            valid = validTargets(b, 'attack');
             if (!valid.length) continue;
             b.windTarget = locked(b, valid); b.windT = b.u.windUp; stats[b.side].winds++;
             continue;
@@ -3482,9 +3672,13 @@ const Engine = (() => {
       objective: () => obj && { n: obj.n.slice(), lead: obj.lead, hold: obj.hold, secs: obj.secs, won: obj.won } };
   }
 
-  function matrix(units, g) {
+  function matrix(units, g, onProgress, instrumentation = {}) {
     const n = units.length;
     const m = [];
+    let completed = 0;
+    const total = n * (n - 1) / 2;
+    const progressEvery = Number.isInteger(instrumentation.progressEvery) && instrumentation.progressEvery > 0
+      ? instrumentation.progressEvery : 0;
     for (let i = 0; i < n; i++) {
       m.push([]);
       for (let j = 0; j < n; j++) {
@@ -3493,7 +3687,26 @@ const Engine = (() => {
           const r = m[j][i];
           m[i].push({ ...r, score: -r.score, winner: r.winner === -1 ? -1 : 1 - r.winner, frac: [r.frac[1], r.frac[0]], mirrored: true });
         } else {
-          m[i].push(battle(units[i], units[j], g));
+          const startedAt = Date.now();
+          let steps = 0;
+          const result = battle(units[i], units[j], g, { targetingMode: instrumentation.targetingMode, ...(progressEvery ? {
+            progressEvery,
+            onProgress: progress => {
+              steps = progress.steps;
+              if (typeof onProgress === 'function' && !progress.complete) onProgress({
+                type: 'matchup-heartbeat', completed, total, unitA: i, unitB: j,
+                unitAName: units[i].name || String(i), unitBName: units[j].name || String(j),
+                steps, battleTime: progress.time, elapsedMs: Date.now() - startedAt
+              });
+            }
+          } : {}) });
+          m[i].push(result);
+          completed++;
+          if (typeof onProgress === 'function') onProgress({
+            type: 'matchup-complete', completed, total, unitA: i, unitB: j,
+            unitAName: units[i].name || String(i), unitBName: units[j].name || String(j),
+            steps, elapsedMs: Date.now() - startedAt
+          });
         }
       }
     }

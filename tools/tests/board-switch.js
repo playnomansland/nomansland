@@ -86,7 +86,7 @@ const URL = 'http://127.0.0.1:8766/?test';
   await p.click('#next'); await p.waitForTimeout(800);
   await fight(p); await on2d(p).catch(() => {});
   check(!(await is3d(p)) && /too slow/.test(await note(p)), `slow fight at low -> 2D: "${await note(p)}"`);
-  check((await stored(p))[0] === '2d', 'the setting goes back to 2D');
+  check((await stored(p))[0] === '3d' && await p.evaluate(() => sessionStorage.getItem('phone-bellum-board')) === '2d', 'too slow: 2D for this visit only, the setting stays 3D');
   await p.screenshot({ path: 'board-switch-slow.png' });
   await p.context().close();
 

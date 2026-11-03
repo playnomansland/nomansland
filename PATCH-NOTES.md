@@ -4,6 +4,14 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 3 November 2026 – 3D board for everyone
+
+- **Everybody starts on the 3D board.** If your phone or computer had been stuck on 2D (from an older version, or because 3D once ran too slowly), it switches to 3D the next time you open the game. This happens once: if you then pick 2D in Settings, it stays 2D.
+- **Too slow now only lasts one visit.** When fights run too slowly in 3D, the board still drops to 2D, but only until you close the game. Next time it tries 3D again.
+- Devices that can't run 3D at all still use 2D, with a line on the board saying so.
+
+---
+
 ## 3 November 2026 – Faster Counter Lab
 
 - **Counter Lab tables build faster.** Big swarm fights (Goblin Swarm, Skeleton Archers and the like) now simulate up to about 3× faster, so a custom unit set's counter table is ready sooner on your phone.
