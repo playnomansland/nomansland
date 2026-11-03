@@ -18,8 +18,8 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ## 3 November 2026 – Puzzles, tower perks, a stealth fix and a fairer leaderboard
 
-### New: Puzzles
-- A **Puzzles** tile on the main menu (it's also offered when you finish the tutorial). Three one-fight puzzles: you see the **whole enemy army**, get a set amount of gold and a small shop, and have to **win the fight**.
+### New: Tutorial puzzles (replace the tutorial)
+- The guided tutorial is **switched off** for now. In its place, one **Tutorial puzzles** tile on the main menu (new players also get a big *New here? Try the tutorial puzzles* button until they solve one). Three one-fight puzzles: you see the **whole enemy army**, get a set amount of gold and a small shop, and have to **win the fight**.
   - **The horde:** two Goblin Swarms and Skeleton Archers, 200 gold.
   - **Two giants:** two Brutes, 300 gold.
   - **Out of reach:** two Fire Mages behind a Brute, 300 gold.

@@ -1,3 +1,5 @@
+// SWITCHED OFF (2026-11-03): the guided tutorial has no menu button any more (Tutorial puzzles replaced it), so this
+// test can't reach it. Kept for when the tutorial comes back.
 // The tutorial, on both boards on a phone (390 x 744), then the range circle on a PC window.
 // Tutorial: the menu leads with it on a first visit. Round 1: your zone blinks, then the coach's ring on your tower,
 // then one card; a pick puts the drawer down, a tap places; taking the squad back steps the coach back; the enemy

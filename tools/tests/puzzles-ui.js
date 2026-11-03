@@ -1,4 +1,5 @@
-// The tutorial puzzles in the browser (2D board, phone size): the Puzzles tile opens the list, a puzzle starts with
+// The tutorial puzzles in the browser (2D board, phone size): the Tutorial puzzles tile replaces the Tutorial (off since
+// 2026-11-03) and a first visit's big button opens the list, a puzzle starts with
 // the enemy army in sight and the puzzle's gold and shop; the coach's X folds it away (not back to the menu); a wrong answer loses and offers a hint and Try again; the
 // answer (two Fire Mages in "The horde") wins, is saved as solved and offers the next puzzle.
 // Needs: python3 -m http.server 8766 in the repo root. Run: node tools/tests/puzzles-ui.js
@@ -18,7 +19,9 @@ const { chromium } = require('playwright-core');
   const tile = async (c, r) => { const [x, y] = await pt(c, r); await p.touchscreen.tap(x, y); await p.waitForTimeout(150); };
   const fightTo = async (re) => { await p.tap('#fight'); await p.waitForFunction((src) => { const el = document.getElementById('coach'); return !el.hidden && new RegExp(src).test(document.getElementById('coach-text').textContent); }, re, { timeout: 120000 }); };
 
-  await p.click('#puzzles-open');
+  check(await p.locator('#tutorial').count() === 0 && /Tutorial puzzles/.test(await p.textContent('#puzzles-open')), 'one Tutorial puzzles tile, no Tutorial tile');
+  check(await p.locator('#tutorial-new').count() === 1, 'a first visit leads with the tutorial puzzles');
+  await p.click('#tutorial-new');
   check(await p.locator('[data-puz]').count() === 3, 'three puzzles listed');
   await p.click('[data-puz="0"]');
   await p.waitForTimeout(400);

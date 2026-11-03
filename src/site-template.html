@@ -2596,7 +2596,7 @@ html.pc .corner button span { display: inline; }
     try { netBack = JSON.parse(localStorage.getItem(NET_STORE) || 'null'); } catch (e) {}
     if (netBack && !(netBack.code && netBack.key && now() - netBack.ts < 6 * 3600e3)) netBack = null;
     if (resume && netBack) resume = null;
-    const newcomer = !tutDone && !resume; // the tutorial leads the menu until it's been played to the end
+    const newcomer = !puzSolved.length && !resume; // the tutorial puzzles lead the menu until one is solved (the guided tutorial is off since 2026-11-03)
     overlay(null); $('panel').innerHTML = '';
     home.ctx = { resume, netBack, newcomer };
     if (!home.screen || home.screen === 'menu' || !home.welcomeNeeded()) home.screen = home.welcomeNeeded() ? 'welcome' : 'menu';
@@ -2873,14 +2873,13 @@ html.pc .corner button span { display: inline; }
           ${inTour ? `<button class="btn primary" id="tour-back">Back to tournament ${esc(tour.code)}</button>` : ''}
           ${resume ? `<button class="btn primary" id="resume">Resume match ${esc(resume.code)}</button>` : ''}
           ${netBack ? `<button class="btn primary" id="net-resume">Back to match ${esc(netBack.code)}</button>` : ''}
-          ${newcomer ? '<button class="btn primary" id="tutorial-new">New here? Play the tutorial</button>' : ''}
+          ${newcomer ? '<button class="btn primary" id="tutorial-new">New here? Try the tutorial puzzles</button>' : ''}
         </div>
       </div>
       <div class="home-foot">
         ${rewardsCard()}
         <div class="tiles">
-          <button id="tutorial" class="${newcomer ? 'hot' : ''}">${HICON.school}Tutorial</button>
-          <button id="puzzles-open">${HICON.puzzle}Puzzles</button>
+          <button id="puzzles-open" class="${newcomer ? 'hot' : ''}">${HICON.puzzle}Tutorial puzzles</button>
           <button id="how">${HICON.help}How to play</button>
           <button id="ency-open">${HICON.book}Encyclopedia</button>
           <button id="lb-open">${HICON.trophy}Leaderboard</button>
@@ -2920,9 +2919,8 @@ html.pc .corner button span { display: inline; }
     $('acct-open').addEventListener('click', openAccountSheet);
     $('ency-open').addEventListener('click', () => openEncyclopedia());
     $('how').addEventListener('click', openHowTo);
-    $('tutorial').addEventListener('click', startTutorial);
-    $('puzzles-open').addEventListener('click', openPuzzles);
-    if ($('tutorial-new')) $('tutorial-new').addEventListener('click', startTutorial);
+    $('puzzles-open').addEventListener('click', openPuzzles); // the guided tutorial (startTutorial) is switched off: no button leads to it
+    if ($('tutorial-new')) $('tutorial-new').addEventListener('click', openPuzzles);
     $('lb-open').addEventListener('click', openLeaderboard);
     if ($('tours-open')) $('tours-open').addEventListener('click', openToursSheet);
     wireRewardsCard();
@@ -4233,7 +4231,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   // the menu's list of puzzles
   function openPuzzles() {
-    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Puzzles</h3><button class="btn small" id="close">Close</button></div>
+    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Tutorial puzzles</h3><button class="btn small" id="close">Close</button></div>
       <p class="hint" style="margin:0">One fight each. You see the whole enemy army; win with the gold you have.</p>
       <div style="display:grid;gap:8px">${PUZZLES.map((P, k) => `<button class="btn" data-puz="${k}" style="display:flex;justify-content:space-between;gap:8px;text-align:left"><span><b>${k + 1}. ${esc(P.name)}</b><br><span class="hint">${esc(P.goal)}</span></span><span style="color:var(--gold)">${puzSolved.includes(k) ? '✓ Solved' : ''}</span></button>`).join('')}</div>`;
     $('sheet-back').hidden = false;
