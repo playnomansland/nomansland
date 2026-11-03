@@ -4,7 +4,87 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 3 November 2026 – Spiders rework, sniper tower, Snow storm
+
+### Spiders (rework)
+The Spiders' skill tree is new:
+- **Poisonous fangs** (100 gold): hits poison, the same as Poison shot.
+- Then pick one (200 gold each): **Spiderlings** (as before) **or** **Cavestalkers** (stealth).
+- **Web-shots** (Master skill, 300 gold, needs Spiderlings or Cavestalkers): once a fight, every spider shoots a web at an enemy within 10 m. Webs deal no damage, but they slow the target and weaken its attacks, and they stack. Hold the skill on the unit sheet for the exact numbers: each stack is 10% slower and 5% less damage, up to 90% of each, and lasts 3 seconds from the newest stack. A web also brings the spider's poison and slows, like a bite would.
+
+### Sniper tower
+- **Mark Bounty now works for all your units**, not just Snipers: every unit deals the marked squad +15% damage and sees it through stealth, and the +100 gold bounty pays when any of your units takes its last body.
+- **Eagle eye** now helps your whole army: **all your units get +1.5 m range and +5% attack speed**. Snipers and the tower get double (+3 m, +10%), the same as before.
+
+### Frost Wizard
+- **Snow storm** reaches 2 m further (8 → 10 m).
+
+### Unit sheets
+- A skill with a short description now keeps its full rules in the hold-to-read-more text (press and hold the skill row).
+
+---
+
+## 3 November 2026 – Sniper Hunter, Water Elemental
+
+### Sniper – Hunter (new Awaken skill, replaces Overwatch)
+- **Overwatch is gone from the Sniper** (no more garrisoning the tower or watchtowers). Its 4th skill is now **Hunter**, an **Awaken** skill: bought for one squad at a time, 300 gold, needs Deadeye or Assaultgunner first.
+- **Place a mark:** open an awakened Sniper's sheet and tap **Place mark**, then tap an enemy squad from an earlier round. It's free, stays for the rest of the match, and **Move mark** puts it on another squad any round (**Undo mark** takes back this round's move). If the marked squad is sold, mark another.
+- **In the fight** a Hunter **always shoots a marked enemy in its range first**, deals it **double damage**, and sees it through stealth. A squad marked by any of your Hunters counts for all of them.
+- **Stealth:** Hunters are hidden until they fire their first shot.
+- Marks show as small dashed crosshairs on the board. Your opponent sees a mark only once the round it was placed has been fought (a moved mark shows on its old squad until then).
+
+### Water Mage – Summon water elemental (new Master skill)
+- New 4th skill, a **Master** skill (300 gold, for all your Water Mages, needs Pool shaper or Flow state first).
+- At the start of every fight each Water Mage summons a **Water Elemental 1.5 tiles in front of her**. It walks **as fast as she does**, has **600 health** and **attacks like a level 2 Ember Imp**. It **grows with her level**.
+- When it dies it leaves a **pool**: it hurts enemies standing in it and heals and speeds up your units, for the rest of the fight.
+
+### Fixes
+- Pools from both sides can now overlap, and a unit standing in pools of both sides gets both effects. Before, whichever side's pool came first blocked the other, which slightly favoured the host in mirror fights.
+
+---
+
+## 3 November 2026 – Legend title
+
+- **New title: Legend** (gold). Finish a month in the **top 5 of the leaderboard** and it's yours to keep. Months follow Swedish time, so November ends at midnight on 30 November.
+- The leaderboard shows how many days are left this month, marks the top 5 in gold and draws a line under 5th place.
+- Pick it in Profile like any other title. If you haven't picked one, Legend shows before Day 1.
+
+---
+
+## 2 November 2026 – 2v2 (developer test)
+
+A first version of **2v2**, open to developer accounts only for now.
+
+### How it works
+- **Two Standard boards side by side**, with a 2-tile open strip between them. A1 and B1 fight on the left board, A2 and B2 on the right. Team A is at the bottom of both boards, team B at the top.
+- **Each player deploys on their own board, just like 1v1:** your own gold, packages, leader, tower, unlocks, skills and levels. Nothing you buy is shared with your teammate.
+- **One fight for all four.** Both boards fight at once as one big field. Nothing keeps units on their own board: a squad near the middle can spot enemies on the other board and cross the strip to fight them, so you can help your teammate (or get caught from the side).
+- **A fallen tower only cripples its own board.** Your teammate's army fights on at full strength.
+- **Shared team health: 200.** After the fight each board is scored as in 1v1 (survivors deal damage, a fallen tower costs health, gold, streaks and treasuries per board), and the damage from both boards comes off your team's health. A team at 0 loses.
+- **Hidden info as in 1v1:** you never see what the enemy deployed this round. Your teammate's board is open to your team.
+- If a player leaves the match, their team loses.
+
+### Talking to your team
+- **Pings:** tap **?**, **!** or **⚔** under the board, then tap a tile. Your teammate sees it on the board with a ripple, plus a line at the top saying who pinged where. Use **?** to ask "why here?", **!** for "look here", **⚔** for "attack here". Pings fade after 8 seconds and only your team sees them. They work while deploying and during the fight.
+- **Say…** sends a quick line to your team: Nice!, Help me!, Sorry!, Wait for me, Thanks!, GG.
+- **Your teammate's board, live:** on a **PC** it sits right beside yours the whole time you deploy (with the strip between, as in the fight), and every squad your teammate places, moves or sells shows up there as they do it. Your own board works exactly as in 1v1. On a **phone** tap **Teammate's board** to look at theirs (it updates live too), then **My board** to go back. You can ping on either board.
+
+### The lobby
+- Developer section of the Play menu: **2v2 lobby**. It gives a 6-letter code and an invite link. Anyone with the link or code can join (the code box now takes 6-letter codes too).
+- Players take the first free seat. **The host sets the teams:** tap one seat, then another, to swap them (or move a player to an empty seat).
+- **Start** works with fewer than four: every empty seat, and anyone not connected when it starts, is played by the AI.
+
+### Watching the fight
+- **On a PC** you see the whole field: both boards, all four players, in 2D and 3D.
+- **On a phone** the fight opens on your own board, with your opponent in front of you. Drag sideways to look at the other board, pinch or double tap to see the whole field. (On the 3D board the camera starts over your own board.)
+- After the fight you're back on your own board for the next round. The bar above the board shows your seat, your board and how your teammate is doing.
+
+---
+
 ## 2 November 2026 – Balance and fixes
+
+### Usernames
+- **Gamertags are now called usernames** everywhere in the game: sign-up, Profile, tournaments and match screens.
 
 ### Unit sheets
 - A unit's **stats** (bodies, health, hit, attacks per second, range, speed) now sit at the **top of its sheet**, right under its name, instead of at the bottom.
@@ -16,6 +96,8 @@ Newest first. Each entry says what changed for players; technical details live i
 ### Units
 - **Ember Imps – Ember Mortar (nerf):** attack speed −20%, range bonus +12 m (was +18 m), and the mortar now **lobs shells at 20 m/s** instead of hitting at once, so fast units can step out of the blast.
 - **Ember Imps – Summon hellfiend (nerf):** the Hellfiend has 30% less health, hit, attack speed and move speed.
+- **Flame Wizard (nerf):** range −3 m (15 → 12 m; its flame cone still reaches 1.2× that) and health −10% (1700 → 1530).
+- **Leaf Wizard (nerf):** range −2 m (22 → 20 m) and health −40% (185 → 111).
 - **Wisps (nerf):** attack speed −15% (0.7 → 0.6 attacks a second).
 - **Truespear (nerf):** attack speed −15% (0.9 → 0.77) and health −30% (1800 → 1260).
 - **Shiv:** now **3 bodies** (was 4). Each knife hits harder (13 → 17.3) and each body has more health (150 → 200), so the squad deals and takes about the same as before.
@@ -28,8 +110,10 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ## 2 November 2026 – Flame Wizard on the main menu
 
-- A **Flame Wizard** now stands at the left edge of the main menu: the same 3D model as on the battlefield, turned toward you and standing still, blasting an orange fire cone from his staff across the screen, with sparks flying and a big wobbling **BABABABABA** above him in a cartoon font.
-- He slides in each time you open the main menu. He sits under the buttons, so taps go through to the menu as before.
+- A **Flame Wizard** now stands at the left edge of the main menu: the same 3D model as on the battlefield, blasting an orange fire cone from his staff across the screen, with a big **BABABABABA** above him in a cartoon font.
+- It all stands still until you **tap him** (or the text): then the fire flickers, sparks fly and BABABABABA shakes for 1 second.
+- He sits under the buttons, so clicks on the menu work as before.
+- He's only on computers (with a mouse), not on phones or tablets.
 - If 3D can't start on a device, he shows as the 2D Flame Wizard symbol instead.
 
 ---

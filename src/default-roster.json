@@ -136,6 +136,41 @@
       }
     },
     {
+      "id": "poisonousFangs",
+      "type": "poison",
+      "name": "Poisonous fangs",
+      "cost": 100,
+      "params": {
+        "pct": 150,
+        "duration": 6
+      }
+    },
+    {
+      "id": "cavestalkers",
+      "type": "stealth",
+      "name": "Cavestalkers",
+      "cost": 200,
+      "params": {},
+      "text": "Gain stealth."
+    },
+    {
+      "id": "webShots",
+      "type": "web",
+      "name": "Web-shots",
+      "cost": 300,
+      "params": {
+        "shots": 1,
+        "range": 10,
+        "slow": 10,
+        "dmg": 5,
+        "max": 90,
+        "secs": 3
+      },
+      "flat": true,
+      "master": true,
+      "text": "Each spider shoots one web a fight: it slows the target and weakens its attacks, and stacks."
+    },
+    {
       "id": "split",
       "type": "split",
       "name": "Split beam",
@@ -337,6 +372,24 @@
         "range": 0.4,
         "max": 5
       }
+    },
+    {
+      "id": "waterElemental",
+      "type": "elemental",
+      "name": "Summon water elemental",
+      "cost": 300,
+      "params": {
+        "hp": 600,
+        "unit": "Ember Imps",
+        "level": 1,
+        "ahead": 9,
+        "pool": 4,
+        "pct": 50,
+        "speed": 0.5,
+        "secs": 2
+      },
+      "flat": true,
+      "master": true
     },
     {
       "id": "heavyMetal",
@@ -629,6 +682,22 @@
       "master": true
     },
     {
+      "id": "hunter",
+      "type": "hunter",
+      "name": "Hunter",
+      "cost": 300,
+      "params": {
+        "dmg": 100
+      },
+      "also": [
+        {
+          "type": "stealth",
+          "params": {}
+        }
+      ],
+      "flat": true
+    },
+    {
       "id": "sightweavers",
       "type": "stats",
       "name": "Sightweavers",
@@ -837,7 +906,7 @@
       "name": "Snow storm",
       "cost": 300,
       "params": {
-        "radius": 8
+        "radius": 10
       },
       "flat": true,
       "master": true
@@ -1136,7 +1205,7 @@
         "rangerScope",
         "deadeye",
         "assaultgunner",
-        "overwatch"
+        "hunter"
       ],
       "skillsOn": [
         false,
@@ -1322,10 +1391,10 @@
       "name": "Leaf Wizard",
       "cost": 200,
       "bodies": 1,
-      "hp": 185,
+      "hp": 111,
       "hit": 95,
       "aps": 1.2,
-      "range": 22,
+      "range": 20,
       "speed": 5,
       "splash": 0,
       "shape": "hexagon",
@@ -1446,10 +1515,10 @@
       "name": "Flame Wizard",
       "cost": 300,
       "bodies": 1,
-      "hp": 1700,
+      "hp": 1530,
       "hit": 11,
       "aps": 4,
-      "range": 15,
+      "range": 12,
       "speed": 2,
       "splash": 0,
       "shape": "flame",
@@ -2055,11 +2124,13 @@
       "shape": "spider",
       "color": "#000000",
       "skills": [
+        "poisonousFangs",
         "spiderlings",
-        "poison",
-        "stealth"
+        "cavestalkers",
+        "webShots"
       ],
       "skillsOn": [
+        false,
         false,
         false,
         false
@@ -2067,15 +2138,29 @@
       "skillsInnate": [
         false,
         false,
+        false,
         false
       ],
       "skillMods": [
         null,
         null,
-        {
-          "params": {},
-          "cost": 200
-        }
+        null,
+        null
+      ],
+      "skillOr": [
+        [
+          1,
+          2
+        ]
+      ],
+      "skillNeedsAny": [
+        null,
+        null,
+        null,
+        [
+          1,
+          2
+        ]
       ]
     },
     {
@@ -2229,9 +2314,11 @@
       "skills": [
         "waterbomb",
         "poolShaper",
-        "flowState"
+        "flowState",
+        "waterElemental"
       ],
       "skillsOn": [
+        false,
         false,
         false,
         false
@@ -2239,14 +2326,25 @@
       "skillsInnate": [
         false,
         false,
+        false,
         false
       ],
       "skillMods": [
         null,
         null,
+        null,
         null
       ],
       "skillOr": [
+        [
+          1,
+          2
+        ]
+      ],
+      "skillNeedsAny": [
+        null,
+        null,
+        null,
         [
           1,
           2

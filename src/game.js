@@ -48,9 +48,9 @@ const Game = (() => {
       skill2: { name: 'Brute guards', cost: 400, needs: true, text: 'Guards are Brutes, with your Brute skills. Needs Guards.' },
       muster: { name: 'Muster', text: '1 extra deployment every round, for free.' } }, // see musterOn
     { id: 'sniper', name: 'Sniper tower', text: 'Slow, huge range, double damage. Can’t hit within 1 tile.', unit: { ...TOWER, name: 'Sniper Tower', kind: 'sniper', hp: 500, hit: 60, aps: 0.4, range: 32, minRange: TILE, color: '#B9C7D6' },
-      skill: { name: 'Eagle eye', text: 'Tower and Snipers: +3 m range, +10% attack speed.' },
+      skill: { name: 'Eagle eye', text: 'All your units: +1.5 m range, +5% attack speed. Snipers and the tower get double.' },
       skill2: { name: 'Deploy airship', cost: 400, text: 'An untouchable airship shoots like a level 2 Sniper and drops 3 paratroopers once each fight as it flies into enemy territory. Snipers and tower: +30 hit.' },
-      mark: { name: 'Mark Bounty', cost: 50, text: 'Mark one enemy squad for the rest of the match. Your Snipers deal it +15% damage and see it through stealth; +100 gold each fight a Sniper takes its last body. The mark can’t be moved; if they sell the squad, place it again for free.' } }, // see MARK
+      mark: { name: 'Mark Bounty', cost: 50, text: 'Mark one enemy squad for the rest of the match. All your units deal it +15% damage and see it through stealth; +100 gold each fight your units take its last body. The mark can’t be moved; if they sell the squad, place it again for free.' } }, // see MARK
     { id: 'bastion', name: 'Bastion', text: `Tough. Burns all enemies within ${MOAT.range} m.`,
       unit: { ...TOWER, name: 'Bastion', kind: 'bastion', hp: 1000, hit: MOAT.hit, aps: MOAT.aps, range: MOAT.range, moat: { ...MOAT }, idle: true, color: '#B79C8A' }, // idle: the moat is its only attack
       skill: { name: 'Home ground', text: 'Bastion blocks 2 hits a fight. Units in your zone: +2 armor, +10% health.' },
@@ -96,7 +96,10 @@ const Game = (() => {
   }
   // Each tower type has one skill, bought once per match after the pick (TOWER_SKILL gold); it stays hidden from the
   // opponent until the fight of the round it was bought in. m.towerSkill[side] = round it was bought (0 = not)
-  const TOWER_SKILL = { cost: 100, guards: 4, guardHold: 5, eagleRange: 3, eagleAps: 10, homeArmor: 2, homeHp: 10 };
+  // Eagle eye (sniper tower, since 2026-11-03): every unit of the side +eagleRange m and +eagleAps % attack speed;
+  // Snipers and the tower get eagleSniper times that
+  const eagleBy = (name) => name === 'Sniper' || name === 'tower' ? TOWER_SKILL.eagleSniper : 1;
+  const TOWER_SKILL = { cost: 100, guards: 4, guardHold: 5, eagleRange: 1.5, eagleAps: 5, eagleSniper: 2, homeArmor: 2, homeHp: 10 };
   const GUARD = { name: 'Wisps', cost: 1, bodies: 2, hp: 65, hit: 75, aps: 0.7, range: 19, speed: 4, splash: 0, projSpeed: 20 }; // used when the roster has no Wisps
   const towerSkillOf = (m, side) => !!(m && m.towerSkill && m.towerSkill[side] > 0);
   const towerSkillVisible = (m, side) => towerSkillOf(m, side) && m.towerSkill[side] < m.round;
@@ -343,7 +346,7 @@ const Game = (() => {
     return true;
   }
   // Mark Bounty (sniper tower): MARK.cost gold, once a match, marks one enemy squad from an earlier round for the rest
-  // of the match: Snipers deal it +MARK.hit % and see it through stealth, and a fight where a Sniper takes its last body
+  // of the match: all its units (Snipers only until 2026-11-03) deal it +MARK.hit % and see it through stealth, and a fight where one takes its last body
   // pays MARK.bounty gold. The mark can't be moved; if its squad leaves the enemy's army (sold), it can be placed again
   // for free. m.mark[side] = { squad, round } (round: when it was placed; hidden from the opponent until that fight)
   const MARK = { cost: 50, hit: 15, bounty: 100 };
@@ -540,6 +543,10 @@ const Game = (() => {
     // deeper zones (8 rows) and only 2 rows of no man's land: the armies meet almost at once
     editorMap('rush', EDITOR_MAPS.rush, { short: 'Deep zones, only 2 rows of no man’s land: the armies meet at once.', text: 'Each zone is 14 by 8 tiles, with only 2 rows of no man’s land between them, so the armies meet almost at once. The towers stand one column further in, and the back corners are flank tiles too. A treasury pays 50 gold per fight it survives.' }), // only when picked, never random
   ];
+  // Boards only drawn, never played or picked (not in MAPS): 'duo' is two Standard boards side by side, the field of a
+  // 2v2 fight (src/duo.js). A match on it is only a picture of the fight (Duo.view).
+  const VIEW_MAPS = [{ id: 'duo', name: '2v2', short: 'Two Standard boards side by side.', text: 'Two Standard boards side by side.', plain: true, skins: true, view: true, grid: { cols: 30, rows: 18, zone: 7 } }]; // 14 + 2 open columns + 14 (Duo.GAP)
+  const findMap = (id) => MAPS.find(x => x.id === id) || VIEW_MAPS.find(x => x.id === id);
   // Looks (skins) for the 3D board: a map with skins (the Standard and the Test Grid) can be played in any of them; the
   // others have their own look. Only how the board looks: the rules stay the map's. The match keeps the host's pick (m.skin).
   const SKINS = [{ id: 'meadow', name: 'Meadow' }, { id: 'autumn', name: 'Autumn' }, { id: 'snow', name: 'Snow' }, { id: 'frost', name: 'Darkwoods' }, { id: 'desert', name: 'Desert' }];
@@ -874,7 +881,7 @@ const Game = (() => {
     if (mp && mp.spots && mp.spots.tower[side]) return { ...mp.spots.tower[side] }; // an editor map's own tile
     return side === 1 && mp && mp.pointMirror ? { col: COLS - 1 - t.col, row: t.row } : { ...t };
   };
-  const mapOf = (m) => (m && m.map && MAPS.find(x => x.id === m.map.id)) || null;
+  const mapOf = (m) => (m && m.map && findMap(m.map.id)) || null;
   // a map's own range and speed for a unit (Test Grid): +rangeAdd m for units with rangeAddMin m of range or more, and
   // each [speed, cut] step in slowSteps the unit reaches takes cut m/s off its move speed. Units in tuneKeep keep theirs.
   function mapTuned(mp, u) {
@@ -1019,14 +1026,18 @@ const Game = (() => {
   }
   // riders follow their carrier's tile
   const syncRiders = (m, side) => { for (const s of m.armies[side]) if (isRider(s)) { const c = carrierOf(m, side, s); if (c) { s.col = c.col; s.row = c.row; } else delete s.in; } };
-  const tileToWorld = (col, row) => ({ x: (col - (COLS - 1) / 2) * TILE, y: ((ROWS - 1) / 2 - row) * TILE });
+  // XOFF: metres added to every tile's x (0 except while a 2v2 lane builds its bodies beside the other lane: see withXOff)
+  let XOFF = 0;
+  const tileToWorld = (col, row) => ({ x: (col - (COLS - 1) / 2) * TILE + XOFF, y: ((ROWS - 1) / 2 - row) * TILE });
+  // runs fn with the board shifted dx metres sideways (2v2, src/duo.js: each lane is its own match, side by side in one fight)
+  function withXOff(dx, fn) { const was = XOFF; XOFF = dx; try { return fn(); } finally { XOFF = was; } }
   const BOUNDS = { x0: -COLS * TILE / 2, x1: COLS * TILE / 2, y0: -ROWS * TILE / 2, y1: ROWS * TILE / 2 }; // the board in world metres
   // Switches the board to the grid of a match's map (or of a map id): COLS, ROWS, ZONE and what hangs on them. The
   // objects keep their identity, so everything holding them sees the new grid. Returns true when the grid changed.
   // Every exported function that takes a match calls it first (see the end of this file), so callers needn't.
   function useGrid(mOrId) {
     const id = mOrId && typeof mOrId === 'object' ? (mOrId.map && mOrId.map.id) : mOrId;
-    const mp = id ? MAPS.find(x => x.id === id) : null, g = (mp && mp.grid) || GRID;
+    const mp = id ? findMap(id) : null, g = (mp && mp.grid) || GRID;
     FLANK_SET = (mp && mp.flankSet) || null;
     if (g.cols === COLS && g.rows === ROWS && g.zone === ZONE) return false;
     COLS = g.cols; ROWS = g.rows; ZONE = g.zone;
@@ -1398,10 +1409,53 @@ const Game = (() => {
     if (!sq || sq.awaken !== m.round) return false;
     m.gold[side] += awakenCost(m, sq.unit);
     delete sq.awaken;
+    delete sq.prey; // a Hunter's mark goes with its awakening
     return true;
   }
   // what the opponent may know: an awakening bought this round stays hidden until the fight
   const seenAwake = (m, sq) => !!sq && sq.awaken > 0 && sq.awaken < m.round;
+
+  // ---------- Hunter (the Sniper's Awaken skill) ----------
+  // An awakened squad of a unit whose Awaken skill is a Hunter (type 'hunter') puts a mark on one enemy squad from an
+  // earlier round (not a rider or a building): free, in any deploy, and placing it again moves it. In the fight its
+  // bodies always shoot a marked body in their reach first, deal it +hunter.dmg %, and see it through stealth; they are
+  // stealthed themselves until they attack (the skill's `also`). Any of its side's Hunters may use any of their marks.
+  // sq.prey = { squad, round, was?, wasRound? }: round = when it was put there; was/wasRound = where it sat before this
+  // round's change (the opponent still sees that until the fight, see preyShown). A mark on a squad that left the
+  // enemy's army (sold) is gone.
+  const isHunter = (m, sq) => { const k = sq && sq.awaken > 0 ? awakenSlot(m, sq.unit) : -1, d = k >= 0 ? skillDef(m, sq.unit, k) : null; return !!d && d.type === 'hunter'; };
+  const preyOf = (m, side, sq) => sq && sq.prey && m.armies[1 - side].some(q => q.id === sq.prey.squad) ? sq.prey : null;
+  const canHunt = (m, side, hid, tid) => { const h = squadOf(m, side, hid); return isHunter(m, h) && (tid == null || (!!markTarget(m, side, tid) && !(h.prey && h.prey.squad === tid && preyOf(m, side, h)))); };
+  function huntMark(m, side, hid, tid) {
+    if (tid == null || !canHunt(m, side, hid, tid)) return false;
+    const h = squadOf(m, side, hid), p = h.prey;
+    const old = !p ? null : p.round < m.round ? { squad: p.squad, round: p.round } : p.was != null ? { squad: p.was, round: p.wasRound } : null;
+    h.prey = { squad: tid, round: m.round, ...(old ? { was: old.squad, wasRound: old.round } : {}) };
+    return true;
+  }
+  // takes back a mark put on this round (the one before it comes back)
+  function undoHunt(m, side, hid) {
+    const h = squadOf(m, side, hid);
+    if (!h || !h.prey || h.prey.round !== m.round) return false;
+    if (h.prey.was != null) h.prey = { squad: h.prey.was, round: h.prey.wasRound }; else delete h.prey;
+    return true;
+  }
+  // the enemy squad id hunter squad sq (of side) has marked, as viewer may know it while deploying or not (null: none)
+  function preyShown(m, viewer, deploying, side, sq) {
+    const p = preyOf(m, side, sq);
+    if (!sq || !sq.prey || (!p && (side === viewer || !deploying))) return null;
+    if (side === viewer || !deploying) return p.squad;
+    if (!seenAwake(m, sq)) return null;
+    const seen = sq.prey.round < m.round ? sq.prey.squad : sq.prey.was;
+    return seen != null && m.armies[1 - side].some(q => q.id === seen) ? seen : null;
+  }
+  // whether enemy squad id of side is marked by one of the other side's Hunters (for the fight)
+  const preyOn = (m, side, id) => m.armies[1 - side].some(h => isHunter(m, h) && preyOf(m, 1 - side, h) && h.prey.squad === id);
+  // the AI: each of its Hunters without a mark marks the priciest enemy squad it may
+  function aiHunt(m, side) {
+    const foes = m.armies[1 - side].filter(q => markTarget(m, side, q.id)).sort((a, b) => (b.cost || 0) - (a.cost || 0) || a.id - b.id);
+    for (const h of m.armies[side]) if (isHunter(m, h) && !preyOf(m, side, h) && foes.length) huntMark(m, side, h.id, foes[0].id);
+  }
 
   // ---------- Evolve skills (by themselves) ----------
   // A squad of a unit with an Evolve skill gets it for free once it meets the skill's needs: needs 'glutMax' (the
@@ -1780,7 +1834,7 @@ const Game = (() => {
       // Zoe: a squad that starts the fight on a buff tile keeps the bonus for the whole fight
       const zoe = onBuffTile(m, side, sq.col, sq.row);
       if (zoe) { const zb = zoeBuff(m, side); u = { ...u, hit: u.hit * (1 + zb.dmg / 100), hp: u.hp * (1 + zb.hp / 100), aps: u.aps * (1 + zb.aps / 100) }; }
-      if (eagle && u.name === 'Sniper') u = { ...u, range: u.range + TOWER_SKILL.eagleRange, aps: u.aps * (1 + TOWER_SKILL.eagleAps / 100) };
+      if (eagle && !m.units[sq.unit].building) { const k = eagleBy(u.name); u = { ...u, range: u.range + TOWER_SKILL.eagleRange * k, aps: u.aps * (1 + TOWER_SKILL.eagleAps * k / 100) }; } // Eagle eye: all units, Snipers double
       if (mp && mp.rangeCut && u.range > mp.rangeKeep) u = { ...u, range: Math.max(mp.rangeKeep, u.range * (1 - mp.rangeCut / 100)) }; // the map shortens reach (never below rangeKeep)
       u = mapTuned(mp, u); // ...or tunes range and speed (Test Grid)
       const aura = isDev(m) ? auraFor(m, side, sq.col, sq.row) : null; // devtest: a building's aura
@@ -1791,14 +1845,15 @@ const Game = (() => {
       const dis = isDev(m) && m.units[sq.unit].disguise ? m.units.find(x => x.name === m.units[sq.unit].disguise) : null; // devtest: a disguise, until its first attack
       if (dis) { const mask = { name: dis.name, shape: dis.shape, color: dis.color, bodies: dis.bodies, range: dis.range }; for (const x of b) x.mask = mask; }
       if (isDev(m) && sq.guide && sq.guide.length && !isRider(sq)) for (const x of b) x.guide = sq.guide.map(p => tileToWorld(p.col, p.row)); // devtest: the squad's arrow
-      if (u.name === 'Sniper' && markOn(m, side)) for (const x of b) x.sniperMark = MARK.hit; // Mark Bounty: these Snipers hunt the mark
+      if (markOn(m, side)) for (const x of b) x.sniperMark = MARK.hit; // Mark Bounty: all its units hunt the mark (since 2026-11-03; Snipers only before)
       if (markOn(m, 1 - side) && markOf(m, 1 - side).squad === sq.id) for (const x of b) x.marked = true;
+      if (preyOn(m, side, sq.id)) for (const x of b) x.prey = true; // a Hunter's mark (the Sniper's Awaken skill)
       if (airship && u.name === 'Sniper') { const su = { ...b[0].u, hit: b[0].u.hit + AIRSHIP.sniperHit }; for (const x of b) x.u = su; } // flat, after levels
       if (home) for (const x of b) x.band = { ...home };
       if (zoe) for (const x of b) x.zoe = true; // for the rising-stars effect
       if (purple) for (const x of b) x.shroom = true; // for the drifting spores effect
       if (isFlank(side, sq.col, sq.row) && (sq.round === m.round || sq.movedRound === m.round)) for (const x of b) x.delay = FLANK.delay * (ch === 'wilhelm' ? CHAR.wilhelmDelay : 1); // only in its first fight
-      if (isFlank(side, sq.col, sq.row)) for (const x of b) x.march = [w.x < 0 ? 1 : -1, 0]; // a flank squad marches in toward the middle until it spots an enemy
+      if (isFlank(side, sq.col, sq.row)) for (const x of b) x.march = [w.x - XOFF < 0 ? 1 : -1, 0]; // a flank squad marches in toward the middle until it spots an enemy
       idx += b.length;
       out.push(...b);
     }
@@ -1935,7 +1990,7 @@ const Game = (() => {
     if (tt.id === 'slime') tu = { ...slimeTowerUnit(m, side, tu), slime: true };
     if (towerSkillOn(m, side, 'bastion')) tu = { ...tu, shield: (tu.shield || 0) + BWALL.shield };
     if (towerSkill2On(m, side, 'bastion')) tu = { ...tu, bonusArmor: (tu.bonusArmor || 0) + BWALL.towerArmor };
-    if (towerSkillOn(m, side, 'sniper')) tu = { ...tu, range: tu.range + TOWER_SKILL.eagleRange, aps: tu.aps * (1 + TOWER_SKILL.eagleAps / 100) }; // Eagle eye
+    if (towerSkillOn(m, side, 'sniper')) tu = { ...tu, range: tu.range + TOWER_SKILL.eagleRange * eagleBy('tower'), aps: tu.aps * (1 + TOWER_SKILL.eagleAps * eagleBy('tower') / 100) }; // Eagle eye
     if (towerSkill2On(m, side, 'sniper')) tu = { ...tu, hit: tu.hit + AIRSHIP.sniperHit };
     if ((fx || buildingEffects(m, side)).awake && tt.awake) tu = { ...tu, ...tt.awake, idle: false, awake: true }; // Core Awoken: the Mecha Tower drives
     return tu;
@@ -1955,7 +2010,7 @@ const Game = (() => {
       u = withFactionTrait(defs.length ? E.applySkills(base, defs, m.units) : E.withTraits(base), base.faction);
     } else u = unitFor(m, side, ui, sq);
     let r = u.range;
-    if (u.name === 'Sniper' && towerSkillOn(m, side, 'sniper') && (!pub || towerSkillVisible(m, side))) r += TOWER_SKILL.eagleRange;
+    if (!base.building && towerSkillOn(m, side, 'sniper') && (!pub || towerSkillVisible(m, side))) r += TOWER_SKILL.eagleRange * eagleBy(u.name);
     const mp = mapOf(m);
     if (mp && mp.rangeCut && r > mp.rangeKeep) r = Math.max(mp.rangeKeep, r * (1 - mp.rangeCut / 100));
     r = mapTuned(mp, { name: u.name, range: r, speed: u.speed }).range;
@@ -1971,7 +2026,7 @@ const Game = (() => {
   function towerReach(m, side, pub) {
     if (pub && !towerTypeShown(m, 1 - side, true, side)) return reachOfUnit(OUTPOST.unit, OUTPOST.unit.range);
     let u = pub ? towerType(m, side).unit : fightTowerUnit(m, side);
-    if (pub && towerSkillOn(m, side, 'sniper') && towerSkillVisible(m, side)) u = { ...u, range: u.range + TOWER_SKILL.eagleRange };
+    if (pub && towerSkillOn(m, side, 'sniper') && towerSkillVisible(m, side)) u = { ...u, range: u.range + TOWER_SKILL.eagleRange * eagleBy('tower') };
     return reachOfUnit(u, u.range);
   }
 
@@ -3018,6 +3073,7 @@ const Game = (() => {
         if (r() < 0.3) awaken(m, side, sq.id);
       }
     }
+    aiHunt(m, side); // Hunters mark the priciest enemy squad they may
     let guard = 0;
     while (m.gold[side] - reserve >= minCost && guard++ < 60) {
       if (deploysLeft(m, side) <= 0) {
@@ -3090,7 +3146,7 @@ const Game = (() => {
     deploysAllowed, deploysLeft, deployedThisRound, canBuyDeploy, buyDeploy, refundDeploy, musterOn, deployBuyable,
     PACKAGE, allPackages, packOf, needsPack, freeLeft, choosePack, ensurePack,
     unlockCost, tierOf, startLevel, shopCost, mapFreeOf, mapFreeLeft, isUnlocked, unlockVisible, unlock, undoUnlock,
-    skillDef, skillCost, SKILL_STEP, skillsBought, isInnate, hasSkill, skillVisible, skillNeeds, skillNeedsAny, skillNeedsMissing, skillHeldUp, isFlat, isMaster, isAwaken, awakenSlot, awakenCost, wokeUnit, awakenBlock, canAwaken, awaken, undoAwaken, seenAwake, isEvolve, evolveSlot, evolveReady, isEvolved, shownAwake, glutOf, glutMax, glutFull, skillOr, skillOrTaken, unitFor, withCharacter,
+    isHunter, preyOf, canHunt, huntMark, undoHunt, preyShown, preyOn, aiHunt, skillDef, skillCost, SKILL_STEP, skillsBought, isInnate, hasSkill, skillVisible, skillNeeds, skillNeedsAny, skillNeedsMissing, skillHeldUp, isFlat, isMaster, isAwaken, awakenSlot, awakenCost, wokeUnit, awakenBlock, canAwaken, awaken, undoAwaken, seenAwake, isEvolve, evolveSlot, evolveReady, isEvolved, shownAwake, glutOf, glutMax, glutFull, skillOr, skillOrTaken, unitFor, withCharacter,
     footprint, blockOf, spotFree, buildingRecords, recordOf, recordWorld, buildingEffects,
     setBuildings, BUILDINGS: () => BUILDINGS, buildingInfo, BUILDING_SQUAD, isBuildingSkill, buildingIdOf, buildingsOf, buildingOf, buildingAt, buildingShown, buildingSpotOk,
     canBuyBuilding, buyBuilding, buildingSkills, buildingSkillInfo, bskillOf, bskillCost, canBuyBuildingSkill, buyBuildingSkill, undoBuildingSkill,
@@ -3104,7 +3160,7 @@ const Game = (() => {
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,
-    zoneRows, inZone, tileToWorld, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, resolve, aiDeploy, occupied,
+    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, resolve, aiDeploy, occupied,
     GRID, useGrid,
     DEV, CAT_NAMES, LESSER_SQ, WALL_SQ, setDevData, devBuilding, devPower, devSpell, isDev, towerUp, pickCat, devOffer, pickNow, needsDevPick, devPick, undoDevPick, devShown,
     lessersOf, placedLessers, unplacedLesser, lesserAt, lesserSpotOk, placeLesser, lesserUnit, auraFor, modUnit, powersOf, devGold, devDeploys,

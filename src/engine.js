@@ -153,7 +153,7 @@ const Engine = (() => {
   // waterHeal: allies inside the splash of its attacks heal for its hit; with no enemy in reach it shoots at the most
   // wounded ally in reach instead (structures aren't healed)
   // pools = { pct, speed, secs }: where its attacks land they leave a pool the size of their splash, for the rest of the
-  // fight (a new one isn't made where it would overlap a pool already there). Every second enemies in it take pct % of
+  // fight (a new one isn't made where it would overlap a pool of its side already there). Every second enemies in it take pct % of
   // the hit (past armor) and allies in it heal that much, and allies in it move `speed` m/s faster for `secs` s.
   // flow = { aps, range, max }: each attack it makes while standing still adds a stack (up to max): +aps attacks a
   // second and +range metres each. Moving takes all the stacks away.
@@ -288,6 +288,9 @@ const Engine = (() => {
     flare:   { label: 'Flare', params: [['per', 'Attack speed stored per second idle (%)', 10, 1], ['max', 'Most stored (%)', 100, 10], ['shot', 'Stored % per extra shot', 25, 5]] },
     portal:  { label: 'Summon portal', params: [['unit', 'Summons (unit name)', 'Brute', null], ['level', 'Its base level (0 = as bought)', 1, 1], ['speed', 'Its move speed (m/s)', 4.5, 0.1], ['cone', 'Its swipe (degrees each side)', 90, 5], ['secs', 'Portal stays (s)', 4, 0.5], ['hp', 'Its health (+%)', 0, 5], ['hit', 'Its hit (+%)', 0, 5], ['aps', 'Its attack speed (+%)', 0, 5]] },
     overwatch: { label: 'Overwatch', params: [['hp', 'Watchtower health', 200, 25]] },
+    web:     { label: 'Web shots', params: [['shots', 'Webs per body each fight', 1, 1], ['range', 'Web range (m)', 10, 0.5], ['slow', 'Slow per stack (%)', 10, 1], ['dmg', 'Damage cut per stack (%)', 5, 1], ['max', 'Most slow / damage cut (%)', 90, 5], ['secs', 'Lasts (s, each stack starts it again)', 3, 0.5]] },
+    hunter:  { label: 'Hunter', params: [['dmg', 'Damage to its mark (+%)', 100, 10]] },
+    elemental: { label: 'Summon water elemental', params: [['hp', 'Its health', 600, 50], ['unit', 'Attacks like (unit name)', 'Ember Imps', null], ['level', 'At level (0 = as bought)', 1, 1], ['ahead', 'Summoned ahead (m)', 9, 0.5], ['pool', 'Pool when it dies (radius, m)', 4, 0.5], ['pct', 'Pool damage / heal per second (% of its hit)', 50, 5], ['speed', 'Pool ally move speed (+m/s)', 0.5, 0.1], ['secs', 'Pool speed lasts (s)', 2, 0.5]] },
     freeMove: { label: 'Free moves', params: [] },
     silent:  { label: 'Silent first strike', params: [] },
     firstHit: { label: 'Opening strike', params: [['pct', 'First attack hit size (+%)', 25, 5]] },
@@ -390,6 +393,9 @@ const Engine = (() => {
       case 'flare': return `Idle time stores attack speed. Next attack fires it as extra shots.`;
       case 'portal': return `Sacrifices itself after ${n('secs')} s to summon a ${String(P('unit')) === 'Brute' ? 'Hellfiend' : String(P('unit'))}.`;
       case 'overwatch': return 'Can garrison a building: untouchable until it falls. Sees stealthed units in its range.';
+      case 'web': return `${+P('shots') > 1 ? `${n('shots')} times` : 'Once'} a fight, each body shoots a web at an enemy within ${n('range')} m. No damage, but its poison and slows land. Each stack: ${n('slow')}% slower and ${n('dmg')}% less damage (up to ${n('max')}%) for ${n('secs')} s; a new stack adds on and restarts the time.`;
+      case 'hunter': return `Marks an enemy squad. Always shoots a marked enemy in its range, for +${n('dmg')}% damage, and sees it through stealth.`;
+      case 'elemental': return `Summons a water elemental ${+(P('ahead') / 6).toFixed(2)} tiles ahead at the start of each fight: ${n('hp')} health, attacks like a level ${Math.round(P('level')) + 1} ${String(P('unit'))}, as fast as she is, grows with her level. Leaves a pool when it dies.`;
       case 'freeMove': return 'Moves are free.';
       case 'silent': return 'Its first attack keeps it hidden.';
       case 'firstHit': return `First attack +${n('pct')}% hit.`;
@@ -516,6 +522,18 @@ const Engine = (() => {
           break;
         }
         case 'overwatch': u.overwatch = { hp: Math.max(1, P('hp')) }; u.trueSight = true; break; // also sees stealthed units within its range
+        case 'web': u.web = { shots: Math.max(1, Math.round(P('shots'))), range: Math.max(1, P('range')), slow: Math.max(0, P('slow')), dmg: Math.max(0, P('dmg')), max: Math.min(95, Math.max(0, P('max'))), secs: Math.max(0.1, P('secs')) }; break;
+        case 'hunter': u.hunter = { dmg: Math.max(0, P('dmg')) }; break; // the game marks the prey (b.prey on its bodies)
+        case 'elemental': {
+          // the summon: one body that attacks like the named unit at the given level, with its own health (levelled with
+          // the summoner's level at the fight), the summoner's speed (set at the fight) and a pool where it falls
+          const name = String(skillParam(d, 'unit')), src = (roster || []).find(r => r && r.name === name);
+          const { skills, skillDefs, skillsOn, skillsInnate, skillMods, skillOr, skillNeeds, skillNeedsAny, trait, trait2, ...plain } = src || { name, cost: 0, bodies: 1, hp: 90, hit: 20, aps: 0.8, range: 10, speed: 4, splash: 3 };
+          const lv = leveled(withTraits({ ...plain, level: 0 }), Math.max(0, Math.round(P('level'))));
+          u.elemental = { ahead: Math.max(0, P('ahead')), unit: withTraits({ ...lv, level: 0, hp: Math.max(1, P('hp')), name: 'Water Elemental', tag: 'ELE', bodies: 1, cost: 0, unlock: 0,
+            shape: 'drop', color: '#74C0FC', defense: 'none', defVal: 0, summoned: true, deathPool: { r: Math.max(0, P('pool')), pct: Math.max(0, P('pct')), speed: Math.max(0, P('speed')), secs: Math.max(0, P('secs')) } }) };
+          break;
+        }
         case 'freeMove': u.freeMove = true; break;
         case 'silent': u.silent = true; break;
         case 'firstHit': u.firstHit = (u.firstHit || 0) + Math.max(0, P('pct')); break;
@@ -764,6 +782,19 @@ const Engine = (() => {
       for (const x of grp) x.channel = true;
       portals.push({ x: cx, y: cy, side: lead.side, t0: lead.delay || 0, secs: pt.secs, grp, hf, done: false }); // a flank squad's portal opens when it arrives
     }
+    // Summon water elemental (the Water Mage's Master skill): each body that has it summons one, `ahead` m in front of
+    // itself, levelled like it and as fast as it; it starts with it (a flank squad's comes in with it)
+    for (const list of [A, B]) for (const [i, b] of list.slice().entries()) { // i: its place in its own side, so a mirror is a mirror
+      const el = b.u.elemental;
+      if (!el || !b.alive) continue;
+      let x = b.x, y = b.y + (b.side === 0 ? 1 : -1) * el.ahead;
+      if (g.bounds) { x = Math.max(g.bounds.x0, Math.min(g.bounds.x1, x)); y = Math.max(g.bounds.y0, Math.min(g.bounds.y1, y)); }
+      const e = newBody(leveled({ ...el.unit, speed: b.u.speed }, b.level), b.side, x, y, i, -1);
+      e.credit = b;
+      if (b.delay) e.delay = b.delay;
+      if (b.march) e.march = b.march.slice();
+      list.push(e);
+    }
     const all = A.concat(B);
     const sides = [A, B];
     const counts = (b) => !(b.u.structure || b.u.aloft || b.u.noCount); // what makes up a side's army (towers, airships and constructs don't)
@@ -777,7 +808,12 @@ const Engine = (() => {
     const sight = !ruleOn(g, 'vision') ? 1e9 : g.sight == null ? SIGHT : g.sight;
     const minSight = g.minSight == null ? MIN_SIGHT : g.minSight;
     const drift = g.drift == null ? DRIFT : g.drift;
-    const cripple = [0, 0];      // seconds left of the tower-down penalty for each side
+    // seconds left of the tower-down penalty for each side. A 2v2 fight (opts.lanes, src/duo.js) keeps one per side and
+    // board: a fallen tower only cripples its own board (cripple[side + 2 * lane]); a body made in the fight takes the
+    // board it stands on. 1v1: just the side.
+    const cripple = [0, 0, 0, 0];
+    const lanesOn = !!opts.lanes;
+    const ck = (b) => { if (!lanesOn) return b.side; if (b.lane == null) b.lane = b.x > 0 ? 1 : 0; return b.side + 2 * b.lane; };
     const downNow = [];          // sides whose tower fell this tick: crippled from the next one
     const towerDown = g.towerDown || TOWER_DOWN;
     // a body died: a fallen tower cripples its side; a body with deathBlast explodes (deathBlast % of its max health)
@@ -791,7 +827,10 @@ const Engine = (() => {
       }
       // a lesser building (Factions devtest) doesn't cripple its side. The penalty starts with the next tick, so the
       // other side's bodies still to act this tick don't get the better of it (see the end of step)
-      if (v.u.structure && !v.u.lesser) downNow.push(v.side);
+      if (v.u.structure && !v.u.lesser) downNow.push(ck(v));
+      // a water elemental leaves a pool where it falls (like the Water Mage's Pool shaper pools: it hurts enemies,
+      // heals and speeds up allies for the rest of the fight), its hit x pct % a second
+      if (v.u.deathPool && v.u.deathPool.r > 0) { const dp = v.u.deathPool; pools.push({ x: v.x, y: v.y, r: dp.r, side: v.side, owner: v, amt: v.u.hit * dp.pct / 100, speed: dp.speed, secs: dp.secs }); }
       if (v.u.deathBlast > 0) {
         const dmg = v.u.hp * v.u.deathBlast / 100, rad = v.u.blastAt > 0 ? v.u.blastAt : BLAST_RADIUS;
         if (opts.record) shots.push([v.x, v.y, v.x, v.y, v.side, rad, 1, 0, 0]);
@@ -1222,8 +1261,9 @@ const Engine = (() => {
     // a target b may pick: not hidden, not sheltered, a lone one while it hunts, and not the tower for a body that
     // ignores it (noTower) while anything else is left to pick
     // seesHidden: b can pick f although f is stealthed: Overwatch (u.trueSight) within b's range, or a Sniper
-    // (b.sniperMark, set by the game) looking for the squad its side's Sniper tower marked (f.marked)
-    const seesHidden = (b, f) => f.u.stealth && !f.u.aloft && ((f.marked && b.sniperMark > 0) || (b.u.trueSight && gap(f, b) <= b.u.range + 1e-9));
+    // (b.sniperMark, set by the game) looking for the squad its side's Sniper tower marked (f.marked), or a Hunter (b.u.hunter)
+    // looking for a squad its side's Hunters marked (f.prey, set by the game)
+    const seesHidden = (b, f) => f.u.stealth && !f.u.aloft && ((f.marked && b.sniperMark > 0) || (f.prey && b.u.hunter) || (b.u.trueSight && gap(f, b) <= b.u.range + 1e-9));
     const pickable = (b, f) => f.alive && (!f.hidden || seesHidden(b, f)) && !sheltered(f) && !(b.hunt && !isLone(f)) && !(b.u.noTower && isTower(f) && othersThan(f.side));
     // damage that skips armor and ward (poison)
     function direct(owner, v, amount) {
@@ -1275,13 +1315,13 @@ const Engine = (() => {
     function makePool(owner, x, y, hit) {
       const r = owner.u.splash;
       if (!(r > 0)) return;
-      for (const q of pools) if (hyp(q.x - x, q.y - y) < q.r + r) return; // pools can't overlap
+      for (const q of pools) if (q.side === owner.side && hyp(q.x - x, q.y - y) < q.r + r) return; // a side's pools can't overlap (the other side's may: which side shot first mustn't matter)
       pools.push({ x, y, r, side: owner.side, owner, amt: hit * owner.u.pools.pct / 100, speed: owner.u.pools.speed, secs: owner.u.pools.secs });
     }
     // damage from the map itself (elf tower, toxic tiles): counts for neither side, earns no experience
     function neutralDamage(v, dmg) {
       if (v.turning || v.u.aloft || sheltered(v)) return;
-      if (cripple[v.side] > 0) dmg = dmg * (1 + towerDown.taken / 100);
+      if (cripple[ck(v)] > 0) dmg = dmg * (1 + towerDown.taken / 100);
       loseHp(v, dmg);
       if (poolHp(v) <= 1e-9) kill(null, v);
     }
@@ -1353,8 +1393,10 @@ const Engine = (() => {
       if (v.guard && owner.alive && owner.side !== v.side && !owner.u.aloft && !(v.avenge && v.avenge.alive)) { v.holdT = 0; v.avenge = owner; v.engaged = true; }
       if (owner.u.bldgPct > 0 && v.u.structure) hit = hit * owner.u.bldgPct / 100; // weaker against buildings (the Assassin)
       let pct = owner.u.pctHit > 0 && !v.u.structure ? v.u.hp * owner.u.pctHit / 100 : 0;
+      if (owner.u.hunter && v.prey && owner.side !== v.side) { hit = hit * (1 + owner.u.hunter.dmg / 100); pct = pct * (1 + owner.u.hunter.dmg / 100); } // Hunter: its mark
       if (owner.sniperMark > 0 && v.marked && owner.side !== v.side) { hit = hit * (1 + owner.sniperMark / 100); pct = pct * (1 + owner.sniperMark / 100); } // Mark Bounty (sniper tower)
-      if (cripple[owner.side] > 0) { hit = hit * (1 - towerDown.attack / 100); pct = pct * (1 - towerDown.attack / 100); }
+      if (cripple[ck(owner)] > 0) { hit = hit * (1 - towerDown.attack / 100); pct = pct * (1 - towerDown.attack / 100); }
+      if (owner.web) { hit = hit * (1 - owner.web.dmg / 100); pct = pct * (1 - owner.web.dmg / 100); } // webbed: it hits softer
       // Shield: the whole hit is blocked, however big, and it brings no poison
       if (v.shield > 0) { v.shield--; st.blocked += hit + pct; return; }
       // ice walls (towers on the ice map): four walls, one per direction; each blocks a number of whole hits
@@ -1376,7 +1418,7 @@ const Engine = (() => {
         if (v.u.defense === 'ward') dmg = Math.min(dmg, v.u.defVal);
         if (v.u.bonusWard > 0) dmg = Math.min(dmg, v.u.bonusWard);
       }
-      if (cripple[v.side] > 0) dmg = dmg * (1 + towerDown.taken / 100);
+      if (cripple[ck(v)] > 0) dmg = dmg * (1 + towerDown.taken / 100);
       st.blocked += hit - dmg;
       const applied = Math.min(dmg, poolHp(v));
       st.dealt += applied;
@@ -1531,6 +1573,40 @@ const Engine = (() => {
       if (!caught.length) { b.stormCd = Math.max(b.stormCd, -dt); return; }
       b.stormCd = Math.max(b.stormCd, -dt) + 1 / Math.max(0.01, apsOf(b));
       for (const f of caught) hurt(b, f, hit, b.x, b.y);
+    }
+    // Web shots (the Spiders' Master skill): each body shoots u.web.shots webs a fight, at the nearest enemy it could
+    // pick within u.web.range (not the tower or a building, not one aloft). A web does no damage; it lands the
+    // shooter's poison and slow as a hit would, and a stack of web (see webOn). It counts as an attack (stealth ends)
+    function webStep(b) {
+      const w = b.u.web;
+      if ((b.webs || 0) >= w.shots) return;
+      let tgt = null, bd = w.range + 0.01;
+      for (const f of sides[1 - b.side]) {
+        if (!pickable(b, f) || f.u.structure || f.u.aloft || !inSight(b, f)) continue;
+        const d = gap(f, b); if (d <= bd) { bd = d; tgt = f; }
+      }
+      if (!tgt) return;
+      b.webs = (b.webs || 0) + 1;
+      if (b.hidden && !b.u.aloft) { if (healLater) hitsLater.push(() => { b.hidden = false; }); else b.hidden = false; }
+      if (opts.record) shots.push([b.x, b.y, tgt.x, tgt.y, b.side, 0, 0, 0]);
+      if (healLater) hitsLater.push(() => webOn(b, tgt)); else webOn(b, tgt); // lands once the tick's attacks are done, so it doesn't matter who went first
+    }
+    // a stack of web from owner on v: its slow and damage cut grow by the owner's per-stack share (up to max) and last
+    // secs from now; plus the owner's poison (a dose from its hit) and its slow skill, as a hit of its would bring
+    function webOn(owner, v) {
+      if (!v.alive || v.turning || v.u.aloft || sheltered(v)) return;
+      const w = owner.u.web, wb = v.web || (v.web = { slow: 0, dmg: 0, t: 0, max: w.max });
+      wb.max = Math.max(wb.max, w.max);
+      wb.slow = Math.min(wb.max, wb.slow + w.slow); wb.dmg = Math.min(wb.max, wb.dmg + w.dmg); wb.t = w.secs;
+      wb.n = (wb.n || 0) + 1;
+      if (owner.u.poisonPct > 0) {
+        const dps = owner.u.hit * owner.u.poisonPct / 100 / owner.u.poisonDur, list = v.poison || (v.poison = []), dose = list.find(p => p.src === owner);
+        if (dose) { dose.dps = dps; dose.t = owner.u.poisonDur; } else list.push({ src: owner, dps, t: owner.u.poisonDur });
+      }
+      if (owner.u.slowDur > 0 && !v.u.unstoppable) {
+        if (!(v.slowT > 0)) { v.slowMove = 0; v.slowAtk = 0; }
+        v.slowMove = Math.max(v.slowMove, owner.u.slowMove || 0); v.slowAtk = Math.max(v.slowAtk, owner.u.slowAtk || 0); v.slowT = Math.max(v.slowT, owner.u.slowDur);
+      }
     }
     // a thrown titanium spear lands: its hit to the nearest enemy body within reach of where it is, and its bleed
     function spearLand(p) {
@@ -1762,6 +1838,7 @@ const Engine = (() => {
     // even if another enemy comes closer; then it picks the nearest
     function locked(b, valid) {
       if (b.avenge && b.avenge.alive && valid.includes(b.avenge)) b.lock = b.avenge; // a guard going for its attacker
+      if (b.u.hunter && !(b.lock && b.lock.alive && b.lock.prey && valid.includes(b.lock))) { const p = valid.find(f => f.prey); if (p) b.lock = p; } // Hunter: a marked enemy in reach comes first
       if (!(b.lock && b.lock.alive && valid.includes(b.lock))) {
         // aware2: the nearest enemy that isn't about to die from what its side is already shooting at it
         b.lock = g.aware2 ? (valid.find(f => (f.claimDmg || 0) < f.hp) || valid[0]) : valid[0];
@@ -1968,7 +2045,7 @@ const Engine = (() => {
       if (!tgt) return;
       b.intent = tgt;
       if (td > RAM_REACH) {
-        const mv = Math.min(td - RAM_REACH * 0.5, spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[b.side] > 0 ? 1 - towerDown.move / 100 : 1) * dt);
+        const mv = Math.min(td - RAM_REACH * 0.5, spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1) * dt);
         [b.hx, b.hy] = steer(b, tgt.x, tgt.y, (tgt.x - b.x) / td, (tgt.y - b.y) / td);
         b.x += b.hx * mv; b.y += b.hy * mv; b.moved += mv;
         if (dist(tgt, b) > RAM_REACH) return;
@@ -1981,7 +2058,7 @@ const Engine = (() => {
     const rammed = [];
 
     // share of its move speed a body walks at right now (slowed, or crippled by its fallen tower)
-    const moveMul = (b) => (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[b.side] > 0 ? 1 - towerDown.move / 100 : 1);
+    const moveMul = (b) => (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1);
 
     // a roller's turn (see ROLL_START): marches like any unit until it spots an enemy, then rolls at its target
     // gathering speed, runs over every enemy body in its path (each once per pass), carries on ROLL_PAST metres past
@@ -2200,7 +2277,7 @@ const Engine = (() => {
       if (t >= g.timeCap || !aliveCount(A) || !aliveCount(B)) { over = true; return false; }
       shots = [];
       tick++;
-      for (let k = 0; k < 2; k++) if (cripple[k] > 0) cripple[k] = Math.max(0, cripple[k] - dt);
+      for (let k = 0; k < 4; k++) if (cripple[k] > 0) cripple[k] = Math.max(0, cripple[k] - dt);
       // map tiles under the units (checked before moving, so the tile a unit starts on always counts)
       if (tiles.length) for (const b of all) {
         if (!b.alive || b.u.structure || b.u.aloft) continue;
@@ -2280,7 +2357,7 @@ const Engine = (() => {
           b.intent = was && was.alive ? was : null;
           // running through after a charge: straight on, hitting each body it runs over once
           // a Bullhead charge runs at twice its speed, hits for bull.hit and knocks each body it hits back along its path
-          const mv = Math.min(b.trampleLeft, spd(b) * (b.charging ? 2 : b.u.trampleSpeed > 0 ? b.u.trampleSpeed : 1) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[b.side] > 0 ? 1 - towerDown.move / 100 : 1) * dt);
+          const mv = Math.min(b.trampleLeft, spd(b) * (b.charging ? 2 : b.u.trampleSpeed > 0 ? b.u.trampleSpeed : 1) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1) * dt);
           const [ux, uy] = b.trampleDir;
           b.x += ux * mv; b.y += uy * mv; b.hx = ux; b.hy = uy;
           if (g.bounds) { b.x = Math.max(g.bounds.x0, Math.min(g.bounds.x1, b.x)); b.y = Math.max(g.bounds.y0, Math.min(g.bounds.y1, b.y)); }
@@ -2358,7 +2435,7 @@ const Engine = (() => {
           const p = b.guide[0], gx = p.x - b.x, gy = p.y - b.y, gd = hyp(gx, gy);
           if (gd < 1.5) { b.guide.shift(); if (!b.guide.length) b.guide = null; continue; }
           if (near && !unseen && nd <= reachTo(reachOf(b), b, near)) continue; // something in reach: stand and fight it
-          const step = spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[b.side] > 0 ? 1 - towerDown.move / 100 : 1) * dt;
+          const step = spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1) * dt;
           const [ux, uy] = steer(b, p.x, p.y, gx / gd, gy / gd);
           if (b.hx === undefined) { b.hx = ux; b.hy = uy; }
           const k = Math.min(1, TURN * dt);
@@ -2382,7 +2459,7 @@ const Engine = (() => {
           if (!wantsDash) b.dashActive = false;
           b.dashing = wantsDash && (b.dashActive || (b.dashCooldownT || 0) <= 0);
           if (b.dashing && !b.dashActive) { b.dashActive = true; b.dashCooldownT = Math.max(0, b.u.dashCooldown || 0); } // per-body cooldown, starts when the dash begins
-          const step = (b.dashing ? Math.max(DASH_SPEED, spd(b)) : spd(b)) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[b.side] > 0 ? 1 - towerDown.move / 100 : 1) * dt;
+          const step = (b.dashing ? Math.max(DASH_SPEED, spd(b)) : spd(b)) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1) * dt;
           let mv;
           // March straight ahead until an enemy comes within sight (range + SIGHT, at least MIN_SIGHT, in any
           // direction), or no enemy is left ahead, then lock on: from then on the body goes for its own nearest
@@ -2522,12 +2599,12 @@ const Engine = (() => {
           neutralDamage(f, dmg);
         }
       }
-      // pools: enemies standing in one take its damage, allies heal and speed up (one pool at a time each)
+      // pools: enemies standing in one take its damage, allies heal and speed up (one pool of each side at a time each)
       if (pools.length) {
-        const done = new Set();
+        const done = [new Set(), new Set()];
         for (const q of pools) for (const f of all) {
-          if (!f.alive || f.u.structure || f.u.aloft || done.has(f) || hyp(f.x - q.x, f.y - q.y) > q.r) continue;
-          done.add(f);
+          if (!f.alive || f.u.structure || f.u.aloft || done[q.side].has(f) || hyp(f.x - q.x, f.y - q.y) > q.r) continue;
+          done[q.side].add(f);
           if (f.side !== q.side) direct(q.owner, f, q.amt * dt);
           else { heal(f, q.amt * healMul * dt); if (q.speed > 0) { f.poolFast = q.speed; f.poolFastT = q.secs; } }
         }
@@ -2545,6 +2622,11 @@ const Engine = (() => {
           }
           if (b.poison) b.poison = b.poison.filter(p => p.t > 0); // a body won over by a Gentleman just now lost its poison
           if (!b.alive) continue;
+          if (b.web) { // webbed (Web shots): slower while it lasts
+            b.web.t -= dt;
+            if (b.web.t <= 1e-9) b.web = null;
+            else if (!b.u.unstoppable) { if (!(b.slowT > 0)) { b.slowMove = 0; b.slowAtk = 0; } b.slowMove = Math.max(b.slowMove, b.web.slow); b.slowT = Math.max(b.slowT, dt * 1.5); }
+          }
           if (b.poison && b.poison.length && !b.u.slime && !b.u.unstoppable) { // poison slows (see POISON_SLOW)
             if (!(b.slowT > 0)) { b.slowMove = 0; b.slowAtk = 0; }
             b.slowMove = Math.max(b.slowMove, POISON_SLOW); b.slowT = Math.max(b.slowT, dt * 1.5);
@@ -2680,6 +2762,7 @@ const Engine = (() => {
         if (b.flurryLeft > 0) { if (b.alive) flurryStep(b); else b.flurryLeft = 0; continue; } // Death flurry: the rest of its blows
         if (b.u.spear && b.alive) forgeSpear(b); // Titanium spears: forged and thrown apart from its own attack
         if (b.u.storm && b.alive) stormStep(b); // Snow storm: apart from its own attack
+        if (b.u.web) webStep(b); // Web shots: apart from its own attack (a body killed this tick still shoots, like its attack)
         if (b.u.missiles && b.alive) { // Leafblade: a salvo at the start and every missiles.every s
           b.missileT = (b.missileT || 0) - dt;
           if (b.missileT <= 1e-9) { if (salvo(b)) b.missileT = b.u.missiles.every; else b.missileT = 0; }
@@ -2878,7 +2961,7 @@ const Engine = (() => {
         v.windTarget = null; v.windT = 0; v.setUp = false; v.firing = -1; v.burstLeft = 0; v.trampleLeft = 0; v.trampled = null;
         v.spinTarget = null; v.aims = null; v.lock = null; v.intent = null; v.march = null; v.guide = null; v.goal = null; v.spreadTo = null; v.engaged = false; v.holdT = 0; v.avenge = null; v.delay = 0; v.band = null; v.hidden = false;
         v.slowT = 0; v.slowMove = 0; v.slowAtk = 0; v.shrinkT = 0; v.shrinkM = 0; v.kids = null; v.stunT = 0; v.frenzy = 0; v.flow = 0; v.knives = null; v.atkN = 0; v.forgeT = 0; v.spearReady = false;
-        v.burn = null; v.kills = 0; v.flurryLeft = 0; v.flurryTgt = null; v.rootTgt = null; v.rootedBy = null; v.hunt = null; v.bullN = 0; v.charging = false; v.inside = null; v.missileT = 0; v.roarSpd = 0; v.roarAtk = 0; v.frost = null; v.frozenT = 0; v.beamAims = null; v.stormCd = 0; v.aimedAt = 0; v.wwDodges = 0; v.watchT = 0;
+        v.burn = null; v.web = null; v.webs = 0; v.kills = 0; v.flurryLeft = 0; v.flurryTgt = null; v.rootTgt = null; v.rootedBy = null; v.hunt = null; v.bullN = 0; v.charging = false; v.inside = null; v.missileT = 0; v.roarSpd = 0; v.roarAtk = 0; v.frost = null; v.frozenT = 0; v.beamAims = null; v.stormCd = 0; v.aimedAt = 0; v.wwDodges = 0; v.watchT = 0;
         sides[v.side].push(v); stats[v.side].totalHp += v.hp;
         for (const b of all) {
           if (b.windTarget === v) { b.windTarget = null; b.windT = 0; }
@@ -2961,7 +3044,7 @@ const Engine = (() => {
       };
     }
 
-    return { step, frame, result, bodies: all, neutrals, mines: () => mines, pools: () => pools, portals: () => portals.filter(p => t >= p.t0 && t < p.t0 + p.secs), isOver: () => over, time: () => t, lastShots: () => shots, projectiles: () => projectiles, crippled: (side) => cripple[side], charm: (side, squad) => (charm[side] && charm[side][squad]) || 0,
+    return { step, frame, result, bodies: all, neutrals, mines: () => mines, pools: () => pools, portals: () => portals.filter(p => t >= p.t0 && t < p.t0 + p.secs), isOver: () => over, time: () => t, lastShots: () => shots, projectiles: () => projectiles, crippled: (side, lane) => cripple[side + 2 * (lane | 0)], charm: (side, squad) => (charm[side] && charm[side][squad]) || 0,
       objective: () => obj && { n: obj.n.slice(), lead: obj.lead, hold: obj.hold, secs: obj.secs, won: obj.won } };
   }
 

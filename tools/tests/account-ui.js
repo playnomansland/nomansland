@@ -58,7 +58,7 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 *
     ok((await a.inputValue('#acct-tag')) === s.tag, 'the gamertag is shown');
     const guestId = s.id;
     await a.fill('#acct-tag', 'Vilhelm'); await a.click('#acct-tag-ok'); await idle(a);
-    ok((await state(a)).tag === 'Vilhelm' && /Gamertag saved/.test(await text(a)), 'renamed');
+    ok((await state(a)).tag === 'Vilhelm' && /Username saved/.test(await text(a)), 'renamed');
     await a.fill('#acct-tag', 'x'); await a.click('#acct-tag-ok'); await idle(a);
     ok(/2–16 letters/.test(await text(a)) && (await state(a)).tag === 'Vilhelm', 'a bad gamertag is refused');
 

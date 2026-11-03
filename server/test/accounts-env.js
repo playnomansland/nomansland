@@ -36,13 +36,14 @@ function accountsConfig() {
   return ['--config', file];
 }
 
-async function startAccounts(port, vars = {}) {
+async function startAccounts(port, vars = {}, extra = []) {
   const keys = http.createServer((req, res) => { res.setHeader('content-type', 'application/json'); res.setHeader('connection', 'close'); res.end(JSON.stringify({ keys: [jwk] })); });
   await new Promise((r) => keys.listen(0, '127.0.0.1', r));
   const keyUrl = `http://127.0.0.1:${keys.address().port}/certs`;
   const state = fs.mkdtempSync(path.join(os.tmpdir(), 'nml-acc-'));
   const args = [...accountsConfig(), '--persist-to', state, '--var', `GOOGLE_CLIENT_ID:${CLIENT}`, '--var', `GOOGLE_JWKS_URL:${keyUrl}`];
   for (const [k, v] of Object.entries(vars)) args.push('--var', `${k}:${v}`);
+  args.push(...extra);
   const srv = await startServer(port, args);
   const stop = srv.stop;
   srv.stop = () => { stop(); keys.close(); fs.rmSync(state, { recursive: true, force: true }); };

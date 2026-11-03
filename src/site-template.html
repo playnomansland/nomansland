@@ -390,6 +390,29 @@ html.dock .bar:has(> .task:not([hidden])) > .hint { display: none; }
 .unx button { position: absolute; pointer-events: auto; width: 16px; height: 16px; margin: -8px 0 0 -8px; padding: 0; border-radius: 50%; border: 1.5px solid var(--you); background: var(--bg); color: var(--ink); font: 700 9px/1 var(--font-body, sans-serif); display: grid; place-items: center; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
 .unx button::before { content: ''; position: absolute; inset: -5px -5px -3px -3px; } /* a bigger target for a finger, reaching out from the tile more than into it */
 .marks .markx { fill: none; stroke-width: 2; opacity: 0.95; }
+/* 2v2 pings: a badge with ? ! or ⚔ and a ring that ripples out (the teammate's in their colour, your own in gold) */
+.marks .ping circle { fill: rgba(10, 14, 16, 0.82); stroke: #5CC6DF; stroke-width: 3; }
+.marks .ping.mine circle { stroke: #E8B64A; }
+.marks .ping .ring { fill: none; transform-box: fill-box; transform-origin: center; animation: ping-ring 1.4s ease-out 3; }
+.marks .ping text { fill: #fff; font: 700 17px "Chakra Petch", sans-serif; text-anchor: middle; dominant-baseline: middle; }
+.marks .ping { animation: ping-pop 0.35s ease-out; }
+@keyframes ping-ring { from { transform: scale(1); opacity: 0.9; } to { transform: scale(2.6); opacity: 0; } }
+@keyframes ping-pop { from { opacity: 0; } to { opacity: 1; } }
+.duo-row .seg.pings button { min-width: 38px; font-weight: 700; }
+/* 2v2: the teammate's board beside this one (a PC, with the open strip between) or in its place (a phone) */
+.mate-board { position: absolute; top: 0; height: 100%; }
+#wrap.duo-pc > canvas#board, #wrap.duo-pc > .board3d:not(.mate-board) { position: absolute; top: 0; height: 100%; width: calc(100% * 14 / 30); left: 0; right: auto; }
+#wrap.duo-pc > .mate-board { width: calc(100% * 14 / 30); right: 0; left: auto; }
+#wrap.duo-pc.mate-left > canvas#board, #wrap.duo-pc.mate-left > .board3d:not(.mate-board) { left: auto; right: 0; }
+#wrap.duo-pc.mate-left > .mate-board { right: auto; left: 0; }
+#wrap.duo-phone > canvas#board, #wrap.duo-phone > .board3d:not(.mate-board) { visibility: hidden; }
+#wrap.duo-phone > .mate-board { left: 0; width: 100%; }
+#wrap:not(.duo-pc):not(.duo-phone) > .mate-board, #wrap:not(.duo-pc):not(.duo-phone) > .mate-tag { display: none; }
+.mate-tag { position: absolute; top: 8px; z-index: 2; white-space: nowrap; padding: 2px 8px; border-radius: 4px; background: rgba(13, 19, 21, 0.78); color: var(--you); font: 600 12px var(--font-data); pointer-events: none; }
+#wrap.duo-pc > .mate-tag { left: calc(100% * 16 / 30 + 8px); }
+#wrap.duo-pc.mate-left > .mate-tag { left: 8px; }
+#wrap.duo-pc.mate-left > .tag-clock { left: calc(100% * 16 / 30 + 10px); }
+#wrap.duo-phone > .mate-tag { right: 8px; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
 .marks .range { fill: none; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 0.1 6; opacity: 0.9; }
 /* intent: where a squad means to go (arrows to the enemy squads it heads for, dashed straight ahead with nothing in sight yet), whom it attacks in a fight (small rings) */
 .marks .intent, .marks .intent-under { fill: none; stroke-linecap: round; }
@@ -468,12 +491,12 @@ html.home .app { visibility: hidden; }
 .home-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .home::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 42%, rgba(13, 19, 21, 0.05), rgba(13, 19, 21, 0.62) 78%), linear-gradient(180deg, rgba(13, 19, 21, 0.35), transparent 30%, transparent 70%, rgba(13, 19, 21, 0.5)); }
 /* The main menu's Flame Wizard (2026-11-02): at the left edge, blasting a fire cone, under the buttons (never takes taps) */
-.home-wiz { position: absolute; left: 0; bottom: calc(4vh + env(safe-area-inset-bottom, 0px)); width: min(78vw, 560px); height: min(300px, 38vh); z-index: 1; pointer-events: none; animation: wiz-in 0.7s cubic-bezier(.2,1.4,.4,1) both; }
+.home-wiz { position: absolute; left: 0; bottom: calc(4vh + env(safe-area-inset-bottom, 0px)); width: min(78vw, 560px); height: min(300px, 38vh); z-index: 1; pointer-events: none; }
 .home-wiz canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.home-wiz .baba { position: absolute; left: 6px; top: 6px; font-family: "Bangers", "Comic Sans MS", "Chalkboard SE", cursive; font-size: clamp(30px, 9vw, 64px); letter-spacing: 0.04em; line-height: 1; color: #FFD23F; -webkit-text-stroke: 2px #5A1A06; paint-order: stroke fill; text-shadow: 3px 4px 0 #A8320C, 0 0 18px rgba(255, 120, 30, 0.55); transform-origin: 30% 80%; animation: baba 0.32s ease-in-out infinite alternate; white-space: nowrap; }
-@keyframes wiz-in { from { transform: translateX(-110%); } to { transform: none; } }
+.home-wiz .baba { position: absolute; left: 6px; top: 6px; font-family: "Bangers", "Comic Sans MS", "Chalkboard SE", cursive; font-size: clamp(30px, 9vw, 64px); letter-spacing: 0.04em; line-height: 1; color: #FFD23F; -webkit-text-stroke: 2px #5A1A06; paint-order: stroke fill; text-shadow: 3px 4px 0 #A8320C, 0 0 18px rgba(255, 120, 30, 0.55); transform-origin: 30% 80%; white-space: nowrap; }
+.home-wiz.go .baba { animation: baba 0.16s ease-in-out infinite alternate; } /* only while a tap's blast plays */
 @keyframes baba { from { transform: rotate(-4deg) scale(1); } to { transform: rotate(3deg) scale(1.07) translateY(-3px); } }
-@media (prefers-reduced-motion: reduce) { .home-wiz, .home-wiz .baba { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .home-wiz.go .baba { animation: none; } }
 .home-in { position: relative; z-index: 1; height: 100%; overflow-y: auto; display: grid; grid-template-rows: auto 1fr auto; justify-items: center; padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(14px + env(safe-area-inset-bottom, 0px)); gap: 14px; }
 .home-title { width: min(100%, 860px); display: block; margin: 0 auto; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45)) drop-shadow(0 0 22px rgba(0, 0, 0, 0.35)); user-select: none; -webkit-user-drag: none; }
 .home-title.stack { display: none; }
@@ -527,10 +550,14 @@ html.pc .corner button span { display: inline; }
 .lb th { font: 600 11px var(--font-display); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 .lb tr.me td { color: var(--gold); }
 .lb td.num { font-family: var(--font-data); }
+.lb tr.legend td:first-child { color: #FFC83D; font-weight: 700; text-shadow: 0 0 8px rgba(255, 200, 61, 0.55); }
+.lb tr.cut td { border-bottom: 1px dashed rgba(255, 200, 61, 0.6); }
+.lb-legend { margin: 0; padding: 8px 10px; border: 1px solid rgba(255, 200, 61, 0.45); border-radius: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lb-legend .hint { margin: 0; flex: 1 1 180px; }
 .series { display: flex; justify-content: center; gap: 10px; align-items: baseline; font-family: var(--font-display); }
 .series b { font-size: 22px; }
 
-/* titles (2026-11-02): a small glowing banner under a gamertag */
+/* titles (2026-11-02): a small glowing banner under a username */
 .nameplate { display: inline-grid; justify-items: center; gap: 2px; line-height: 1.15; vertical-align: middle; }
 .nameplate .np-tag { font: 700 15px var(--font-display); letter-spacing: 0.03em; }
 .nameplate.big .np-tag { font-size: 22px; }
@@ -562,7 +589,7 @@ html.pc .corner button span { display: inline; }
 .mp-mode[aria-pressed="true"] { color: var(--gold); border-color: var(--gold); }
 .sheet .mplayer { margin-top: 0; padding-top: 0; border-top: 0; }
 
-/* the HUD's names (2026-11-02): gamertag with the title under it */
+/* the HUD's names (2026-11-02): username with the title under it */
 #you-name, #foe-name { display: inline-grid; gap: 1px; min-width: 0; }
 #foe-name { justify-items: end; }
 #you-name .hud-tag, #foe-name .hud-tag { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 34vw; text-transform: none; letter-spacing: 0.02em; }
@@ -620,6 +647,7 @@ html.pc .corner button span { display: inline; }
 <script>
 /*GAME*/
 /*REFEREE*/
+/*DUO*/
 /*TOUR*/
 </script>
 <script>
@@ -802,12 +830,12 @@ html.pc .corner button span { display: inline; }
   const solo = () => mode === 'ai' || mode === 'claude' || mode === 'tutorial'; // playing against the computer on this screen
   // the opponent's account on a server match ({ tag, title }), if their phone has one
   const foePlayer = () => mode === 'net' && net.players && net.players[foe()] || null;
-  const foeName = () => (mode === 'spec' && tour.spec ? tour.spec.foe : '') || tourFoe() || (foePlayer() ? foePlayer().tag : '') || (mode === 'ai' || mode === 'tutorial' ? 'Enemy' : mode === 'claude' ? 'Claude' : 'Opponent'); // a tournament opponent by gamertag
+  const foeName = () => (mode === 'spec' && tour.spec ? tour.spec.foe : '') || tourFoe() || (foePlayer() ? foePlayer().tag : '') || (mode === 'ai' || mode === 'tutorial' ? 'Enemy' : mode === 'claude' ? 'Claude' : 'Opponent'); // a tournament opponent by username
   let me = 0;               // which side of the match this screen plays (the guest is side 1)
   const foe = () => 1 - me;
   let m = null;             // match state (on the guest: a copy kept in step by the host)
   let phase = 'start';      // start | lobby | draft | deploy | battle | result | end
-  try { if (/[?&]test\b/.test(location.search)) window.__tour = () => tour.t && JSON.parse(JSON.stringify(tour.t)); if (/[?&]test\b/.test(location.search)) window.__pb = () => ({ m, me, board3d, board, bt, phase, liveSpeed: liveSpeed.slice(), playSpeed: playSpeed(), away, timeUp, ready: ready.slice(), expireDeploy: () => { deadline = now() - 400; tick(); } }); } catch (e) {} // read-only peek and countdown trigger for UI tests
+  try { if (/[?&]test\b/.test(location.search)) window.__tour = () => tour.t && JSON.parse(JSON.stringify(tour.t)); if (/[?&]test\b/.test(location.search)) window.__pb = () => ({ m, me, board3d, board, bt, phase, liveSpeed: liveSpeed.slice(), playSpeed: playSpeed(), away, timeUp, ready: ready.slice(), mate: mateMatch(), pings: duoPings.slice(), expireDeploy: () => { deadline = now() - 400; tick(); } }); } catch (e) {} // read-only peek and countdown trigger for UI tests
   try { if (/[?&]test\b/.test(location.search)) window.__pbRedraw = () => { if (phase === 'deploy') panelDeploy(); render(); }; } catch (e) {} // UI tests that set up a board state: draw it
   let selected = null;      // unit index chosen in the shop
   let rangeOf = null;       // { side, id }: the squad last tapped on the board; its range shows as a dotted ring
@@ -1493,8 +1521,8 @@ html.pc .corner button span { display: inline; }
   const boardView = () => ({ m: lookPre() || m || menuPre(), me, phase, units, mode, bt: lookPre() ? null : bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf,
     editable: editable(), placingUnit: placingUnit(), placingElf: placingElf(), placingTower: placingTower(), placingWall: placingWall(),
     dev: m && m.dev ? { bPlacing, castMode, guideMode, guideId: guideDrag ? guideDrag.id : guideMode !== 'pick' ? guideMode : null, guide: guideDrag ? guideDrag.pts : guideMode != null && guideMode !== 'pick' ? guideDraft : null } : null,
-    battleCam: cam && cam.k > 0 ? { zoom: 1 + (CAM.zoom - 1) * cam.k, x: cam.x, y: cam.y, k: cam.k } : null,
-    placingBuilding: placingBuilding() });
+    battleCam: cam && cam.k > 0 ? { zoom: 1 + (CAM.zoom - 1) * cam.k, x: cam.x, y: cam.y, k: cam.k } : duoFocus(),
+    placingBuilding: placingBuilding(), win: duoWin() });
   const board = Render2D(cv, boardView);
   let board3d = null; // the 3D board when it's on (see "the 3D board" below)
   const size = () => (board3d || board).size();
@@ -1572,7 +1600,7 @@ html.pc .corner button span { display: inline; }
   // the X on the task line: stop placing that unit (or the Move, the Charisma, the elf tower)
   function stopTask() {
     if (guideMode != null && guideMode !== 'pick' && guideDraft.length && m && editable()) Game.setGuide(m, me, guideMode, guideDraft); // the ✕ finishes an arrow
-    selected = null; moveMode = false; moving = null; charmMode = false; elfPlacing = false; wallPlacing = false; fortPlacing = false; markPicking = false;
+    selected = null; moveMode = false; moving = null; charmMode = false; elfPlacing = false; wallPlacing = false; fortPlacing = false; markPicking = false; huntPicking = null;
     bPlacing = null; castMode = null; guideMode = null; guideDraft = []; guideDrag = null;
     if (phase === 'deploy') panelDeploy();
     render();
@@ -1624,16 +1652,20 @@ html.pc .corner button span { display: inline; }
   // The board's shape follows the match's map (Test Grid has a bigger board; no match: the standard one). On a change
   // the 2D board resizes and the 3D board starts again, as it builds its ground and camera for one size.
   let gridKey = Game.COLS + 'x' + Game.ROWS;
+  let arKey = '';
   function syncGrid() {
     Game.useGrid(m);
     const key = Game.COLS + 'x' + Game.ROWS;
+    // the board's shape on screen: a 2v2 phone window (duoWin), or both boards side by side (duoSplit)
+    const w = duoWin(), sp = duoSplit(), ar = (w ? w.aspect : sp === 'pc' ? duoFull() : Game.COLS) / Game.ROWS;
+    if (String(ar) !== arKey) { arKey = String(ar); document.documentElement.style.setProperty('--board-ar', arKey); if (key === gridKey) size(); }
     if (key === gridKey) return;
     gridKey = key;
-    document.documentElement.style.setProperty('--board-ar', String(Game.COLS / Game.ROWS));
     if (board3d) { stop3d(); start3d(); } else size();
   }
   function render() {
     syncGrid();
+    syncMate();
     syncMusic();
     cv.style.touchAction = phase === 'deploy' ? 'none' : ''; // so a finger can drag squads without scrolling the page
     if (board3d) wake3d(); else { board.draw(); boardMarks(); }
@@ -1678,6 +1710,8 @@ html.pc .corner button span { display: inline; }
   let wallPlacing = false; // placing the bastion's Defensive walls
   let fortPlacing = false; // placing the bastion's Fortify wall for this round
   let markPicking = false; // picking the enemy squad for the sniper tower's Mark Bounty
+  let huntPicking = null; // the id of the awakened Hunter (Sniper) squad whose mark is being placed
+  const pickingHunt = () => huntPicking != null && phase === 'deploy' && !!m && Game.canHunt(m, me, huntPicking);
   const placingFort = () => fortPlacing && phase === 'deploy' && !!m && Game.canFortify(m, me);
   const pickingMark = () => markPicking && phase === 'deploy' && !!m && Game.canMark(m, me);
   const placingWall = () => wallPlacing && phase === 'deploy' && !!m && Game.bwallsLeft(m, me) > 0;
@@ -1690,8 +1724,9 @@ html.pc .corner button span { display: inline; }
     const v = phase === 'battle' && battlePre ? battlePre : m;
     const hpMe = v ? v.hp[me] : Game.START_HP, hpFoe = v ? v.hp[foe()] : Game.START_HP;
     $('hp-you').textContent = hpMe; $('hp-foe').textContent = hpFoe;
-    $('hpbar-you').style.width = (hpMe / Game.START_HP * 100) + '%';
-    $('hpbar-foe').style.width = (hpFoe / Game.START_HP * 100) + '%';
+    const hpFull = net.duo && mode === 'net' ? Duo.HP : Game.START_HP; // 2v2: the team's shared health
+    $('hpbar-you').style.width = Math.min(100, hpMe / hpFull * 100) + '%';
+    $('hpbar-foe').style.width = Math.min(100, hpFoe / hpFull * 100) + '%';
     $('round').textContent = v ? v.round : 1;
     for (const [id, sd] of [['streak-you', me], ['streak-foe', foe()]]) { // a live shutdown bounty on a win streak
       const n = v && v.streak ? v.streak[sd] || 0 : 0, el = $(id), b = Game.shutdownGold(n);
@@ -1700,11 +1735,16 @@ html.pc .corner button span { display: inline; }
     }
     if (home.screen) syncHome();
     $('phase').textContent = { start: 'Ready', lobby: 'Lobby', draft: 'Draft', deploy: 'Deploy', battle: 'Battle', result: 'Result', end: 'Match over' }[phase];
-    // gamertags and titles (2026-11-02): this phone's account, and the opponent's on a server match
+    // usernames and titles (2026-11-02): this phone's account, and the opponent's on a server match
     const mine = mode !== 'spec' && mode !== 'tutorial' && acct ? acct : null, theirs = foePlayer();
     const hudName = (tag, title) => `<span class="hud-tag">${esc(tag)}</span>${titleHtml(title)}`;
-    const fh = theirs ? hudName(foeName(), theirs.title) : esc(foeName());
-    const yh = mine ? hudName(mine.tag, mine.title) : esc(mode === 'spec' && tour.spec ? tour.spec.host : 'You'); // spectating: the host's side is at the bottom
+    let fh = theirs ? hudName(foeName(), theirs.title) : esc(foeName());
+    let yh = mine ? hudName(mine.tag, mine.title) : esc(mode === 'spec' && tour.spec ? tour.spec.host : 'You'); // spectating: the host's side is at the bottom
+    if (net.duo && net.duoInfo && net.duoInfo.names && mode === 'net') { // 2v2: both teams
+      const nm = net.duoInfo.names, mySd = me, seats = [0, 1, 2, 3].filter(k => Duo.SEATS[k].side === mySd), foes = [0, 1, 2, 3].filter(k => Duo.SEATS[k].side !== mySd);
+      yh = esc('You & ' + (nm[seats.find(k => k !== net.duoInfo.seat)] || 'mate'));
+      fh = esc(foes.map(k => nm[k] || Duo.SEAT_NAMES[k]).join(' & '));
+    }
     // a ranked series: the score in games, from this player's side, above the round number
     const rk = mode === 'net' && net.ranked && m ? net.ranked : null, chip = $('series-chip');
     chip.hidden = !rk;
@@ -1725,6 +1765,7 @@ html.pc .corner button span { display: inline; }
   function netStatus() {
     if (solo()) { setNet(''); return; }
     if (mode === 'spec') { setNet(net.connected ? `Watching ${tour.spec ? tour.spec.host + ' vs ' + tour.spec.foe : 'a match'}` : 'Connecting to the match…', net.connected ? 'ok' : 'bad'); dock(); return; }
+    if (mode === 'net' && net.duo && net.connected && m && phase !== 'lobby') { setNet(duoLine(), 'ok'); dock(); return; }
     if (mode === 'net' && net.connected && !net.foeHere && m && !m.over && phase !== 'lobby') setNet('Opponent disconnected. The clock waits for them…', 'bad');
     else if (net.connected) setNet(mode === 'host' ? `Match ${net.code} · opponent connected` : `Match ${net.code} · connected`, 'ok');
     else if (phase === 'lobby') setNet('');
@@ -2222,6 +2263,7 @@ html.pc .corner button span { display: inline; }
       if (placingWall()) hint = `Tap a tile edge to build a wall (${Game.bwallsLeft(m, me)} left).`;
       if (placingFort()) hint = `Fortify: tap a tile edge on your side for this round's wall (${Game.FORTIFY.cost} gold).`;
       if (pickingMark()) hint = `Mark Bounty: tap an enemy squad from an earlier round${Game.markCost(m, me) ? ` (${Game.markCost(m, me)} gold)` : ' (free)'}. The mark can't be moved.`;
+      if (pickingHunt()) hint = 'Hunter: tap an enemy squad from an earlier round to mark it (free). Tap anywhere else to cancel.';
       if (devPicking()) hint = 'Pick a card.';
       const pb = bPlacing != null && Game.lessersOf(m, me).find(b => b.key === bPlacing);
       if (pb) hint = `Tap a gold tile to place your ${esc((Game.devBuilding(pb.id) || {}).name || 'building')}.${pb.col != null ? ' Tap anywhere else to leave it where it is.' : ''}`;
@@ -2301,6 +2343,7 @@ html.pc .corner button span { display: inline; }
         ${action}
       </div>
       <div class="hint2">${tip}</div>
+      ${net.duo && mode === 'net' ? duoRow(false) : ''}
       ${xb.includes('<button') ? `<div class="xrow">${xb}</div>` : ''}
       ${showShop ? `<div class="shop2" id="shop">${shopHtml}</div>` : ''}`;
     syncPick();
@@ -2333,6 +2376,7 @@ html.pc .corner button span { display: inline; }
     if ($('ready')) $('ready').addEventListener('click', () => ready[me] ? toggleReady() : capCheck(toggleReady));
     if ($('buy-deploy')) $('buy-deploy').addEventListener('click', () => { if (editable() && Game.buyDeploy(m, me)) changed(); });
     wireMore();
+    if (net.duo && mode === 'net') wireDuoRow();
     $('help-btn').addEventListener('click', openHelp);
     if ($('mage-gen')) $('mage-gen').addEventListener('click', () => openTowerSheet(me));
     if ($('loan')) $('loan').addEventListener('click', () => { if (editable() && Game.takeLoan(m, me)) changed(); });
@@ -2369,7 +2413,7 @@ html.pc .corner button span { display: inline; }
     if (!editable() || !undoSnap || undoSnap.key !== undoKey()) return;
     Referee.restoreSide(m, me, JSON.parse(undoSnap.state));
     if (mode === 'net') srvAct('undoAll', []);
-    selected = null; moveMode = false; moving = null; charmMode = false; elfPlacing = false; wallPlacing = false; fortPlacing = false; markPicking = false; bPlacing = null; castMode = null; guideMode = null; guideDraft = []; guideDrag = null; rangeOf = null;
+    selected = null; moveMode = false; moving = null; charmMode = false; elfPlacing = false; wallPlacing = false; fortPlacing = false; markPicking = false; huntPicking = null; bPlacing = null; castMode = null; guideMode = null; guideDraft = []; guideDrag = null; rangeOf = null;
     closeSheet(); changed();
   }
   function changed() {
@@ -2397,7 +2441,9 @@ html.pc .corner button span { display: inline; }
         </div>
         <button class="btn small" id="skip">Skip to result</button>
       </div>
+      ${net.duo && mode === 'net' ? duoRow(true) : ''}
       <span class="hint speed-ask" id="speed-ask" aria-live="polite" hidden></span>`;
+    if (net.duo && mode === 'net') wireDuoRow();
     $('panel').querySelectorAll('[data-s]').forEach(b => b.addEventListener('click', () => pickSpeed(+b.dataset.s)));
     showSpeed();
     // asks first, as selling does: the first tap turns it into "Tap again to skip" (gold) for a few seconds
@@ -2489,15 +2535,18 @@ html.pc .corner button span { display: inline; }
     size(); render();
   }
 
-  // ---------- titles (2026-11-02): earned on the server (accounts.js titlesOf), shown under a gamertag ----------
-  // day1: every account made in the first week (to Sunday 2026-11-08); dev: developer accounts. The player picks
+  // ---------- titles (2026-11-02): earned on the server (accounts.js titlesOf), shown under a username ----------
+  // day1: every account made in the first week (to Sunday 2026-11-08); dev: developer accounts; legend (2026-11-03):
+  // ended a month in the top 5 of the leaderboard (kept for good). The player picks
   // which one shows (Profile). A title this phone hasn't announced yet gets the "new Title" popup on the main menu.
   const TITLES = {
     day1: { name: 'Day 1', col: '#B67CFF', glow: 'rgba(182, 124, 255, 0.55)' },
     dev: { name: 'DEV', col: '#FF5FC4', glow: 'rgba(255, 95, 196, 0.55)' },
+    legend: { name: 'Legend', col: '#FFC83D', glow: 'rgba(255, 200, 61, 0.6)' },
   };
+  const TITLE_WHY = { day1: 'Day 1: you were here in the very first week.', dev: 'DEV: you make this game.', legend: 'Legend: you ended a month in the top 5 of the leaderboard.' };
   const titleHtml = (id, big) => TITLES[id] ? `<span class="ptitle${big ? ' big' : ''}" style="--tc:${TITLES[id].col};--tg:${TITLES[id].glow}"><i aria-hidden="true"></i>${esc(TITLES[id].name)}<i aria-hidden="true"></i></span>` : '';
-  // a gamertag with its title under it
+  // a username with its title under it
   const nameplate = (tag, title, cls = '') => `<span class="nameplate ${cls}"><span class="np-tag">${esc(tag)}</span>${titleHtml(title)}</span>`;
   const TITLES_SEEN = 'pb-titles-seen'; // { playerId: [title ids already announced on this phone] }
   function titlesUnseen() {
@@ -2536,24 +2585,28 @@ html.pc .corner button span { display: inline; }
     document.documentElement.classList.toggle('home', on);
     $('home').hidden = !on;
     if (on) paintHomeBg();
-    homeWiz(on && home.screen !== 'welcome' && home.screen !== 'signup' && home.screen !== 'login');
+    homeWiz(on && WIZ_PC && home.screen !== 'welcome' && home.screen !== 'signup' && home.screen !== 'login');
   }
-  // the Flame Wizard on the main menu: its body (the board's Flame shape) and a flickering fire cone, drawn every frame while shown
-  const wiz = { on: false, raf: 0, sparks: [] };
+  // the Flame Wizard on the main menu: the 3D model as a still picture and its fire cone, frozen; a tap on him (or the text)
+  // plays the blast for 1 second (WIZ_PLAY_MS): the cone flickers, sparks fly and BABABABABA shakes, then it freezes again
+  const WIZ_PLAY_MS = 1000;
+  const WIZ_PC = matchMedia('(hover: hover) and (pointer: fine)').matches; // computers only (a mouse): never on phones or tablets
+  const wiz = { on: false, raf: 0, sparks: [], until: 0, t0: 0, hit: null, frame: null };
   function homeWiz(on) {
     const box = $('home-wiz');
     if (on === wiz.on) return;
     wiz.on = on; box.hidden = !on;
     if (!on) { cancelAnimationFrame(wiz.raf); wiz.raf = 0; return; }
-    box.style.animation = 'none'; void box.offsetWidth; box.style.animation = ''; // slide in again each time the menu opens
-    const cv = $('home-wiz-cv'), g = cv.getContext('2d'), t0 = performance.now();
+    const cv = $('home-wiz-cv'), g = cv.getContext('2d');
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const frame = (now) => {
       if (!wiz.on) return;
       const r = cv.getBoundingClientRect(), W = Math.round(r.width), H = Math.round(r.height), dpr = Math.min(2, window.devicePixelRatio || 1);
       if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
       g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-      const t = still ? 0 : (now - t0) / 1000;
+      const playing = !still && now < wiz.until, t = playing ? (now - wiz.t0) / 1000 : 0;
+      if (!playing) wiz.sparks = [];
+      box.classList.toggle('go', playing);
       const R = Math.max(27, Math.min(40, W / 14)), x = R * 1.25, y = H * 0.62;
       // the picture (when ready): its feet just under y; the fire comes out of the staff's tip (at 86% across, 42% down the picture: the middle of the staff)
       const ph = Math.min(R * 4.4, H * 0.7), pw = wiz.pic ? ph * wiz.pic.width / wiz.pic.height : 0, px = x - pw * 0.5, py = y + R * 1.3 - ph;
@@ -2570,7 +2623,7 @@ html.pc .corner button span { display: inline; }
         g.arc(tip, ty, len * k, -hh, hh); g.closePath(); g.fill();
       }
       // sparks blown out along the cone
-      if (!still && wiz.sparks.length < 40) for (let i = 0; i < 2; i++) wiz.sparks.push({ a: (Math.random() * 2 - 1) * half * 0.9, d: R * 0.3, v: reach * (0.9 + Math.random() * 0.8), s: 1.5 + Math.random() * 2.5 });
+      if (playing && wiz.sparks.length < 40) for (let i = 0; i < 2; i++) wiz.sparks.push({ a: (Math.random() * 2 - 1) * half * 0.9, d: R * 0.3, v: reach * (0.9 + Math.random() * 0.8), s: 1.5 + Math.random() * 2.5 });
       wiz.sparks = wiz.sparks.filter(p => (p.d += p.v / 60) < reach);
       for (const p of wiz.sparks) {
         const f = p.d / reach; g.globalAlpha = 1 - f;
@@ -2581,11 +2634,25 @@ html.pc .corner button span { display: inline; }
       // the wizard: the 3D board's Flame Wizard model, rendered once as a still picture (the 2D shape until it's ready, or if 3D can't start)
       if (wiz.pic) g.drawImage(wiz.pic, px, py, pw, ph);
       else Shapes.body(g, 'flame', x, y, R, 1, '#b95018', Art.css('--you') || '#4FA3FF');
-      if (!still) wiz.raf = requestAnimationFrame(frame);
+      const wpx = wiz.pic ? px : x - R, wpw = wiz.pic ? pw : R * 2, wpy = wiz.pic ? py : y - R * 1.4, wph = wiz.pic ? ph : R * 2.6;
+      wiz.hit = { x: r.left + wpx, y: r.top + wpy, w: wpw, h: wph }; // where a tap starts the blast (page coordinates)
+      wiz.raf = playing ? requestAnimationFrame(frame) : 0; // frozen: nothing more to draw until the next tap
     };
+    wiz.frame = frame;
     wiz.raf = requestAnimationFrame(frame);
-    if (!wiz.pic && !wiz.loading) wiz.loading = wizPic().then(c => { wiz.pic = c; if (still && wiz.on) requestAnimationFrame(frame); }, e => console.warn('No Mans Land: menu wizard stays 2D.', e));
+    if (!wiz.pic && !wiz.loading) wiz.loading = wizPic().then(c => { wiz.pic = c; if (wiz.on && !wiz.raf) wiz.raf = requestAnimationFrame(frame); }, e => console.warn('No Mans Land: menu wizard stays 2D.', e));
   }
+  // a tap on the wizard or his BABABABABA (not on a button, or with a popup open) plays the blast
+  $('home').addEventListener('click', (e) => {
+    if (!wiz.on || !wiz.frame || e.target.closest('button, a, input, select, textarea, label, .pop-back, [role="dialog"]')) return;
+    const h = wiz.hit, tb = document.querySelector('#home-wiz .baba').getBoundingClientRect();
+    const inR = (x, y, w, hh) => e.clientX >= x && e.clientX <= x + w && e.clientY >= y && e.clientY <= y + hh;
+    if (!(h && inR(h.x, h.y, h.w, h.h)) && !inR(tb.left, tb.top, tb.width, tb.height)) return;
+    const now = performance.now();
+    if (now >= wiz.until) wiz.t0 = now;
+    wiz.until = now + WIZ_PLAY_MS;
+    if (!wiz.raf) wiz.raf = requestAnimationFrame(wiz.frame);
+  });
   // draws the Flame Wizard model (Models3D 'wizard:flame') once, standing still and turned three-quarters to the right
   const WIZ_TURN = Math.PI * 1.75; // faces -z; this turns it three-quarters to the right, its staff on the fire's side
   async function wizPic() {
@@ -2666,7 +2733,7 @@ html.pc .corner button span { display: inline; }
     $('w-signup').addEventListener('click', () => { home.screen = 'signup'; home.msg = ''; drawHome(); });
     $('w-guest').addEventListener('click', playAsGuest);
   }
-  // Play as guest: a guest account on the server (a gamertag of its own); without the server, straight to the menu
+  // Play as guest: a guest account on the server (a username of its own); without the server, straight to the menu
   async function playAsGuest() {
     if (home.busy) return;
     if (acct) { homeDone(); return; }
@@ -2676,16 +2743,16 @@ html.pc .corner button span { display: inline; }
     if (r.status === 200) acctTake(r);
     homeDone();
   }
-  // Sign up (its own screen: a gamertag, then Google or a guest with that name) and Log in (Google)
+  // Sign up (its own screen: a username, then Google or a guest with that name) and Log in (Google)
   function drawSignIn(el) {
     const up = home.screen === 'signup';
     el.innerHTML = `<div>${titleImg()}</div><div class="home-mid">
         <div class="home-card">
           <h3>${up ? 'Sign up' : 'Log in'}</h3>
-          ${up ? `<p class="hint" style="margin:0">Pick your gamertag. Sign up with Google to keep your account on any phone or computer, or just make a guest account on this one.</p>
-            <span class="hint">Gamertag</span>
-            <input class="tour-in" id="su-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Gamertag" placeholder="2–16 letters" value="${esc(home.tag || '')}">`
-          : '<p class="hint" style="margin:0">Log in with the Google account you signed up with. You get your gamertag, match history and ranked results back on this device.</p>'}
+          ${up ? `<p class="hint" style="margin:0">Pick your username. Sign up with Google to keep your account on any phone or computer, or just make a guest account on this one.</p>
+            <span class="hint">Username</span>
+            <input class="tour-in" id="su-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Username" placeholder="2–16 letters" value="${esc(home.tag || '')}">`
+          : '<p class="hint" style="margin:0">Log in with the Google account you signed up with. You get your username, match history and ranked results back on this device.</p>'}
           <div id="acct-google" class="acct-google"></div>
           <p class="acct-trust">Sign-in is handled by Google. We never see your password or email.</p>
           ${up ? '<button class="btn" id="su-guest">Sign up as a guest instead</button>' : ''}
@@ -2699,13 +2766,13 @@ html.pc .corner button span { display: inline; }
     $('si-other').addEventListener('click', () => { home.screen = up ? 'login' : 'signup'; home.msg = ''; drawHome(); });
     if ($('su-guest')) $('su-guest').addEventListener('click', async () => {
       const tag = (tagIn.value || '').trim();
-      if (tag && !cleanTagOk(tag)) { signMsg('Gamertags are 2–16 letters, digits, spaces, _ . or -.'); return; }
+      if (tag && !cleanTagOk(tag)) { signMsg('Usernames are 2–16 letters, digits, spaces, _ . or -.'); return; }
       signMsg('One moment…');
       const r = await acctCall('guest', tag ? { tag } : {});
       if (r.status !== 200) { signMsg(acctFail(r)); return; }
       acctTake(r); homeDone();
     });
-    acctUi.after = async (r) => { // Google said yes (acctGoogle): Sign up keeps the gamertag typed here
+    acctUi.after = async (r) => { // Google said yes (acctGoogle): Sign up keeps the username typed here
       const tag = up && tagIn ? tagIn.value.trim() : '';
       if (tag && cleanTagOk(tag) && r.linked === 'new') await acctCall('tag', { tag }, true).then(x => { if (x.status === 200) acctTake(x); });
       if (phase === 'start') homeDone();
@@ -2757,7 +2824,7 @@ html.pc .corner button span { display: inline; }
           <span class="eyebrow">${titlesUnseen().length > 1 ? 'New titles' : 'New title'}</span>
           <h3 id="title-h">You have received a new Title!</h3>
           <div class="tp-list">${titlesUnseen().map(t => titleHtml(t, true)).join('')}</div>
-          <p class="hint" style="margin:0">${titlesUnseen().map(t => t === 'day1' ? 'Day 1: you were here in the very first week.' : t === 'dev' ? 'DEV: you make this game.' : '').join(' ')} It shows under your name. Change it any time in Profile.</p>
+          <p class="hint" style="margin:0">${titlesUnseen().map(t => TITLE_WHY[t] || '').join(' ')} It shows under your name. Change it any time in Profile.</p>
           <button class="hbtn gold" id="title-ok">Nice!</button>
         </div></div>` : ''}`;
     wirePlayer();
@@ -2774,7 +2841,7 @@ html.pc .corner button span { display: inline; }
     $('lb-open').addEventListener('click', openLeaderboard);
     if ($('tours-open')) $('tours-open').addEventListener('click', openToursSheet);
     if ($('resume')) $('resume').addEventListener('click', () => resumeHost(resume));
-    if ($('net-resume')) $('net-resume').addEventListener('click', () => srvJoin(netBack.code, { key: netBack.key, side: netBack.side }));
+    if ($('net-resume')) $('net-resume').addEventListener('click', () => netBack.duo ? duoJoin(netBack.code, netBack.key) : srvJoin(netBack.code, { key: netBack.key, side: netBack.side }));
     if ($('tour-back')) $('tour-back').addEventListener('click', () => { tour.menu = false; showStart(); });
     if (home.pop) wirePop();
     if (!home.asked) rankedCheck();
@@ -2816,7 +2883,7 @@ html.pc .corner button span { display: inline; }
       </div>`}
       <div class="bar">
         <span class="hint">Have a code?</span>
-        <span class="joinrow"><input id="code-in" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Match code" placeholder="CODE"><button class="btn" id="join">Join</button></span>
+        <span class="joinrow"><input id="code-in" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Match code" placeholder="CODE"><button class="btn" id="join">Join</button></span>
       </div>
       <span class="hint" id="join-msg" aria-live="polite" hidden></span>
       ${sampleFn ? `<button class="btn primary" id="vs-claude">Play vs Claude</button>` : ''}
@@ -2824,6 +2891,7 @@ html.pc .corner button span { display: inline; }
       ${devMode() ? `<details class="settings"><summary>Developer<span>more modes</span></summary><div class="settings-body">
         <div class="bar"><span class="hint">${factionsReady() ? 'Factions: draft two factions each.' : 'Factions mode: coming soon.'}</span><button class="btn small" id="factions-ai" ${factionsReady() ? '' : 'disabled'}>Factions vs AI</button></div>
         <div class="bar"><span class="hint">${devReady() ? 'Buildings, Powers and spells on the big board.' : 'No factions yet.'}</span><button class="btn small" id="devtest-ai" ${devReady() ? '' : 'disabled'}>Factions – devtest</button></div>
+        <div class="bar"><span class="hint">2v2: two boards side by side. Invite three players, set the teams.</span><button class="btn small" id="duo-new">2v2 lobby</button></div>
         ${TEST ? `<div class="bar"><span class="hint">Level-up cost (test setting)</span><div class="seg" role="group" aria-label="Level-up cost">${[50, 75].map(c => `<button data-c="${c}" aria-pressed="${Game.CONFIG.levelCostPerTier === c}">${c} gold</button>`).join('')}</div></div>` : ''}
         <div class="bar"><span class="hint">${customSet ? `Your ${units.length} Counter Lab units` : `${units.length} built-in units`}${reportDb ? '. Matches are saved for Claude to review.' : ''}</span>
           <span class="btnrow"><button class="btn small" id="load-units">Load units</button><a class="btn small" id="lab-link" href="lab.html" style="text-decoration:none;color:inherit;display:inline-block">Counter Lab</a></span></div>
@@ -2844,6 +2912,7 @@ html.pc .corner button span { display: inline; }
     }));
     if ($('factions-ai')) $('factions-ai').addEventListener('click', () => { matchKind = 'factions'; startAiMatch(); });
     if ($('devtest-ai')) $('devtest-ai').addEventListener('click', () => { matchKind = 'devtest'; startAiMatch(); });
+    if ($('duo-new')) $('duo-new').addEventListener('click', () => duoHost());
     if ($('vs-claude')) $('vs-claude').addEventListener('click', startClaudeMatch);
     if ($('load-units')) $('load-units').addEventListener('click', openLoader);
     if ($('tour-new')) $('tour-new').addEventListener('click', () => tourCreate());
@@ -2851,6 +2920,7 @@ html.pc .corner button span { display: inline; }
     const joinNow = () => {
       const c = $('code-in').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (c.length === 4) { tourJoin(c); return; } // a tournament
+      if (c.length === DUO_CODE_LEN) { duoJoin(c); return; } // a 2v2 match
       if (c.length !== 5) { $('join-msg').hidden = false; $('join-msg').textContent = 'Match codes are 5 letters and numbers, tournament codes 4.'; return; }
       if (srvOk()) srvJoin(c, { typed: true }); else joinMatch(c); // the game server first (an older phone-to-phone match: see 'nomatch')
     };
@@ -2882,7 +2952,7 @@ html.pc .corner button span { display: inline; }
   function openToursSheet() { // developers only (Vilhelm, 2026-11-02); joining by code or link stays open to everyone
     if (!devMode()) return;
     $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Tournaments</h3><button class="btn small" id="close">Close</button></div>
-      <p class="hint" style="margin:0">Invite friends to a tournament: brackets, gamertags, your rules. Got a tournament code? Type it under Play → Have a code.</p>
+      <p class="hint" style="margin:0">Invite friends to a tournament: brackets, usernames, your rules. Got a tournament code? Type it under Play → Have a code.</p>
       <span class="btnrow"><button class="btn primary" id="tour-new">Host a tournament</button><button class="btn" id="tour-practice">Practice vs bots</button></span>`;
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', closeSheet);
@@ -2902,9 +2972,17 @@ html.pc .corner button span { display: inline; }
     home.rankedOn = !!j.on; home.board = j;
     const pct = (r) => Math.round((r.w + r.t / 2) / Math.max(1, r.w + r.t + r.l) * 100);
     $('lb-msg').textContent = (j.rows.length ? 'Ranked best-of-3 series. Win share counts a tie as half a win.' : 'No ranked results yet. Play a ranked match against a friend to get on the board.') + (j.on ? '' : ' Ranked is switched off right now.');
+    // Legend (2026-11-03): the top 5 when the month ends (Stockholm time) get the gold title
+    const lg = j.legend && j.legend.top ? j.legend : null;
+    if (lg) {
+      const left = Math.max(0, (lg.ends - Date.now()) / 864e5);
+      const when = left >= 1 ? `${Math.floor(left)} day${Math.floor(left) === 1 ? '' : 's'} left this month.` : left * 24 >= 1 ? `${Math.floor(left * 24)} hours left this month.` : 'The month ends within the hour.';
+      $('lb-msg').insertAdjacentHTML('afterend', `<div class="lb-legend">${titleHtml('legend')}<p class="hint">Top ${lg.top} when the month ends earn the gold Legend title, theirs to keep. ${when}</p></div>`);
+    }
     if (!j.rows.length) return;
+    const top = lg ? lg.top : 0;
     $('lb').innerHTML = `<table class="lb"><thead><tr><th>#</th><th>Player</th><th>W</th><th>T</th><th>L</th><th>Win %</th></tr></thead><tbody>
-      ${j.rows.map((r, i) => `<tr class="${acct && r.id === acct.id ? 'me' : ''}"><td class="num">${i + 1}</td><td>${nameplate(r.tag, r.title, 'row')}</td><td class="num">${r.w}</td><td class="num">${r.t}</td><td class="num">${r.l}</td><td class="num">${pct(r)}%</td></tr>`).join('')}
+      ${j.rows.map((r, i) => `<tr class="${[acct && r.id === acct.id ? 'me' : '', i < top ? 'legend' : '', i === top - 1 && j.rows.length > top ? 'cut' : ''].join(' ').trim()}"><td class="num">${i + 1}</td><td>${nameplate(r.tag, r.title, 'row')}</td><td class="num">${r.w}</td><td class="num">${r.t}</td><td class="num">${r.l}</td><td class="num">${pct(r)}%</td></tr>`).join('')}
       </tbody></table>`;
   }
 
@@ -3005,10 +3083,11 @@ html.pc .corner button span { display: inline; }
     const iWon = sum.winner === me && !sum.timeout, iLost = sum.winner === foe() && !sum.timeout;
     const head = sum.timeout ? 'Time ran out' : iWon ? `Round ${sum.round} won` : iLost ? `Round ${sum.round} lost` : 'Draw';
     const cls = iWon ? 'you' : iLost ? 'foe' : '';
-    const them = foeName();
+    const duo = net.duo && mode === 'net' && sum.duo; // 2v2: the damage is the team's
+    const them = duo ? 'Their team' : foeName();
     const lines = [];
     if (sum.dmg[foe()]) lines.push(`${them} takes <b class="num">${sum.dmg[foe()]}</b> damage.`);
-    if (sum.dmg[me]) lines.push(`You take <b class="num">${sum.dmg[me]}</b> damage.`);
+    if (sum.dmg[me]) lines.push(`${duo ? 'Your team takes' : 'You take'} <b class="num">${sum.dmg[me]}</b> damage.`);
     if (!sum.dmg[0] && !sum.dmg[1]) lines.push('Nobody takes damage.');
     if (sum.towerFell && sum.towerFell[foe()]) lines.push(`You broke ${mode === 'claude' ? 'Claude’s' : 'the enemy’s'} tower${towerLoss(sum, foe()) ? `: −${towerLoss(sum, foe())} health for them` : ''}.`);
     if (sum.towerFell && sum.towerFell[me]) lines.push(`Your tower fell${towerLoss(sum, me) ? `: −${towerLoss(sum, me)} health` : ''}.`);
@@ -3304,8 +3383,8 @@ html.pc .corner button span { display: inline; }
   }
 
   // ---------- account (server step 5) ----------
-  // A guest id and gamertag from the server, kept on this phone; "Sign in with Google" keeps it on any phone. Nothing
-  // else uses it yet: matches and tournaments still go by gamertag (linking them comes after the 2026-11-08 tournament).
+  // A guest id and username from the server, kept on this phone; "Sign in with Google" keeps it on any phone. Nothing
+  // else uses it yet: matches and tournaments still go by username (linking them comes after the 2026-11-08 tournament).
   // The session token goes only in the Authorization header. Google's script loads only when the sheet opens.
   const GOOGLE_CLIENT_ID = '732949481177-ikom5gqq07pt0sg89km9mth5d9ibfvmi.apps.googleusercontent.com';   // public OAuth client id (Google Cloud Console); empty = Google sign-in off
   const ACCT_STORE = 'phonebellum.account.v1';
@@ -3349,8 +3428,8 @@ html.pc .corner button span { display: inline; }
   function acctFail(r) {
     if (r.status === 503 && r.error === 'accounts off') { acctUi.off = true; return 'Accounts aren’t switched on yet on the game server.'; }
     if (r.status === 429) return 'Too many tries from this network. Wait a while and try again.';
-    if (r.status === 429 && r.error === 'too soon') return `You can change your gamertag once a week. Next change: ${tagWhen(r.next)}.`;
-    if (r.status === 400 && r.error === 'bad tag') return 'Gamertags are 2–16 letters, digits, spaces, _ . or -.';
+    if (r.status === 429 && r.error === 'too soon') return `You can change your username once a week. Next change: ${tagWhen(r.next)}.`;
+    if (r.status === 400 && r.error === 'bad tag') return 'Usernames are 2–16 letters, digits, spaces, _ . or -.';
     if (r.status === 401 && r.error === 'google token') return 'Google sign-in didn’t go through. Try again.';
     if (r.status === 401) { acctSave(null); return 'This phone was signed out. Make a new guest or sign in with Google.'; }
     if (r.status === 503 && r.error === 'google unavailable') return 'Couldn’t check with Google just now. Try again.';
@@ -3370,7 +3449,7 @@ html.pc .corner button span { display: inline; }
   const acctRename = (tag) => acctDo(async () => {
     const r = await acctCall('tag', { tag }, true);
     if (r.status !== 200) return acctFail(r);
-    acctTake(r); return 'Gamertag saved.';
+    acctTake(r); return 'Username saved.';
   });
   const acctGoogle = (credential) => acctDo(async () => {
     const r = await acctCall('google', { credential }, true);
@@ -3437,16 +3516,16 @@ html.pc .corner button span { display: inline; }
       <div style="text-align:center">${nameplate(a.tag, a.title, 'big')}</div>
       ${(a.titles || []).length ? `<span class="hint">Title under your name</span>
       <div class="seg" role="group" aria-label="Title">${a.titles.map(t => `<button data-title="${t}" aria-pressed="${a.title === t}" ${dis}>${esc(TITLES[t].name)}</button>`).join('')}<button data-title="" aria-pressed="${!a.title}" ${dis}>None</button></div>` : ''}
-      <span class="hint">Your gamertag</span>
-      <span class="joinrow"><input class="tour-in" id="acct-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Your gamertag" value="${esc(a.tag)}" ${a.tagNext > now() ? 'disabled' : ''}><button class="btn" id="acct-tag-ok" ${dis} ${a.tagNext > now() ? 'disabled' : ''}>Save</button></span>
+      <span class="hint">Your username</span>
+      <span class="joinrow"><input class="tour-in" id="acct-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Your username" value="${esc(a.tag)}" ${a.tagNext > now() ? 'disabled' : ''}><button class="btn" id="acct-tag-ok" ${dis} ${a.tagNext > now() ? 'disabled' : ''}>Save</button></span>
       <p class="hint" style="margin:0">${a.dev ? 'Developer: change it any time.' : a.tagNext > now() ? `You can change it again on ${tagWhen(a.tagNext)}.` : 'You can change it once a week.'}</p>
       ${a.google ? '' : google}
       <span class="btnrow"><button class="btn" id="hist-open">Match history</button><button class="btn" id="acct-out" ${dis}>${acctUi.outSure ? 'Tap again to log out' : 'Log out'}</button></span>
-      ${acctUi.outSure && !a.google ? '<p class="hint" style="margin:0">A guest can’t log back in: sign up with Google first to keep this gamertag and your results.</p>' : ''}
+      ${acctUi.outSure && !a.google ? '<p class="hint" style="margin:0">A guest can’t log back in: sign up with Google first to keep this username and your results.</p>' : ''}
       <span class="btnrow"><button class="btn small" id="acct-del" ${dis}>${acctUi.sure ? 'Tap again to delete' : 'Delete account'}</button></span>
-      ${acctUi.sure ? '<p class="hint" style="margin:0">Deleting removes your gamertag and sign-in for good. Past match results stay, without your name.</p>' : ''}`
+      ${acctUi.sure ? '<p class="hint" style="margin:0">Deleting removes your username and sign-in for good. Past match results stay, without your name.</p>' : ''}`
     : `
-      <p class="hint" style="margin:0">No account needed to play. Make a guest to get a gamertag on this phone${GOOGLE_CLIENT_ID ? ', or sign in with Google to keep it on any phone' : ''}.</p>
+      <p class="hint" style="margin:0">No account needed to play. Make a guest to get a username on this phone${GOOGLE_CLIENT_ID ? ', or sign in with Google to keep it on any phone' : ''}.</p>
       <span class="btnrow"><button class="btn primary" id="acct-guest" ${dis}>Play as a guest</button><button class="btn" id="hist-open">Match history</button></span>
       ${google}
       ${GOOGLE_CLIENT_ID ? '' : '<p class="hint" style="margin:0">Sign in with Google is coming soon.</p>'}`;
@@ -3738,6 +3817,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     for (const name of list(mv.unlock)) { const ui = unitIdx(name); if (ui >= 0 && Game.unlock(m, 1, ui)) did.push(`unlocked ${units[ui].name}`); }
     trySkills();
     for (const id of list(mv.awaken)) { const sq = m.armies[1].find(s => s.id === int(id)); if (sq && Game.awaken(m, 1, sq.id)) did.push(`awakened ${units[sq.unit].name} (id ${sq.id})`); }
+    for (const h of m.armies[1]) if (Game.isHunter(m, h) && !Game.preyOf(m, 1, h)) { Game.aiHunt(m, 1); const p = Game.preyOf(m, 1, h), q = p && m.armies[0].find(x => x.id === p.squad); if (q) did.push(`Hunter marked your ${units[q.unit].name}`); } // its Hunters mark your priciest squad
     for (const id of list(mv.levelBuilding)) if (Game.levelBuilding(m, 1, String(id))) levels.push({ building: String(id), level: Game.buildingOf(m, 1, String(id)).level });
     if (mv.buildingSkills && typeof mv.buildingSkills === 'object') for (const id in mv.buildingSkills) if (Game.buyBuildingSkill(m, 1, id, String(mv.buildingSkills[id]))) { const kind = Game.recordOf(m, 1, id).id; did.push(`bought ${Game.buildingSkillInfo(kind, String(mv.buildingSkills[id])).name} at its ${buildingName(kind)}`); }
     const bribes = Math.max(0, Math.min(20, mv.bribe === true ? 1 : int(mv.bribe) || 0));
@@ -4145,7 +4225,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     phase = 'battle'; selected = null; deadline = 0; timeUp = false; watchSq = null;
     sfx('battle');
     battlePre = withUnits(pre); lastPre = battlePre;
-    bt = Game.startBattle(battlePre);
+    if (net.duo && net.duoPres && mode === 'net') duoBattle(); // 2v2: both lanes on the wide board
+    else bt = Game.startBattle(battlePre);
     fx = []; acc = 0; lastTs = 0;
     cam = { end: lastSummary && lastSummary.round === pre.round ? lastSummary.time : null, decided: false, on: false, k: 0, x: 0, y: 0 };
     closeSheet(); overlay(null); hud(); panelBattle(); render();
@@ -4230,6 +4311,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     }
     battlePre = null;
     inspect = null;
+    if (duoRestore()) bt = null; // 2v2: back to this phone's own lane (its board shows the squads after the fight)
     render();
     showResult(lastSummary);
   }
@@ -4241,6 +4323,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // drag one of your squads: this round's squads move for free; an older one only with the Move ability.
   // Returns true when a drag starts.
   function boardPress(t) {
+    if (pingKind) return false; // 2v2: a ping goes down on the tap
     if (!t || phase !== 'deploy' || !m || !editable() || choosingPack() || placingTower()) return false;
     if (guideMode != null) { // devtest: drag an arrow out of one of your squads
       const gs = Game.squadAt(m, me, t.col, t.row);
@@ -4313,6 +4396,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // a tap on a tile (2D or 3D board). It clears the range ring; tapping a squad shows its range and its sheet (a squad
   // of yours from this round is taken back with the X at its top right corner, see unplaceMarks)
   function boardTap(t) {
+    if (pingKind && net.duo) { duoPlacePing(t); return; } // 2v2: the ping picked in the panel
     if (phase === 'battle') { // a fight: a tap on a unit shows its card, and where its squad is walking now (intentMarks)
       const b = t && bodyAt(t); inspect = b && b !== inspect ? b : null; inspectCard();
       watchSq = inspect && inspect.squad >= 0 && !inspect.u.structure ? { side: inspect.side, id: inspect.squad } : null;
@@ -4364,6 +4448,12 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       }
       const gs = Game.squadAt(m, me, t.col, t.row);
       if (gs && Game.inBuilding(m, me, gs) && !(had && had.side === me && had.id === gs.id)) { rangeOf = { side: me, id: gs.id }; openSheet(gs.unit, gs, me); return; }
+    }
+    if (pickingHunt()) { // Hunter: the enemy squad on this tile gets this Hunter's mark
+      const fs = Game.squadAt(m, foe(), t.col, t.row), hid = huntPicking;
+      huntPicking = null;
+      if (fs && editable() && Game.huntMark(m, me, hid, fs.id)) changed(); else { render(); hud(); panelDeploy(); }
+      return;
     }
     if (pickingMark()) { // Mark Bounty: the enemy squad on this tile, after a check (it can't be moved once placed)
       const fs = Game.squadAt(m, foe(), t.col, t.row);
@@ -4716,7 +4806,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const w = $('wrap').getBoundingClientRect(), T = Game.TILE, C = Game.COLS, R = Game.ROWS;
     const tile = (x, y) => [x / T + (C - 1) / 2, (R - 1) / 2 - y / T];
     if (board3d) return (x, y) => { const [c, r] = tile(x, y), [sx, sy] = board3d.screenAt(c, r, 0); return [sx - w.left, sy - w.top]; };
-    const b = cv.getBoundingClientRect(), f = me === 1;
+    const b = cv.getBoundingClientRect(), f = me === 1, win = duoWin();
+    if (win) { // a phone's window on a 2v2 board (see Render2D's draw)
+      const t = b.width / win.cols, oy = Math.max(0, (b.height - R * t) / 2);
+      return (x, y) => { const [c, r] = tile(x, y); return [b.left - w.left + ((f ? C - 1 - c : c) - win.x + 0.5) * t, b.top - w.top + oy + ((f ? R - 1 - r : r) + 0.5) * t]; };
+    }
     const at = (x, y) => { const [c, r] = tile(x, y); return [b.left - w.left + ((f ? C - 1 - c : c) + 0.5) * b.width / C, b.top - w.top + ((f ? R - 1 - r : r) + 0.5) * b.height / R]; };
     if (!(phase === 'battle' && cam && cam.k > 0)) return at;
     const z = 1 + (CAM.zoom - 1) * cam.k, o = at(cam.x, cam.y); // the 2D battle cam zooms around its focus
@@ -4729,13 +4823,24 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     let tr = tapRange();
     if (tr && h && Math.abs(tr.x - h.x) < 1e-6 && Math.abs(tr.y - h.y) < 1e-6 && Math.abs(tr.r - h.r) < 1e-6) tr = null; // the same ring once
     const cinematic = board3d && board3d.camera.level() >= 3; // the ground view shows no markers
+    Game.useGrid(m); // the board as drawn
     let html = '';
-    if (!cinematic && m && (phase === 'deploy' || phase === 'battle')) html += intentMarks(wrapMap());
+    if (!cinematic && m && !(matePeek && duoSplit()) && (phase === 'deploy' || phase === 'battle')) html += intentMarks(wrapMap());
+    if (net.duo) html += pingMarks(cinematic ? null : wrapMap());
     if (!cinematic && m && phase === 'deploy') for (const sd of [0, 1]) { // Mark Bounty: crosshairs on the marked squad
       const k = Game.markOn(m, sd) && Game.markShown(m, me, true, sd) ? Game.markOf(m, sd) : null, q = k && m.armies[1 - sd].find(x => x.id === k.squad);
       if (!q) continue;
       const at = wrapMap(), n = Game.footprint(m, q.unit), c = Game.tileToWorld(q.col + (n - 1) / 2, q.row + (n - 1) / 2), [x, y] = at(c.x, c.y), r = 14;
       html += `<g class="markx" style="stroke:${sd === me ? 'var(--gold)' : 'var(--foe)'}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}"/><path d="M${(x - r - 5).toFixed(1)} ${y.toFixed(1)}h10M${(x + r - 5).toFixed(1)} ${y.toFixed(1)}h10M${x.toFixed(1)} ${(y - r - 5).toFixed(1)}v10M${x.toFixed(1)} ${(y + r - 5).toFixed(1)}v10"/></g>`;
+    }
+    if (!cinematic && m && phase === 'deploy') for (const sd of [0, 1]) { // Hunter: a smaller crosshair on each squad a Hunter marked
+      const ids = new Set(m.armies[sd].map(hq => Game.isHunter(m, hq) ? Game.preyShown(m, me, true, sd, hq) : null).filter(v => v != null));
+      for (const id of ids) {
+        const q = m.armies[1 - sd].find(x => x.id === id);
+        if (!q) continue;
+        const at = wrapMap(), n = Game.footprint(m, q.unit), c = Game.tileToWorld(q.col + (n - 1) / 2, q.row + (n - 1) / 2), [x, y] = at(c.x, c.y), r = 9;
+        html += `<g class="markx hunt" style="stroke:${sd === me ? 'var(--gold)' : 'var(--foe)'}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" stroke-dasharray="3 2"/><path d="M${(x - r - 4).toFixed(1)} ${y.toFixed(1)}h8M${(x + r - 4).toFixed(1)} ${y.toFixed(1)}h8M${x.toFixed(1)} ${(y - r - 4).toFixed(1)}v8M${x.toFixed(1)} ${(y + r - 4).toFixed(1)}v8"/></g>`;
+      }
     }
     if ((h || tr || tiles.length || ring) && !cinematic) {
       const at = wrapMap(), pt = (x, y) => at(x, y).map(v => v.toFixed(1)).join(',');
@@ -4845,6 +4950,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         if (!want3d) return; // switched back to 2D while loading
         el.className = 'board3d';
         cv.after(el);
+        three = THREE;
+        { const v0 = boardView(); if (v0.m) Game.useGrid(v0.m); } // its ground and camera are built for one grid: the one it draws
         b = Render3D(THREE, el, boardView, { onTap: boardTap, onPress: boardPress, onDrag: boardDrag, onDrop: boardDrop, onHover: boardHover, placing: () => phase === 'deploy', onInput: wake3d });
         const can = el.querySelector('canvas');
         can.setAttribute('aria-label', cv.getAttribute('aria-label'));
@@ -4909,6 +5016,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     raf3d = 0;
     if (!board3d) return;
     board3d.draw();
+    if (mateB && mateB.kind === '3d' && mateB.on) mateB.r.draw();
     boardMarks();
     meterFrame(ts);
     if (board3d && (phase === 'battle' || !board3d.still() || performance.now() < wakeUntil)) raf3d = requestAnimationFrame(frame3d);
@@ -5031,9 +5139,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
           ? `<span class="chip" style="color:var(--foe);border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px">${foeName()} has it</span>` : `<span class="hint">Not bought</span>`;
       }
       const anyOf = Game.skillNeedsAny(m, i, k).map(j => defs[j].name), label = evolve ? 'Evolve' : wake ? 'Awaken' : Game.isMaster(m, i, k) ? 'Master' : '';
-      const more = evolve ? `Not bought: a squad evolves by itself, free, after the fight ${d.needs === 'glutMax' ? 'that fills its Glut' : 'it meets the need in'}, and keeps it all match. Enzo’s squads evolve too.`
+      const detail = d.text ? esc(Engine.describeSkill({ ...d, text: '' })) : ''; // a skill with a short text of its own: the full rules when held
+      const more0 = evolve ? `Not bought: a squad evolves by itself, free, after the fight ${d.needs === 'glutMax' ? 'that fills its Glut' : 'it meets the need in'}, and keeps it all match. Enzo’s squads evolve too.`
         : [anyOf.length ? `<b style="color:var(--gold)">Needs</b> ${esc(anyOf.join(' or '))} first.` : '',
         wake ? 'Bought for one squad at a time, on its own sheet. You can awaken only one unit type a match.' : label ? 'For all your squads of this unit.' : '', Game.isFlat(m, i, k) ? 'Always this price.' : ''].filter(Boolean).join(' ');
+      const more = [detail, more0].filter(Boolean).join('<br>');
       return upRow({ name: d.name, label, act, text: esc(Engine.describeSkill(d)), more });
     };
     // in slot order; either-or skills (owning one rules out the others) boxed together where the first of them comes
@@ -5050,10 +5160,19 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function awakenAct(i, k, side, sq) {
     const chip = (txt, col) => `<span class="chip" style="color:${col};border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px">${txt}</span>`;
     const mine = side === undefined || side === me, cost = Game.skillCost(m, i, k);
-    if (!mine) return sq && (Game.seenAwake(m, sq) || (phase !== 'deploy' && sq.awaken > 0)) ? chip('Awakened', 'var(--foe)') : `<span class="hint">${sq ? 'Not awakened' : 'Per squad'}</span>`;
+    const preyName = (sd) => { const id = sq && Game.isHunter(m, sq) ? Game.preyShown(m, me, phase === 'deploy', sd, sq) : null, q = id != null && m.armies[1 - sd].find(x => x.id === id); return q ? esc(units[q.unit].name) : ''; };
+    if (!mine) { const pn = preyName(side); return sq && (Game.seenAwake(m, sq) || (phase !== 'deploy' && sq.awaken > 0)) ? chip('Awakened', 'var(--foe)') + (pn ? ' ' + chip(`Marks your ${pn}`, 'var(--foe)') : '') : `<span class="hint">${sq ? 'Not awakened' : 'Per squad'}</span>`; }
     const woke = Game.wokeUnit(m, me), other = woke != null && woke !== i; // one unit type a match
     if (!sq) { const n = m.armies[me].filter(q => q.unit === i && q.awaken > 0).length; return `<span class="hint">${other ? `You awakened ${esc(units[woke].name)}` : `${n ? `${n} awakened · ` : ''}${cost} gold a squad`}</span>`; }
-    if (sq.awaken > 0) return chip('Awakened', 'var(--gold)') + (phase === 'deploy' && editable() && sq.awaken === m.round ? ` <button class="btn small" data-act="unawaken">Undo</button>` : '');
+    if (sq.awaken > 0) {
+      let hunt = ''; // Hunter: its mark on an enemy squad
+      if (Game.isHunter(m, sq)) {
+        const pn = preyName(me), now = !!(sq.prey && sq.prey.round === m.round && pn);
+        if (pn) hunt += ' ' + chip(`Marks their ${pn}`, 'var(--gold)');
+        if (phase === 'deploy' && editable()) hunt += ` <button class="btn small${pn ? '' : ' primary'}" data-act="hunt">${pn ? 'Move mark' : 'Place mark'}</button>` + (now ? ` <button class="btn small" data-act="unhunt">Undo mark</button>` : '');
+      }
+      return chip('Awakened', 'var(--gold)') + (phase === 'deploy' && editable() && sq.awaken === m.round ? ` <button class="btn small" data-act="unawaken">Undo</button>` : '') + hunt;
+    }
     if (phase !== 'deploy') return `<span class="hint">${cost} gold</span>`;
     const why = { enzo: 'Not with Enzo', type: other ? `Only ${esc(units[woke].name)} this match` : '', glut: `Needs ${Game.glutMax(m, me, sq)} Glut (${Game.glutOf(sq)} now)`, needs: `Needs ${Game.skillNeedsMissing(m, me, i, k).map(j => units[i].skillDefs[j].name).join(' or ')}`, or: 'Not with your skills', gold: `Need ${cost} gold` }[Game.awakenBlock(m, me, sq)] || '';
     return why || !editable() ? `<button class="btn small" disabled>${why || `Awaken · ${cost} gold`}</button>` : `<button class="btn small primary" data-act="awaken">Awaken · ${cost} gold</button>`;
@@ -5597,6 +5716,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     on('take-back', () => { if (editable() && Game.unplaceSquad(m, me, sq.id)) after(); });
     on('awaken', () => { if (editable() && Game.awaken(m, me, sq.id)) after(); });
     on('unawaken', () => { if (editable() && Game.undoAwaken(m, me, sq.id)) after(); });
+    on('hunt', () => { if (!editable()) return; closeSheet(); markPicking = false; fortPlacing = false; huntPicking = sq.id; render(); hud(); panelDeploy(); });
+    on('unhunt', () => { if (editable() && Game.undoHunt(m, me, sq.id)) after(); });
     root.querySelectorAll('[data-skill]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.buySkill(m, me, i, +b.dataset.skill)) after(); }));
     root.querySelectorAll('[data-bplace]').forEach(b => b.addEventListener('click', () => { if (!editable()) return; buildPlacing = { ui: i, k: +b.dataset.bplace }; closeSheet(); render(); hud(); panelDeploy(); }));
     root.querySelectorAll('[data-unskill]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.undoSkill(m, me, i, +b.dataset.unskill)) after(); }));
@@ -5752,7 +5873,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // the guest sends its own deployments and plays back the same battle.
   // =====================================================================
   const net = { peer: null, conn: null, code: '', connected: false, retryTimer: 0, tries: 0, alive: false, specs: new Set(), // specs: spectators' connections (host)
-    srv: false, ws: null, ping: 0, key: '', create: false, typed: false, welcomed: false, tourCode: '', watch: false, foeHere: false, seq: 0, pending: [], replaying: false }; // a match on the game server (see srvOpen)
+    srv: false, ws: null, ping: 0, key: '', create: false, typed: false, welcomed: false, tourCode: '', watch: false, foeHere: false, seq: 0, pending: [], replaying: false, // a match on the game server (see srvOpen)
+    duo: false, duoInfo: null, duoPres: null, duoHost: false, duoLobby: null }; // a 2v2 match (src/duo.js, see duoHost)
   const peerOpts = () => {
     const o = { debug: 1 };
     if (qs.get('peerhost')) { o.host = qs.get('peerhost'); o.port = +qs.get('peerport') || 9000; o.path = qs.get('peerpath') || '/'; o.secure = qs.get('peersecure') === '1'; }
@@ -5782,11 +5904,12 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     try { if (net.ws) net.ws.close(); } catch (e) {}
     clearInterval(net.ping);
     net.peer = null; net.conn = null; net.connected = false; net.code = ''; net.tries = 0;
-    Object.assign(net, { srv: false, ws: null, key: '', create: false, typed: false, welcomed: false, tourCode: '', watch: false, foeHere: false, seq: 0, pending: [], replaying: false });
+    Object.assign(net, { srv: false, ws: null, key: '', create: false, typed: false, welcomed: false, tourCode: '', watch: false, foeHere: false, seq: 0, pending: [], replaying: false, duo: false, duoInfo: null, duoPres: null, duoHost: false, duoLobby: null });
+    duoRestore(); duoPings = []; duoToast = null;
     liveSpeed = [1, 1]; // a new live match starts at 1x
     // the address bar, not qs: joinMatch puts join= back in it after the first leaveNet
     const u = new URLSearchParams(location.search);
-    if (u.has('join') || u.has('play')) { u.delete('join'); u.delete('play'); qs.delete('join'); qs.delete('play'); history.replaceState(null, '', location.pathname + (u.toString() ? '?' + u : '')); }
+    if (u.has('join') || u.has('play') || u.has('duo')) { u.delete('join'); u.delete('play'); u.delete('duo'); qs.delete('join'); qs.delete('play'); qs.delete('duo'); history.replaceState(null, '', location.pathname + (u.toString() ? '?' + u : '')); }
   }
 
   // ----- host -----
@@ -5888,7 +6011,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function selectLink() { const r = document.createRange(); r.selectNodeContents($('link')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 
   function hostStartMatch() {
-    if (mode === 'net') { if (net.foeHere && me === 0 && !net.tourCode) send({ t: 'start', settings: srvSettings() }); return; } // the server starts it
+    if (mode === 'net') { if (net.duo) return; if (net.foeHere && me === 0 && !net.tourCode) send({ t: 'start', settings: srvSettings() }); return; } // the server starts it
     if (!net.connected) return;
     const tx = tourLive();
     if (!tx && matchKind === 'factions' && factionsReady()) { startDraft(); return; }
@@ -5931,6 +6054,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         delete q.from; delete q.movedRound; delete q.luckMove;
         if (q.charmGiven === m.round) { delete q.charm; delete q.charmGiven; } // Matteo's first stack, given this round
         if (q.awaken === m.round) delete q.awaken; // an awakening bought this round
+        if (q.prey) { const p = Game.preyShown(s, -2, true, 0, q); if (p == null) delete q.prey; else q.prey = { squad: p, round: Math.min(q.prey.round, m.round - 1) }; } // a Hunter's mark moved this round shows where it was
         return q;
       });
       if (s.moved) s.moved[0] = null;
@@ -6015,6 +6139,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       level: Math.max(0, Math.min(Engine.MAX_LEVEL, s.level | 0)), cost: Math.max(0, +s.cost || 0), ...(s.free ? { free: true } : {}), ...(s.gift ? { gift: true } : {}),
       ...(s.boughtLevels && typeof s.boughtLevels === 'object' ? { boughtLevels: s.boughtLevels } : {}),
       ...((a, h) => a > 0 && Game.awakenSlot(m, s.unit) >= 0 && (a === m.round || (h && h.awaken === a)) ? { awaken: a } : {})(s.awaken | 0, had.get(s.id | 0)), // this round's awakening as sent (gold was checked on their side), earlier ones as they were
+      ...(s.prey && Number.isInteger(s.prey.squad) ? { prey: { squad: s.prey.squad, round: Math.max(1, Math.min(m.round, s.prey.round | 0)), ...(Number.isInteger(s.prey.was) ? { was: s.prey.was, wasRound: Math.max(1, Math.min(m.round, s.prey.wasRound | 0)) } : {}) } } : {}), // a Hunter's mark (checked below)
 
       ...(s.from && (s.movedRound | 0) === m.round && (s.round | 0) < m.round && Number.isInteger(s.from.col) && Number.isInteger(s.from.row) ? { from: { col: s.from.col, row: s.from.row, ...(Number.isInteger(s.from.in) ? { in: s.from.in } : {}) }, movedRound: m.round, ...((s.luckMove | 0) === m.round ? { luckMove: m.round } : {}) } : {}),
     }));
@@ -6049,6 +6174,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     // one unit type a match: this round's awakenings of any other type than the one they may awaken don't count
     const woke = Game.wokeUnit(m, 1);
     for (const q of m.armies[1]) if (q.awaken === m.round && woke != null && q.unit !== woke) delete q.awaken;
+    for (const q of m.armies[1]) if (q.prey && (!Game.isHunter(m, q) || !Game.markTarget(m, 1, q.prey.squad))) delete q.prey; // a Hunter's mark: only an awakened Hunter's, on a squad it may mark
     m.gold[1] = Math.max(0, +d.gold || 0);
     m.extraDeploys[1] = Math.max(0, Math.min(Game.CONFIG.maxExtraDeploys, d.extra | 0));
     m.nextId[1] = Math.max(m.nextId[1], d.nextId | 0);
@@ -6365,7 +6491,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   const NET_STORE = 'phonebellum.net.v1'; // { code, key, side, ts }: a friend's match on the server, to come back to
   const srvOk = () => typeof WebSocket === 'function' && !qs.has('peer');
   const playLink = () => { const u = new URL(shareLink()); u.searchParams.delete('join'); u.searchParams.set('play', net.code); return u.toString(); };
-  function srvSave() { try { if (mode === 'net' && net.key && !net.tourCode) localStorage.setItem(NET_STORE, JSON.stringify({ code: net.code, key: net.key, side: me, ts: now() })); } catch (e) {} }
+  function srvSave() { try { if (mode === 'net' && net.key && !net.tourCode) localStorage.setItem(NET_STORE, JSON.stringify({ code: net.code, key: net.key, side: me, ts: now(), ...(net.duo ? { duo: true } : {}) })); } catch (e) {} }
   function srvForget() { try { localStorage.removeItem(NET_STORE); } catch (e) {} }
   // the built-in units for a server match (the server only plays those); the player's own come back after it
   function srvUnits() {
@@ -6399,13 +6525,14 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     net.alive = true;
     clearTimeout(net.retryTimer);
     let ws;
-    try { ws = new WebSocket(`${SERVER_URL.replace(/^http/, 'ws')}/room/${net.code}${net.tourCode ? '?t=' + net.tourCode : ''}`); } catch (e) { srvRetry(); return; }
+    try { ws = new WebSocket(`${SERVER_URL.replace(/^http/, 'ws')}/${net.duo ? 'duo' : 'room'}/${net.code}${net.tourCode ? '?t=' + net.tourCode : ''}`); } catch (e) { srvRetry(); return; }
     net.ws = ws;
     ws.onopen = () => {
       if (net.ws !== ws) return;
       net.connected = true; net.tries = 0;
       const hello = net.watch ? { watch: true } : net.tourCode ? { id: tour.myId, tkey: tour.key } : net.key ? { key: net.key } : net.create ? { create: true, ...(net.wantRanked ? { ranked: true } : {}) } : {};
-      if (acct && !net.watch && !net.tourCode) hello.session = acct.session; // who this is: ranked needs it, and the other phone shows the gamertag (never in the URL)
+      if (net.duo) delete hello.ranked;
+      if (acct && !net.watch && !net.tourCode) hello.session = acct.session; // who this is: ranked needs it, and the other phone shows the username (never in the URL)
       ws.send(JSON.stringify({ t: 'hello', ...hello }));
       clearInterval(net.ping); net.ping = setInterval(() => { if (net.ws === ws && ws.readyState === 1) ws.send('{"t":"ping"}'); }, 30000);
       netStatus();
@@ -6418,7 +6545,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       netStatus();
       if (phase === 'deploy' && mode === 'net') panelDeploy();
       // the game server can't be reached at all: a new friend's match goes phone to phone (PeerJS) instead
-      if (!net.welcomed && net.tries >= 1 && phase === 'lobby' && !m && !net.tourCode && !net.watch && !net.wantRanked && (net.create || net.typed) && peerAvailable()) {
+      if (net.duo && !net.welcomed && net.tries >= 3 && !m) { leaveNet(); overlayMsg('2v2', 'Can’t reach the game server. 2v2 only runs there.'); return; }
+      if (!net.duo && !net.welcomed && net.tries >= 1 && phase === 'lobby' && !m && !net.tourCode && !net.watch && !net.wantRanked && (net.create || net.typed) && peerAvailable()) {
         const code = net.code, typed = net.typed; leaveNet();
         if (typed) joinMatch(code); else hostLobby(true);
         return;
@@ -6457,6 +6585,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (me === 0) drawLobby(); else guestWaiting(net.foeHere ? 'Connected. Waiting for your friend to start the match' : 'Connected');
   }
   function srvRecv(d) {
+    if (net.duo && duoRecv(d)) return;
     if ('ranked' in d && d.t !== 'ack') net.ranked = d.ranked || null;
     if ('players' in d && d.t !== 'ack') { net.players = d.players || null; hud(); }
     if (d.t === 'welcome') {
@@ -6556,6 +6685,336 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function srvSpec(d) {
     if (d.t === 'sync' && d.m && !m) srvUnits();
     if (d.t === 'sync' || d.t === 'fight') specRecv(d);
+  }
+
+  // =====================================================================
+  // 2v2 (developer test, 2026-11-02; src/duo.js, server/src/duo.js). Two Standard boards side by side: each phone plays
+  // its own lane as a server match (mode 'net' with net.duo: the same deploy screen, actions and Ready as 1v1), the
+  // 2v2 room adds the seats and the teammate's lane (net.duoInfo), and the fight is played back on the wide board from
+  // both lanes as they stood (net.duoPres): m is the wide picture while it plays (Duo.view), then this lane again.
+  // Only a developer account can make a 2v2 lobby; anyone with the code (6 letters) or the link can join it.
+  // =====================================================================
+  const DUO_CODE_LEN = 6;
+  const newDuoCode = () => newCode() + CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  const duoLink = () => { const u = new URL(shareLink()); u.searchParams.delete('join'); u.searchParams.set('duo', net.code); return u.toString(); };
+  var duoKeep = null; // this phone's lane while the wide fight plays (m is the picture of both lanes then)
+  var duoView = null; // a phone's window on the wide board: { cols shown, half (one board's columns), full (all columns), x (first screen column), free (moved by hand) }
+  var matePeek = false; // a phone: the teammate's board in place of this one (a PC always shows both)
+  var mateB = null;     // the teammate's board: { kind: '2d' | '3d', el, r (its renderer), on, key }
+  var mateM = null, mateOf = null; // the teammate's lane as a match (made from net.duoInfo.mate when that changes)
+  var three = null;     // THREE, once the 3D board has loaded it (the teammate's 3D board uses it too)
+  var duoPings = [];   // pings showing: { from (seat), kind, lane, col, row, at }
+  var pingKind = null; // the ping the next tap on the board puts down
+  var duoToast = null; // a line from the team for the status bar: { text, until }
+  var duoPick = -1;   // the host's first tap when swapping two seats
+  function duoHost() {
+    if (!devMode()) { overlayMsg('2v2', 'Only developer accounts can make a 2v2 lobby for now. Ask a developer for the code.'); return; }
+    leaveNet();
+    mode = 'net'; me = 0; m = null; phase = 'lobby'; bt = null; battlePre = null; lastSummary = null; matchKind = 'standard';
+    net.srv = true; net.duo = true; net.create = true; net.key = ''; net.code = newDuoCode(); net.players = null; net.ranked = null;
+    duoPick = -1;
+    hud(); netStatus(); render();
+    drawDuoLobby();
+    srvOpen();
+  }
+  function duoJoin(code, key) {
+    leaveNet();
+    mode = 'net'; me = 0; m = null; phase = 'lobby'; bt = null; battlePre = null; lastSummary = null; matchKind = 'standard';
+    net.srv = true; net.duo = true; net.create = false; net.key = key || ''; net.code = code; net.players = null; net.ranked = null; net.typed = true;
+    duoPick = -1;
+    { const u = new URL(location.href.split('#')[0]); u.searchParams.delete('join'); u.searchParams.delete('play'); u.searchParams.set('duo', code); history.replaceState(null, '', u.toString()); } // a reload comes back to it
+    hud(); netStatus(); render();
+    guestWaiting('Connecting to 2v2 lobby ' + code);
+    srvOpen();
+  }
+  // messages only a 2v2 room sends (true: handled here); the rest go on to srvRecv as in 1v1
+  function duoRecv(d) {
+    if (d.t === 'welcome' && d.duo) {
+      net.welcomed = true; net.create = false;
+      me = d.side; net.key = d.key || net.key; net.seq = Math.max(net.seq, d.seq | 0); net.duoHost = !!d.host;
+      net.duoInfo = { ...(net.duoInfo || {}), seat: d.seat, lane: d.lane };
+      srvSave(); netStatus(); hud();
+      if (!m && phase === 'lobby') drawDuoLobby();
+      return true;
+    }
+    if (d.t === 'mark' || d.t === 'emote') { duoTalk(d); return true; }
+    if (d.t === 'mate') { net.duoInfo = { ...(net.duoInfo || {}), mate: d.mate || null }; if (duoSplit()) { syncMate(); boardMarks(); wake3d(); } return true; } // the teammate changed their board
+    if (d.t === 'duolobby') { net.duoLobby = d; net.duoHost = !!d.host; if (!m && phase === 'lobby') drawDuoLobby(); return true; }
+    if (d.t === 'taken') { net.code = newDuoCode(); net.create = true; const ws = net.ws; net.ws = null; try { ws.close(); } catch (e) {} drawDuoLobby(); srvOpen(); return true; }
+    if (d.t === 'nomatch' || d.t === 'full' || d.t === 'denied') {
+      const code = net.code;
+      leaveNet(); srvForget();
+      overlayMsg('2v2', d.t === 'nomatch' ? `Nobody has made 2v2 lobby ${code}.` : d.t === 'full' ? `2v2 lobby ${code} is full or its match has started.`
+        : d.why === 'dev' ? 'Only developer accounts can make a 2v2 lobby for now.' : d.why === 'kicked' ? 'The host took you out of the lobby.' : 'You can’t join this 2v2 match.');
+      return true;
+    }
+    if (d.t === 'forfeit' && d.duo) {
+      net.duoInfo = { ...(net.duoInfo || {}), ...d.duo };
+      if (d.side === me && d.seat !== net.duoInfo.seat) { leaveNet(); srvForget(); overlayMsg('Your teammate left', 'Your team lost the 2v2 match.'); return true; }
+      return false; // the other team left: as a forfeit in 1v1
+    }
+    if (d.duo) {
+      const mate = d.duo.mate === undefined && net.duoInfo ? net.duoInfo.mate : d.duo.mate;
+      net.duoInfo = { ...(net.duoInfo || {}), ...d.duo, mate };
+      if (d.t === 'fight') net.duoPres = d.duo.pres || null;
+      netStatus(); hud();
+    }
+    return false;
+  }
+  // the lobby: four seats in two teams. The host taps two seats to swap them (a player onto an empty seat moves them)
+  function drawDuoLobby(problem) {
+    const L = net.duoLobby, seats = L ? L.seats : [null, null, null, null], mine = net.duoInfo ? net.duoInfo.seat : -1, host = net.duoHost;
+    const seatBtn = (k) => {
+      const p = seats[k];
+      return `<button class="btn duo-seat${duoPick === k ? ' primary' : ''}" data-seat="${k}" ${host ? '' : 'disabled'} aria-pressed="${duoPick === k}" style="display:grid;gap:2px;min-width:0;text-align:left">
+        <span class="hint" style="margin:0">${Duo.SEAT_NAMES[k]} · lane ${Duo.SEATS[k].lane + 1}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p ? esc(p.tag) + (k === mine ? ' (you)' : '') + (p.here ? '' : ' · away') : '<span class="hint">Empty · AI plays</span>'}</span></button>`;
+    };
+    const team = (sd, name) => `<div style="display:grid;gap:6px;min-width:0"><span class="eyebrow">${name}</span>${[0, 1, 2, 3].filter(k => Duo.SEATS[k].side === sd).map(seatBtn).join('')}</div>`;
+    const n = seats.filter(Boolean).length;
+    overlay(`<div class="card">
+      <span class="eyebrow">2v2 lobby · developer test</span>
+      <span class="code" aria-label="Lobby code">${esc(net.code)}</span>
+      <p class="status ${n >= 4 ? '' : 'wait'}" id="lobby-status">${problem ? esc(problem) : !net.welcomed ? 'Setting up the lobby' : `${n} of 4 here${host ? (duoPick >= 0 ? ' · tap another seat to swap' : ' · tap two seats to swap them') : ' · the host sets the teams'}`}</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%">${team(0, 'Team A')}${team(1, 'Team B')}</div>
+      ${host ? `<button class="btn primary" id="duo-start" ${net.welcomed ? '' : 'disabled'}>Start${n < 4 ? ` (AI in ${4 - n} seat${4 - n > 1 ? 's' : ''})` : ''}</button>` : '<p class="hint" style="margin:0">Waiting for the host to start.</p>'}
+    </div>`);
+    const link = duoLink();
+    $('panel').innerHTML = `
+      <span class="hint">Two Standard boards side by side: A1 and B1 fight on the left board, A2 and B2 on the right. Each player deploys on their own board as in 1v1; in the fight units can cross to the other board. Each team shares one health of ${Duo.HP}.</span>
+      <div class="linkbox" id="link">${esc(link)}</div>
+      <div class="bar">
+        <span class="btnrow">
+          ${navigator.share ? '<button class="btn primary" id="share">Share link</button>' : ''}
+          <button class="btn ${navigator.share ? '' : 'primary'}" id="copy">Copy link</button>
+        </span>
+        <button class="btn" id="cancel">Leave</button>
+      </div>`;
+    if ($('share')) $('share').addEventListener('click', () => { navigator.share({ title: 'No Mans Land 2v2', text: `Join my 2v2 in No Mans Land! Code ${net.code}`, url: link }).catch(() => {}); });
+    $('copy').addEventListener('click', () => {
+      const done = () => { $('copy').textContent = 'Copied'; setTimeout(() => { if ($('copy')) $('copy').textContent = 'Copy link'; }, 1500); };
+      if (navigator.clipboard) navigator.clipboard.writeText(link).then(done, () => selectLink()); else selectLink();
+    });
+    $('cancel').addEventListener('click', () => { leaveNet(); srvForget(); showStart(); });
+    if ($('duo-start')) $('duo-start').addEventListener('click', () => { duoPick = -1; send({ t: 'start', settings: { skin: skinPick || '' } }); });
+    $('overlay').querySelectorAll('[data-seat]').forEach(b => b.addEventListener('click', () => {
+      if (!net.duoHost) return;
+      const k = +b.dataset.seat;
+      if (duoPick < 0 || duoPick === k) { duoPick = duoPick === k ? -1 : k; drawDuoLobby(); return; }
+      send({ t: 'seat', a: duoPick, b: k }); duoPick = -1; drawDuoLobby();
+    }));
+  }
+  // the fight: both lanes on the wide board
+  function duoBattle() {
+    duoKeep = m; // this lane after the fight (the server's post)
+    battlePre = withUnits(Duo.view(net.duoPres)); lastPre = battlePre;
+    m = battlePre;
+    bt = Duo.battle(net.duoPres.map(withUnits));
+    net.duoPres = null;
+    pingKind = null;
+    // on a phone the fight starts on this player's own board (their opponent in front of them): drag sideways to look
+    // at the other board, pinch (or double tap) to see the whole field. On a PC the whole field shows.
+    duoView = duoWindow();
+  }
+  function duoRestore() { duoView = null; pingKind = null; if (!duoKeep) return false; m = duoKeep; duoKeep = null; return true; }
+  // one board's columns (Standard) and the wide board's (both boards and the open strip between them)
+  const duoHalf = () => Game.MAPS.find(x => x.id === Duo.MAP).grid.cols, duoFull = () => 2 * duoHalf() + Duo.GAP;
+  // a fresh phone window over this player's own board
+  function duoWindow() {
+    const half = duoHalf(), full = duoFull(), lane = net.duoInfo ? net.duoInfo.lane : 0, c0 = lane === 0 ? 0 : half + Duo.GAP;
+    return { cols: half, half, full, x: me === 0 ? c0 : full - c0 - half, free: false };
+  }
+  // the wide board on show (the fight), else null
+  const shownWide = () => phase === 'battle' && m && m.duo ? m : null;
+  // ----- the teammate's board, beside this one (a PC) or in its place (a phone, Teammate's board) -----
+  // A board of its own: the teammate's lane as the team sees it (net.duoInfo.mate; the server sends it again on every
+  // change the teammate makes, so it is live), drawn by its own renderer (2D or 3D, as this player's board) and only
+  // to look at and ping on. This player's own board keeps working as in 1v1.
+  // 'pc' | 'phone' | null: how the two boards show now
+  function duoSplit() {
+    if (mode !== 'net' || !net.duo || !m || m.duo || !['deploy', 'result', 'end'].includes(phase) || !net.duoInfo || !net.duoInfo.mate) return null;
+    return pcLayout() ? 'pc' : matePeek ? 'phone' : null;
+  }
+  const mateLane = () => net.duoInfo ? 1 - net.duoInfo.lane : 1;
+  // the teammate's board is on the left of the screen (lane 0 is on the left of the field, as side 0 sees it)
+  const mateLeft = () => (mateLane() === 0) === (me === 0);
+  function mateMatch() {
+    const x = net.duoInfo && net.duoInfo.mate;
+    if (!x) return null;
+    if (mateOf !== x) { mateOf = x; mateM = withUnits(JSON.parse(JSON.stringify(x))); }
+    return mateM;
+  }
+  const mateView = () => ({ m: mateMatch(), me, phase: phase === 'battle' ? 'deploy' : phase, units, mode, bt: null, battlePre: null, fx: [], selected: null, moving: null, drag: null, hoverTile: null, rangeOf: null,
+    editable: false, placingUnit: null, placingElf: false, placingTower: false, placingWall: false, placingBuilding: null, dev: null, battleCam: null, placingBuilding: null, win: null });
+  function mateTap(t) {
+    if (!pingKind || !t) return;
+    const kind = pingKind;
+    pingKind = null;
+    send({ t: 'mark', kind, lane: mateLane(), col: t.col, row: t.row });
+    if (phase === 'deploy') panelDeploy();
+    render();
+  }
+  // makes, places, sizes and draws the teammate's board (called from render)
+  function syncMate() {
+    const sp = duoSplit(), wrap = $('wrap'), kind = board3d ? '3d' : '2d';
+    wrap.classList.toggle('duo-pc', sp === 'pc'); wrap.classList.toggle('duo-phone', sp === 'phone');
+    wrap.classList.toggle('mate-left', sp === 'pc' && mateLeft());
+    if (mateB && (mateB.kind !== kind || !sp)) {
+      if (mateB.kind !== kind) { try { if (mateB.r.dispose) mateB.r.dispose(); } catch (e) {} mateB.el.remove(); mateB.tag.remove(); mateB = null; }
+      else if (mateB.on) { mateB.on = false; mateB.el.hidden = true; mateB.tag.hidden = true; }
+    }
+    if (!sp) return;
+    if (!mateB) {
+      if (kind === '3d' && !three) return;
+      const el = kind === '3d' ? document.createElement('div') : document.createElement('canvas');
+      el.className = kind === '3d' ? 'board3d mate-board' : 'mate-board'; el.id = 'mate'; el.setAttribute('aria-label', 'Your teammate’s board');
+      wrap.insertBefore(el, $('clock'));
+      let r;
+      if (kind === '3d') r = Render3D(three, el, mateView, { onTap: mateTap, placing: () => false, onInput: wake3d });
+      else { r = Render2D(el, mateView); el.addEventListener('click', (ev) => mateTap(r.tileAt(ev.clientX, ev.clientY))); }
+      const tag = document.createElement('span'); tag.className = 'mate-tag'; tag.id = 'mate-tag';
+      wrap.insertBefore(tag, $('clock'));
+      mateB = { kind, el, r, on: false, key: '', tag };
+    }
+    const tagText = `${seatName(Duo.mateOf(net.duoInfo.seat))}’s board · teammate`;
+    if (mateB.tag.textContent !== tagText) mateB.tag.textContent = tagText;
+    const key = sp + (mateLeft() ? 'L' : 'R') + (wrap.getBoundingClientRect().width | 0) + 'x' + (wrap.getBoundingClientRect().height | 0);
+    if (!mateB.on) { mateB.on = true; mateB.el.hidden = false; mateB.tag.hidden = false; }
+    if (mateB.key !== key) { mateB.key = key; if (board3d) size(); requestAnimationFrame(() => { if (mateB) { mateB.r.size(); if (mateB.kind === '2d') mateB.r.draw(); } }); }
+    if (mateB.kind === '2d') mateB.r.draw();
+  }
+  // board metres on the teammate's board -> a point in #wrap (for its pings)
+  function mateMap() {
+    if (!mateB || !mateB.on) return null;
+    const w = $('wrap').getBoundingClientRect(), T = Game.TILE, C = duoHalf(), R = Game.ROWS, f = me === 1;
+    const tile = (x, y) => [x / T + (C - 1) / 2, (R - 1) / 2 - y / T];
+    if (mateB.kind === '3d') return (x, y) => { const [c, r] = tile(x, y), [sx, sy] = mateB.r.screenAt(c, r, 0); return [sx - w.left, sy - w.top]; };
+    const b = mateB.el.getBoundingClientRect();
+    return (x, y) => { const [c, r] = tile(x, y); return [b.left - w.left + ((f ? C - 1 - c : c) + 0.5) * b.width / C, b.top - w.top + ((f ? R - 1 - r : r) + 0.5) * b.height / R]; };
+  }
+  // the window the 2D board shows of the wide board on a phone (null: the whole board, as on a PC or the 3D board)
+  function duoWin() {
+    if (!duoView || pcLayout() || board3d || !shownWide()) return null;
+    return { aspect: duoView.half, cols: duoView.cols, x: Math.max(0, Math.min(duoView.full - duoView.cols, duoView.x)) };
+  }
+  // the 3D board on a phone: the camera starts over this player's own board (the battle cam's focus), until they
+  // move it themselves
+  function duoFocus() {
+    if (!duoView || pcLayout() || !board3d || duoView.free || !shownWide()) return null;
+    return { zoom: 1.6, x: (net.duoInfo && net.duoInfo.lane === 1 ? 1 : -1) * (duoView.half + Duo.GAP) * Game.TILE / 2, y: 0, k: 0.45 };
+  }
+  // gestures on the 2D wide board on a phone: one finger drags sideways, two pinch, a double tap swaps between this
+  // board and the whole field
+  {
+    const pts = new Map();
+    let pinch0 = null, lastTap = 0;
+    const live = () => !pingKind && !!duoWin();
+    const clampX = () => { duoView.x = Math.max(0, Math.min(duoView.full - duoView.cols, duoView.x)); };
+    cv.addEventListener('pointerdown', (e) => {
+      if (duoView && shownWide()) duoView.free = true;
+      if (!live()) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch0 = { d: Math.hypot(a.x - b.x, a.y - b.y), cols: duoView.cols }; }
+      if (pts.size === 1) { const t = performance.now(); if (t - lastTap < 300) { duoView.cols = duoView.cols > duoView.half ? duoView.half : duoView.full; clampX(); render(); } lastTap = t; }
+    });
+    cv.addEventListener('pointermove', (e) => {
+      if (!live() || !pts.has(e.pointerId)) return;
+      const p = pts.get(e.pointerId), w = cv.getBoundingClientRect().width;
+      if (pts.size === 1) { duoView.x -= (e.clientX - p.x) / (w / duoView.cols); clampX(); }
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2 && pinch0) {
+        const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
+        duoView.cols = Math.max(duoView.half, Math.min(duoView.full, pinch0.cols * pinch0.d / Math.max(20, d))); clampX();
+      }
+      render();
+    });
+    const up = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch0 = null; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  }
+  // ----- team talk: pings and quick lines (to the team only) -----
+  const PING_MS = 8000, PING_SYM = { '?': '?', '!': '!', go: '⚔' }, PING_NAME = { '?': 'Question', '!': 'Look here', go: 'Attack here' };
+  const seatName = (k) => (net.duoInfo && net.duoInfo.names && net.duoInfo.names[k]) || Duo.SEAT_NAMES[k];
+  const boardName = (lane) => lane === 0 ? 'left board' : 'right board';
+  function duoToastSay(text, ms = 4000) { duoToast = { text, until: now() + ms }; netStatus(); setTimeout(netStatus, ms + 60); }
+  // where a tap puts a ping: on the wide board (the fight, or both boards) by its column, else on this player's board
+  function duoPlacePing(t) {
+    const kind = pingKind;
+    pingKind = null;
+    if (t) {
+      let lane = net.duoInfo ? net.duoInfo.lane : 0, col = t.col;
+      if (shownWide()) {
+        const half = duoHalf();
+        if (t.col < half) lane = 0; else if (t.col >= half + Duo.GAP) { lane = 1; col = t.col - half - Duo.GAP; }
+        else { lane = t.col < half + Duo.GAP / 2 ? 0 : 1; col = lane === 0 ? half - 1 : 0; } // the strip: the nearest board's edge
+      }
+      send({ t: 'mark', kind, lane, col, row: t.row }); // a ping ('ping' itself is the keep-alive)
+    }
+    if (phase === 'deploy') panelDeploy(); else if (phase === 'battle') panelBattle();
+    render();
+  }
+  // the pings still showing, as SVG over the board (at: world -> screen, see wrapMap)
+  function pingMarks(at) {
+    const t0 = now();
+    duoPings = duoPings.filter(p => t0 - p.at < PING_MS);
+    if (!duoPings.length || !m) return '';
+    const wide = !!shownWide(), half = duoHalf(), lane0 = net.duoInfo ? net.duoInfo.lane : 0, mySeat = net.duoInfo ? net.duoInfo.seat : -1;
+    const sp = duoSplit(), ownOn = !!at && sp !== 'phone', mate = sp ? mateMap() : null;
+    let html = '';
+    for (const p of duoPings) {
+      let pos;
+      if (wide) { if (!ownOn) continue; const w = Game.tileToWorld(p.lane === 0 ? p.col : p.col + half + Duo.GAP, p.row); pos = at(w.x, w.y); }
+      else if (p.lane === lane0) { if (!ownOn) continue; const w = Game.tileToWorld(p.col, p.row); pos = at(w.x, w.y); } // this player's board
+      else if (mate) { Game.useGrid(Duo.MAP); const w = Game.tileToWorld(p.col, p.row); pos = mate(w.x, w.y); } // the teammate's
+      else continue;
+      const [x, y] = pos;
+      html += `<g class="ping${p.from === mySeat ? ' mine' : ''}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><circle r="14"/><circle class="ring" r="14"/><text y="1">${PING_SYM[p.kind] || '?'}</text></g>`;
+    }
+    return html;
+  }
+  function duoTalk(d) {
+    if (d.t === 'mark') {
+      if (!Duo.PINGS.includes(d.kind)) return;
+      duoPings = duoPings.filter(p => !(p.from === d.from && p.lane === d.lane && p.col === d.col && p.row === d.row)).concat([{ from: d.from, kind: d.kind, lane: d.lane | 0, col: d.col | 0, row: d.row | 0, at: now() }]).slice(-8);
+      const mine = net.duoInfo && d.from === net.duoInfo.seat;
+      if (!mine) { sfx('menu'); duoToastSay(`${seatName(d.from)} pinged ${PING_SYM[d.kind]} on ${net.duoInfo && net.duoInfo.lane === d.lane ? 'your board' : 'their board'}${d.kind === '?' ? '' : ' · ' + PING_NAME[d.kind]}`); }
+      render(); setTimeout(render, PING_MS + 60);
+    } else if (d.t === 'emote' && Duo.EMOTE_TEXT[d.id]) {
+      if (!(net.duoInfo && d.from === net.duoInfo.seat)) sfx('menu');
+      duoToastSay(`${seatName(d.from)}: ${Duo.EMOTE_TEXT[d.id]}`);
+    }
+  }
+  // the 2v2 row in the panel: Both boards (deploying), the pings, and Say
+  function duoRow(battle) {
+    return `<div class="xrow duo-row">
+      ${battle || pcLayout() ? '' : `<button class="btn small" id="duo-peek" aria-pressed="${matePeek}" ${net.duoInfo && net.duoInfo.mate ? '' : 'disabled'}>${matePeek ? 'My board' : 'Teammate’s board'}</button>`}
+      <span class="seg pings" role="group" aria-label="Ping your team">${Duo.PINGS.map(k => `<button data-ping="${k}" aria-pressed="${pingKind === k}" title="${PING_NAME[k]}" aria-label="Ping: ${PING_NAME[k]}">${PING_SYM[k]}</button>`).join('')}</span>
+      <button class="btn small" id="duo-say">Say…</button>
+    </div>`;
+  }
+  function wireDuoRow() {
+    const redraw = () => { if (phase === 'deploy') panelDeploy(); else if (phase === 'battle') panelBattle(); render(); };
+    if ($('duo-peek')) $('duo-peek').addEventListener('click', () => { matePeek = !matePeek; redraw(); });
+    $('panel').querySelectorAll('[data-ping]').forEach(b => b.addEventListener('click', () => {
+      pingKind = pingKind === b.dataset.ping ? null : b.dataset.ping;
+      if (pingKind) duoToastSay(`Tap a tile to ping ${PING_SYM[pingKind]} for your team`, 2500);
+      redraw();
+    }));
+    if ($('duo-say')) $('duo-say').addEventListener('click', () => {
+      $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Say to your team</h3><button class="btn small" id="close">Close</button></div>
+        <div class="btnrow" style="flex-wrap:wrap">${Duo.EMOTES.map(id => `<button class="btn" data-emote="${id}">${esc(Duo.EMOTE_TEXT[id])}</button>`).join('')}</div>`;
+      $('sheet-back').hidden = false;
+      $('close').addEventListener('click', closeSheet);
+      $('sheet').querySelectorAll('[data-emote]').forEach(b => b.addEventListener('click', () => { send({ t: 'emote', id: b.dataset.emote }); closeSheet(); }));
+    });
+  }
+  // the line above the board: which board, and how the teammate is doing
+  function duoLine() {
+    if (duoToast && duoToast.until > now()) return duoToast.text;
+    const x = net.duoInfo;
+    if (!x || x.seat == null) return `2v2 · ${net.code}`;
+    const mate = Duo.mateOf(x.seat), nm = (x.names && x.names[mate]) || Duo.SEAT_NAMES[mate];
+    const st = x.bots && x.bots[mate] ? '' : x.here && !x.here[mate] ? 'away' : phase === 'deploy' ? (x.ready && x.ready[mate] ? 'ready' : 'deploying') : '';
+    return `2v2 · ${Duo.SEAT_NAMES[x.seat]} · ${x.lane === 0 ? 'left' : 'right'} board · teammate ${nm}${st ? ': ' + st : ''}`;
   }
 
   function overlayMsg(head, text) {
@@ -7089,7 +7548,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       <h2>${head}</h2>
       <p class="big">${body}</p>
       ${tour.problem ? `<p class="status wait">${esc(tour.problem)}</p>` : ''}
-      ${tour.role === 'player' && t.status === 'lobby' ? `<span class="hint">Your gamertag</span><span class="joinrow"><input class="tour-in" id="tour-name" maxlength="18" autocomplete="nickname" spellcheck="false" aria-label="Your gamertag" placeholder="Your gamertag" value="${esc(me0 ? me0.name : tour.myName)}"><button class="btn" id="tour-name-ok">Save</button></span>` : ''}
+      ${tour.role === 'player' && t.status === 'lobby' ? `<span class="hint">Your username</span><span class="joinrow"><input class="tour-in" id="tour-name" maxlength="18" autocomplete="nickname" spellcheck="false" aria-label="Your username" placeholder="Your username" value="${esc(me0 ? me0.name : tour.myName)}"><button class="btn" id="tour-name-ok">Save</button></span>` : ''}
       ${(() => { const d = tourBracketData(t); if (!d) return btns ? `<div class="btnrow">${btns}</div>` : '';
         if (tour.role === 'watch') return btns ? `<div class="btnrow">${btns}</div>` : ''; // the big screen has it in full, below
         return `<div class="btnrow">${btns}<button class="btn" id="tour-bracket">Bracket</button></div>`; })()}
@@ -7149,7 +7608,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (k === 'players') {
       const list = t.players.map(p => `<li class="prow"><span>${pname(p.id)}${p.dropped ? ' <small>(dropped)</small>' : ''}${p.id === t.org ? ' <small>· organizer</small>' : ''}</span>
         <span class="btnrow"><button class="btn small" data-rename="${p.id}">Rename</button>${p.dropped ? '' : `<button class="btn small" data-drop="${p.id}">${t.status === 'lobby' ? 'Remove' : 'Drop'}</button>`}</span></li>`).join('');
-      return `${t.status === 'lobby' ? `<span class="hint">Invite link (players open it and pick a gamertag):</span>
+      return `${t.status === 'lobby' ? `<span class="hint">Invite link (players open it and pick a username):</span>
         <div class="linkbox" id="tour-link">${esc(tourLink())}</div>
         <span class="btnrow">${navigator.share ? '<button class="btn primary small" id="tour-share">Share invite</button>' : ''}<button class="btn small" id="tour-copy">Copy invite</button><button class="btn small" id="tour-copy-watch">Copy big-screen link</button></span>` : ''}
         <ul class="tour-list">${list}</ul>
@@ -7254,10 +7713,10 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if ($('tour-copy')) $('tour-copy').addEventListener('click', () => { const l = tourLink(); if (navigator.clipboard) navigator.clipboard.writeText(l).then(() => { $('tour-copy').textContent = 'Copied'; }, () => {}); });
     if ($('tour-copy-watch')) $('tour-copy-watch').addEventListener('click', () => { const l = tourLink(true); if (navigator.clipboard) navigator.clipboard.writeText(l).then(() => { $('tour-copy-watch').textContent = 'Copied'; }, () => {}); });
     on('[data-watch]', (b) => tourSpectate(b.dataset.watch));
-    if ($('tour-share')) $('tour-share').addEventListener('click', () => navigator.share({ title: t.name, text: `Join ${t.name} in No Mans Land! Pick a gamertag when you're in.`, url: tourLink() }).catch(() => {}));
+    if ($('tour-share')) $('tour-share').addEventListener('click', () => navigator.share({ title: t.name, text: `Join ${t.name} in No Mans Land! Pick a username when you're in.`, url: tourLink() }).catch(() => {}));
     if (!tourOrg()) return;
     // organizer actions go to the server (Tour.apply there); the screen updates when its new state comes back
-    on('[data-rename]', (b) => { const p = Tour.player(t, b.dataset.rename); const n = p && prompt('New gamertag', p.name); if (n) tourDo('rename', { id: p.id, name: n }); });
+    on('[data-rename]', (b) => { const p = Tour.player(t, b.dataset.rename); const n = p && prompt('New username', p.name); if (n) tourDo('rename', { id: p.id, name: n }); });
     on('[data-drop]', (b) => {
       if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Sure?'; return; }
       tourDo('drop', { id: b.dataset.drop });
@@ -7351,9 +7810,14 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (tc.length === 4 && !(fresh(org) && org.key && org.code === tc)) tourJoin(tc, qs.has('watch'));
     else if (fresh(org) && org.key) tourResumeOrg(org);
     else if (fresh(mine) && mine.code) tourJoin(mine.code, false);
-    if (joinCode.length === 5 || playCode.length === 5) tour.menu = false;
+    if (joinCode.length === 5 || playCode.length === 5 || (qs.get('duo') || '').length === 6) tour.menu = false;
   }
-  if (playCode.length === 5) {
+  const duoCode = (qs.get('duo') || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); // a 2v2 match
+  if (duoCode.length === DUO_CODE_LEN) {
+    showStart();
+    let back = null; try { back = JSON.parse(localStorage.getItem(NET_STORE) || 'null'); } catch (e) {}
+    duoJoin(duoCode, back && back.duo && back.code === duoCode ? back.key : '');
+  } else if (playCode.length === 5) {
     showStart();
     let back = null; try { back = JSON.parse(localStorage.getItem(NET_STORE) || 'null'); } catch (e) {}
     if (back && back.code === playCode && back.key) srvJoin(playCode, { key: back.key, side: back.side }); else srvJoin(playCode);

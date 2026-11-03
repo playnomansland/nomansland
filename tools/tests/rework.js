@@ -209,8 +209,10 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
   steps(bt2, 3.5); assert.ok(!bt2.bodies.some(b => b.u.name === 'Hellfiend'), 'no hellfiend once the imps fell');
 }
 // either-or, Awaken: needs skill 2 or 3, always 300 gold, doesn't make the others dearer
+// (Overwatch left the Sniper on 2026-11-03 for Hunter but stays in the skill library: this block gives it back to test it)
 {
-  const units = roster.units.map(u => ({ ...u, cost: u.cost / 100, skillDefs: E.SLOTS.map(k => (u.skills || [])[k] ? skill(u.skills[k]) : null) }));
+  const ow = (u) => u.name === 'Sniper' ? { ...u, skills: [...u.skills.slice(0, 3), 'overwatch'] } : u;
+  const units = roster.units.map(ow).map(u => ({ ...u, cost: u.cost / 100, skillDefs: E.SLOTS.map(k => (u.skills || [])[k] ? skill(u.skills[k]) : null) }));
   const m = Game.createMatch(units, null, 3, 'standard');
   const sn = units.findIndex(u => u.name === 'Sniper');
   m.gold = [5000, 5000]; m.unlocks[0][sn] = 1;
@@ -281,7 +283,7 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
   steps(c.bt, 15);
   assert.ok(c.s.inside === wt2 && wt2.alive, 'it stays while it sees an enemy');
   // the same through the game: a squad's bodies leave together and only then does its watchtower go
-  const units = roster.units.map(u => ({ ...u, cost: u.cost / 100, skillDefs: E.SLOTS.map(k => (u.skills || [])[k] ? skill(u.skills[k]) : null) }));
+  const units = roster.units.map(u => u.name === 'Sniper' ? { ...u, skills: [...u.skills.slice(0, 3), 'overwatch'] } : u).map(u => ({ ...u, cost: u.cost / 100, skillDefs: E.SLOTS.map(k => (u.skills || [])[k] ? skill(u.skills[k]) : null) }));
   const m = Game.createMatch(units, null, 5, 'standard'), si = units.findIndex(u => u.name === 'Sniper');
   m.gold = [5000, 5000]; m.unlocks[0][si] = 1; Game.ensureTower(m, 0);
   assert.ok(Game.place(m, 0, si, 2, 13) && Game.buySkill(m, 0, si, 1) && Game.buySkill(m, 0, si, 3));

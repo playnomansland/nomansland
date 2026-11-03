@@ -19,9 +19,11 @@
 // colour and how strongly the zones are tinted on a painted floor.
 const Render2D = (cv, view, opts = {}) => {
   let ctx = cv.getContext('2d'); // swapped for a moment while drawing map thumbnails (thumb)
-  let m = null, me = 0, phase = 'start', units = [], mode = 'ai', bt = null, battlePre = null, fx = [], battleCam = null;
+  let m = null, me = 0, phase = 'start', units = [], mode = 'ai', bt = null, battlePre = null, fx = [], battleCam = null, win = null;
   let selected = null, moving = null, drag = null, hoverTile = null, rangeOf = null, editable = false, placingUnit = null, placingElf = false, placingTower = false, placingWall = false, dev = null, placingBuilding = null;
-  const pull = () => { ({ m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf, editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev } = view()); };
+  const pull = () => { ({ m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf, editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev, win = null } = view()); };
+  // win (a 2v2 fight on a phone): { aspect, cols, x } the canvas is shaped for `aspect` columns, shows `cols` of them
+  // (zoomed out up to the whole wide board) and starts at screen column x; the board sits in the middle top to bottom
   const foe = () => 1 - me;
   const css = Art.css, tag = Shapes.tag;
   const { ELF_COL, SHROOM_COL, CHARM_COL, BLEED_COL, POOL_COL, FROST_COL, GLUT_COL } = Art;
@@ -29,7 +31,9 @@ const Render2D = (cv, view, opts = {}) => {
   function size() {
     const r = cv.getBoundingClientRect();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    W = r.width; H = W * Game.ROWS / Game.COLS;
+    pull();
+    if (m) Game.useGrid(m); // the board as drawn (view() may have used the page's match: a 2v2 picture is wider)
+    W = r.width; H = W * Game.ROWS / (win ? win.aspect : Game.COLS);
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     S = W / (Game.COLS * Game.TILE);
@@ -460,6 +464,14 @@ const Render2D = (cv, view, opts = {}) => {
     ctx.strokeStyle = css('--you');
     ctx.beginPath(); ctx.moveTo(0, mine); ctx.lineTo(W, mine); ctx.stroke();
     ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const dv = phase === 'battle' && battlePre ? battlePre : m;
+    if (dv && dv.duo) { // 2v2: the open strip between the two boards (symmetric, so the same for both sides), edged
+      const gx = dv.duo.cols * t, gw = dv.duo.gap * t;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)'; ctx.fillRect(gx, 0, gw, H);
+      ctx.strokeStyle = css('--muted'); ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.moveTo(gx + gw, 0); ctx.lineTo(gx + gw, H); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
   }
 
   // ---------- Factions devtest: spells, arrows, the tower's tile, where things may go (on the floor, so the 3D board
@@ -1253,9 +1265,11 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.fillRect(x - 2.5, y - 2.5, 5, 5);
     }
     // a fallen tower cripples its army for a few seconds
-    const crip = [me, foe()].filter(sd => bt.crippled(sd) > 0);
+    // (a 2v2 fight: per board, bt.crippled(side, lane); the longest of the two shows)
+    const cripOf = (sd) => Math.max(bt.crippled(sd, 0), bt.crippled(sd, 1) || 0);
+    const crip = [me, foe()].filter(sd => cripOf(sd) > 0);
     crip.forEach((sd, k) => {
-      const txt = sd === me ? `Your tower fell · crippled ${Math.ceil(bt.crippled(sd))} s` : `${mode === 'claude' ? 'Claude’s' : 'Enemy'} tower fell · crippled ${Math.ceil(bt.crippled(sd))} s`;
+      const txt = sd === me ? `${m && m.duo ? 'A tower of yours' : 'Your tower'} fell · crippled ${Math.ceil(cripOf(sd))} s` : `${mode === 'claude' ? 'Claude’s' : 'Enemy'} tower fell · crippled ${Math.ceil(cripOf(sd))} s`;
       ctx.font = `600 ${Math.max(11, Math.round(W * 0.035))}px "IBM Plex Mono", monospace`;
       const tw = ctx.measureText(txt).width + 16, th = Math.max(20, W * 0.06), x = (W - tw) / 2, y = H * (sd === me ? 0.62 : 0.32) + k * 2;
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x, y, tw, th);
@@ -1264,6 +1278,20 @@ const Render2D = (cv, view, opts = {}) => {
   }
   function draw() {
     pull();
+    if (m) Game.useGrid(m);
+    if (win && m) { // a window on the wide board: draw the whole board, moved and scaled into the canvas
+      const cw = W, ch = H, s0 = S;
+      S = cw / (win.cols * Game.TILE);
+      const bw = Game.COLS * Game.TILE * S, bh = Game.ROWS * Game.TILE * S;
+      ctx.save(); ctx.fillStyle = css('--board'); ctx.fillRect(0, 0, cw, ch);
+      ctx.translate(-win.x * Game.TILE * S, Math.max(0, (ch - bh) / 2));
+      W = bw; H = bh;
+      try { drawInner(); } finally { ctx.restore(); W = cw; H = ch; S = s0; }
+      return;
+    }
+    drawInner();
+  }
+  function drawInner() {
     if (!m) { drawBoard(); return; }
     if (bt && phase === 'battle' && battleCam) { // the battle cam, zoomed in around its focus
       const fx0 = PX(battleCam.x), fy0 = PY(battleCam.y);
@@ -1277,8 +1305,13 @@ const Render2D = (cv, view, opts = {}) => {
   // the tile under a point on the screen, in model coordinates (the flip is its own inverse)
   function tileAt(clientX, clientY) {
     pull();
+    if (m) Game.useGrid(m); // the board as drawn (a 2v2 picture is wider than the match in play)
     const r = cv.getBoundingClientRect();
-    const x = (clientX - r.left) / r.width * Game.COLS, y = (clientY - r.top) / r.height * Game.ROWS;
+    let x = (clientX - r.left) / r.width * Game.COLS, y = (clientY - r.top) / r.height * Game.ROWS;
+    if (win) { // the window on the wide board (see draw)
+      const t = r.width / win.cols, oy = Math.max(0, (r.height - Game.ROWS * t) / 2);
+      x = (clientX - r.left) / t + win.x; y = (clientY - r.top - oy) / t;
+    }
     const c = Math.floor(x), rw = Math.floor(y);
     if (c < 0 || rw < 0 || c >= Game.COLS || rw >= Game.ROWS) return null;
     const fx = x - c, fy = y - rw; // where in the tile (for a wall's edge), in model terms
