@@ -19,7 +19,7 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 ## 3 November 2026 – Unit skins: the Champion Brute
 
 - **Skins are here.** A skin changes how one of your units looks, never how it plays.
-- **Champion Brute** (unique, for **Gubbolas Cage**): a crowned Brute in gold-trimmed armour, with spiked pauldrons, a cape in your team colour and a great war hammer. On the 2D board it's a broad-shouldered figure with a gold crown and belt.
+- **Champion Brute** (unique, for **Gubbolas Cage**): a crowned Brute in gold-trimmed armour, with spiked pauldrons, a cape in your team colour and a great war hammer. It shows on the 3D board; on the 2D board the Brute keeps its usual square.
 - **Your opponent sees it too** in online matches (friends and ranked), and so do spectators. Against the AI you always see your own. Not shown in tournaments or 2v2 yet.
 - **Profile → Skins** lists the skins you own, with **On / Off**. A skin you just received gets its own popup on the main menu.
 - Skins are given, never sold, and they stay with your account if you change your username.

@@ -463,10 +463,7 @@ const Shapes = (() => {
   const GOBLIN_PTS = [[-0.6, -0.42], [-0.34, -0.74], [0, -0.84], [0.34, -0.74], [0.6, -0.42], [0.66, 0.04], [0.5, 0.5], [0.24, 0.86], [0, 0.98],
     [-0.24, 0.86], [-0.5, 0.5], [-0.66, 0.04]];
   const GOBLIN_EARS = [[[-0.56, -0.3], [-1.4, -0.78], [-0.62, 0.18]], [[0.56, -0.3], [0.62, 0.18], [1.4, -0.78]]];
-  // the Brute's Champion skin (2026-11-03): broad shoulders with round pauldrons, a crown on top (drawn gold over it, CROWN)
-  const CROWN = [[-0.62, -0.5], [-0.66, -1.28], [-0.33, -0.92], [0, -1.42], [0.33, -0.92], [0.66, -1.28], [0.62, -0.5]];
   const FIGURES = {
-    champion: [{ p: [[-0.72, -0.56], [0.72, -0.56], [0.86, -0.1], [0.68, 0.96], [-0.68, 0.96], [-0.86, -0.1]] }, { c: [-0.78, -0.36, 0.42] }, { c: [0.78, -0.36, 0.42] }, { p: CROWN }],
     goblin: [{ p: GOBLIN_PTS }, ...GOBLIN_EARS.map(p => ({ p }))],
     spider: [{ c: [0, 0.32, 0.56] }, { c: [0, -0.42, 0.33] }, ...SPIDER_LEGS.flatMap(l => [{ p: strip(l, 0.15) }, { p: strip(l.map(([x, y]) => [-x, y]), 0.15) }])],
     sun: [{ c: [0, 0, 0.64] }, ...Array.from({ length: 8 }, (_, i) => ({ p: ray(-Math.PI / 2 + i * Math.PI / 4) }))],
@@ -622,22 +619,13 @@ const Shapes = (() => {
     outline(ctx, shape, x, y, shape === 'ring' ? r * 1.05 : r + 0.6, up);
   }
 
-  // gold trim drawn over a body (a skin's crown or belt): parts as in FIGURES, filled gold with a thin dark edge
-  function gild(ctx, parts, x, y, r, alpha = 1, color = '#E6B84A') {
-    ctx.beginPath();
-    for (const pt of parts) { if (pt.c) { const [cx, cy, cr] = pt.c; ctx.moveTo(x + (cx + cr) * r, y + cy * r); ctx.arc(x + cx * r, y + cy * r, cr * r, 0, Math.PI * 2); } else { pt.p.forEach(([px, py], i) => i ? ctx.lineTo(x + px * r, y + py * r) : ctx.moveTo(x + px * r, y + py * r)); ctx.closePath(); } }
-    ctx.globalAlpha = alpha; ctx.fillStyle = color; ctx.fill();
-    ctx.strokeStyle = 'rgba(40,28,10,0.8)'; ctx.lineWidth = Math.max(0.75, r * 0.08); ctx.lineJoin = 'round'; ctx.stroke(); ctx.lineJoin = 'miter'; ctx.globalAlpha = 1;
-  }
-
   // ---------- skins (2026-11-03) ----------
   // Cosmetic looks for one unit, owned by a player's account (server/src/accounts.js SKINS has the same ids). Only how
-  // the unit is drawn changes: never its stats. shape: its 2D figure; gild: gold parts drawn over it; model: its 3D
-  // model (models3d.js BUILD). Which skins each side wears is set by the page (useSkins) before the board is drawn:
+  // the unit is drawn changes: never its stats. model: its 3D model (models3d.js BUILD); pic: a picture of it for
+  // menus (rendered from the model). The 2D board always keeps the unit's own symbol (Vilhelm, 2026-11-03). Which skins each side wears is set by the page (useSkins) before the board is drawn:
   // this phone's own from its account, the opponent's from the server (net.players), so nobody can claim one they don't own.
   const SKINS = {
-    'brute-champion': { unit: 'Brute', name: 'Champion', text: 'A crowned Brute in gold armour with a great hammer and a cape.', shape: 'champion', model: 'brute:champion',
-      gild: [{ p: CROWN }, { p: [[-0.7, 0.3], [0.7, 0.3], [0.69, 0.48], [-0.69, 0.48]] }] },
+    'brute-champion': { unit: 'Brute', name: 'Champion', text: 'A crowned Brute in gold armour with a great hammer and a cape.', model: 'brute:champion', pic: 'img/skins/brute-champion.png' },
   };
   let worn = [{}, {}]; // per side: unit name -> skin
   function useSkins(lists) {
@@ -646,7 +634,7 @@ const Shapes = (() => {
   // the skin a body of unit u on this side wears, or null
   const skinOf = (side, u) => (u && (side === 0 || side === 1) && worn[side][u.name]) || null;
 
-  return { SKINS, useSkins, skinOf, gild, CROWN, IMP, GOBLIN_PTS, GOBLIN_EARS, LIST, tag, LABELS, PALETTE, valid, validColor, assign, draw, outline, path, svg, body };
+  return { SKINS, useSkins, skinOf, IMP, GOBLIN_PTS, GOBLIN_EARS, LIST, tag, LABELS, PALETTE, valid, validColor, assign, draw, outline, path, svg, body };
 })();
 
 // ===== Battle engine (shared by headless tests and the page) =====

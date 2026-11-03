@@ -1684,16 +1684,8 @@ html.pc .corner button span { display: inline; }
     }
     Shapes.useSkins(sides);
   }
-  // a skin's picture (2D, in the blue team colour) as an image, for Profile and the "new skin" popup
-  const skinPics = {};
-  function skinPic(id) {
-    if (skinPics[id]) return skinPics[id];
-    const k = Shapes.SKINS[id], u = units.find(x => x.name === k.unit) || { color: '#8D99AE' }, c = document.createElement('canvas');
-    c.width = c.height = 96; const g = c.getContext('2d');
-    Shapes.body(g, k.shape, 48, 54, 26, 1, u.color, css('--you') || '#4EA8FF', 1);
-    if (k.gild) Shapes.gild(g, k.gild, 48, 54, 26);
-    return (skinPics[id] = c.toDataURL());
-  }
+  // a skin's picture for Profile and the "new skin" popup: its 3D model, rendered once into img/skins (Shapes.SKINS pic)
+  const skinPic = (id) => Shapes.SKINS[id].pic || '';
   const SKINS_SEEN = 'pb-skins-seen'; // { playerId: [skin ids already announced on this phone] }
   function skinsUnseen() {
     if (!acct || !acct.skins || acct.dev) return []; // a developer has every skin: no popup

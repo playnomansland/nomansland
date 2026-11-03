@@ -632,10 +632,8 @@ const Render2D = (cv, view, opts = {}) => {
     const r = radius(u);
     // an awakened or evolved squad (the opponent's awakening from this round stays hidden): a gold ring round each body, the Leafblade suit's blades
     const awake = Game.shownAwake(m, sq, side === me || phase !== 'deploy'), mech = awake && Game.unitFor(m, side, sq.unit, sq).mech;
-    const sk = Shapes.skinOf(side, u); // a skin (2026-11-03): its own figure, gold trim over it
     for (const b of bodies) {
-      Shapes.body(ctx, sk ? sk.shape : u.shape, PX(b.x), PY(b.y), r, upOf(side), u.color, col, 0.95);
-      if (sk && sk.gild) Shapes.gild(ctx, sk.gild, PX(b.x), PY(b.y), r, 0.95);
+      Shapes.body(ctx, u.shape, PX(b.x), PY(b.y), r, upOf(side), u.color, col, 0.95);
       if (mech) bladeMark(PX(b.x), PY(b.y), r, 0);
       if (awake) { ctx.globalAlpha = 0.9; ctx.strokeStyle = css('--gold'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(PX(b.x), PY(b.y), r + 3, 0, Math.PI * 2); ctx.stroke(); }
     }
@@ -1113,9 +1111,7 @@ const Render2D = (cv, view, opts = {}) => {
       // what Mechites build rattles as it goes (the Mechites themselves move smoothly)
       const rattle = b.u.construct ? Math.sin(bt.time() * 47 + b.x * 3.1) * r * 0.08 : 0;
       const lk = b.mask && b.side !== me && !b.revealed ? b.mask : b.u; // a disguise, until its first attack (devtest)
-      const sk = lk === b.u ? Shapes.skinOf(b.side, b.u) : null, fa = (0.35 + 0.65 * hpr) * (b.delay > 0 ? 0.45 : 1); // a skin (2026-11-03)
-      Shapes.body(ctx, sk ? sk.shape : lk.shape, PX(b.x) + rattle, PY(b.y), r, upOf(b.side), lk.color, c, fa);
-      if (sk && sk.gild) Shapes.gild(ctx, sk.gild, PX(b.x) + rattle, PY(b.y), r, fa);
+      Shapes.body(ctx, lk.shape, PX(b.x) + rattle, PY(b.y), r, upOf(b.side), lk.color, c, (0.35 + 0.65 * hpr) * (b.delay > 0 ? 0.45 : 1));
       if (b.u.mech) bladeMark(PX(b.x) + rattle, PY(b.y), r, bt.time() * (b.lastAtk > bt.time() - 0.4 ? 14 : 1.5) + b.x); // the Leafblade suit: its blades spin as it strikes
       if (b.u.unfolded) { ctx.fillStyle = 'rgba(30,24,20,0.75)'; for (const o of [-1, 1]) ctx.fillRect(PX(b.x) + o * r * 0.45 - r * 0.15, PY(b.y) + r * 0.75, r * 0.3, r * 0.45); } // an unfolded roller: two stumpy legs
       if (b.u.roll > 0) { // a roller: a seam across the ball turns as it rolls
