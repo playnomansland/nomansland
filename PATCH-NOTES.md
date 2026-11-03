@@ -8,7 +8,7 @@ Newest first. Each entry says what changed for players; technical details live i
 
 - **Counter Lab tables build faster.** Big swarm fights (Goblin Swarm, Skeleton Archers and the like) now simulate up to about 3× faster, so a custom unit set's counter table is ready sooner on your phone.
 - **Every fight plays out exactly as before:** same targets, same moves, same winner. Only the work the game skipped changed, not the rules.
-- Behind the scenes: the Balance Lab (our test bench for bot-vs-bot matches) now drafts with the same counter table as the real game, and starts in seconds instead of half an hour.
+- Behind the scenes: the Balance Lab (our test bench for bot-vs-bot matches) now plays exactly like a ranked server match: the same map and rules, the same counter table, every bot move checked by the game server's referee, and the bots level up like the in-game AI. It starts in seconds instead of half an hour, and its reports show what each side bought, gold per round, and how leaders, towers, skills and units do.
 
 ---
 
