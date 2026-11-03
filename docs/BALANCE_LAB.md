@@ -17,7 +17,7 @@ node tools/balance-lab.js --matches 200 --seed 700000 --out reports/lab.json
 - `--no-mirror`: different package/leader/tower offers per side (default: mirrored, as in ranked).
 - `--out`: write the full JSON report (every match, every round). Nothing is written without it.
 
-Speed: about 4 s per match on one core.
+Speed: about 3.5 s per match (200 matches: 11 min on one core).
 
 ## How a match is played: like a server match
 
@@ -47,7 +47,8 @@ Summary (`summary` in the report, printed by the CLI):
 - These are the **AI's** results, not humans'. The AI's drafting, economy and placement shape everything. Use it to compare strategies the AI plays, and to see what a change does, not as human win rates.
 - Win rates "when fielded" or "when bought" are **descriptive**, not causal: a unit the AI buys when it is already winning looks good.
 - Look at `games` before any rate: below ~50 games a rate swings by 10+ points by chance.
-- Mirrored offers mean both sides can pick the same leader in one match; that leader then gets one win and one loss.
+- With mirrored offers (the default) both AIs almost always pick the **same leader** (197 of 200 matches), so leader win rates sit at 50% and say nothing: run `--no-mirror` for leaders. Tower types are picked at random among the offers, so tower win rates are the cleanest signal the lab has.
+- The AI almost never buys the 500-gold units with a 150-gold unlock (Ether Golem, Necromancer, Truespear, Assassin, Sun Priest) or the Obelisk: the lab can't rate them until the AI drafts them.
 
 ## Engine fast paths (`opts.targetingMode === 'indexed'`)
 
