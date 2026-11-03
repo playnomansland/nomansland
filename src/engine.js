@@ -288,6 +288,7 @@ const Engine = (() => {
     flare:   { label: 'Flare', params: [['per', 'Attack speed stored per second idle (%)', 10, 1], ['max', 'Most stored (%)', 100, 10], ['shot', 'Stored % per extra shot', 25, 5]] },
     portal:  { label: 'Summon portal', params: [['unit', 'Summons (unit name)', 'Brute', null], ['level', 'Its base level (0 = as bought)', 1, 1], ['speed', 'Its move speed (m/s)', 4.5, 0.1], ['cone', 'Its swipe (degrees each side)', 90, 5], ['secs', 'Portal stays (s)', 4, 0.5], ['hp', 'Its health (+%)', 0, 5], ['hit', 'Its hit (+%)', 0, 5], ['aps', 'Its attack speed (+%)', 0, 5]] },
     overwatch: { label: 'Overwatch', params: [['hp', 'Watchtower health', 200, 25]] },
+    web:     { label: 'Web shots', params: [['shots', 'Webs per body each fight', 1, 1], ['range', 'Web range (m)', 10, 0.5], ['slow', 'Slow per stack (%)', 10, 1], ['dmg', 'Damage cut per stack (%)', 5, 1], ['max', 'Most slow / damage cut (%)', 90, 5], ['secs', 'Lasts (s, each stack starts it again)', 3, 0.5]] },
     hunter:  { label: 'Hunter', params: [['dmg', 'Damage to its mark (+%)', 100, 10]] },
     elemental: { label: 'Summon water elemental', params: [['hp', 'Its health', 600, 50], ['unit', 'Attacks like (unit name)', 'Ember Imps', null], ['level', 'At level (0 = as bought)', 1, 1], ['ahead', 'Summoned ahead (m)', 9, 0.5], ['pool', 'Pool when it dies (radius, m)', 4, 0.5], ['pct', 'Pool damage / heal per second (% of its hit)', 50, 5], ['speed', 'Pool ally move speed (+m/s)', 0.5, 0.1], ['secs', 'Pool speed lasts (s)', 2, 0.5]] },
     freeMove: { label: 'Free moves', params: [] },
@@ -392,6 +393,7 @@ const Engine = (() => {
       case 'flare': return `Idle time stores attack speed. Next attack fires it as extra shots.`;
       case 'portal': return `Sacrifices itself after ${n('secs')} s to summon a ${String(P('unit')) === 'Brute' ? 'Hellfiend' : String(P('unit'))}.`;
       case 'overwatch': return 'Can garrison a building: untouchable until it falls. Sees stealthed units in its range.';
+      case 'web': return `${+P('shots') > 1 ? `${n('shots')} times` : 'Once'} a fight, each body shoots a web at an enemy within ${n('range')} m. No damage, but its poison and slows land. Each stack: ${n('slow')}% slower and ${n('dmg')}% less damage (up to ${n('max')}%) for ${n('secs')} s; a new stack adds on and restarts the time.`;
       case 'hunter': return `Marks an enemy squad. Always shoots a marked enemy in its range, for +${n('dmg')}% damage, and sees it through stealth.`;
       case 'elemental': return `Summons a water elemental ${+(P('ahead') / 6).toFixed(2)} tiles ahead at the start of each fight: ${n('hp')} health, attacks like a level ${Math.round(P('level')) + 1} ${String(P('unit'))}, as fast as she is, grows with her level. Leaves a pool when it dies.`;
       case 'freeMove': return 'Moves are free.';
@@ -520,6 +522,7 @@ const Engine = (() => {
           break;
         }
         case 'overwatch': u.overwatch = { hp: Math.max(1, P('hp')) }; u.trueSight = true; break; // also sees stealthed units within its range
+        case 'web': u.web = { shots: Math.max(1, Math.round(P('shots'))), range: Math.max(1, P('range')), slow: Math.max(0, P('slow')), dmg: Math.max(0, P('dmg')), max: Math.min(95, Math.max(0, P('max'))), secs: Math.max(0.1, P('secs')) }; break;
         case 'hunter': u.hunter = { dmg: Math.max(0, P('dmg')) }; break; // the game marks the prey (b.prey on its bodies)
         case 'elemental': {
           // the summon: one body that attacks like the named unit at the given level, with its own health (levelled with
@@ -1378,6 +1381,7 @@ const Engine = (() => {
       if (owner.u.hunter && v.prey && owner.side !== v.side) { hit = hit * (1 + owner.u.hunter.dmg / 100); pct = pct * (1 + owner.u.hunter.dmg / 100); } // Hunter: its mark
       if (owner.sniperMark > 0 && v.marked && owner.side !== v.side) { hit = hit * (1 + owner.sniperMark / 100); pct = pct * (1 + owner.sniperMark / 100); } // Mark Bounty (sniper tower)
       if (cripple[ck(owner)] > 0) { hit = hit * (1 - towerDown.attack / 100); pct = pct * (1 - towerDown.attack / 100); }
+      if (owner.web) { hit = hit * (1 - owner.web.dmg / 100); pct = pct * (1 - owner.web.dmg / 100); } // webbed: it hits softer
       // Shield: the whole hit is blocked, however big, and it brings no poison
       if (v.shield > 0) { v.shield--; st.blocked += hit + pct; return; }
       // ice walls (towers on the ice map): four walls, one per direction; each blocks a number of whole hits
@@ -1554,6 +1558,40 @@ const Engine = (() => {
       if (!caught.length) { b.stormCd = Math.max(b.stormCd, -dt); return; }
       b.stormCd = Math.max(b.stormCd, -dt) + 1 / Math.max(0.01, apsOf(b));
       for (const f of caught) hurt(b, f, hit, b.x, b.y);
+    }
+    // Web shots (the Spiders' Master skill): each body shoots u.web.shots webs a fight, at the nearest enemy it could
+    // pick within u.web.range (not the tower or a building, not one aloft). A web does no damage; it lands the
+    // shooter's poison and slow as a hit would, and a stack of web (see webOn). It counts as an attack (stealth ends)
+    function webStep(b) {
+      const w = b.u.web;
+      if ((b.webs || 0) >= w.shots) return;
+      let tgt = null, bd = w.range + 0.01;
+      for (const f of sides[1 - b.side]) {
+        if (!pickable(b, f) || f.u.structure || f.u.aloft || !inSight(b, f)) continue;
+        const d = gap(f, b); if (d <= bd) { bd = d; tgt = f; }
+      }
+      if (!tgt) return;
+      b.webs = (b.webs || 0) + 1;
+      if (b.hidden && !b.u.aloft) { if (healLater) hitsLater.push(() => { b.hidden = false; }); else b.hidden = false; }
+      if (opts.record) shots.push([b.x, b.y, tgt.x, tgt.y, b.side, 0, 0, 0]);
+      if (healLater) hitsLater.push(() => webOn(b, tgt)); else webOn(b, tgt); // lands once the tick's attacks are done, so it doesn't matter who went first
+    }
+    // a stack of web from owner on v: its slow and damage cut grow by the owner's per-stack share (up to max) and last
+    // secs from now; plus the owner's poison (a dose from its hit) and its slow skill, as a hit of its would bring
+    function webOn(owner, v) {
+      if (!v.alive || v.turning || v.u.aloft || sheltered(v)) return;
+      const w = owner.u.web, wb = v.web || (v.web = { slow: 0, dmg: 0, t: 0, max: w.max });
+      wb.max = Math.max(wb.max, w.max);
+      wb.slow = Math.min(wb.max, wb.slow + w.slow); wb.dmg = Math.min(wb.max, wb.dmg + w.dmg); wb.t = w.secs;
+      wb.n = (wb.n || 0) + 1;
+      if (owner.u.poisonPct > 0) {
+        const dps = owner.u.hit * owner.u.poisonPct / 100 / owner.u.poisonDur, list = v.poison || (v.poison = []), dose = list.find(p => p.src === owner);
+        if (dose) { dose.dps = dps; dose.t = owner.u.poisonDur; } else list.push({ src: owner, dps, t: owner.u.poisonDur });
+      }
+      if (owner.u.slowDur > 0 && !v.u.unstoppable) {
+        if (!(v.slowT > 0)) { v.slowMove = 0; v.slowAtk = 0; }
+        v.slowMove = Math.max(v.slowMove, owner.u.slowMove || 0); v.slowAtk = Math.max(v.slowAtk, owner.u.slowAtk || 0); v.slowT = Math.max(v.slowT, owner.u.slowDur);
+      }
     }
     // a thrown titanium spear lands: its hit to the nearest enemy body within reach of where it is, and its bleed
     function spearLand(p) {
@@ -2395,6 +2433,11 @@ const Engine = (() => {
           }
           if (b.poison) b.poison = b.poison.filter(p => p.t > 0); // a body won over by a Gentleman just now lost its poison
           if (!b.alive) continue;
+          if (b.web) { // webbed (Web shots): slower while it lasts
+            b.web.t -= dt;
+            if (b.web.t <= 1e-9) b.web = null;
+            else if (!b.u.unstoppable) { if (!(b.slowT > 0)) { b.slowMove = 0; b.slowAtk = 0; } b.slowMove = Math.max(b.slowMove, b.web.slow); b.slowT = Math.max(b.slowT, dt * 1.5); }
+          }
           if (b.poison && b.poison.length && !b.u.slime && !b.u.unstoppable) { // poison slows (see POISON_SLOW)
             if (!(b.slowT > 0)) { b.slowMove = 0; b.slowAtk = 0; }
             b.slowMove = Math.max(b.slowMove, POISON_SLOW); b.slowT = Math.max(b.slowT, dt * 1.5);
@@ -2529,6 +2572,7 @@ const Engine = (() => {
         if (b.flurryLeft > 0) { if (b.alive) flurryStep(b); else b.flurryLeft = 0; continue; } // Death flurry: the rest of its blows
         if (b.u.spear && b.alive) forgeSpear(b); // Titanium spears: forged and thrown apart from its own attack
         if (b.u.storm && b.alive) stormStep(b); // Snow storm: apart from its own attack
+        if (b.u.web) webStep(b); // Web shots: apart from its own attack (a body killed this tick still shoots, like its attack)
         if (b.u.missiles && b.alive) { // Leafblade: a salvo at the start and every missiles.every s
           b.missileT = (b.missileT || 0) - dt;
           if (b.missileT <= 1e-9) { if (salvo(b)) b.missileT = b.u.missiles.every; else b.missileT = 0; }
@@ -2727,7 +2771,7 @@ const Engine = (() => {
         v.windTarget = null; v.windT = 0; v.setUp = false; v.firing = -1; v.burstLeft = 0; v.trampleLeft = 0; v.trampled = null;
         v.spinTarget = null; v.aims = null; v.lock = null; v.intent = null; v.march = null; v.guide = null; v.goal = null; v.spreadTo = null; v.engaged = false; v.holdT = 0; v.avenge = null; v.delay = 0; v.band = null; v.hidden = false;
         v.slowT = 0; v.slowMove = 0; v.slowAtk = 0; v.shrinkT = 0; v.shrinkM = 0; v.kids = null; v.stunT = 0; v.frenzy = 0; v.flow = 0; v.knives = null; v.atkN = 0; v.forgeT = 0; v.spearReady = false;
-        v.burn = null; v.kills = 0; v.flurryLeft = 0; v.flurryTgt = null; v.rootTgt = null; v.rootedBy = null; v.hunt = null; v.bullN = 0; v.charging = false; v.inside = null; v.missileT = 0; v.roarSpd = 0; v.roarAtk = 0; v.frost = null; v.frozenT = 0; v.beamAims = null; v.stormCd = 0; v.aimedAt = 0; v.wwDodges = 0; v.watchT = 0;
+        v.burn = null; v.web = null; v.webs = 0; v.kills = 0; v.flurryLeft = 0; v.flurryTgt = null; v.rootTgt = null; v.rootedBy = null; v.hunt = null; v.bullN = 0; v.charging = false; v.inside = null; v.missileT = 0; v.roarSpd = 0; v.roarAtk = 0; v.frost = null; v.frozenT = 0; v.beamAims = null; v.stormCd = 0; v.aimedAt = 0; v.wwDodges = 0; v.watchT = 0;
         sides[v.side].push(v); stats[v.side].totalHp += v.hp;
         for (const b of all) {
           if (b.windTarget === v) { b.windTarget = null; b.windT = 0; }

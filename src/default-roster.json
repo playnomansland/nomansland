@@ -136,6 +136,41 @@
       }
     },
     {
+      "id": "poisonousFangs",
+      "type": "poison",
+      "name": "Poisonous fangs",
+      "cost": 100,
+      "params": {
+        "pct": 150,
+        "duration": 6
+      }
+    },
+    {
+      "id": "cavestalkers",
+      "type": "stealth",
+      "name": "Cavestalkers",
+      "cost": 200,
+      "params": {},
+      "text": "Gain stealth."
+    },
+    {
+      "id": "webShots",
+      "type": "web",
+      "name": "Web-shots",
+      "cost": 300,
+      "params": {
+        "shots": 1,
+        "range": 10,
+        "slow": 10,
+        "dmg": 5,
+        "max": 90,
+        "secs": 3
+      },
+      "flat": true,
+      "master": true,
+      "text": "Each spider shoots one web a fight: it slows the target and weakens its attacks, and stacks."
+    },
+    {
       "id": "split",
       "type": "split",
       "name": "Split beam",
@@ -871,7 +906,7 @@
       "name": "Snow storm",
       "cost": 300,
       "params": {
-        "radius": 8
+        "radius": 10
       },
       "flat": true,
       "master": true
@@ -2089,11 +2124,13 @@
       "shape": "spider",
       "color": "#000000",
       "skills": [
+        "poisonousFangs",
         "spiderlings",
-        "poison",
-        "stealth"
+        "cavestalkers",
+        "webShots"
       ],
       "skillsOn": [
+        false,
         false,
         false,
         false
@@ -2101,15 +2138,29 @@
       "skillsInnate": [
         false,
         false,
+        false,
         false
       ],
       "skillMods": [
         null,
         null,
-        {
-          "params": {},
-          "cost": 200
-        }
+        null,
+        null
+      ],
+      "skillOr": [
+        [
+          1,
+          2
+        ]
+      ],
+      "skillNeedsAny": [
+        null,
+        null,
+        null,
+        [
+          1,
+          2
+        ]
       ]
     },
     {

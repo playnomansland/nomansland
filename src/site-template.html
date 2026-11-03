@@ -5139,9 +5139,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
           ? `<span class="chip" style="color:var(--foe);border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px">${foeName()} has it</span>` : `<span class="hint">Not bought</span>`;
       }
       const anyOf = Game.skillNeedsAny(m, i, k).map(j => defs[j].name), label = evolve ? 'Evolve' : wake ? 'Awaken' : Game.isMaster(m, i, k) ? 'Master' : '';
-      const more = evolve ? `Not bought: a squad evolves by itself, free, after the fight ${d.needs === 'glutMax' ? 'that fills its Glut' : 'it meets the need in'}, and keeps it all match. Enzo’s squads evolve too.`
+      const detail = d.text ? esc(Engine.describeSkill({ ...d, text: '' })) : ''; // a skill with a short text of its own: the full rules when held
+      const more0 = evolve ? `Not bought: a squad evolves by itself, free, after the fight ${d.needs === 'glutMax' ? 'that fills its Glut' : 'it meets the need in'}, and keeps it all match. Enzo’s squads evolve too.`
         : [anyOf.length ? `<b style="color:var(--gold)">Needs</b> ${esc(anyOf.join(' or '))} first.` : '',
         wake ? 'Bought for one squad at a time, on its own sheet. You can awaken only one unit type a match.' : label ? 'For all your squads of this unit.' : '', Game.isFlat(m, i, k) ? 'Always this price.' : ''].filter(Boolean).join(' ');
+      const more = [detail, more0].filter(Boolean).join('<br>');
       return upRow({ name: d.name, label, act, text: esc(Engine.describeSkill(d)), more });
     };
     // in slot order; either-or skills (owning one rules out the others) boxed together where the first of them comes

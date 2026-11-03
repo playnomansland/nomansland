@@ -95,6 +95,7 @@
     "portal": { "makes": ["Spawn"] },
     "overwatch": { "has": ["Range boost"] },
     "hunter": { "has": ["Stealth"] },
+    "web": { "has": ["Slow"] },
     "elemental": { "makes": ["Spawn"] },
     "freeMove": { "has": [] },
     "silent": { "has": ["Stealth"] },

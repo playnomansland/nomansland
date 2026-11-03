@@ -4,6 +4,26 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 3 November 2026 – Spiders rework, sniper tower, Snow storm
+
+### Spiders (rework)
+The Spiders' skill tree is new:
+- **Poisonous fangs** (100 gold): hits poison, the same as Poison shot.
+- Then pick one (200 gold each): **Spiderlings** (as before) **or** **Cavestalkers** (stealth).
+- **Web-shots** (Master skill, 300 gold, needs Spiderlings or Cavestalkers): once a fight, every spider shoots a web at an enemy within 10 m. Webs deal no damage, but they slow the target and weaken its attacks, and they stack. Hold the skill on the unit sheet for the exact numbers: each stack is 10% slower and 5% less damage, up to 90% of each, and lasts 3 seconds from the newest stack. A web also brings the spider's poison and slows, like a bite would.
+
+### Sniper tower
+- **Mark Bounty now works for all your units**, not just Snipers: every unit deals the marked squad +15% damage and sees it through stealth, and the +100 gold bounty pays when any of your units takes its last body.
+- **Eagle eye** now helps your whole army: **all your units get +1.5 m range and +5% attack speed**. Snipers and the tower get double (+3 m, +10%), the same as before.
+
+### Frost Wizard
+- **Snow storm** reaches 2 m further (8 → 10 m).
+
+### Unit sheets
+- A skill with a short description now keeps its full rules in the hold-to-read-more text (press and hold the skill row).
+
+---
+
 ## 3 November 2026 – Sniper Hunter, Water Elemental
 
 ### Sniper – Hunter (new Awaken skill, replaces Overwatch)
