@@ -7,7 +7,7 @@ Newest first. Each entry says what changed for players; technical details live i
 ## Coming up (PC focus)
 
 Planned for the next updates (details in `docs/ROADMAP.md`):
-- **Families and classes (draft):** buy a unit family, pick a class for it, and unlock classes with XP instead of levelling up (plan in `docs/CLASSES.md`, nothing decided yet).
+- **Families and classes (draft):** buy a unit family, pick a class for it, and unlock classes with XP instead of levelling up (plan in `docs/CLASSES.md`, nothing decided yet). How the economy would change with it, measured against today's spending: `docs/CLASSES-ECONOMY.md`.
 - **Factions in the trees:** spec into a faction through your units' skills.
 - **New looks:** units change model at tree milestones (an Ent grows into a different tree depending on its spec).
 - **More lore** for the world, factions and units.

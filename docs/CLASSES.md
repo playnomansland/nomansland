@@ -104,6 +104,8 @@ Open:
 
 ## 6. Removing level-ups
 
+Economy analysis (where gold goes today, and what has to replace levels): `docs/CLASSES-ECONOMY.md`.
+
 Today level-ups are a major part of power and one of the biggest gold sinks (Balance Lab: over 6,000 gold in 200 matches). If they go:
 
 - Power comes from class instead of level, which is simpler to read.
