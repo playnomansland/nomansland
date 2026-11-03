@@ -20,7 +20,7 @@ A first version of **2v2**, open to developer accounts only for now.
 ### Talking to your team
 - **Pings:** tap **?**, **!** or **⚔** under the board, then tap a tile. Your teammate sees it on the board with a ripple, plus a line at the top saying who pinged where. Use **?** to ask "why here?", **!** for "look here", **⚔** for "attack here". Pings fade after 8 seconds and only your team sees them. They work while deploying and during the fight.
 - **Say…** sends a quick line to your team: Nice!, Help me!, Sorry!, Wait for me, Thanks!, GG.
-- **Both boards:** while deploying, tap **Both boards** to see your teammate's board beside yours (with what they placed this round), then **My board** to go back. Ping on their board from there. It's only to look at: deploying happens on your own board.
+- **Your teammate's board, live:** on a **PC** it sits right beside yours the whole time you deploy (with the strip between, as in the fight), and every squad your teammate places, moves or sells shows up there as they do it. Your own board works exactly as in 1v1. On a **phone** tap **Teammate's board** to look at theirs (it updates live too), then **My board** to go back. You can ping on either board.
 
 ### The lobby
 - Developer section of the Play menu: **2v2 lobby**. It gives a 6-letter code and an invite link. Anyone with the link or code can join (the code box now takes 6-letter codes too).
@@ -28,8 +28,8 @@ A first version of **2v2**, open to developer accounts only for now.
 - **Start** works with fewer than four: every empty seat, and anyone not connected when it starts, is played by the AI.
 
 ### Watching the fight
-- **On a PC** you see the whole field: both boards, all four players.
-- **On a phone** the fight (and Both boards) opens on your own board, with your opponent in front of you. Drag sideways to look at the other board, pinch or double tap to see the whole field. (On the 3D board the camera starts over your own board.)
+- **On a PC** you see the whole field: both boards, all four players, in 2D and 3D.
+- **On a phone** the fight opens on your own board, with your opponent in front of you. Drag sideways to look at the other board, pinch or double tap to see the whole field. (On the 3D board the camera starts over your own board.)
 - After the fight you're back on your own board for the next round. The bar above the board shows your seat, your board and how your teammate is doing.
 
 ---

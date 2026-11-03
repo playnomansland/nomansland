@@ -13,7 +13,7 @@
 //               lobby), start { settings } (host), act { seq, fn, a }, ready { v }, next { round }, rematch, forfeit,
 //               mark { kind, lane, col, row } (a ping; 'ping' is the keep-alive), emote { id } (both to the team only), sync
 // Messages out: welcome { side, key, seq, seat, lane, host }, duolobby { seats, host, seat }, full, denied { why },
-//               mark { from, kind, lane, col, row }, emote { from, id },
+//               mark { from, kind, lane, col, row }, emote { from, id }, mate { mate } (the teammate's lane changed),
 //               sync / status / fight as in a 1v1 room (server/src/room.js) for the seat's own lane, plus duo
 //               ({ seat, lane, names, here, bots, hp, ready, nextReady, mate }) and, in fight, duo.pres (both lanes before
 //               the fight, for the wide playback).
@@ -32,6 +32,7 @@ export class DuoRoom extends DurableObject {
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('{"t":"ping"}', '{"t":"pong"}'));
     this.rate = new Map();
     this.sent = new Map();
+    this.mateSent = new Map(); // socket -> fingerprint of the teammate lane it last got
     ctx.blockConcurrencyWhile(async () => {
       const { units, matrix } = builtin();
       this.meta = (await ctx.storage.get('meta')) || null; // { code, seats: [{ key, tag, title } | null x4], host: seat }
@@ -88,11 +89,12 @@ export class DuoRoom extends DurableObject {
     for (const s of this.sockets(opts.gone)) {
       if (this.att(s).role !== 'p') continue;
       const msg = this.syncMsg(s, opts.gone);
-      const key = Ref.fnv(JSON.stringify({ ...msg, remaining: 0, ack: 0, held: 0 }));
-      if (s === opts.skip) { this.sent.set(s, key); continue; }
-      if (!opts.force && this.sent.get(s) === key) continue;
-      this.sent.set(s, key);
-      this.send(s, msg);
+      // the teammate's lane goes on its own ('mate'), so a teammate's change doesn't resend this phone's own lane
+      const mate = msg.duo ? msg.duo.mate : undefined, mk = mate === undefined ? '' : Ref.fnv(JSON.stringify(mate));
+      const key = Ref.fnv(JSON.stringify({ ...msg, remaining: 0, ack: 0, held: 0, duo: msg.duo ? { ...msg.duo, mate: null } : undefined }));
+      if (s === opts.skip) { this.sent.set(s, key); this.mateSent.set(s, mk); continue; }
+      if (opts.force || this.sent.get(s) !== key) { this.sent.set(s, key); this.mateSent.set(s, mk); this.send(s, msg); continue; }
+      if (mk && this.mateSent.get(s) !== mk) { this.mateSent.set(s, mk); this.send(s, { t: 'mate', mate }); }
     }
   }
   broadcastFight(f) {
