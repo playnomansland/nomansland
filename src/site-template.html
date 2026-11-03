@@ -579,6 +579,11 @@ html.pc .corner button span { display: inline; }
 .tp-burst { position: absolute; inset: -40%; pointer-events: none; background: repeating-conic-gradient(from 0deg, rgba(230, 184, 74, 0.10) 0 10deg, transparent 10deg 20deg); animation: tspin 14s linear infinite; z-index: -1; }
 @keyframes tspin { to { transform: rotate(360deg); } }
 .title-pop > *:not(.tp-burst) { position: relative; }
+/* skins (2026-11-03): the "new skin" popup card and the Profile row */
+.skin-card { display: grid; justify-items: center; gap: 4px; }
+.skin-card img { filter: drop-shadow(0 0 10px rgba(230, 184, 74, 0.55)); }
+.skin-row { display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; }
+.skin-row small { display: block; }
 @media (prefers-reduced-motion: reduce) { .ptitle, .tp-burst, .tp-list { animation: none; } }
 
 /* the music player (2026-11-02): Now playing opens the playlist; shuffle and repeat */
@@ -1665,7 +1670,44 @@ html.pc .corner button span { display: inline; }
     gridKey = key;
     if (board3d) { stop3d(); start3d(); } else size();
   }
+  // ---------- skins (2026-11-03): looks for a unit, owned by an account (Shapes.SKINS, server accounts.js SKINS) ----------
+  // This phone's own worn skins come from its account; the opponent's only from the game server (net.players), which
+  // reads them from their account. No skins in 2v2 (both teammates' units share a side in the fight).
+  const wornIds = (list) => (Array.isArray(list) ? list : []).filter(k => typeof k === 'string' && Shapes.SKINS[k]);
+  function syncSkins() {
+    const pl = mode === 'net' || mode === 'spec' ? net.players : null, sides = [[], []];
+    if (net.duo && mode === 'net') { Shapes.useSkins(sides); return; }
+    if (mode === 'spec') { for (const sd of [0, 1]) sides[sd] = wornIds(pl && pl[sd] && pl[sd].skins); }
+    else {
+      sides[me] = acct ? (acct.skins || []).filter(k => k.worn).map(k => k.id) : [];
+      sides[foe()] = wornIds(pl && pl[foe()] && pl[foe()].skins);
+    }
+    Shapes.useSkins(sides);
+  }
+  // a skin's picture (2D, in the blue team colour) as an image, for Profile and the "new skin" popup
+  const skinPics = {};
+  function skinPic(id) {
+    if (skinPics[id]) return skinPics[id];
+    const k = Shapes.SKINS[id], u = units.find(x => x.name === k.unit) || { color: '#8D99AE' }, c = document.createElement('canvas');
+    c.width = c.height = 96; const g = c.getContext('2d');
+    Shapes.body(g, k.shape, 48, 54, 26, 1, u.color, css('--you') || '#4EA8FF', 1);
+    if (k.gild) Shapes.gild(g, k.gild, 48, 54, 26);
+    return (skinPics[id] = c.toDataURL());
+  }
+  const SKINS_SEEN = 'pb-skins-seen'; // { playerId: [skin ids already announced on this phone] }
+  function skinsUnseen() {
+    if (!acct || !acct.skins || acct.dev) return []; // a developer has every skin: no popup
+    let seen = {}; try { seen = JSON.parse(localStorage.getItem(SKINS_SEEN) || '{}') || {}; } catch (e) {}
+    return acct.skins.map(k => k.id).filter(k => !(seen[acct.id] || []).includes(k));
+  }
+  function skinsSeen() {
+    let seen = {}; try { seen = JSON.parse(localStorage.getItem(SKINS_SEEN) || '{}') || {}; } catch (e) {}
+    seen[acct.id] = acct.skins.map(k => k.id);
+    try { localStorage.setItem(SKINS_SEEN, JSON.stringify(seen)); } catch (e) {}
+  }
+
   function render() {
+    syncSkins();
     syncGrid();
     syncMate();
     syncMusic();
@@ -2829,9 +2871,18 @@ html.pc .corner button span { display: inline; }
           <div class="tp-list">${titlesUnseen().map(t => titleHtml(t, true)).join('')}</div>
           <p class="hint" style="margin:0">${titlesUnseen().map(t => TITLE_WHY[t] || '').join(' ')} It shows under your name. Change it any time in Profile.</p>
           <button class="hbtn gold" id="title-ok">Nice!</button>
+        </div></div>`
+        : acct && skinsUnseen().length && !HOME_AUTO ? `<div class="pop-back" id="skin-back"><div class="pop title-pop" role="dialog" aria-modal="true" aria-labelledby="skin-h">
+          <div class="tp-burst" aria-hidden="true"></div>
+          <span class="eyebrow">${skinsUnseen().length > 1 ? 'New skins' : 'New skin'}</span>
+          <h3 id="skin-h">You have received a unique skin!</h3>
+          <div class="tp-list">${skinsUnseen().map(id => `<div class="skin-card"><img src="${skinPic(id)}" alt="" width="72" height="72"><b>${esc(Shapes.SKINS[id].name)} ${esc(Shapes.SKINS[id].unit)}</b></div>`).join('')}</div>
+          <p class="hint" style="margin:0">${skinsUnseen().map(id => esc(Shapes.SKINS[id].text)).join(' ')} Your ${esc(Shapes.SKINS[skinsUnseen()[0]].unit)}s wear it, and your opponents see it in online matches. Switch it off any time in Profile.</p>
+          <button class="hbtn gold" id="skin-ok">Nice!</button>
         </div></div>` : ''}`;
     wirePlayer();
     if ($('title-ok')) $('title-ok').addEventListener('click', () => { titlesSeen(); drawHome(); });
+    if ($('skin-ok')) $('skin-ok').addEventListener('click', () => { skinsSeen(); drawHome(); });
     if (acct && !home.refreshed) { home.refreshed = true; acctCall('me', {}, true).then(r => { if (r.status === 200) { acctTake(r); if (phase === 'start' && home.screen === 'menu' && !home.pop) drawHome(); } }); } // titles for accounts made before them
     if ($('stay-yes')) { $('stay-yes').addEventListener('click', () => { setStay(true); drawHome(); }); $('stay-no').addEventListener('click', () => { setStay(false); drawHome(); }); }
     $('play').addEventListener('click', () => { home.pop = true; drawHome(); });
@@ -3429,7 +3480,8 @@ html.pc .corner button span { display: inline; }
   function acctTake(r) {
     if (typeof r.rankedOn === 'boolean' && typeof home !== 'undefined') home.rankedOn = r.rankedOn;
     if (!r.player) return;
-    acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, dev: !!r.player.dev, titles: Array.isArray(r.player.titles) ? r.player.titles.filter(t => TITLES[t]) : [], title: TITLES[r.player.title] ? r.player.title : '', tagNext: +r.player.tagNext || 0, session: r.session || acct.session, ts: now() });
+    acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, dev: !!r.player.dev, titles: Array.isArray(r.player.titles) ? r.player.titles.filter(t => TITLES[t]) : [], title: TITLES[r.player.title] ? r.player.title : '', tagNext: +r.player.tagNext || 0,
+      skins: Array.isArray(r.player.skins) ? r.player.skins.filter(k => k && Shapes.SKINS[k.id]).map(k => ({ id: k.id, worn: !!k.worn })) : [], session: r.session || acct.session, ts: now() });
   }
   function acctFail(r) {
     if (r.status === 503 && r.error === 'accounts off') { acctUi.off = true; return 'Accounts aren’t switched on yet on the game server.'; }
@@ -3522,6 +3574,9 @@ html.pc .corner button span { display: inline; }
       <div style="text-align:center">${nameplate(a.tag, a.title, 'big')}</div>
       ${(a.titles || []).length ? `<span class="hint">Title under your name</span>
       <div class="seg" role="group" aria-label="Title">${a.titles.map(t => `<button data-title="${t}" aria-pressed="${a.title === t}" ${dis}>${esc(TITLES[t].name)}</button>`).join('')}<button data-title="" aria-pressed="${!a.title}" ${dis}>None</button></div>` : ''}
+      ${(a.skins || []).length ? `<span class="hint">Skins</span>
+      ${a.skins.map(k => `<div class="skin-row"><img src="${skinPic(k.id)}" alt="" width="40" height="40"><span><b>${esc(Shapes.SKINS[k.id].name)} ${esc(Shapes.SKINS[k.id].unit)}</b><small class="hint">${esc(Shapes.SKINS[k.id].text)}</small></span>
+        <div class="seg" role="group" aria-label="${esc(Shapes.SKINS[k.id].name)} skin"><button data-skin-id="${k.id}" data-worn="1" aria-pressed="${k.worn}" ${dis}>On</button><button data-skin-id="${k.id}" data-worn="" aria-pressed="${!k.worn}" ${dis}>Off</button></div></div>`).join('')}` : ''}
       <span class="hint">Your username</span>
       <span class="joinrow"><input class="tour-in" id="acct-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Your username" value="${esc(a.tag)}" ${a.tagNext > now() ? 'disabled' : ''}><button class="btn" id="acct-tag-ok" ${dis} ${a.tagNext > now() ? 'disabled' : ''}>Save</button></span>
       <p class="hint" style="margin:0">${a.dev ? 'Developer: change it any time.' : a.tagNext > now() ? `You can change it again on ${tagWhen(a.tagNext)}.` : 'You can change it once a week.'}</p>
@@ -3546,6 +3601,11 @@ html.pc .corner button span { display: inline; }
       const r = await acctCall('title', { title: b.dataset.title }, true);
       if (r.status !== 200) return acctFail(r);
       acctTake(r); if (phase === 'start' && !m) drawHome(); return 'Title saved.';
+    })));
+    $('acct').querySelectorAll('[data-skin-id]').forEach(b => b.addEventListener('click', () => acctDo(async () => {
+      const r = await acctCall('skin', { skin: b.dataset.skinId, worn: !!b.dataset.worn }, true);
+      if (r.status !== 200) return r.error === 'not your skin' ? 'That skin isn’t yours.' : acctFail(r);
+      acctTake(r); render(); return b.dataset.worn ? 'Skin on.' : 'Skin off.';
     })));
     on('acct-del', () => { if (acctUi.sure) acctDelete(); else { acctUi.sure = true; acctDraw(); } });
     acctGoogleButton();

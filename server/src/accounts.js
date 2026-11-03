@@ -21,6 +21,7 @@
 //   /account/delete  (auth)              -> { ok }  (login, sessions and gamertag removed; the id stays as a tombstone)
 //   /account/title   { title } (auth)   -> { player }  (shows one of the player's titles under the gamertag; '' = none)
 //   /account/ranked  { on } (auth, developer only) -> { on }  (switches ranked play on or off for everyone)
+//   /account/skin    { skin, worn } (auth) -> { player }  (wear or take off a skin the player owns; see SKINS below)
 //
 // Month end (2026-11-03): the Worker's hourly cron (wrangler.toml [triggers], index.js scheduled) calls awardLegends,
 // which gives the top LEGEND.top of the leaderboard the gold Legend title once a month has ended (Stockholm time).
@@ -53,6 +54,8 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS config (k TEXT PRIMARY KEY, v TEXT)`,
   // titles won (2026-11-03): one row per player, title and period ('legend', '2026-11'), place = leaderboard rank
   `CREATE TABLE IF NOT EXISTS awards (player TEXT NOT NULL, title TEXT NOT NULL, period TEXT NOT NULL, place INTEGER, created INTEGER NOT NULL, PRIMARY KEY (player, title, period))`,
+  // unit skins (2026-11-03): src 'grant' = owned; 'dev' = only a developer's on/off choice for a skin they have as a developer
+  `CREATE TABLE IF NOT EXISTS skins (player TEXT NOT NULL, skin TEXT NOT NULL, src TEXT NOT NULL, worn INTEGER NOT NULL DEFAULT 1, created INTEGER NOT NULL, PRIMARY KEY (player, skin))`,
 ];
 let schemaReady = null;
 function ensureSchema(db) {
@@ -89,6 +92,41 @@ export function titleShown(p) {
   if (p && p.title === 'none') return '';
   return p && have.includes(p.title) ? p.title : have[0] || '';
 }
+
+// ---------- unit skins (2026-11-03) ----------
+// A skin changes how one unit looks (src/shapes.js Shapes.SKINS has the same ids and the looks); never its stats.
+// Skins are given, never bought. SKIN_GRANTS gives a skin to the account with that gamertag: the first time a player
+// with that tag is found (the hourly cron and every /account/me check), the oldest such account gets it for good and
+// config 'grant:<skin>:<tag>' records that it is done, so someone who takes the name later gets nothing. Developers have
+// every skin (off until they wear it). Owned skins are worn by default; POST /account/skin { skin, worn } switches one.
+// A match's Room puts the worn skins of each side in its players list (sessionPlayer), so the other phone draws them.
+export const SKINS = ['brute-champion'];
+export const SKIN_GRANTS = [{ skin: 'brute-champion', tag: 'Gubbolas Cage' }];
+let grantsDone = false;
+export async function grantSkins(env, now = Date.now()) {
+  const db = env.ACCOUNTS;
+  if (grantsDone || !db) return;
+  await ensureSchema(db);
+  let left = 0;
+  for (const g of SKIN_GRANTS) {
+    const key = `grant:${g.skin}:${g.tag}`;
+    if (await db.prepare('SELECT 1 FROM config WHERE k = ?').bind(key).first()) continue;
+    const p = await db.prepare('SELECT id FROM players WHERE deleted IS NULL AND lower(tag) = lower(?) ORDER BY created LIMIT 1').bind(g.tag).first();
+    if (!p) { left++; continue; }
+    await db.batch([
+      db.prepare(`INSERT INTO skins (player, skin, src, worn, created) VALUES (?1, ?2, 'grant', 1, ?3) ON CONFLICT (player, skin) DO UPDATE SET src = 'grant'`).bind(p.id, g.skin, now),
+      db.prepare('INSERT OR REPLACE INTO config (k, v) VALUES (?, ?)').bind(key, p.id),
+    ]);
+  }
+  if (!left) grantsDone = true;
+}
+// the skins a player owns, [{ id, worn }]: granted rows, plus every skin for a developer
+async function skinsOf(db, id, dev) {
+  const rows = (await db.prepare('SELECT skin, src, worn FROM skins WHERE player = ?').bind(id).all()).results;
+  return SKINS.filter((k) => dev || rows.some((r) => r.skin === k && r.src === 'grant'))
+    .map((k) => { const r = rows.find((x) => x.skin === k); return { id: k, worn: r ? !!r.worn : !dev }; });
+}
+const wornSkins = async (db, id, dev) => (await skinsOf(db, id, dev)).filter((k) => k.worn).map((k) => k.id);
 
 const enc = new TextEncoder();
 async function sha256(s) {
@@ -198,7 +236,9 @@ export async function sessionPlayer(env, token) {
   const s = await db.prepare(`SELECT s.player, s.expires, p.tag, p.deleted, p.dev FROM sessions s JOIN players p ON p.id = s.player WHERE s.hash = ?`).bind(await sha256(token)).first();
   if (!s || s.expires < Date.now() || s.deleted) return null;
   const p = await db.prepare('SELECT created, dev, title, legend FROM players WHERE id = ?').bind(s.player).first();
-  return { id: s.player, tag: s.tag || 'Player', dev: !!s.dev, title: titleShown(p) };
+  let skins = [];
+  try { skins = await wornSkins(db, s.player, !!s.dev); } catch (e) { skins = []; } // a look only: never in the way of playing
+  return { id: s.player, tag: s.tag || 'Player', dev: !!s.dev, title: titleShown(p), skins };
 }
 // Ranked play is on unless a developer switched it off (config 'ranked' = 'off'). No database: off.
 export async function rankedOn(env) {
@@ -276,7 +316,7 @@ export async function leaderboard(env, cors) {
 async function playerOut(db, id) {
   const p = await db.prepare('SELECT id, tag, created, dev, title, tag_changed, legend FROM players WHERE id = ?').bind(id).first();
   const logins = await db.prepare('SELECT provider FROM logins WHERE player = ?').bind(id).all();
-  return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google'), dev: !!p.dev, titles: titlesOf(p), title: titleShown(p), tagNext: tagNext(p) > Date.now() ? tagNext(p) : 0 };
+  return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google'), dev: !!p.dev, titles: titlesOf(p), title: titleShown(p), tagNext: tagNext(p) > Date.now() ? tagNext(p) : 0, skins: await skinsOf(db, id, !!p.dev) };
 }
 
 // Developer mode: a Google account whose verified email is in the secret DEV_EMAILS (comma separated; a Cloudflare
@@ -294,7 +334,7 @@ export async function handleAccount(request, env, cors) {
   const db = env.ACCOUNTS;
   if (!db) return json({ error: 'accounts off' }, 503, cors);
   const route = new URL(request.url).pathname.replace(/^\/account\/?/, '').replace(/\/$/, '');
-  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title'].includes(route)) return json({ error: 'not found' }, 404, cors);
+  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title', 'skin'].includes(route)) return json({ error: 'not found' }, 404, cors);
   if (request.method !== 'POST') return json({ error: 'method' }, 405, cors);
 
   let body = {};
@@ -359,6 +399,12 @@ export async function handleAccount(request, env, cors) {
       await db.prepare('UPDATE players SET title = ? WHERE id = ?').bind(t || 'none', me.player).run();
       return json({ player: await playerOut(db, me.player) }, 200, cors);
     }
+    if (route === 'skin') {
+      const k = typeof body.skin === 'string' ? body.skin : '', p = await db.prepare('SELECT dev FROM players WHERE id = ?').bind(me.player).first();
+      if (!(await skinsOf(db, me.player, !!(p && p.dev))).some((x) => x.id === k)) return json({ error: 'not your skin' }, 400, cors);
+      await db.prepare(`INSERT INTO skins (player, skin, src, worn, created) VALUES (?1, ?2, 'dev', ?3, ?4) ON CONFLICT (player, skin) DO UPDATE SET worn = ?3`).bind(me.player, k, body.worn ? 1 : 0, now).run();
+      return json({ player: await playerOut(db, me.player) }, 200, cors);
+    }
     if (route === 'ranked') {
       // a developer switches ranked play on or off for everyone (the server's own dev flag, never the phone's word)
       const p = await db.prepare('SELECT dev FROM players WHERE id = ?').bind(me.player).first();
@@ -367,6 +413,7 @@ export async function handleAccount(request, env, cors) {
       return json({ on: await rankedOn(env) }, 200, cors);
     }
     if (route === 'me') {
+      try { await grantSkins(env, now); } catch (e) { console.warn('skins', e && e.message); }
       const out = { player: await playerOut(db, me.player), rankedOn: await rankedOn(env) };
       const lastRotation = me.expires - ACCOUNT.SESSION_DAYS * DAY;
       if (now - lastRotation > (+env.ACCOUNT_ROTATE_MS || ACCOUNT.ROTATE_MS)) {   // the setting is for tests

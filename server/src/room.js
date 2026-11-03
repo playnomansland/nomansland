@@ -21,7 +21,7 @@
 //               rematch, summary, ack, here }, ack { seq, ok, h }, status {...}, fight { pre, post, summary },
 //               speed { s }, forfeit { side }, full, denied { why? }, pong. welcome, lobby, sync and fight carry ranked
 //               (the series: { tags, wins, ties, games, best, done, result, forfeit }) in a ranked match, and players
-//               ([side 0, side 1]: { tag, title } of a phone that sent its account session, or null).
+//               ([side 0, side 1]: { tag, title, skins } of a phone that sent its account session, or null).
 import { DurableObject } from 'cloudflare:workers';
 import Game from '../../src/game.js';
 import Ref from '../../src/referee.js';
@@ -294,7 +294,7 @@ export class Room extends DurableObject {
       }
       key = this.meta.keys[side];
       if (!this.meta.players) this.meta.players = [null, null];
-      if (who) this.meta.players[side] = { tag: who.tag, title: who.title || '' };
+      if (who) this.meta.players[side] = { tag: who.tag, title: who.title || '', skins: who.skins || [] }; // skins: looks only (Shapes.SKINS)
     }
     // one socket per side: an older one of this side (a reload) is let go
     for (const s of this.players(side)) if (s !== ws) { this.setAtt(s, { role: 'x' }); try { s.close(1000, 'replaced'); } catch {} }

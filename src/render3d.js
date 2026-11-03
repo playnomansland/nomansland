@@ -708,7 +708,9 @@ const Render3D = (THREE, el, view, opts = {}) => {
     const battle = v.bt && (v.phase === 'battle' || v.phase === 'result' || v.phase === 'end');
     if (battle) collectBattle(v, dt, f); else collectDeploy(v, f);
     const byKey = {};
-    for (const s of bodies) { const k = models.kindOf(s.u) + '#' + s.look; (byKey[k] || (byKey[k] = [])).push(s); }
+    // a skin's own model (2026-11-03, Shapes.skinOf), else the unit's
+    const kindOfBody = (s) => { const sk = !s.u.structure && Shapes.skinOf(s.side, s.u); return sk && sk.model && models.KINDS.includes(sk.model) ? sk.model : models.kindOf(s.u); };
+    for (const s of bodies) { const k = kindOfBody(s) + '#' + s.look; (byKey[k] || (byKey[k] = [])).push(s); }
     const rings = [], labels = new Map();
     models_ = [];
     for (const [key, list] of Object.entries(byKey)) {

@@ -13,7 +13,7 @@
 // Sizes are for a body of radius 1 metre standing on y = 0 and facing -z; the renderer scales them like the 2D board.
 const Models3D = (THREE) => {
   const SKIN = '#D9A27A', DARK = '#2B2F33', METAL = '#B8C0C8', WOOD = '#8A5A32', BONE = '#E9E3CF', GLOW = '#FFE9A8';
-  const BRASS = '#C9A24A', IRON = '#55595E', PAPER = '#E8DFC4', HEAL = '#6FD08C';
+  const GOLD = '#E6B84A', BRASS = '#C9A24A', IRON = '#55595E', PAPER = '#E8DFC4', HEAL = '#6FD08C';
   const ICE = '#BFEFFF', GLUT = '#B07CFF';
   const STONE = '#6E6A64', ETHER = '#8FE3FF', SUN = '#F7D154', FIRE = '#FF8A3D', EMBER = '#FFD27A', ROCK = '#5A4A42', GHOST = '#7CFF6B';
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1);
@@ -124,6 +124,28 @@ const Models3D = (THREE) => {
       P(cyl(0.18, 0.15, 0.9), SKIN, [-0.75, 1.15, 0], [0, 0, 0.25]),
       P(cyl(0.18, 0.15, 0.9), SKIN, [0.75, 1.15, 0], [0.6, 0, -0.2]),
       P(cyl(0.24, 0.1, 1.2, 6), WOOD, [0.85, 1.25, -0.65], [-1.1, 0, 0])],
+    // the Brute's Champion skin (2026-11-03, Shapes.SKINS): a crowned Brute in gold-trimmed armour, spiked pauldrons,
+    // a cape in the team colour and a two-handed war hammer held up over its shoulder
+    'brute:champion': () => [...legs(0.72, 0.32, 0.38),
+      P(box(0.42, 0.14, 0.5), GOLD, [-0.32, 0.08, -0.05]), P(box(0.42, 0.14, 0.5), GOLD, [0.32, 0.08, -0.05]), // armoured boots
+      P(box(1.25, 1.0, 0.8), 'tint', [0, 1.22, 0]),
+      P(box(0.9, 0.72, 0.12), GOLD, [0, 1.3, -0.42]), // the breastplate
+      P(ball(0.16), '#C0392B', [0, 1.38, -0.5]), // a red gem in it
+      P(box(1.32, 0.2, 0.86), 'team', [0, 0.76, 0]), P(box(0.3, 0.24, 0.08), GOLD, [0, 0.76, -0.45]), // sash and buckle
+      P(box(1.2, 1.35, 0.08), 'team', [0, 1.05, 0.48], [0.12, 0, 0]), // the cape
+      ...[-1, 1].flatMap(sd => [
+        P(new THREE.SphereGeometry(0.38, 7, 5, 0, Math.PI * 2, 0, Math.PI / 2), GOLD, [sd * 0.7, 1.62, 0]), // pauldron
+        P(cone(0.09, 0.42, 4), IRON, [sd * 0.82, 1.98, 0], [0, 0, sd * -0.45]),
+        P(cyl(0.19, 0.16, 0.85), SKIN, [sd * 0.78, 1.12, -0.1], [0.35, 0, sd * 0.2]), // arms
+        P(cyl(0.2, 0.2, 0.18), GOLD, [sd * 0.8, 0.88, -0.2], [0.35, 0, sd * 0.2])]), // bracers
+      P(ball(0.31), SKIN, [0, 1.98, -0.08]),
+      // the crown: a gold band and five points
+      P(cyl(0.3, 0.3, 0.16, 8), GOLD, [0, 2.24, -0.08]),
+      ...[0, 1, 2, 3, 4].map(i => { const a = i / 5 * Math.PI * 2; return P(cone(0.07, 0.24, 4), GOLD, [Math.sin(a) * 0.27, 2.43, -0.08 - Math.cos(a) * 0.27]); }),
+      // the war hammer, two hands on the haft, its head up behind the right shoulder
+      P(cyl(0.06, 0.06, 2.1, 5), WOOD, [0.55, 1.75, 0.05], [0.25, 0, -0.35]),
+      P(box(0.42, 0.62, 0.42), IRON, [0.92, 2.72, 0.3], [0.25, 0, -0.35]),
+      P(box(0.46, 0.12, 0.46), GOLD, [0.92, 2.72, 0.3], [0.25, 0, -0.35])],
     // a winged imp or wisp, hovering
     flier: () => [
       P(ball(0.45), 'tint', [0, 1.3, 0]),

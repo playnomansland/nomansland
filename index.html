@@ -706,6 +706,11 @@ html.pc .corner button span { display: inline; }
 .tp-burst { position: absolute; inset: -40%; pointer-events: none; background: repeating-conic-gradient(from 0deg, rgba(230, 184, 74, 0.10) 0 10deg, transparent 10deg 20deg); animation: tspin 14s linear infinite; z-index: -1; }
 @keyframes tspin { to { transform: rotate(360deg); } }
 .title-pop > *:not(.tp-burst) { position: relative; }
+/* skins (2026-11-03): the "new skin" popup card and the Profile row */
+.skin-card { display: grid; justify-items: center; gap: 4px; }
+.skin-card img { filter: drop-shadow(0 0 10px rgba(230, 184, 74, 0.55)); }
+.skin-row { display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; }
+.skin-row small { display: block; }
 @media (prefers-reduced-motion: reduce) { .ptitle, .tp-burst, .tp-list { animation: none; } }
 
 /* the music player (2026-11-02): Now playing opens the playlist; shuffle and repeat */
@@ -840,7 +845,10 @@ const Shapes = (() => {
   const GOBLIN_PTS = [[-0.6, -0.42], [-0.34, -0.74], [0, -0.84], [0.34, -0.74], [0.6, -0.42], [0.66, 0.04], [0.5, 0.5], [0.24, 0.86], [0, 0.98],
     [-0.24, 0.86], [-0.5, 0.5], [-0.66, 0.04]];
   const GOBLIN_EARS = [[[-0.56, -0.3], [-1.4, -0.78], [-0.62, 0.18]], [[0.56, -0.3], [0.62, 0.18], [1.4, -0.78]]];
+  // the Brute's Champion skin (2026-11-03): broad shoulders with round pauldrons, a crown on top (drawn gold over it, CROWN)
+  const CROWN = [[-0.62, -0.5], [-0.66, -1.28], [-0.33, -0.92], [0, -1.42], [0.33, -0.92], [0.66, -1.28], [0.62, -0.5]];
   const FIGURES = {
+    champion: [{ p: [[-0.72, -0.56], [0.72, -0.56], [0.86, -0.1], [0.68, 0.96], [-0.68, 0.96], [-0.86, -0.1]] }, { c: [-0.78, -0.36, 0.42] }, { c: [0.78, -0.36, 0.42] }, { p: CROWN }],
     goblin: [{ p: GOBLIN_PTS }, ...GOBLIN_EARS.map(p => ({ p }))],
     spider: [{ c: [0, 0.32, 0.56] }, { c: [0, -0.42, 0.33] }, ...SPIDER_LEGS.flatMap(l => [{ p: strip(l, 0.15) }, { p: strip(l.map(([x, y]) => [-x, y]), 0.15) }])],
     sun: [{ c: [0, 0, 0.64] }, ...Array.from({ length: 8 }, (_, i) => ({ p: ray(-Math.PI / 2 + i * Math.PI / 4) }))],
@@ -996,7 +1004,31 @@ const Shapes = (() => {
     outline(ctx, shape, x, y, shape === 'ring' ? r * 1.05 : r + 0.6, up);
   }
 
-  return { IMP, GOBLIN_PTS, GOBLIN_EARS, LIST, tag, LABELS, PALETTE, valid, validColor, assign, draw, outline, path, svg, body };
+  // gold trim drawn over a body (a skin's crown or belt): parts as in FIGURES, filled gold with a thin dark edge
+  function gild(ctx, parts, x, y, r, alpha = 1, color = '#E6B84A') {
+    ctx.beginPath();
+    for (const pt of parts) { if (pt.c) { const [cx, cy, cr] = pt.c; ctx.moveTo(x + (cx + cr) * r, y + cy * r); ctx.arc(x + cx * r, y + cy * r, cr * r, 0, Math.PI * 2); } else { pt.p.forEach(([px, py], i) => i ? ctx.lineTo(x + px * r, y + py * r) : ctx.moveTo(x + px * r, y + py * r)); ctx.closePath(); } }
+    ctx.globalAlpha = alpha; ctx.fillStyle = color; ctx.fill();
+    ctx.strokeStyle = 'rgba(40,28,10,0.8)'; ctx.lineWidth = Math.max(0.75, r * 0.08); ctx.lineJoin = 'round'; ctx.stroke(); ctx.lineJoin = 'miter'; ctx.globalAlpha = 1;
+  }
+
+  // ---------- skins (2026-11-03) ----------
+  // Cosmetic looks for one unit, owned by a player's account (server/src/accounts.js SKINS has the same ids). Only how
+  // the unit is drawn changes: never its stats. shape: its 2D figure; gild: gold parts drawn over it; model: its 3D
+  // model (models3d.js BUILD). Which skins each side wears is set by the page (useSkins) before the board is drawn:
+  // this phone's own from its account, the opponent's from the server (net.players), so nobody can claim one they don't own.
+  const SKINS = {
+    'brute-champion': { unit: 'Brute', name: 'Champion', text: 'A crowned Brute in gold armour with a great hammer and a cape.', shape: 'champion', model: 'brute:champion',
+      gild: [{ p: CROWN }, { p: [[-0.7, 0.3], [0.7, 0.3], [0.69, 0.48], [-0.69, 0.48]] }] },
+  };
+  let worn = [{}, {}]; // per side: unit name -> skin
+  function useSkins(lists) {
+    worn = [0, 1].map((sd) => { const o = {}; for (const id of (lists && lists[sd]) || []) { const k = SKINS[id]; if (k && !o[k.unit]) o[k.unit] = k; } return o; });
+  }
+  // the skin a body of unit u on this side wears, or null
+  const skinOf = (side, u) => (u && (side === 0 || side === 1) && worn[side][u.name]) || null;
+
+  return { SKINS, useSkins, skinOf, gild, CROWN, IMP, GOBLIN_PTS, GOBLIN_EARS, LIST, tag, LABELS, PALETTE, valid, validColor, assign, draw, outline, path, svg, body };
 })();
 
 // ===== Battle engine (shared by headless tests and the page) =====
@@ -9185,8 +9217,10 @@ const Render2D = (cv, view, opts = {}) => {
     const r = radius(u);
     // an awakened or evolved squad (the opponent's awakening from this round stays hidden): a gold ring round each body, the Leafblade suit's blades
     const awake = Game.shownAwake(m, sq, side === me || phase !== 'deploy'), mech = awake && Game.unitFor(m, side, sq.unit, sq).mech;
+    const sk = Shapes.skinOf(side, u); // a skin (2026-11-03): its own figure, gold trim over it
     for (const b of bodies) {
-      Shapes.body(ctx, u.shape, PX(b.x), PY(b.y), r, upOf(side), u.color, col, 0.95);
+      Shapes.body(ctx, sk ? sk.shape : u.shape, PX(b.x), PY(b.y), r, upOf(side), u.color, col, 0.95);
+      if (sk && sk.gild) Shapes.gild(ctx, sk.gild, PX(b.x), PY(b.y), r, 0.95);
       if (mech) bladeMark(PX(b.x), PY(b.y), r, 0);
       if (awake) { ctx.globalAlpha = 0.9; ctx.strokeStyle = css('--gold'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(PX(b.x), PY(b.y), r + 3, 0, Math.PI * 2); ctx.stroke(); }
     }
@@ -9664,7 +9698,9 @@ const Render2D = (cv, view, opts = {}) => {
       // what Mechites build rattles as it goes (the Mechites themselves move smoothly)
       const rattle = b.u.construct ? Math.sin(bt.time() * 47 + b.x * 3.1) * r * 0.08 : 0;
       const lk = b.mask && b.side !== me && !b.revealed ? b.mask : b.u; // a disguise, until its first attack (devtest)
-      Shapes.body(ctx, lk.shape, PX(b.x) + rattle, PY(b.y), r, upOf(b.side), lk.color, c, (0.35 + 0.65 * hpr) * (b.delay > 0 ? 0.45 : 1));
+      const sk = lk === b.u ? Shapes.skinOf(b.side, b.u) : null, fa = (0.35 + 0.65 * hpr) * (b.delay > 0 ? 0.45 : 1); // a skin (2026-11-03)
+      Shapes.body(ctx, sk ? sk.shape : lk.shape, PX(b.x) + rattle, PY(b.y), r, upOf(b.side), lk.color, c, fa);
+      if (sk && sk.gild) Shapes.gild(ctx, sk.gild, PX(b.x) + rattle, PY(b.y), r, fa);
       if (b.u.mech) bladeMark(PX(b.x) + rattle, PY(b.y), r, bt.time() * (b.lastAtk > bt.time() - 0.4 ? 14 : 1.5) + b.x); // the Leafblade suit: its blades spin as it strikes
       if (b.u.unfolded) { ctx.fillStyle = 'rgba(30,24,20,0.75)'; for (const o of [-1, 1]) ctx.fillRect(PX(b.x) + o * r * 0.45 - r * 0.15, PY(b.y) + r * 0.75, r * 0.3, r * 0.45); } // an unfolded roller: two stumpy legs
       if (b.u.roll > 0) { // a roller: a seam across the ball turns as it rolls
@@ -10952,7 +10988,44 @@ Floors.floor = (() => {
     gridKey = key;
     if (board3d) { stop3d(); start3d(); } else size();
   }
+  // ---------- skins (2026-11-03): looks for a unit, owned by an account (Shapes.SKINS, server accounts.js SKINS) ----------
+  // This phone's own worn skins come from its account; the opponent's only from the game server (net.players), which
+  // reads them from their account. No skins in 2v2 (both teammates' units share a side in the fight).
+  const wornIds = (list) => (Array.isArray(list) ? list : []).filter(k => typeof k === 'string' && Shapes.SKINS[k]);
+  function syncSkins() {
+    const pl = mode === 'net' || mode === 'spec' ? net.players : null, sides = [[], []];
+    if (net.duo && mode === 'net') { Shapes.useSkins(sides); return; }
+    if (mode === 'spec') { for (const sd of [0, 1]) sides[sd] = wornIds(pl && pl[sd] && pl[sd].skins); }
+    else {
+      sides[me] = acct ? (acct.skins || []).filter(k => k.worn).map(k => k.id) : [];
+      sides[foe()] = wornIds(pl && pl[foe()] && pl[foe()].skins);
+    }
+    Shapes.useSkins(sides);
+  }
+  // a skin's picture (2D, in the blue team colour) as an image, for Profile and the "new skin" popup
+  const skinPics = {};
+  function skinPic(id) {
+    if (skinPics[id]) return skinPics[id];
+    const k = Shapes.SKINS[id], u = units.find(x => x.name === k.unit) || { color: '#8D99AE' }, c = document.createElement('canvas');
+    c.width = c.height = 96; const g = c.getContext('2d');
+    Shapes.body(g, k.shape, 48, 54, 26, 1, u.color, css('--you') || '#4EA8FF', 1);
+    if (k.gild) Shapes.gild(g, k.gild, 48, 54, 26);
+    return (skinPics[id] = c.toDataURL());
+  }
+  const SKINS_SEEN = 'pb-skins-seen'; // { playerId: [skin ids already announced on this phone] }
+  function skinsUnseen() {
+    if (!acct || !acct.skins || acct.dev) return []; // a developer has every skin: no popup
+    let seen = {}; try { seen = JSON.parse(localStorage.getItem(SKINS_SEEN) || '{}') || {}; } catch (e) {}
+    return acct.skins.map(k => k.id).filter(k => !(seen[acct.id] || []).includes(k));
+  }
+  function skinsSeen() {
+    let seen = {}; try { seen = JSON.parse(localStorage.getItem(SKINS_SEEN) || '{}') || {}; } catch (e) {}
+    seen[acct.id] = acct.skins.map(k => k.id);
+    try { localStorage.setItem(SKINS_SEEN, JSON.stringify(seen)); } catch (e) {}
+  }
+
   function render() {
+    syncSkins();
     syncGrid();
     syncMate();
     syncMusic();
@@ -12116,9 +12189,18 @@ Floors.floor = (() => {
           <div class="tp-list">${titlesUnseen().map(t => titleHtml(t, true)).join('')}</div>
           <p class="hint" style="margin:0">${titlesUnseen().map(t => TITLE_WHY[t] || '').join(' ')} It shows under your name. Change it any time in Profile.</p>
           <button class="hbtn gold" id="title-ok">Nice!</button>
+        </div></div>`
+        : acct && skinsUnseen().length && !HOME_AUTO ? `<div class="pop-back" id="skin-back"><div class="pop title-pop" role="dialog" aria-modal="true" aria-labelledby="skin-h">
+          <div class="tp-burst" aria-hidden="true"></div>
+          <span class="eyebrow">${skinsUnseen().length > 1 ? 'New skins' : 'New skin'}</span>
+          <h3 id="skin-h">You have received a unique skin!</h3>
+          <div class="tp-list">${skinsUnseen().map(id => `<div class="skin-card"><img src="${skinPic(id)}" alt="" width="72" height="72"><b>${esc(Shapes.SKINS[id].name)} ${esc(Shapes.SKINS[id].unit)}</b></div>`).join('')}</div>
+          <p class="hint" style="margin:0">${skinsUnseen().map(id => esc(Shapes.SKINS[id].text)).join(' ')} Your ${esc(Shapes.SKINS[skinsUnseen()[0]].unit)}s wear it, and your opponents see it in online matches. Switch it off any time in Profile.</p>
+          <button class="hbtn gold" id="skin-ok">Nice!</button>
         </div></div>` : ''}`;
     wirePlayer();
     if ($('title-ok')) $('title-ok').addEventListener('click', () => { titlesSeen(); drawHome(); });
+    if ($('skin-ok')) $('skin-ok').addEventListener('click', () => { skinsSeen(); drawHome(); });
     if (acct && !home.refreshed) { home.refreshed = true; acctCall('me', {}, true).then(r => { if (r.status === 200) { acctTake(r); if (phase === 'start' && home.screen === 'menu' && !home.pop) drawHome(); } }); } // titles for accounts made before them
     if ($('stay-yes')) { $('stay-yes').addEventListener('click', () => { setStay(true); drawHome(); }); $('stay-no').addEventListener('click', () => { setStay(false); drawHome(); }); }
     $('play').addEventListener('click', () => { home.pop = true; drawHome(); });
@@ -12716,7 +12798,8 @@ Floors.floor = (() => {
   function acctTake(r) {
     if (typeof r.rankedOn === 'boolean' && typeof home !== 'undefined') home.rankedOn = r.rankedOn;
     if (!r.player) return;
-    acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, dev: !!r.player.dev, titles: Array.isArray(r.player.titles) ? r.player.titles.filter(t => TITLES[t]) : [], title: TITLES[r.player.title] ? r.player.title : '', tagNext: +r.player.tagNext || 0, session: r.session || acct.session, ts: now() });
+    acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, dev: !!r.player.dev, titles: Array.isArray(r.player.titles) ? r.player.titles.filter(t => TITLES[t]) : [], title: TITLES[r.player.title] ? r.player.title : '', tagNext: +r.player.tagNext || 0,
+      skins: Array.isArray(r.player.skins) ? r.player.skins.filter(k => k && Shapes.SKINS[k.id]).map(k => ({ id: k.id, worn: !!k.worn })) : [], session: r.session || acct.session, ts: now() });
   }
   function acctFail(r) {
     if (r.status === 503 && r.error === 'accounts off') { acctUi.off = true; return 'Accounts aren’t switched on yet on the game server.'; }
@@ -12809,6 +12892,9 @@ Floors.floor = (() => {
       <div style="text-align:center">${nameplate(a.tag, a.title, 'big')}</div>
       ${(a.titles || []).length ? `<span class="hint">Title under your name</span>
       <div class="seg" role="group" aria-label="Title">${a.titles.map(t => `<button data-title="${t}" aria-pressed="${a.title === t}" ${dis}>${esc(TITLES[t].name)}</button>`).join('')}<button data-title="" aria-pressed="${!a.title}" ${dis}>None</button></div>` : ''}
+      ${(a.skins || []).length ? `<span class="hint">Skins</span>
+      ${a.skins.map(k => `<div class="skin-row"><img src="${skinPic(k.id)}" alt="" width="40" height="40"><span><b>${esc(Shapes.SKINS[k.id].name)} ${esc(Shapes.SKINS[k.id].unit)}</b><small class="hint">${esc(Shapes.SKINS[k.id].text)}</small></span>
+        <div class="seg" role="group" aria-label="${esc(Shapes.SKINS[k.id].name)} skin"><button data-skin-id="${k.id}" data-worn="1" aria-pressed="${k.worn}" ${dis}>On</button><button data-skin-id="${k.id}" data-worn="" aria-pressed="${!k.worn}" ${dis}>Off</button></div></div>`).join('')}` : ''}
       <span class="hint">Your username</span>
       <span class="joinrow"><input class="tour-in" id="acct-tag" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Your username" value="${esc(a.tag)}" ${a.tagNext > now() ? 'disabled' : ''}><button class="btn" id="acct-tag-ok" ${dis} ${a.tagNext > now() ? 'disabled' : ''}>Save</button></span>
       <p class="hint" style="margin:0">${a.dev ? 'Developer: change it any time.' : a.tagNext > now() ? `You can change it again on ${tagWhen(a.tagNext)}.` : 'You can change it once a week.'}</p>
@@ -12833,6 +12919,11 @@ Floors.floor = (() => {
       const r = await acctCall('title', { title: b.dataset.title }, true);
       if (r.status !== 200) return acctFail(r);
       acctTake(r); if (phase === 'start' && !m) drawHome(); return 'Title saved.';
+    })));
+    $('acct').querySelectorAll('[data-skin-id]').forEach(b => b.addEventListener('click', () => acctDo(async () => {
+      const r = await acctCall('skin', { skin: b.dataset.skinId, worn: !!b.dataset.worn }, true);
+      if (r.status !== 200) return r.error === 'not your skin' ? 'That skin isn’t yours.' : acctFail(r);
+      acctTake(r); render(); return b.dataset.worn ? 'Skin on.' : 'Skin off.';
     })));
     on('acct-del', () => { if (acctUi.sure) acctDelete(); else { acctUi.sure = true; acctDraw(); } });
     acctGoogleButton();
@@ -14220,7 +14311,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // It falls back to the 2D board when it can't start (no WebGL), when the phone drops the WebGL context, and when
   // fights run under 20 fps at low quality (slower fights step the quality down first), with one line on the board.
   const THREE_URL = './vendor/three.module.min.js'; // the artifact build points this at jsDelivr
-  const V3D = 'ce80573491'; // the 3D code's version (src/build.js puts a hash of it here)
+  const V3D = '6f494775dd'; // the 3D code's version (src/build.js puts a hash of it here)
   const B3D_STORE = 'phone-bellum-board';
   const force2d = /[?&]board=2d\b/.test(location.search);
   const force3d = !force2d && (/[?&]board=3d\b/.test(location.search) || window.PB_FORCE3D === true);

@@ -12,9 +12,10 @@
 //   GET /history/<MATCH>   -> one match's rounds (<ROOM>-<seed>, or a bare room code for that room's newest match)
 //   GET /leaderboard       -> ranked players with wins, ties and losses, and whether ranked play is on (accounts.js)
 //   POST /account/<route>  -> accounts (step 5; guest, me, google, tag, signout, delete): see accounts.js
-// Cron (wrangler.toml [triggers], hourly): month end, the Legend title for the leaderboard's top 5 (accounts.js awardLegends)
+// Cron (wrangler.toml [triggers], hourly): month end, the Legend title for the leaderboard's top 5 (accounts.js awardLegends),
+// and skins given to a gamertag (accounts.js grantSkins)
 import { json } from './limits.js';
-import { handleAccount, leaderboard, awardLegends } from './accounts.js';
+import { handleAccount, leaderboard, awardLegends, grantSkins } from './accounts.js';
 import { VERSION } from './version.js';
 export { Room } from './room.js';
 export { TourRoom } from './tour.js';
@@ -34,6 +35,7 @@ export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(awardLegends(env, +env.LEGEND_NOW || event.scheduledTime).then((r) => { if (r) console.log('legend', r.month, r.players.length); })
       .catch((e) => console.warn('legend', e && e.message)));
+    ctx.waitUntil(grantSkins(env).catch((e) => console.warn('skins', e && e.message))); // skins given to a gamertag (accounts.js SKIN_GRANTS)
   },
   async fetch(request, env) {
     const url = new URL(request.url);
