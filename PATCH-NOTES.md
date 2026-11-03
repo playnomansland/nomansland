@@ -4,6 +4,18 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## Coming up (PC focus)
+
+Planned for the next updates (details in `docs/ROADMAP.md`):
+- **Skill trees:** a much bigger skill tree for every unit.
+- **Factions in the trees:** spec into a faction through your units' skills.
+- **New looks:** units change model at tree milestones (an Ent grows into a different tree depending on its spec).
+- **More lore** for the world, factions and units.
+- **More balancing.**
+- **Damage types (idea):** physical and magic.
+
+---
+
 ## 3 November 2026 – 3D board for everyone
 
 - **Everybody starts on the 3D board.** If your phone or computer had been stuck on 2D (from an older version, or because 3D once ran too slowly), it switches to 3D the next time you open the game. This happens once: if you then pick 2D in Settings, it stays 2D.
