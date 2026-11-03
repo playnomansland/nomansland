@@ -11,26 +11,60 @@ const Lab = require('../balance-lab.js');
   );
   assert.throws(() => Lab.parseArgs(['--matches', '0']), /--matches/);
   assert.throws(() => Lab.parseArgs(['--seed', '-1']), /--seed/);
+  assert.strictEqual(Lab.parseArgs([]).mirror, true, 'ranked: mirrored offers by default');
+  assert.strictEqual(Lab.parseArgs(['--map', 'random']).map, '');
   assert.strictEqual(Lab.parseArgs(['--mirror']).mirror, true);
   assert.strictEqual(Lab.parseArgs(['--mirror', '--no-mirror']).mirror, false);
   console.log('ok  CLI argument parsing and validation');
 }
 
 {
+  const empty = { units: [], skills: [], levelUps: 0, unlocks: [], other: {} };
+  const round = (bought0) => ({ damage: [5, 20], gold: { start: [300, 300], atFight: [50, 0], after: [400, 350] },
+    bought: [bought0, empty], squads: [[{ unit: 0, survival: 0.5, damageDealt: 100 }], []] });
   const report = Lab.summarize([
     {
-      completed: true, winner: 0, rounds: 2, hp: [80, 0],
-      roundLog: [{ damage: [5, 20], squads: [[{ unit: 0, survival: 0.5, damageDealt: 100 }], []] }]
+      completed: true, winner: 0, rounds: 2, hp: [80, 0], leaders: ['otto', 'zoe'], towers: ['keep', 'mage'],
+      referee: { accepted: 7, refused: [], desyncs: [] },
+      roundLog: [round({ ...empty, units: ['Test Unit'], skills: ['Test Unit: Sharp'], levelUps: 2 }), round(empty)]
     },
-    { completed: false, winner: -1, rounds: 3, hp: [20, 50], roundLog: [] }
+    { completed: false, winner: -1, rounds: 3, hp: [20, 50], leaders: [null, null], towers: [null, null],
+      referee: { accepted: 1, refused: [{ fn: 'place', why: 'rules' }], desyncs: [] }, roundLog: [] }
   ], [{ name: 'Test Unit' }]);
   assert.strictEqual(report.completed, 1);
   assert.strictEqual(report.unfinished, 1);
   assert.deepStrictEqual(report.wins, [1, 0]);
   assert.deepStrictEqual(report.winRate, [100, 0]);
-  assert.strictEqual(report.unitStats[0].damageDealt, 100);
+  assert.strictEqual(report.unitStats[0].damageDealt, 200);
   assert.strictEqual(report.unitStats[0].avgSurvival, 0.5);
-  console.log('ok  summary aggregation and unfinished-match handling');
+  assert.strictEqual(report.unitStats[0].bought, 1);
+  assert.strictEqual(report.unitStats[0].matches, 1);
+  assert.strictEqual(report.unitStats[0].winRateWhenFielded, 100);
+  assert.deepStrictEqual(report.referee, { accepted: 8, refused: 1, desyncs: 0, refusedBy: { 'place (rules)': 1 } });
+  assert.strictEqual(report.economy.levelUps, 2);
+  assert.strictEqual(report.economy.avgGoldSpentPerRound, 275);
+  assert.strictEqual(report.economy.avgGoldEarnedPerRound, 275); // between rounds 1 and 2 only: (250 + 300) / 2
+  assert.deepStrictEqual(report.skills, [{ name: 'Test Unit: Sharp', games: 1, wins: 1, winRate: 100 }]);
+  const otto = report.leaders.find(l => l.name.startsWith('Otto')), zoe = report.leaders.find(l => l.name === 'Zoe');
+  assert.deepStrictEqual([otto.winRate, zoe.winRate], [100, 0]);
+  console.log('ok  summary aggregation (units, skills, leaders, economy, referee) and unfinished matches');
+}
+
+{
+  // A whole refereed match: every AI move goes through the referee and is accepted, the AI's view stays in step,
+  // the AI levels up at fight time, and the same seed gives the same match.
+  const prepared = Lab.prepareRoster();
+  const a = Lab.simulateMatch(prepared, 4242, { maxRounds: 30 });
+  const b = Lab.simulateMatch(prepared, 4242, { maxRounds: 30 });
+  assert.deepStrictEqual(a, b, 'deterministic');
+  assert.strictEqual(a.map, 'testgrid', 'ranked settings: the Standard map');
+  assert.ok(a.referee.accepted > 10);
+  assert.deepStrictEqual(a.referee.refused, [], 'no AI move refused');
+  assert.deepStrictEqual(a.referee.desyncs, [], 'AI view and referee in step');
+  assert.ok(a.roundLog.some(r => r.bought.some(sd => sd.levelUps > 0)), 'the AI levels up');
+  assert.ok(a.leaders.every(Boolean) && a.towers.every(Boolean), 'leaders and towers recorded');
+  assert.ok(!a.leaders.includes('blixten'), 'no Blixten in ranked');
+  console.log('ok  refereed AI match (' + a.rounds + ' rounds, ' + a.referee.accepted + ' moves)');
 }
 
 {

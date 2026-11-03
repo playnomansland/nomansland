@@ -2,39 +2,52 @@
 
 The Balance Lab runs headless matches using the **actual NML source modules**. It does not implement a second combat simulator.
 
-## First milestone: simulation runner
+## Running it
 
 From the repository root:
 
 ```bash
 node tools/balance-lab.js --matches 10
+node tools/balance-lab.js --matches 200 --seed 700000 --out reports/lab.json
 ```
 
-Useful options:
+- `--matches`: number of matches (default 10). `--seed`: the first match's seed, +1 per match (default 700000).
+- `--max-rounds`: safety limit (default 30); matches that hit it count as unfinished.
+- `--map`: map id (default `testgrid`, the map players get, shown as "Standard"); `random` picks one per match.
+- `--no-mirror`: different package/leader/tower offers per side (default: mirrored, as in ranked).
+- `--out`: write the full JSON report (every match, every round). Nothing is written without it.
 
-```bash
-node tools/balance-lab.js --matches 100 --seed 700000 --max-rounds 30 --out tools/balance-lab/results/baseline.json
-```
+Speed: about 4 s per match on one core.
 
-- `--matches`: number of independent matches (default: 10).
-- `--seed`: first deterministic match seed; each match increments it (default: 700000).
-- `--max-rounds`: safety limit for matches that do not finish (default: 30).
-- `--map`: map id (default: `standard`).
-- `--mirror`: give both sides identical package/leader/tower offers and mirrored Zoe tiles, useful for controlled symmetry checks. Default: off, matching ordinary non-mirrored matches.
-- `--out`: optional path for the full JSON report. No report file is written unless requested.
+## How a match is played: like a server match
 
-Units and counter table: `src/demo-units.json` (the table the real AI drafts with, built by `tools/counter-table.js`), prepared by `server/src/prepare-units.cjs`, the same code the game server uses. No battles run before the matches start. (Until 2 November 2026 the lab built its own table from `src/default-roster.json` with different settings, ~30 min, and handed the AI battle results instead of scores, so its drafts were wrong. Reports from before then are not valid.)
+Each match is a **refereed match** (`src/referee.js`, the code the game server runs), with the server's **ranked** settings (`server/src/room.js` RANKED: Standard map, 5 package offers, mirrored offers, no Blixten):
+- Units and counter table: `src/demo-units.json` (the table the real AI drafts with, built by `tools/counter-table.js`), prepared by `server/src/prepare-units.cjs`, as on the server.
+- Each side is the game's AI, playing on **what that side may see** (the referee's view: none of the opponent's new squads, buys or picks this round). `Game.aiDeploy(view, side, rec)` records every move that worked as an action, and the lab sends them to the referee one by one, as a phone does. At fight time the AI spends its level-ups (`Game.aiLevel`), as the page's AI and the server's tournament bots do.
+- The referee checks every move against its whitelist and the rules, settles what nobody picked (packages, tower picks, walls), runs the fight and resolves the round.
+- The report counts moves the referee accepted, **refused** (an AI move a player couldn't make) and **desyncs** (the AI's view and the referee's match differ after its moves). Both should be 0.
 
-Both sides use the current `Game.aiDeploy` implementation. Each match uses the normal match creation, deployment, battle setup, engine stepping and round resolution functions. The runner records the seed, winner/completion, rounds, remaining HP/gold, per-round damage, battle duration and squad-level damage/survival.
+The recorder (`aiCall` in `src/game.js`) changes nothing in how the AI plays: 28 whole AI matches on all 7 maps ended byte-identical before and after it.
 
-## Interpreting the first report
+Reports from before 3 November 2026 are not valid: the lab drafted with battle results instead of scores (until 2 November), never levelled up, skipped the server's pre-fight settling, and played the developer-only Old standard map.
 
-This first runner is a **baseline harness**, not yet a reliable unit/skill ranking:
-- Side 0 and side 1 win rates are reported separately. Side bias must be measured before interpreting balance.
-- The current AI is not a proxy for human decision-making. Its draft, economy and placement choices influence results.
-- Squad appearances and damage are descriptive. They are not causal estimates of unit or skill value.
-- Matches that hit the round limit are marked unfinished and excluded from the completed-match win-rate denominator.
-- A small sample is useful for checking the harness, not drawing balance conclusions.
+## What the report holds
+
+Per match: seed, map, winner, rounds, health and gold left, leaders and towers, referee counts, and per round: gold at the start, at the fight and after, what each side bought (units, skills incl. Awaken, level-ups, unlocks, everything else by action), damage to each side, fight time, and every squad's level, survival and damage.
+
+Summary (`summary` in the report, printed by the CLI):
+- `wins` / `winRate` per side: **side bias**. With mirrored offers the sides should be even; check this before reading anything else.
+- `referee`: accepted, refused (by action and reason), desyncs.
+- `economy`: average gold at the round's start, left at the fight, spent per round, earned between rounds; level-ups; every other purchase by action.
+- `leaders`, `towers`, `skills`: games, wins and win rate (completed matches), most played first.
+- `unitStats` per unit: squads bought, rounds fielded, damage (total and per squad-round), average survival, matches fielded and win rate in those matches.
+
+## Reading it
+
+- These are the **AI's** results, not humans'. The AI's drafting, economy and placement shape everything. Use it to compare strategies the AI plays, and to see what a change does, not as human win rates.
+- Win rates "when fielded" or "when bought" are **descriptive**, not causal: a unit the AI buys when it is already winning looks good.
+- Look at `games` before any rate: below ~50 games a rate swings by 10+ points by chance.
+- Mirrored offers mean both sides can pick the same leader in one match; that leader then gets one win and one loss.
 
 ## Engine fast paths (`opts.targetingMode === 'indexed'`)
 
@@ -53,8 +66,7 @@ Profiling: `node tools/profile-matchup-matrix.js --mode indexed` (CI: run the wo
 
 ## Next milestones
 
-1. **Validate the baseline:** run larger samples, check side symmetry and repeatability, and profile simulation speed.
-2. **Improve result data:** capture roster, purchases, upgrades, skills, leaders, towers, economy transactions and battle-event attribution.
-3. **Balance dashboard:** filter by unit, skill, leader, tower, matchup, map and round.
-4. **Experiments:** compare baseline and modified values with paired seeds and controlled compositions.
-5. **Skill agency:** distinguish availability/selection/activation from measurable combat impact. Agency will need decision/event instrumentation; raw damage alone cannot measure it.
+1. **Balance dashboard:** a page over a report: filter by unit, skill, leader, tower, map and round, with sample sizes.
+2. **Experiments:** run the same seeds with old and new values (paired seeds) and compare, before a change ships.
+3. **Real armies:** replay players' matches from the server's history (seed + actions) instead of only AI-vs-AI.
+4. **Skill agency:** tell availability, selection and activation apart from measurable combat impact (needs fight events, not just damage).

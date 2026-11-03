@@ -921,6 +921,16 @@ const Game = (() => {
   // where the elf tower stands (world coordinates), or null: on its column, on the line between the two middle rows
   const elfSpot = (m) => { const mp = mapOf(m); return mp && mp.elfTower && m.map.elfCol != null ? { x: tileToWorld(m.map.elfCol, 0).x, y: 0, col: m.map.elfCol } : null; };
   const towerColOk = (col) => col >= 0 && col < COLS && (col < TOWER_MID[0] || col > TOWER_MID[1]);
+  // The AI makes its moves through aiCall: the very same calls, and while a recorder is on (aiDeploy/aiLevel with rec)
+  // each move that worked is noted as an action a player could send ({ fn, a }, see Referee.ACTIONS), so the Balance
+  // Lab can play the AI through the server referee (tools/balance-lab.js).
+  let aiRec = null, aiFns = null;
+  function aiCall(fn, m, side, ...a) {
+    aiFns = aiFns || { awaken, bribe, buyAltar, buyBuilding, buyBuildingSkill, buyDeploy, buyElfOwn, buyMageGen, buySkill, buyTowerSkill, buyTowerSkill2, buyTround, choosePack, fortify, huntMark, levelBuilding, levelUp, place, placeMark, removeShroom, setTowerType, spin, takeLoan, unlock };
+    const r = aiFns[fn](m, side, ...a);
+    if (r && aiRec) aiRec.push({ fn, a });
+    return r;
+  }
   const AI = { levelPolicy: 'smart', maxExtraDeploys: 3, skills: true }; // levelPolicy: smart | never | all (for experiments)
 
   // rows 0-4: enemy zone (row 4 is its front), rows 5-10: no man's land, rows 11-15: player zone (row 11 is its front)
@@ -1454,7 +1464,7 @@ const Game = (() => {
   // the AI: each of its Hunters without a mark marks the priciest enemy squad it may
   function aiHunt(m, side) {
     const foes = m.armies[1 - side].filter(q => markTarget(m, side, q.id)).sort((a, b) => (b.cost || 0) - (a.cost || 0) || a.id - b.id);
-    for (const h of m.armies[side]) if (isHunter(m, h) && !preyOf(m, side, h) && foes.length) huntMark(m, side, h.id, foes[0].id);
+    for (const h of m.armies[side]) if (isHunter(m, h) && !preyOf(m, side, h) && foes.length) aiCall('huntMark', m, side, h.id, foes[0].id);
   }
 
   // ---------- Evolve skills (by themselves) ----------
@@ -2508,7 +2518,7 @@ const Game = (() => {
   // the bot: now and then a spin, while it keeps a squad's worth of gold
   function aiSlots(m, side) {
     const r = rng(m.seed + m.round * 853 + side * 59);
-    while (canSpin(m, side) && m.gold[side] - SLOT.cost >= SQUAD_COST && r() < 0.5) spin(m, side);
+    while (canSpin(m, side) && m.gold[side] - SLOT.cost >= SQUAD_COST && r() < 0.5) aiCall('spin', m, side);
   }
 
   // ---------- leveling (manual, costs gold) ----------
@@ -2573,7 +2583,12 @@ const Game = (() => {
 
   // AI levels up at fight time, using only what it knew at the start of the round.
   // It skips chaff (8+ bodies): feeding leveled chaff to the enemy gives away XP.
-  function aiLevel(m, side) {
+  function aiLevel(m, side, rec) { // rec: a list that gets each move that worked, as an action ({ fn, a })
+    if (!rec) return aiLevelRun(m, side);
+    const was = aiRec; aiRec = rec;
+    try { return aiLevelRun(m, side); } finally { aiRec = was; }
+  }
+  function aiLevelRun(m, side) {
     const done = [];
     if (AI.levelPolicy === 'never') return done;
     const ready = m.armies[side].filter(s => isReady(m, s))
@@ -2581,9 +2596,9 @@ const Game = (() => {
     for (const sq of ready) {
       const u = m.units[sq.unit];
       if (AI.levelPolicy === 'smart' && u.bodies >= 8) continue;
-      while (isReady(m, sq) && levelUp(m, side, sq.id)) done.push({ id: sq.id, unit: sq.unit, level: sq.level });
+      while (isReady(m, sq) && aiCall('levelUp', m, side, sq.id)) done.push({ id: sq.id, unit: sq.unit, level: sq.level });
     }
-    for (const b of buildingsOf(m, side)) while (buildingReady(b) && levelBuilding(m, side, b.id)) done.push({ building: b.id, level: b.level });
+    for (const b of buildingsOf(m, side)) while (buildingReady(b) && aiCall('levelBuilding', m, side, b.id)) done.push({ building: b.id, level: b.level });
     return done;
   }
 
@@ -2965,7 +2980,12 @@ const Game = (() => {
   // ---------- AI ----------
   // Buys units that counter the opponent's army as it stood at the start of the round,
   // using the counter table, with a nudge toward variety and a little randomness.
-  function aiDeploy(m, side) {
+  function aiDeploy(m, side, rec) { // rec: a list that gets each move that worked, as an action ({ fn, a })
+    if (!rec) return aiDeployRun(m, side);
+    const was = aiRec; aiRec = rec;
+    try { return aiDeployRun(m, side); } finally { aiRec = was; }
+  }
+  function aiDeployRun(m, side) {
     const r = rng(m.seed + m.round * 7919 + side * 104729);
     if (needsPack(m, side)) { // the package whose units do best against the whole roster
       let bk = 0, bs = -Infinity;
@@ -2975,37 +2995,37 @@ const Game = (() => {
         s += (r() - 0.5) * 50;
         if (s > bs) { bs = s; bk = k; }
       });
-      choosePack(m, side, bk);
+      aiCall('choosePack', m, side, bk);
     }
     if (needsTower(m, side)) { // tower first: a back corner, left or right
       const rows = zoneRows(side);
       const col = r() < 0.5 ? 1 + Math.floor(r() * 2) : 9 + Math.floor(r() * 2);
       if (!placeTower(m, side, col, rows[3 + Math.floor(r() * 2)])) ensureTower(m, side);
     }
-    if (needsTowerPick(m, side)) { const ch = towerChoices(m, side); setTowerType(m, side, ch[Math.floor(rng(m.seed + side * 7477)() * ch.length)].id); } // own stream: the rest of the AI rolls stay as they were
-    if (canBuyTowerSkill(m, side) && rng(m.seed + m.round * 331 + side * 17)() < 0.5) buyTowerSkill(m, side); // own stream, as above
-    if (canBuyTowerSkill2(m, side) && m.gold[side] - towerSkill2Cost(m, side) >= SQUAD_COST && rng(m.seed + m.round * 347 + side * 19)() < 0.35) buyTowerSkill2(m, side);
-    if (canTakeLoan(m, side) && loanTerms(m, side) === CREDIT_LINE && m.gold[side] < SQUAD_COST * 3 && rng(m.seed + m.round * 613 + side * 37)() < 0.4) takeLoan(m, side); // short on gold: sometimes a loan
+    if (needsTowerPick(m, side)) { const ch = towerChoices(m, side); aiCall('setTowerType', m, side, ch[Math.floor(rng(m.seed + side * 7477)() * ch.length)].id); } // own stream: the rest of the AI rolls stay as they were
+    if (canBuyTowerSkill(m, side) && rng(m.seed + m.round * 331 + side * 17)() < 0.5) aiCall('buyTowerSkill', m, side); // own stream, as above
+    if (canBuyTowerSkill2(m, side) && m.gold[side] - towerSkill2Cost(m, side) >= SQUAD_COST && rng(m.seed + m.round * 347 + side * 19)() < 0.35) aiCall('buyTowerSkill2', m, side);
+    if (canTakeLoan(m, side) && loanTerms(m, side) === CREDIT_LINE && m.gold[side] < SQUAD_COST * 3 && rng(m.seed + m.round * 613 + side * 37)() < 0.4) aiCall('takeLoan', m, side); // short on gold: sometimes a loan
     if (canMark(m, side) && m.gold[side] - markCost(m, side) >= SQUAD_COST) { // Mark Bounty: their priciest squad
       const t = m.armies[1 - side].filter(q => markTarget(m, side, q.id)).sort((a, b) => (b.cost || 0) - (a.cost || 0) || a.id - b.id)[0];
-      if (t) placeMark(m, side, t.id);
+      if (t) aiCall('placeMark', m, side, t.id);
     }
     if (canFortify(m, side) && m.gold[side] - FORTIFY.cost >= SQUAD_COST && rng(m.seed + m.round * 631 + side * 43)() < 0.5) { // Fortify: in front of the tower or treasury
       const t = (treasuryUp(m) && rng(m.seed + m.round * 641 + side)() < 0.5 && treasurySpot(m, side)) || (m.towers && m.towers[side]);
-      if (t) for (const [dc, dr] of [[0, side === 0 ? -1 : 1], [-1, 0], [1, 0], [0, 0]]) if (fortify(m, side, t.col + dc, t.row + dr, frontEdge(side))) break;
+      if (t) for (const [dc, dr] of [[0, side === 0 ? -1 : 1], [-1, 0], [1, 0], [0, 0]]) if (aiCall('fortify', m, side, t.col + dc, t.row + dr, frontEdge(side))) break;
     }
     for (const x of towerRounds(m, side)) { // the Mecha Tower's bots: some rounds, if they leave gold for a squad
-      if (canBuyTround(m, side, x.id) && m.gold[side] - troundCost(m, side, x.id) >= SQUAD_COST && rng(m.seed + m.round * 619 + side * 41 + x.id.length)() < 0.45) buyTround(m, side, x.id);
+      if (canBuyTround(m, side, x.id) && m.gold[side] - troundCost(m, side, x.id) >= SQUAD_COST && rng(m.seed + m.round * 619 + side * 41 + x.id.length)() < 0.45) aiCall('buyTround', m, side, x.id);
     }
     if (towerPicked(m, side) && towerType(m, side).id === 'mage') { // a mage general most rounds, if it leaves gold for a squad
       const q = rng(m.seed + m.round * 577 + side * 29), g = MAGE_GENERALS[Math.floor(q() * MAGE_GENERALS.length)];
-      if (q() < 0.6 && m.gold[side] - g.cost >= SQUAD_COST) buyMageGen(m, side, g.id);
+      if (q() < 0.6 && m.gold[side] - g.cost >= SQUAD_COST) aiCall('buyMageGen', m, side, g.id);
     }
     aiDev(m, side, rng(m.seed + m.round * 829 + side * 53)); // devtest: pick, buildings, spells (own stream)
     aiSlots(m, side); // Otto: the slot machine (own stream)
     const opp = 1 - side;
     const oppArmy = m.armies[opp].filter(s => s.round < m.round);
-    for (const ui of freeLeft(m, side)) { const spot = aiSpot(m, side, ui, oppArmy, r); if (spot) place(m, side, ui, spot.col, spot.row); }
+    for (const ui of freeLeft(m, side)) { const spot = aiSpot(m, side, ui, oppArmy, r); if (spot) aiCall('place', m, side, ui, spot.col, spot.row); }
     const oppCount = {};
     for (const s of oppArmy) oppCount[s.unit] = (oppCount[s.unit] || 0) + 1;
     const own = {};
@@ -3024,26 +3044,26 @@ const Game = (() => {
     // the elf tower: from round 2, sometimes bribe it while a squad is still affordable after; more often when not ahead
     if (m.round >= 2) for (let k = 0; k < 3; k++) {
       if (!canBribe(m, side) || m.gold[side] - reserve - bribeCost(m, side) < minCost || r() >= (bribeLeader(m, true) === side ? 0.2 : 0.5)) break;
-      bribe(m, side);
+      aiCall('bribe', m, side);
     }
     // its own elf tower once the elves offer it: a free back-row tile, if a squad is still affordable after
     if (canBuyElfOwn(m, side) && m.gold[side] - reserve - elfOwnCost(m, side) >= minCost) {
       const spots = [];
       for (const row of zoneRows(side).slice(3)) for (let col = 1; col < COLS - 1; col++) if (elfOwnSpotOk(m, side, col, row)) spots.push({ col, row });
-      if (spots.length) { const sp = spots[Math.floor(r() * spots.length)]; buyElfOwn(m, side, sp.col, sp.row); }
+      if (spots.length) { const sp = spots[Math.floor(r() * spots.length)]; aiCall('buyElfOwn', m, side, sp.col, sp.row); }
     }
     // the altar of ice: walls now and then, push the storm away when it sits on its side, a Snowgre when gold allows
     if (altarRound(m)) {
       const spare = (c) => m.gold[side] - reserve - c >= minCost;
-      if (spare(altarCost(m, side, 'walls')) && r() < 0.4) buyAltar(m, side, 'walls');
+      if (spare(altarCost(m, side, 'walls')) && r() < 0.4) aiCall('buyAltar', m, side, 'walls');
       const off = stormShift(m, m.round + 1);
-      if ((side === 0 ? off <= 0 : off >= 0) && spare(altarCost(m, side, 'push')) && r() < 0.4) buyAltar(m, side, 'push');
-      if (m.gold[side] - reserve - altarCost(m, side, 'snowgre') >= minCost * 2 && r() < 0.4) buyAltar(m, side, 'snowgre');
+      if ((side === 0 ? off <= 0 : off >= 0) && spare(altarCost(m, side, 'push')) && r() < 0.4) aiCall('buyAltar', m, side, 'push');
+      if (m.gold[side] - reserve - altarCost(m, side, 'snowgre') >= minCost * 2 && r() < 0.4) aiCall('buyAltar', m, side, 'snowgre');
     }
     // mushroom tiles: sometimes clear a green one out of its own zone
     for (const row of zoneRows(side)) for (let col = 0; col < COLS; col++) {
       const sh = shroomAt(m, col, row);
-      if (sh && sh.type === 'green' && m.gold[side] - reserve - shroomCost(m, side) >= minCost && r() < 0.4) removeShroom(m, side, col, row);
+      if (sh && sh.type === 'green' && m.gold[side] - reserve - shroomCost(m, side) >= minCost && r() < 0.4) aiCall('removeShroom', m, side, col, row);
     }
     // buildings (a Factory): with a squad of the unit that brings one, sometimes place it on a back tile of its zone; once it
     // is built, buy one of its units most rounds. Its own random stream, so the rest of the AI rolls the same as before.
@@ -3052,12 +3072,12 @@ const Game = (() => {
       if (!canBuyBuilding(m, side, ui, k) || m.gold[side] - reserve - skillCost(m, ui, k, side) < minCost || rb() >= 0.6) return;
       const spots = [];
       for (const row of zoneRows(side).slice(3)) for (let col = 1; col < COLS - 1; col++) if (buildingSpotOk(m, side, col, row)) spots.push({ col, row });
-      if (spots.length) { const sp = spots[Math.floor(rb() * spots.length)]; buyBuilding(m, side, ui, k, sp.col, sp.row); }
+      if (spots.length) { const sp = spots[Math.floor(rb() * spots.length)]; aiCall('buyBuilding', m, side, ui, k, sp.col, sp.row); }
     }));
     for (const r of buildingRecords(m, side)) {
       if (!r.rec.built || bskillOf(m, side, r.key) || rb() >= 0.75) continue;
       const ok = buildingSkills(r.id).filter(x => m.gold[side] - reserve - bskillCost(r.id, x.id) >= 0);
-      if (ok.length) buyBuildingSkill(m, side, r.key, ok[Math.floor(rb() * ok.length)].id);
+      if (ok.length) aiCall('buyBuildingSkill', m, side, r.key, ok[Math.floor(rb() * ok.length)].id);
     }
     // skills: for unit types it has 2 or more squads of, sometimes buy a skill if a squad is still affordable after
     if (AI.skills) {
@@ -3065,12 +3085,12 @@ const Game = (() => {
       for (const ui of types) for (const k of E.SLOTS) {
         if (!skillDef(m, ui, k) || hasSkill(m, side, ui, k)) continue;
         if (m.gold[side] - reserve - skillCost(m, ui, k, side) < minCost) continue;
-        if (r() < 0.5) buySkill(m, side, ui, k);
+        if (r() < 0.5) aiCall('buySkill', m, side, ui, k);
       }
       // ...and awaken a squad now and then (its most levelled one first)
       for (const sq of m.armies[side].slice().sort((a, b) => (b.level || 0) - (a.level || 0))) {
         if (!canAwaken(m, side, sq.id) || m.gold[side] - reserve - awakenCost(m, sq.unit) < minCost) continue;
-        if (r() < 0.3) awaken(m, side, sq.id);
+        if (r() < 0.3) aiCall('awaken', m, side, sq.id);
       }
     }
     aiHunt(m, side); // Hunters mark the priciest enemy squad they may
@@ -3079,7 +3099,7 @@ const Game = (() => {
       if (deploysLeft(m, side) <= 0) {
         // out of deployments: buy one more only if a squad is still affordable after it
         if (m.extraDeploys[side] >= AI.maxExtraDeploys || m.gold[side] - reserve < minCost + deployCost(m, side)) break;
-        if (!buyDeploy(m, side)) break;
+        if (!aiCall('buyDeploy', m, side)) break;
       }
       const budget = m.gold[side] - reserve;
       let best = -1, bs = -Infinity;
@@ -3099,8 +3119,8 @@ const Game = (() => {
       if (best < 0) break;
       const spot = aiSpot(m, side, best, oppArmy, r);
       if (!spot) break;
-      if (!isUnlocked(m, side, best) && !unlock(m, side, best)) break;
-      const sq = place(m, side, best, spot.col, spot.row);
+      if (!isUnlocked(m, side, best) && !aiCall('unlock', m, side, best)) break;
+      const sq = aiCall('place', m, side, best, spot.col, spot.row);
       if (!sq) break;
       own[best] = (own[best] || 0) + 1;
       bought.push(sq);
