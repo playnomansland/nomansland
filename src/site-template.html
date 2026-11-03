@@ -1600,7 +1600,7 @@ html.pc .corner button span { display: inline; }
   // the X on the task line: stop placing that unit (or the Move, the Charisma, the elf tower)
   function stopTask() {
     if (guideMode != null && guideMode !== 'pick' && guideDraft.length && m && editable()) Game.setGuide(m, me, guideMode, guideDraft); // the ✕ finishes an arrow
-    selected = null; moveMode = false; moving = null; charmMode = false; elfPlacing = false; wallPlacing = false; fortPlacing = false; markPicking = false;
+    selected = null; moveMode = false; moving = null; charmMode = false; elfPlacing = false; wallPlacing = false; fortPlacing = false; markPicking = false; huntPicking = null;
     bPlacing = null; castMode = null; guideMode = null; guideDraft = []; guideDrag = null;
     if (phase === 'deploy') panelDeploy();
     render();
@@ -1710,6 +1710,8 @@ html.pc .corner button span { display: inline; }
   let wallPlacing = false; // placing the bastion's Defensive walls
   let fortPlacing = false; // placing the bastion's Fortify wall for this round
   let markPicking = false; // picking the enemy squad for the sniper tower's Mark Bounty
+  let huntPicking = null; // the id of the awakened Hunter (Sniper) squad whose mark is being placed
+  const pickingHunt = () => huntPicking != null && phase === 'deploy' && !!m && Game.canHunt(m, me, huntPicking);
   const placingFort = () => fortPlacing && phase === 'deploy' && !!m && Game.canFortify(m, me);
   const pickingMark = () => markPicking && phase === 'deploy' && !!m && Game.canMark(m, me);
   const placingWall = () => wallPlacing && phase === 'deploy' && !!m && Game.bwallsLeft(m, me) > 0;
@@ -2261,6 +2263,7 @@ html.pc .corner button span { display: inline; }
       if (placingWall()) hint = `Tap a tile edge to build a wall (${Game.bwallsLeft(m, me)} left).`;
       if (placingFort()) hint = `Fortify: tap a tile edge on your side for this round's wall (${Game.FORTIFY.cost} gold).`;
       if (pickingMark()) hint = `Mark Bounty: tap an enemy squad from an earlier round${Game.markCost(m, me) ? ` (${Game.markCost(m, me)} gold)` : ' (free)'}. The mark can't be moved.`;
+      if (pickingHunt()) hint = 'Hunter: tap an enemy squad from an earlier round to mark it (free). Tap anywhere else to cancel.';
       if (devPicking()) hint = 'Pick a card.';
       const pb = bPlacing != null && Game.lessersOf(m, me).find(b => b.key === bPlacing);
       if (pb) hint = `Tap a gold tile to place your ${esc((Game.devBuilding(pb.id) || {}).name || 'building')}.${pb.col != null ? ' Tap anywhere else to leave it where it is.' : ''}`;
@@ -2410,7 +2413,7 @@ html.pc .corner button span { display: inline; }
     if (!editable() || !undoSnap || undoSnap.key !== undoKey()) return;
     Referee.restoreSide(m, me, JSON.parse(undoSnap.state));
     if (mode === 'net') srvAct('undoAll', []);
-    selected = null; moveMode = false; moving = null; charmMode = false; elfPlacing = false; wallPlacing = false; fortPlacing = false; markPicking = false; bPlacing = null; castMode = null; guideMode = null; guideDraft = []; guideDrag = null; rangeOf = null;
+    selected = null; moveMode = false; moving = null; charmMode = false; elfPlacing = false; wallPlacing = false; fortPlacing = false; markPicking = false; huntPicking = null; bPlacing = null; castMode = null; guideMode = null; guideDraft = []; guideDrag = null; rangeOf = null;
     closeSheet(); changed();
   }
   function changed() {
@@ -3814,6 +3817,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     for (const name of list(mv.unlock)) { const ui = unitIdx(name); if (ui >= 0 && Game.unlock(m, 1, ui)) did.push(`unlocked ${units[ui].name}`); }
     trySkills();
     for (const id of list(mv.awaken)) { const sq = m.armies[1].find(s => s.id === int(id)); if (sq && Game.awaken(m, 1, sq.id)) did.push(`awakened ${units[sq.unit].name} (id ${sq.id})`); }
+    for (const h of m.armies[1]) if (Game.isHunter(m, h) && !Game.preyOf(m, 1, h)) { Game.aiHunt(m, 1); const p = Game.preyOf(m, 1, h), q = p && m.armies[0].find(x => x.id === p.squad); if (q) did.push(`Hunter marked your ${units[q.unit].name}`); } // its Hunters mark your priciest squad
     for (const id of list(mv.levelBuilding)) if (Game.levelBuilding(m, 1, String(id))) levels.push({ building: String(id), level: Game.buildingOf(m, 1, String(id)).level });
     if (mv.buildingSkills && typeof mv.buildingSkills === 'object') for (const id in mv.buildingSkills) if (Game.buyBuildingSkill(m, 1, id, String(mv.buildingSkills[id]))) { const kind = Game.recordOf(m, 1, id).id; did.push(`bought ${Game.buildingSkillInfo(kind, String(mv.buildingSkills[id])).name} at its ${buildingName(kind)}`); }
     const bribes = Math.max(0, Math.min(20, mv.bribe === true ? 1 : int(mv.bribe) || 0));
@@ -4445,6 +4449,12 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       const gs = Game.squadAt(m, me, t.col, t.row);
       if (gs && Game.inBuilding(m, me, gs) && !(had && had.side === me && had.id === gs.id)) { rangeOf = { side: me, id: gs.id }; openSheet(gs.unit, gs, me); return; }
     }
+    if (pickingHunt()) { // Hunter: the enemy squad on this tile gets this Hunter's mark
+      const fs = Game.squadAt(m, foe(), t.col, t.row), hid = huntPicking;
+      huntPicking = null;
+      if (fs && editable() && Game.huntMark(m, me, hid, fs.id)) changed(); else { render(); hud(); panelDeploy(); }
+      return;
+    }
     if (pickingMark()) { // Mark Bounty: the enemy squad on this tile, after a check (it can't be moved once placed)
       const fs = Game.squadAt(m, foe(), t.col, t.row);
       markPicking = false;
@@ -4823,6 +4833,15 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       const at = wrapMap(), n = Game.footprint(m, q.unit), c = Game.tileToWorld(q.col + (n - 1) / 2, q.row + (n - 1) / 2), [x, y] = at(c.x, c.y), r = 14;
       html += `<g class="markx" style="stroke:${sd === me ? 'var(--gold)' : 'var(--foe)'}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}"/><path d="M${(x - r - 5).toFixed(1)} ${y.toFixed(1)}h10M${(x + r - 5).toFixed(1)} ${y.toFixed(1)}h10M${x.toFixed(1)} ${(y - r - 5).toFixed(1)}v10M${x.toFixed(1)} ${(y + r - 5).toFixed(1)}v10"/></g>`;
     }
+    if (!cinematic && m && phase === 'deploy') for (const sd of [0, 1]) { // Hunter: a smaller crosshair on each squad a Hunter marked
+      const ids = new Set(m.armies[sd].map(hq => Game.isHunter(m, hq) ? Game.preyShown(m, me, true, sd, hq) : null).filter(v => v != null));
+      for (const id of ids) {
+        const q = m.armies[1 - sd].find(x => x.id === id);
+        if (!q) continue;
+        const at = wrapMap(), n = Game.footprint(m, q.unit), c = Game.tileToWorld(q.col + (n - 1) / 2, q.row + (n - 1) / 2), [x, y] = at(c.x, c.y), r = 9;
+        html += `<g class="markx hunt" style="stroke:${sd === me ? 'var(--gold)' : 'var(--foe)'}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" stroke-dasharray="3 2"/><path d="M${(x - r - 4).toFixed(1)} ${y.toFixed(1)}h8M${(x + r - 4).toFixed(1)} ${y.toFixed(1)}h8M${x.toFixed(1)} ${(y - r - 4).toFixed(1)}v8M${x.toFixed(1)} ${(y + r - 4).toFixed(1)}v8"/></g>`;
+      }
+    }
     if ((h || tr || tiles.length || ring) && !cinematic) {
       const at = wrapMap(), pt = (x, y) => at(x, y).map(v => v.toFixed(1)).join(',');
       for (const t of tiles) {
@@ -5139,10 +5158,19 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function awakenAct(i, k, side, sq) {
     const chip = (txt, col) => `<span class="chip" style="color:${col};border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px">${txt}</span>`;
     const mine = side === undefined || side === me, cost = Game.skillCost(m, i, k);
-    if (!mine) return sq && (Game.seenAwake(m, sq) || (phase !== 'deploy' && sq.awaken > 0)) ? chip('Awakened', 'var(--foe)') : `<span class="hint">${sq ? 'Not awakened' : 'Per squad'}</span>`;
+    const preyName = (sd) => { const id = sq && Game.isHunter(m, sq) ? Game.preyShown(m, me, phase === 'deploy', sd, sq) : null, q = id != null && m.armies[1 - sd].find(x => x.id === id); return q ? esc(units[q.unit].name) : ''; };
+    if (!mine) { const pn = preyName(side); return sq && (Game.seenAwake(m, sq) || (phase !== 'deploy' && sq.awaken > 0)) ? chip('Awakened', 'var(--foe)') + (pn ? ' ' + chip(`Marks your ${pn}`, 'var(--foe)') : '') : `<span class="hint">${sq ? 'Not awakened' : 'Per squad'}</span>`; }
     const woke = Game.wokeUnit(m, me), other = woke != null && woke !== i; // one unit type a match
     if (!sq) { const n = m.armies[me].filter(q => q.unit === i && q.awaken > 0).length; return `<span class="hint">${other ? `You awakened ${esc(units[woke].name)}` : `${n ? `${n} awakened · ` : ''}${cost} gold a squad`}</span>`; }
-    if (sq.awaken > 0) return chip('Awakened', 'var(--gold)') + (phase === 'deploy' && editable() && sq.awaken === m.round ? ` <button class="btn small" data-act="unawaken">Undo</button>` : '');
+    if (sq.awaken > 0) {
+      let hunt = ''; // Hunter: its mark on an enemy squad
+      if (Game.isHunter(m, sq)) {
+        const pn = preyName(me), now = !!(sq.prey && sq.prey.round === m.round && pn);
+        if (pn) hunt += ' ' + chip(`Marks their ${pn}`, 'var(--gold)');
+        if (phase === 'deploy' && editable()) hunt += ` <button class="btn small${pn ? '' : ' primary'}" data-act="hunt">${pn ? 'Move mark' : 'Place mark'}</button>` + (now ? ` <button class="btn small" data-act="unhunt">Undo mark</button>` : '');
+      }
+      return chip('Awakened', 'var(--gold)') + (phase === 'deploy' && editable() && sq.awaken === m.round ? ` <button class="btn small" data-act="unawaken">Undo</button>` : '') + hunt;
+    }
     if (phase !== 'deploy') return `<span class="hint">${cost} gold</span>`;
     const why = { enzo: 'Not with Enzo', type: other ? `Only ${esc(units[woke].name)} this match` : '', glut: `Needs ${Game.glutMax(m, me, sq)} Glut (${Game.glutOf(sq)} now)`, needs: `Needs ${Game.skillNeedsMissing(m, me, i, k).map(j => units[i].skillDefs[j].name).join(' or ')}`, or: 'Not with your skills', gold: `Need ${cost} gold` }[Game.awakenBlock(m, me, sq)] || '';
     return why || !editable() ? `<button class="btn small" disabled>${why || `Awaken · ${cost} gold`}</button>` : `<button class="btn small primary" data-act="awaken">Awaken · ${cost} gold</button>`;
@@ -5686,6 +5714,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     on('take-back', () => { if (editable() && Game.unplaceSquad(m, me, sq.id)) after(); });
     on('awaken', () => { if (editable() && Game.awaken(m, me, sq.id)) after(); });
     on('unawaken', () => { if (editable() && Game.undoAwaken(m, me, sq.id)) after(); });
+    on('hunt', () => { if (!editable()) return; closeSheet(); markPicking = false; fortPlacing = false; huntPicking = sq.id; render(); hud(); panelDeploy(); });
+    on('unhunt', () => { if (editable() && Game.undoHunt(m, me, sq.id)) after(); });
     root.querySelectorAll('[data-skill]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.buySkill(m, me, i, +b.dataset.skill)) after(); }));
     root.querySelectorAll('[data-bplace]').forEach(b => b.addEventListener('click', () => { if (!editable()) return; buildPlacing = { ui: i, k: +b.dataset.bplace }; closeSheet(); render(); hud(); panelDeploy(); }));
     root.querySelectorAll('[data-unskill]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.undoSkill(m, me, i, +b.dataset.unskill)) after(); }));
@@ -6022,6 +6052,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         delete q.from; delete q.movedRound; delete q.luckMove;
         if (q.charmGiven === m.round) { delete q.charm; delete q.charmGiven; } // Matteo's first stack, given this round
         if (q.awaken === m.round) delete q.awaken; // an awakening bought this round
+        if (q.prey) { const p = Game.preyShown(s, -2, true, 0, q); if (p == null) delete q.prey; else q.prey = { squad: p, round: Math.min(q.prey.round, m.round - 1) }; } // a Hunter's mark moved this round shows where it was
         return q;
       });
       if (s.moved) s.moved[0] = null;
@@ -6106,6 +6137,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       level: Math.max(0, Math.min(Engine.MAX_LEVEL, s.level | 0)), cost: Math.max(0, +s.cost || 0), ...(s.free ? { free: true } : {}), ...(s.gift ? { gift: true } : {}),
       ...(s.boughtLevels && typeof s.boughtLevels === 'object' ? { boughtLevels: s.boughtLevels } : {}),
       ...((a, h) => a > 0 && Game.awakenSlot(m, s.unit) >= 0 && (a === m.round || (h && h.awaken === a)) ? { awaken: a } : {})(s.awaken | 0, had.get(s.id | 0)), // this round's awakening as sent (gold was checked on their side), earlier ones as they were
+      ...(s.prey && Number.isInteger(s.prey.squad) ? { prey: { squad: s.prey.squad, round: Math.max(1, Math.min(m.round, s.prey.round | 0)), ...(Number.isInteger(s.prey.was) ? { was: s.prey.was, wasRound: Math.max(1, Math.min(m.round, s.prey.wasRound | 0)) } : {}) } } : {}), // a Hunter's mark (checked below)
 
       ...(s.from && (s.movedRound | 0) === m.round && (s.round | 0) < m.round && Number.isInteger(s.from.col) && Number.isInteger(s.from.row) ? { from: { col: s.from.col, row: s.from.row, ...(Number.isInteger(s.from.in) ? { in: s.from.in } : {}) }, movedRound: m.round, ...((s.luckMove | 0) === m.round ? { luckMove: m.round } : {}) } : {}),
     }));
@@ -6140,6 +6172,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     // one unit type a match: this round's awakenings of any other type than the one they may awaken don't count
     const woke = Game.wokeUnit(m, 1);
     for (const q of m.armies[1]) if (q.awaken === m.round && woke != null && q.unit !== woke) delete q.awaken;
+    for (const q of m.armies[1]) if (q.prey && (!Game.isHunter(m, q) || !Game.markTarget(m, 1, q.prey.squad))) delete q.prey; // a Hunter's mark: only an awakened Hunter's, on a squad it may mark
     m.gold[1] = Math.max(0, +d.gold || 0);
     m.extraDeploys[1] = Math.max(0, Math.min(Game.CONFIG.maxExtraDeploys, d.extra | 0));
     m.nextId[1] = Math.max(m.nextId[1], d.nextId | 0);

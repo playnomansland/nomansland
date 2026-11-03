@@ -31,7 +31,7 @@
   const ACTIONS = {
     place: 'iii', unplaceSquad: 'i', moveSquad: 'iii', undoMove: '', sell: 'i',
     levelUp: 'i', undoLevel: 'i', levelAll: 'i',
-    buySkill: 'ii', undoSkill: 'ii', unlock: 'i', undoUnlock: 'i', awaken: 'i', undoAwaken: 'i',
+    buySkill: 'ii', undoSkill: 'ii', unlock: 'i', undoUnlock: 'i', awaken: 'i', undoAwaken: 'i', huntMark: 'ii', undoHunt: 'i',
     choosePack: 'i', setTowerType: 's',
     buyDeploy: '', refundDeploy: '', takeLoan: '', undoLoan: '', spin: '',
     buyTowerSkill: '', undoTowerSkill: '', buyTowerSkill2: '', undoTowerSkill2: '',
@@ -70,6 +70,7 @@
       delete q.from; delete q.movedRound; delete q.luckMove;
       if (q.charmGiven === round) { delete q.charm; delete q.charmGiven; } // Matteo's first stack, given this round
       if (q.awaken === round) delete q.awaken; // an awakening bought this round
+      if (q.prey) { const p = G.preyShown(s, -2, true, h, q); if (p == null) delete q.prey; else q.prey = { squad: p, round: Math.min(q.prey.round, round - 1) }; } // a Hunter's mark moved this round shows where it was
       if (q.boughtLevels && q.boughtLevels[round]) { q.level -= q.boughtLevels[round]; delete q.boughtLevels[round]; } // levels bought this round
       return q;
     });

@@ -1406,10 +1406,53 @@ const Game = (() => {
     if (!sq || sq.awaken !== m.round) return false;
     m.gold[side] += awakenCost(m, sq.unit);
     delete sq.awaken;
+    delete sq.prey; // a Hunter's mark goes with its awakening
     return true;
   }
   // what the opponent may know: an awakening bought this round stays hidden until the fight
   const seenAwake = (m, sq) => !!sq && sq.awaken > 0 && sq.awaken < m.round;
+
+  // ---------- Hunter (the Sniper's Awaken skill) ----------
+  // An awakened squad of a unit whose Awaken skill is a Hunter (type 'hunter') puts a mark on one enemy squad from an
+  // earlier round (not a rider or a building): free, in any deploy, and placing it again moves it. In the fight its
+  // bodies always shoot a marked body in their reach first, deal it +hunter.dmg %, and see it through stealth; they are
+  // stealthed themselves until they attack (the skill's `also`). Any of its side's Hunters may use any of their marks.
+  // sq.prey = { squad, round, was?, wasRound? }: round = when it was put there; was/wasRound = where it sat before this
+  // round's change (the opponent still sees that until the fight, see preyShown). A mark on a squad that left the
+  // enemy's army (sold) is gone.
+  const isHunter = (m, sq) => { const k = sq && sq.awaken > 0 ? awakenSlot(m, sq.unit) : -1, d = k >= 0 ? skillDef(m, sq.unit, k) : null; return !!d && d.type === 'hunter'; };
+  const preyOf = (m, side, sq) => sq && sq.prey && m.armies[1 - side].some(q => q.id === sq.prey.squad) ? sq.prey : null;
+  const canHunt = (m, side, hid, tid) => { const h = squadOf(m, side, hid); return isHunter(m, h) && (tid == null || (!!markTarget(m, side, tid) && !(h.prey && h.prey.squad === tid && preyOf(m, side, h)))); };
+  function huntMark(m, side, hid, tid) {
+    if (tid == null || !canHunt(m, side, hid, tid)) return false;
+    const h = squadOf(m, side, hid), p = h.prey;
+    const old = !p ? null : p.round < m.round ? { squad: p.squad, round: p.round } : p.was != null ? { squad: p.was, round: p.wasRound } : null;
+    h.prey = { squad: tid, round: m.round, ...(old ? { was: old.squad, wasRound: old.round } : {}) };
+    return true;
+  }
+  // takes back a mark put on this round (the one before it comes back)
+  function undoHunt(m, side, hid) {
+    const h = squadOf(m, side, hid);
+    if (!h || !h.prey || h.prey.round !== m.round) return false;
+    if (h.prey.was != null) h.prey = { squad: h.prey.was, round: h.prey.wasRound }; else delete h.prey;
+    return true;
+  }
+  // the enemy squad id hunter squad sq (of side) has marked, as viewer may know it while deploying or not (null: none)
+  function preyShown(m, viewer, deploying, side, sq) {
+    const p = preyOf(m, side, sq);
+    if (!sq || !sq.prey || (!p && (side === viewer || !deploying))) return null;
+    if (side === viewer || !deploying) return p.squad;
+    if (!seenAwake(m, sq)) return null;
+    const seen = sq.prey.round < m.round ? sq.prey.squad : sq.prey.was;
+    return seen != null && m.armies[1 - side].some(q => q.id === seen) ? seen : null;
+  }
+  // whether enemy squad id of side is marked by one of the other side's Hunters (for the fight)
+  const preyOn = (m, side, id) => m.armies[1 - side].some(h => isHunter(m, h) && preyOf(m, 1 - side, h) && h.prey.squad === id);
+  // the AI: each of its Hunters without a mark marks the priciest enemy squad it may
+  function aiHunt(m, side) {
+    const foes = m.armies[1 - side].filter(q => markTarget(m, side, q.id)).sort((a, b) => (b.cost || 0) - (a.cost || 0) || a.id - b.id);
+    for (const h of m.armies[side]) if (isHunter(m, h) && !preyOf(m, side, h) && foes.length) huntMark(m, side, h.id, foes[0].id);
+  }
 
   // ---------- Evolve skills (by themselves) ----------
   // A squad of a unit with an Evolve skill gets it for free once it meets the skill's needs: needs 'glutMax' (the
@@ -1801,6 +1844,7 @@ const Game = (() => {
       if (isDev(m) && sq.guide && sq.guide.length && !isRider(sq)) for (const x of b) x.guide = sq.guide.map(p => tileToWorld(p.col, p.row)); // devtest: the squad's arrow
       if (u.name === 'Sniper' && markOn(m, side)) for (const x of b) x.sniperMark = MARK.hit; // Mark Bounty: these Snipers hunt the mark
       if (markOn(m, 1 - side) && markOf(m, 1 - side).squad === sq.id) for (const x of b) x.marked = true;
+      if (preyOn(m, side, sq.id)) for (const x of b) x.prey = true; // a Hunter's mark (the Sniper's Awaken skill)
       if (airship && u.name === 'Sniper') { const su = { ...b[0].u, hit: b[0].u.hit + AIRSHIP.sniperHit }; for (const x of b) x.u = su; } // flat, after levels
       if (home) for (const x of b) x.band = { ...home };
       if (zoe) for (const x of b) x.zoe = true; // for the rising-stars effect
@@ -3026,6 +3070,7 @@ const Game = (() => {
         if (r() < 0.3) awaken(m, side, sq.id);
       }
     }
+    aiHunt(m, side); // Hunters mark the priciest enemy squad they may
     let guard = 0;
     while (m.gold[side] - reserve >= minCost && guard++ < 60) {
       if (deploysLeft(m, side) <= 0) {
@@ -3098,7 +3143,7 @@ const Game = (() => {
     deploysAllowed, deploysLeft, deployedThisRound, canBuyDeploy, buyDeploy, refundDeploy, musterOn, deployBuyable,
     PACKAGE, allPackages, packOf, needsPack, freeLeft, choosePack, ensurePack,
     unlockCost, tierOf, startLevel, shopCost, mapFreeOf, mapFreeLeft, isUnlocked, unlockVisible, unlock, undoUnlock,
-    skillDef, skillCost, SKILL_STEP, skillsBought, isInnate, hasSkill, skillVisible, skillNeeds, skillNeedsAny, skillNeedsMissing, skillHeldUp, isFlat, isMaster, isAwaken, awakenSlot, awakenCost, wokeUnit, awakenBlock, canAwaken, awaken, undoAwaken, seenAwake, isEvolve, evolveSlot, evolveReady, isEvolved, shownAwake, glutOf, glutMax, glutFull, skillOr, skillOrTaken, unitFor, withCharacter,
+    isHunter, preyOf, canHunt, huntMark, undoHunt, preyShown, preyOn, aiHunt, skillDef, skillCost, SKILL_STEP, skillsBought, isInnate, hasSkill, skillVisible, skillNeeds, skillNeedsAny, skillNeedsMissing, skillHeldUp, isFlat, isMaster, isAwaken, awakenSlot, awakenCost, wokeUnit, awakenBlock, canAwaken, awaken, undoAwaken, seenAwake, isEvolve, evolveSlot, evolveReady, isEvolved, shownAwake, glutOf, glutMax, glutFull, skillOr, skillOrTaken, unitFor, withCharacter,
     footprint, blockOf, spotFree, buildingRecords, recordOf, recordWorld, buildingEffects,
     setBuildings, BUILDINGS: () => BUILDINGS, buildingInfo, BUILDING_SQUAD, isBuildingSkill, buildingIdOf, buildingsOf, buildingOf, buildingAt, buildingShown, buildingSpotOk,
     canBuyBuilding, buyBuilding, buildingSkills, buildingSkillInfo, bskillOf, bskillCost, canBuyBuildingSkill, buyBuildingSkill, undoBuildingSkill,

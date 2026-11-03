@@ -339,6 +339,24 @@
       }
     },
     {
+      "id": "waterElemental",
+      "type": "elemental",
+      "name": "Summon water elemental",
+      "cost": 300,
+      "params": {
+        "hp": 600,
+        "unit": "Ember Imps",
+        "level": 1,
+        "ahead": 9,
+        "pool": 4,
+        "pct": 50,
+        "speed": 0.5,
+        "secs": 2
+      },
+      "flat": true,
+      "master": true
+    },
+    {
       "id": "heavyMetal",
       "type": "armorHp",
       "name": "Heavy metal",
@@ -627,6 +645,22 @@
       ],
       "flat": true,
       "master": true
+    },
+    {
+      "id": "hunter",
+      "type": "hunter",
+      "name": "Hunter",
+      "cost": 300,
+      "params": {
+        "dmg": 100
+      },
+      "also": [
+        {
+          "type": "stealth",
+          "params": {}
+        }
+      ],
+      "flat": true
     },
     {
       "id": "sightweavers",
@@ -1136,7 +1170,7 @@
         "rangerScope",
         "deadeye",
         "assaultgunner",
-        "overwatch"
+        "hunter"
       ],
       "skillsOn": [
         false,
@@ -2229,9 +2263,11 @@
       "skills": [
         "waterbomb",
         "poolShaper",
-        "flowState"
+        "flowState",
+        "waterElemental"
       ],
       "skillsOn": [
+        false,
         false,
         false,
         false
@@ -2239,14 +2275,25 @@
       "skillsInnate": [
         false,
         false,
+        false,
         false
       ],
       "skillMods": [
         null,
         null,
+        null,
         null
       ],
       "skillOr": [
+        [
+          1,
+          2
+        ]
+      ],
+      "skillNeedsAny": [
+        null,
+        null,
+        null,
         [
           1,
           2

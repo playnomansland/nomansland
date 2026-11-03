@@ -4,6 +4,25 @@ Newest first. Each entry says what changed for players; technical details live i
 
 ---
 
+## 3 November 2026 – Sniper Hunter, Water Elemental
+
+### Sniper – Hunter (new Awaken skill, replaces Overwatch)
+- **Overwatch is gone from the Sniper** (no more garrisoning the tower or watchtowers). Its 4th skill is now **Hunter**, an **Awaken** skill: bought for one squad at a time, 300 gold, needs Deadeye or Assaultgunner first.
+- **Place a mark:** open an awakened Sniper's sheet and tap **Place mark**, then tap an enemy squad from an earlier round. It's free, stays for the rest of the match, and **Move mark** puts it on another squad any round (**Undo mark** takes back this round's move). If the marked squad is sold, mark another.
+- **In the fight** a Hunter **always shoots a marked enemy in its range first**, deals it **double damage**, and sees it through stealth. A squad marked by any of your Hunters counts for all of them.
+- **Stealth:** Hunters are hidden until they fire their first shot.
+- Marks show as small dashed crosshairs on the board. Your opponent sees a mark only once the round it was placed has been fought (a moved mark shows on its old squad until then).
+
+### Water Mage – Summon water elemental (new Master skill)
+- New 4th skill, a **Master** skill (300 gold, for all your Water Mages, needs Pool shaper or Flow state first).
+- At the start of every fight each Water Mage summons a **Water Elemental 1.5 tiles in front of her**. It walks **as fast as she does**, has **600 health** and **attacks like a level 2 Ember Imp**. It **grows with her level**.
+- When it dies it leaves a **pool**: it hurts enemies standing in it and heals and speeds up your units, for the rest of the fight.
+
+### Fixes
+- Pools from both sides can now overlap, and a unit standing in pools of both sides gets both effects. Before, whichever side's pool came first blocked the other, which slightly favoured the host in mirror fights.
+
+---
+
 ## 3 November 2026 – Legend title
 
 - **New title: Legend** (gold). Finish a month in the **top 5 of the leaderboard** and it's yours to keep. Months follow Swedish time, so November ends at midnight on 30 November.

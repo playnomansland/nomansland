@@ -94,6 +94,8 @@
     "flare": { "has": ["Attack speed"] },
     "portal": { "makes": ["Spawn"] },
     "overwatch": { "has": ["Range boost"] },
+    "hunter": { "has": ["Stealth"] },
+    "elemental": { "makes": ["Spawn"] },
     "freeMove": { "has": [] },
     "silent": { "has": ["Stealth"] },
     "firstHit": { "has": ["Damage boost"] },
