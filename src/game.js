@@ -25,7 +25,7 @@ const Game = (() => {
   // Gold both players get at the start of a round: 250 going into round 2, then 100 more each round (like Mechabellum)
   const incomeFor = (round) => INCOME + CONFIG.incomeStep * Math.max(0, round - 2);
   const deploysAllowed = (m, side) => CONFIG.deployCap
-    ? (m.round === 1 ? CONFIG.firstRoundDeploys : CONFIG.deploysPerRound) + m.extraDeploys[side] + devDeploys(m, side) + (musterOn(m, side) ? 1 : 0) + slotWins(m, side, 'shoe')
+    ? (m.round === 1 ? CONFIG.firstRoundDeploys : CONFIG.deploysPerRound) + m.extraDeploys[side] + devDeploys(m, side) + (musterOn(m, side) ? 1 : 0) + (shoePerk(m, side, 'deploy') ? 1 : 0)
     : Infinity;
   const deployedThisRound = (m, side) => m.armies[side].filter(s => s.round === m.round && !s.free && !s.gift).length; // package squads and slot machine goblins don't count
   const deploysLeft = (m, side) => deploysAllowed(m, side) - deployedThisRound(m, side);
@@ -58,9 +58,10 @@ const Game = (() => {
       skill: { name: 'Home ground', text: 'Bastion blocks 2 hits a fight. Units in your zone: +2 armor, +10% health.' },
       skill2: { name: 'Defensive walls', cost: 250, text: 'Place 3 walls on your side that block enemies. Bastion +4 armor.' },
       fortify: { name: 'Fortify', cost: 50, text: 'Once a round: one extra wall on your side for this round’s fight only.' }, // see FORTIFY
-      vault: { name: 'Vault', text: 'Your treasury has +6 armor, and a raid on it steals half as much.' } }, // see VAULT
+      vault: { name: 'Vault', text: 'Your treasury has +6 armor, and a raid on it steals half as much.' },
+      freeMove: { name: 'March order', text: '1 free move every round.' } }, // see freeMoves
     { id: 'mage', name: 'Mage tower', text: 'A beam that ramps up on one target. Melts giants.', unit: { ...TOWER, name: 'Mage Tower', kind: 'mage', hp: 600, hit: 14, aps: 1.5, range: 12, spinUp: 50, spinHit: 50, color: '#A493DE' },
-      generals: true }, // no once-per-match skill: a mage general can be called every round instead (MAGE_GENERALS)
+      generals: true, muster: { name: 'Muster', text: '1 extra deployment every round, for free.' } }, // no once-per-match skill: a mage general can be called every round instead (MAGE_GENERALS)
     { id: 'bank', name: 'Bank tower', text: 'Sturdy, medium range. Credit line: your loans are 200 (pay back 300).', unit: { ...TOWER, name: 'Bank Tower', kind: 'bank', hp: 700, hit: 45, aps: 0.6, range: 18, color: '#D9B95B' },
       loan: true, creditLine: { name: 'Credit line', text: 'Your loans are 200 gold (pay back 300) instead of 100 (pay back 200).' }, // see loanTerms
       skill2: { name: 'Major investment', cost: 500, noFree: true, text: 'Pay 500 now, get 800 next round. Once per match.' } }, // see resolve
@@ -1734,7 +1735,7 @@ const Game = (() => {
   const freeOut = (m, side, sq) => !!sq && sq.round !== m.round && movedId(m, side) !== sq.id
     && (isRider(sq) || (!!sq.from && sq.movedRound === m.round && sq.from.in != null));
   const canMove = (m, side, sq) => !!sq && !(m.units[sq.unit] && m.units[sq.unit].building) && (sq.round === m.round || freeMover(m, side, sq) || freeOut(m, side, sq) || // a building stays put
-    sq.luckMove === m.round || (movedId(m, side) !== sq.id && slotMovesLeft(m, side) > 0) || // Otto's horseshoe: a free move
+    sq.luckMove === m.round || (movedId(m, side) !== sq.id && freeMovesLeft(m, side) > 0) || // a free move (Bastion's March order, Otto's horseshoe)
     (movedId(m, side) == null ? m.gold[side] >= CONFIG.moveCost : movedId(m, side) === sq.id));
   function moveSquad(m, side, sqId, col, row) {
     const sq = m.armies[side].find(s => s.id === sqId);
@@ -1744,7 +1745,7 @@ const Game = (() => {
     if (into && into.id === sq.in) return false;
     if (!canPlaceAt(m, side, col, row, sq.unit, true) || (occupied(m, side, col, row) && !into && !garrisonFree(m, side, col, row, sq.unit))) return false;
     const free = freeMover(m, side, sq) || freeOut(m, side, sq);
-    if (sq.round !== m.round && !free && movedId(m, side) !== sq.id && sq.luckMove !== m.round && slotMovesLeft(m, side) > 0) { // a horseshoe move: free
+    if (sq.round !== m.round && !free && movedId(m, side) !== sq.id && sq.luckMove !== m.round && freeMovesLeft(m, side) > 0) { // a free move (used before the paid one)
       sq.from = { col: sq.col, row: sq.row, ...(isRider(sq) ? { in: sq.in } : {}) };
       sq.movedRound = m.round; sq.luckMove = m.round;
     } else if (sq.round !== m.round && !free && sq.luckMove !== m.round && movedId(m, side) == null) {
@@ -2453,16 +2454,34 @@ const Game = (() => {
   // ---------- Otto - The Gambler: the slot machine ----------
   // SLOT.cost gold a spin, SLOT.perRound spins a round. Each spin's outcome comes from the match seed, the side, the
   // round and the spin's number, so both phones get the same one. Three of a kind pays (odds in %, the rest is nothing):
-  // skull −SLOT.skullHp health (never below 1), shoe a free move and +1 deployment this round, coin +SLOT.coinGold,
+  // skull −SLOT.skullHp health (never below 1), shoe +1 deployment or +1 free move every round (shoeKind), coin +SLOT.coinGold,
   // goblin a random tier 1 squad at level 2 (unlocked too, no deployment used), chest +SLOT.chestGold.
   // m.slots[side][round] = [{ win: symbol or null, unit (goblin) }, ...]. A spin can't be undone.
   // Forgiveness luck: after SLOT.forgive losing spins in a row (nothing or skulls, across rounds), the next spin always
   // wins one of the good prizes (shoe, coin, goblin, chest, by their odds).
-  const SLOT = { cost: 50, perRound: 3, skullHp: 5, coinGold: 100, chestGold: 500, forgive: 5,
+  const SLOT = { cost: 50, perRound: 3, skullHp: 5, coinGold: 100, chestGold: 500, shoeGold: 200, forgive: 5,
     odds: [['skull', 12], ['shoe', 12], ['coin', 12], ['goblin', 3], ['chest', 1]], symbols: ['skull', 'shoe', 'coin', 'goblin', 'chest'] };
   const slotSpins = (m, side, round = m && m.round) => (m && m.slots && m.slots[side] && m.slots[side][round]) || [];
   const slotWins = (m, side, sym) => slotSpins(m, side).filter(x => x.win === sym).length;
-  const slotMovesLeft = (m, side) => slotWins(m, side, 'shoe') - m.armies[side].filter(q => q.luckMove === m.round).length;
+  // Free moves every round: Bastion's March order and Otto's horseshoe move (each 1). A free move is used before the
+  // paid one, on its own: dragging an older squad just moves it. q.luckMove = the round it used one.
+  const freeMoves = (m, side) => (towerPicked(m, side) && towerType(m, side).freeMove ? 1 : 0) + (shoePerk(m, side, 'move') ? 1 : 0);
+  const freeMovesLeft = (m, side) => freeMoves(m, side) - m.armies[side].filter(q => q.luckMove === m.round).length;
+  const slotMovesLeft = freeMovesLeft; // older name
+  // Otto's horseshoe (2026-11-03): three of a kind gives, at random, +1 deployment or +1 free move every round for the
+  // rest of the match. One of each at most: the one already owned gives the other; with both, SLOT.shoeGold gold.
+  // rec.shoe on the spin's record: 'deploy', 'move' or 'gold'.
+  const shoeKind = (m, side, round, k, had) => {
+    const want = rng(m.seed + round * 5483 + side * 7933 + k * 619 + 37)() < 0.5 ? 'deploy' : 'move';
+    return !had[want] ? want : !had[want === 'deploy' ? 'move' : 'deploy'] ? (want === 'deploy' ? 'move' : 'deploy') : 'gold';
+  };
+  // the perks owned now: from every horseshoe spun this match, in order
+  function shoePerks(m, side) {
+    const had = { deploy: false, move: false }, rounds = (m && m.slots && m.slots[side]) || {};
+    for (const rd of Object.keys(rounds).map(Number).sort((a, b) => a - b)) (rounds[rd] || []).forEach((x) => { if (x && x.win === 'shoe' && (x.shoe === 'deploy' || x.shoe === 'move')) had[x.shoe] = true; });
+    return had;
+  }
+  const shoePerk = (m, side, kind) => charOf(m, side) === 'otto' && shoePerks(m, side)[kind];
   const canSpin = (m, side) => !!m && !m.over && charOf(m, side) === 'otto' && slotSpins(m, side).length < SLOT.perRound && m.gold[side] >= SLOT.cost;
   const slotRng = (m, side, round, k) => rng(m.seed + round * 5471 + side * 7919 + k * 613 + 29);
   const slotLost = (rec) => !rec || !rec.win || rec.win === 'skull';
@@ -2512,6 +2531,7 @@ const Game = (() => {
     if (o.win === 'skull') m.hp[side] = Math.max(1, m.hp[side] - SLOT.skullHp);
     else if (o.win === 'coin') m.gold[side] += SLOT.coinGold;
     else if (o.win === 'chest') m.gold[side] += SLOT.chestGold;
+    else if (o.win === 'shoe') { rec.shoe = shoeKind(m, side, m.round, list.length, shoePerks(m, side)); if (rec.shoe === 'gold') m.gold[side] += SLOT.shoeGold; }
     else if (o.win === 'goblin') {
       if (o.unit == null) m.gold[side] += SLOT.coinGold * 2;
       else {
@@ -2536,7 +2556,9 @@ const Game = (() => {
     while (list.length < n) {
       const o = slotOutcome(m, side, m.round, list.length);
       if (o.win === 'skull') m.hp[side] = Math.max(1, m.hp[side] - SLOT.skullHp);
-      list.push(o.unit != null ? { win: o.win, unit: o.unit } : { win: o.win });
+      const rec = o.unit != null ? { win: o.win, unit: o.unit } : { win: o.win };
+      if (o.win === 'shoe') rec.shoe = shoeKind(m, side, m.round, list.length, shoePerks(m, side));
+      list.push(rec);
     }
   }
   // the bot: now and then a spin, while it keeps a squad's worth of gold
@@ -3201,7 +3223,7 @@ const Game = (() => {
     FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, isOff, enemyHolds, inNoMans, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
     STANDARD_PACK, ICE, ALTAR, GOLEM, isIce, hailRound, altarRound, stormShift, stormRows, hailTiles, altarCost, altarRefund, altarCount, pushRoom, altarBought, addAltar, buyAltar, undoAltar, snowgres, snowgreUnit,
     MAPS, SKINS, MAP_LOOK, lookOf, EDITOR_MAPS, TERRAIN, objectiveOf, objectiveTiles, SHAPE_PATH, terrainTile, terrainBlocks, terrainOf, groundHeight, ELF_TOWER, SHROOM, SHROOM_SPLIT, shroomAt, shroomTileAt, shroomRemoval, SHROOM_REMOVE, shroomCost, removeShroom, undoRemoveShroom, mapOf, elfSpot, rollMap, BRIBE_COST, bribeList, bribeGold, bribeCount, bribeNow, bribeCost, bribeRefund, ELF_POWER, elfPowered, elfUnit, ELF_OWN, elfOwnCost, elfOwnOf, elfOwnAt, elfOwnUnlocked, elfOwnOffered, canBuyElfOwn, elfOwnSpotOk, buyElfOwn, undoElfOwn, bribeLeader, canBribe, bribe, undoBribe,
-    CHARACTERS, CHAR, charOf, SLOT, slotSpins, slotDry, slotWins, slotMovesLeft, canSpin, slotOutcome, slotReels, spin, takeSpins, aiSlots, charInfo, enzoSkill, enzoActive, charmOf, isGentleman, canGiveCharm, giveCharm, undoCharm, ensureCharm, felixGold, isTier1, rollBuffTiles, onBuffTile, zoeBuff, yotImps, yotLevel, TOWER_SPOT, towerSpot,
+    CHARACTERS, CHAR, charOf, SLOT, slotSpins, slotDry, slotWins, slotMovesLeft, freeMoves, freeMovesLeft, shoePerks, shoePerk, canSpin, slotOutcome, slotReels, spin, takeSpins, aiSlots, charInfo, enzoSkill, enzoActive, charmOf, isGentleman, canGiveCharm, giveCharm, undoCharm, ensureCharm, felixGold, isTier1, rollBuffTiles, onBuffTile, zoeBuff, yotImps, yotLevel, TOWER_SPOT, towerSpot,
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,

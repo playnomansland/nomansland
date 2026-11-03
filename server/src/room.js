@@ -231,13 +231,15 @@ export class Room extends DurableObject {
         return;
       }
       case 'forfeit': {
-        if (!R || !Ref.forfeit(R, side)) return;
+        // leaving while the opponent is disconnected isn't a loss: the one who went away first loses (2026-11-03)
+        const loser = R && R.away && R.away[1 - side] ? 1 - side : side;
+        if (!R || !Ref.forfeit(R, loser)) return;
         if (this.meta) this.meta.left = { seed: R.seed, side }; // who left this match (countOnline)
-        this.tally(side);
+        this.tally(loser);
         await this.save();
-        const text = JSON.stringify({ t: 'forfeit', side, ranked: this.rankedView() });
+        const text = JSON.stringify({ t: 'forfeit', side: loser, left: side, ranked: this.rankedView() });
         for (const s of this.sockets()) this.send(s, text);
-        this.record(null, side);
+        this.record(null, loser);
         await this.ended();
         return;
       }

@@ -25,6 +25,7 @@ const Engine = (() => {
   // chargeStun: after a charged hit (and the trample run that follows it) the unit is stunned this many seconds:
   // it can't move or attack
   const STEALTH_BACK = 1.5;    // a stealth unit hides again after this many seconds without attacking
+  const STEALTH_GRACE = 0.5;  // ...counted from when its next attack was ready (its reload), plus this much
   // dash (metres): once its target is this close the unit covers the rest at DASH_SPEED (a stealth unit stays hidden)
   const DASH_SPEED = 30;
   // lone (Shadow hunter): a body hunts lone enemies, bodies with no other body of their side within LONE_R metres (a
@@ -80,7 +81,7 @@ const Engine = (() => {
   const RULES = [
     ['vision', 'Vision', 'Units march straight ahead until an enemy comes within sight (see Sight in Battle settings), then turn to it. Off: every unit knows where every enemy is from the start and heads straight for the nearest one.'],
     ['stealth', 'Stealth', 'Units with the Stealth skill can’t be targeted while hidden. Off: the skill does nothing and they can be targeted like any other unit.'],
-    ['stealthBack', 'Stealth returns', `A stealth unit hides again after ${STEALTH_BACK} s without attacking. Off: once it has attacked it stays seen for the rest of the fight.`],
+    ['stealthBack', 'Stealth returns', `A stealth unit hides again once it has stopped attacking for ${STEALTH_BACK} s (a slow shooter: its reload plus ${STEALTH_GRACE} s). Off: once it has attacked it stays seen for the rest of the fight.`],
     ['knockback', 'Knockback', 'Hits from units with knockback push the bodies they hit. Off: nothing is pushed.'],
   ];
   const ruleOn = (g, k) => !(g && g.rules && g.rules[k] === false);
@@ -333,7 +334,7 @@ const Engine = (() => {
     switch (d.type) {
       case 'regen': return +P('hp') ? `+${n('hp')}% health. Regains ${n('pct')}% health a second.` : `Regains ${n('pct')}% health a second.`;
       case 'poison': return `Hits poison: ${n('pct')}% of the hit over ${n('duration')} s, past armor.${+P('slow') ? ` ${n('slow')}% slower attacks.` : ''}`;
-      case 'stealth': return `Hidden until it attacks. Hides again after ${STEALTH_BACK} s.`;
+      case 'stealth': return `Hidden until it attacks. Hides again ${STEALTH_BACK} s after it stops attacking.`;
       case 'armorHp': return +P('hp') ? `+${n('armor')} armor, +${n('hp')}% health.` : `+${n('armor')} armor.`;
       case 'spawn': return `Spawns ${n('count')} ${String(P('unit'))} every ${n('every')} s (max ${n('max')}${+P('waves') > 0 ? `, ${n('waves')} ${+P('waves') === 1 ? 'wave' : 'waves'}` : ''}).`;
       case 'rapid': return +P('range') ? `+${n('aps')}% attack speed, −${n('range')}% range.` : `+${n('aps')}% attack speed.`;
@@ -2287,7 +2288,9 @@ const Engine = (() => {
       for (const b of all) {
         if (!b.alive || !b.u.stealth) continue;
         if (!stealthOn) b.hidden = false;
-        else if (!b.hidden && stealthBack && t - b.lastAtk >= STEALTH_BACK - 1e-9) b.hidden = true;
+        // "without attacking" counts from when it could have attacked again: a slow shooter (a Sniper reloads for 4 s or
+        // more) no longer hides between its own shots, which made it impossible to hit (fixed 2026-11-03)
+        else if (!b.hidden && stealthBack && t - b.lastAtk >= Math.max(STEALTH_BACK, 1 / Math.max(0.01, apsOf(b) * atkMul(b)) + STEALTH_GRACE) - 1e-9) b.hidden = true;
       }
       // a body with a start delay (deployed on a flank) can't move or attack until it runs out
       for (const b of all) if (b.delay > 0) b.delay = Math.max(0, b.delay - dt);

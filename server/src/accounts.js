@@ -378,9 +378,15 @@ export async function recordSeries(env, ids, winner) {
   const col = (sd) => winner === -1 ? 't' : winner === sd ? 'w' : 'l';
   await db.batch([row(ids[0], col(0)), row(ids[1], col(1))]);
 }
-// The leaderboard's order: win share (a tie counts as half a win), then wins, then fewest losses. Deleted accounts drop off.
-const BOARD_SQL = `SELECT p.id, p.tag, p.created, p.dev, p.title, p.legend, p.discord, r.w, r.t, r.l FROM ranked r JOIN players p ON p.id = r.player
-  WHERE p.deleted IS NULL AND (r.w + r.t + r.l) > 0 ORDER BY (r.w + 0.5 * r.t) * 1.0 / (r.w + r.t + r.l) DESC, r.w DESC, r.l ASC`;
+// The leaderboard's order (2026-11-03): a score of 75% wins and 25% win share. Wins count against the most wins on
+// the board (the leader in wins gets the full 75); the win share counts a tie as half a win. Then wins, then fewest
+// losses. score is 0 to 100. Deleted accounts drop off.
+export const BOARD_WEIGHTS = { wins: 0.75, share: 0.25 };
+const BOARD_SQL = `WITH b AS (SELECT p.id, p.tag, p.created, p.dev, p.title, p.legend, p.discord, r.w, r.t, r.l FROM ranked r JOIN players p ON p.id = r.player
+    WHERE p.deleted IS NULL AND (r.w + r.t + r.l) > 0), top AS (SELECT MAX(w) AS mw FROM b)
+  SELECT b.*, 100.0 * (${BOARD_WEIGHTS.wins} * (CASE WHEN top.mw > 0 THEN b.w * 1.0 / top.mw ELSE 0 END)
+    + ${BOARD_WEIGHTS.share} * (b.w + 0.5 * b.t) * 1.0 / (b.w + b.t + b.l)) AS score
+  FROM b, top ORDER BY score DESC, b.w DESC, b.l ASC`;
 
 // ---------- Legend: the top 5 when a month ends (2026-11-03) ----------
 // Months are Stockholm months ('2026-11'). LEGEND.first is the first month that counts (ranked play began 2026-11-02).
@@ -417,7 +423,7 @@ export async function awardLegends(env, now = Date.now()) {
   return { month, players: top.map((r) => r.id) };
 }
 
-// GET /leaderboard: every ranked player with a name, best first (win share, then wins, then fewest losses). Deleted
+// GET /leaderboard: every ranked player with a name, best first (score: 75% wins, 25% win share; see BOARD_SQL). Deleted
 // accounts drop off. Ties count as half a win in the share.
 export async function leaderboard(env, cors) {
   const db = env.ACCOUNTS;
@@ -426,7 +432,7 @@ export async function leaderboard(env, cors) {
     await ensureSchema(db);
     const on = await rankedOn(env);
     const res = await db.prepare(`${BOARD_SQL} LIMIT 200`).all();
-    return json({ on, legend: { top: LEGEND.top, ends: monthEnd(Date.now()) }, rows: res.results.map((r) => ({ id: r.id, tag: r.tag || 'Player', title: titleShown(r), w: r.w, t: r.t, l: r.l })) }, 200, { ...cors, 'cache-control': 'no-store' });
+    return json({ on, legend: { top: LEGEND.top, ends: monthEnd(Date.now()) }, rows: res.results.map((r) => ({ id: r.id, tag: r.tag || 'Player', title: titleShown(r), w: r.w, t: r.t, l: r.l, score: Math.round((+r.score || 0) * 10) / 10 })) }, 200, { ...cors, 'cache-control': 'no-store' });
   } catch (e) {
     console.warn('leaderboard', e && e.message);
     return json({ error: 'leaderboard unavailable' }, 503, cors);

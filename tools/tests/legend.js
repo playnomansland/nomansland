@@ -48,7 +48,7 @@ function fakeD1() {
   const created = at('2026-11-02T12:00:00Z');
   const players = [
     ['pA', 'Alpha', 9, 0, 1], ['pB', 'Bravo', 8, 0, 2], ['pC', 'Charlie', 5, 2, 3], ['pD', 'Delta', 4, 0, 4],
-    ['pE', 'Echo', 3, 0, 5], ['pF', 'Foxtrot', 1, 0, 6], ['pX', 'Gone', 20, 0, 0], ['pZ', 'Zero', 0, 0, 9],
+    ['pE', 'Echo', 3, 0, 5], ['pF', 'Foxtrot', 1, 0, 6], ['pG', 'Golf', 1, 0, 0], ['pX', 'Gone', 20, 0, 0], ['pZ', 'Zero', 0, 0, 9],
   ];
   for (const [id, tag, w, t, l] of players) {
     db.sql.prepare('INSERT INTO players (id, tag, created, seen) VALUES (?, ?, ?, ?)').run(id, tag, created, created);
@@ -61,7 +61,8 @@ function fakeD1() {
   const r = await A.awardLegends(env, at('2026-11-30T23:07:00Z'));
   assert.ok(r, 'given once November has ended');
   assert.strictEqual(r.month, '2026-11');
-  // win share: A 0.9, B 0.8, C 6/10, D 0.5, E 3/8, F 1/7, Z 0
+  // score = 75 x wins / most wins (9) + 25 x win share: A 97.5, B 86.7, C 56.7, D 45.8, E 34.4, G 33.3 (1-0: the best
+  // win share, but few wins), F 11.9, Z 0
   assert.deepStrictEqual(r.players, ['pA', 'pB', 'pC', 'pD', 'pE'], 'the top 5 in leaderboard order, deleted accounts skipped');
   assert.strictEqual(await A.awardLegends(env, at('2026-12-01T05:07:00Z')), null, 'not twice for the same month');
 

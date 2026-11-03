@@ -2385,7 +2385,7 @@
       "bleedHit": 2,
       "trait": {
         "name": "Stealthed",
-        "text": "Hidden until it attacks. Hides again after 1.5 s."
+        "text": "Hidden until it attacks. Hides again 1.5 s after it stops attacking."
       },
       "trait2": {
         "name": "Shadow dash",

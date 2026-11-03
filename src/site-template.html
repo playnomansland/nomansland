@@ -365,6 +365,7 @@ html.dock .bar:has(> .task:not([hidden])) > .hint { display: none; }
 .board-banner small { display: block; margin-top: 4px; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; text-transform: none; color: var(--text, #e8e6df); }
 @keyframes banner-in { 0% { opacity: 0; transform: scale(1.15); } 12% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
 .coach { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 3; display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--gold); border-radius: 8px; background: rgba(13, 19, 21, 0.92); font-size: 14px; line-height: 1.4; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); animation: coach-in 0.25s ease both; }
+.coach.mid { top: 38%; } /* a puzzle: over no man's land, so the enemy army stays in sight */
 .coach p { margin: 0; padding-right: 26px; }
 .coach-x { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 14px; line-height: 1; }
 .coach b { color: var(--gold); }
@@ -1339,6 +1340,7 @@ html.pc .corner button span { display: inline; }
   // "Old standard"). Only developers pick a map, as before; their pick is mapPick.
   const STD_MAP = 'testgrid';
   const curMap = () => devMode() ? mapPick : STD_MAP;
+  const playMap = () => lateGame ? STD_MAP : curMap(); // DEVTESTLATEGAME always plays on Standard (the test base, with treasuries)
   // the 3D board's look for a map with skins (Standard, Old standard): '' = the map's own, 'random' = a new one each
   // match; saved on this device, the host's counts
   let skinPick = '';
@@ -2087,6 +2089,15 @@ html.pc .corner button span { display: inline; }
     wireMore();
     if (phase === 'deploy') panelDeploy(); // the button stops glowing
   }
+  // Zoe's buff tile: this round's bonus, how often it has been used and what the next use brings
+  const zoeLine = (zb) => `+${zb.dmg}% damage, +${zb.hp}% health${zb.aps ? `, +${zb.aps}% attack speed` : ''}`;
+  function zoeText(side) {
+    const C = Game.CHAR, used = (m.zoeUses && m.zoeUses[side]) || 0, lv = Math.min(C.zoeDmg.length - 1, used), max = C.zoeDmg.length - 1;
+    const next = { dmg: C.zoeDmg[Math.min(max, lv + 1)], hp: C.zoeHp[Math.min(max, lv + 1)], aps: C.zoeAps[Math.min(max, lv + 1)] };
+    const who = side === me ? 'you' : 'they';
+    return `Now: ${zoeLine(Game.zoeBuff(m, side))} for a squad that starts the fight here (level ${lv + 1} of ${max + 1}). ${side === me ? 'You have' : 'They have'} used buff tiles in ${used} fight${used === 1 ? '' : 's'}. ${lv < max ? `Each fight ${who} use one makes it grow; next: ${zoeLine(next)}.` : 'The bonus is at its highest.'}`;
+  }
+  function openZoeSheet(side) { overlayMsgSheet(side === me ? 'Your buff tile' : `${foeName()}'s buff tile`, zoeText(side)); }
   function overlayMsgSheet(head, text) {
     $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">${esc(head)}</h3><button class="btn small" id="close">Close</button></div><p style="margin:0">${esc(text)}</p>`;
     $('sheet-back').hidden = false;
@@ -2299,13 +2310,13 @@ html.pc .corner button span { display: inline; }
         : (fresh ? 'Drag a squad to move it.' : 'Pick a unit, then tap a tile in your zone.');
       if (left <= 0 && selected === null) hint = Game.deployBuyable(m, me) ? `No deployments left. +1 costs ${Game.deployCost(m, me)}.` : 'No deployments left.';
       if (readyN && selected === null) hint = `${readyN} squad${readyN === 1 ? '' : 's'} ready to level up.`;
-      if (Game.charOf(m, me) === 'zoe' && selected === null && (m.buff && m.buff[me] || []).length) hint += ` Starred tiles: ${(zb => `+${zb.dmg}% damage, +${zb.hp}% health${zb.aps ? `, +${zb.aps}% attack speed` : ''}`)(Game.zoeBuff(m, me))}.`;
+      if (Game.charOf(m, me) === 'zoe' && selected === null && (m.buff && m.buff[me] || []).length) hint += ` Starred tiles: ${zoeLine(Game.zoeBuff(m, me))} (tap one for more).`;
       if (Game.hailRound(m) && selected === null && !fresh) hint = `Hail this round: ${Game.ICE.hailDps} damage a second on hail tiles. ${MORE('map-more')}`;
       if (Game.altarRound(m) && selected === null && !fresh) hint = `${Game.hailRound(m) ? 'Hail this round, and the' : 'The'} altar of ice has risen: tap it for ice walls, a push of the hail or a Snowgre. ${MORE('map-more')}`;
       if (m.round === Game.FLANK.round && selected === null && !fresh) hint = `Flanks are open: deploy on the blue edges of their half. ${MORE('flank-more')}`;
       if (m.round === 1 && selected === null && m.armies[me].some(s => s.free)) hint = 'Your package squads are placed. Drag to move them.';
       if (charmMode && Game.canGiveCharm(m, me)) hint = 'Tap one of your squads to give it a stack of Charisma.';
-      if (moveMode) hint = moving == null ? `Tap an older squad to move it (${Game.CONFIG.moveCost} gold).` : `Tap a free tile to move ${esc(units[m.armies[me].find(s => s.id === moving).unit].name)} there.`;
+      if (moveMode) hint = moving == null ? `Tap an older squad to move it (${Game.freeMovesLeft(m, me) > 0 ? 'free' : `${Game.CONFIG.moveCost} gold`}).` : `Tap a free tile to move ${esc(units[m.armies[me].find(s => s.id === moving).unit].name)} there.`;
       if (selected !== null && !moveMode && m.armies[me].some(q => Game.boardable(m, me, q.col, q.row, selected))) hint += ` Or tap your ${esc(units[m.armies[me].find(q => Game.boardable(m, me, q.col, q.row, selected)).unit].name)} (gold outline) to hide this squad inside it.`;
       if (selected !== null && Game.isCarrier(m, selected)) hint += ` It carries one squad of any other unit, hidden from your opponent: place one on its tile.`;
       const freeL = Game.freeLeft(m, me);
@@ -2759,6 +2770,7 @@ html.pc .corner button span { display: inline; }
     user: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="currentColor"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="currentColor"/></svg>',
     cog: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.4-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.7a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.4 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.7h4l.4-2.7a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>',
     school: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3 1 9l11 6 9-4.9V17h2V9zM5 13.2v4L12 21l7-3.8v-4L12 17z"/></svg>',
+    puzzle: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 3a2 2 0 0 1 4 0v2h5v5h-2a2 2 0 0 0 0 4h2v7h-6v-2a2 2 0 0 0-4 0v2H3v-7h2a2 2 0 0 0 0-4H3V5h7z"/></svg>',
     book: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 3h11a3 3 0 0 1 3 3v15H7a2 2 0 0 1-2-2zm2 14v2h10v-2zM8 6v2h8V6z"/></svg>',
     help: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m1 17h-2v-2h2zm2.1-7.7-.9.9c-.7.7-1.2 1.3-1.2 2.8h-2v-.5c0-1.1.5-2.1 1.2-2.8l1.2-1.3a2 2 0 1 0-3.4-1.4H8a4 4 0 1 1 7.1 2.3"/></svg>',
     trophy: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 3h10v2h4v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 15v3h4v3H7v-3h4v-3a5 5 0 0 1-3.7-3H7a4 4 0 0 1-4-4V5h4zm0 4H5v1a2 2 0 0 0 2 2zm10 0v3a2 2 0 0 0 2-2V7z"/></svg>',
@@ -2864,6 +2876,7 @@ html.pc .corner button span { display: inline; }
         ${rewardsCard()}
         <div class="tiles">
           <button id="tutorial" class="${newcomer ? 'hot' : ''}">${HICON.school}Tutorial</button>
+          <button id="puzzles-open">${HICON.puzzle}Puzzles</button>
           <button id="how">${HICON.help}How to play</button>
           <button id="ency-open">${HICON.book}Encyclopedia</button>
           <button id="lb-open">${HICON.trophy}Leaderboard</button>
@@ -2904,6 +2917,7 @@ html.pc .corner button span { display: inline; }
     $('ency-open').addEventListener('click', () => openEncyclopedia());
     $('how').addEventListener('click', openHowTo);
     $('tutorial').addEventListener('click', startTutorial);
+    $('puzzles-open').addEventListener('click', openPuzzles);
     if ($('tutorial-new')) $('tutorial-new').addEventListener('click', startTutorial);
     $('lb-open').addEventListener('click', openLeaderboard);
     if ($('tours-open')) $('tours-open').addEventListener('click', openToursSheet);
@@ -2960,7 +2974,7 @@ html.pc .corner button span { display: inline; }
       ${devMode() ? `<details class="settings"><summary>Developer<span>more modes</span></summary><div class="settings-body">
         <div class="bar"><span class="hint">${factionsReady() ? 'Factions: draft two factions each.' : 'Factions mode: coming soon.'}</span><button class="btn small" id="factions-ai" ${factionsReady() ? '' : 'disabled'}>Factions vs AI</button></div>
         <div class="bar"><span class="hint">${devReady() ? 'Buildings, Powers and spells on the big board.' : 'No factions yet.'}</span><button class="btn small" id="devtest-ai" ${devReady() ? '' : 'disabled'}>Factions – devtest</button></div>
-        <div class="bar"><span class="hint">DEVTESTLATEGAME: ${Game.START_HP + Game.LATE.hp} health each, at most ${Game.LATE.cap} squads of any one tier 3 or tier 4 unit.</span><span class="btnrow"><button class="btn small" id="late-friend">vs Friend</button><button class="btn small" id="late-ai">vs AI</button></span></div>
+        <div class="bar"><span class="hint">DEVTESTLATEGAME on Standard (with treasuries): ${Game.START_HP + Game.LATE.hp} health each, at most ${Game.LATE.cap} squads of any one tier 3 or tier 4 unit.</span><span class="btnrow"><button class="btn small" id="late-friend">vs Friend</button><button class="btn small" id="late-ai">vs AI</button></span></div>
         <div class="bar"><span class="hint">2v2: two boards side by side. Invite three players, set the teams.</span><button class="btn small" id="duo-new">2v2 lobby</button></div>
         ${TEST ? `<div class="bar"><span class="hint">Level-up cost (test setting)</span><div class="seg" role="group" aria-label="Level-up cost">${[50, 75].map(c => `<button data-c="${c}" aria-pressed="${Game.CONFIG.levelCostPerTier === c}">${c} gold</button>`).join('')}</div></div>` : ''}
         <div class="bar"><span class="hint">${customSet ? `Your ${units.length} Counter Lab units` : `${units.length} built-in units`}${reportDb ? '. Matches are saved for Claude to review.' : ''}</span>
@@ -3043,7 +3057,7 @@ html.pc .corner button span { display: inline; }
     if (!j) { $('lb-msg').textContent = 'Couldn’t reach the game server. Check your connection and try again.'; return; }
     home.rankedOn = !!j.on; home.board = j;
     const pct = (r) => Math.round((r.w + r.t / 2) / Math.max(1, r.w + r.t + r.l) * 100);
-    $('lb-msg').textContent = (j.rows.length ? 'Ranked best-of-3 series. Win share counts a tie as half a win.' : 'No ranked results yet. Play a ranked match against a friend to get on the board.') + (j.on ? '' : ' Ranked is switched off right now.');
+    $('lb-msg').textContent = (j.rows.length ? 'Ranked best-of-3 series. Score: 75% wins (the most wins on the board is full marks), 25% win share (a tie is half a win).' : 'No ranked results yet. Play a ranked match against a friend to get on the board.') + (j.on ? '' : ' Ranked is switched off right now.');
     // Legend (2026-11-03): the top 5 when the month ends (Stockholm time) get the gold title
     const lg = j.legend && j.legend.top ? j.legend : null;
     if (lg) {
@@ -3053,8 +3067,8 @@ html.pc .corner button span { display: inline; }
     }
     if (!j.rows.length) return;
     const top = lg ? lg.top : 0;
-    $('lb').innerHTML = `<table class="lb"><thead><tr><th>#</th><th>Player</th><th>W</th><th>T</th><th>L</th><th>Win %</th></tr></thead><tbody>
-      ${j.rows.map((r, i) => `<tr class="${[acct && r.id === acct.id ? 'me' : '', i < top ? 'legend' : '', i === top - 1 && j.rows.length > top ? 'cut' : ''].join(' ').trim()}"><td class="num">${i + 1}</td><td>${nameplate(r.tag, r.title, 'row')}</td><td class="num">${r.w}</td><td class="num">${r.t}</td><td class="num">${r.l}</td><td class="num">${pct(r)}%</td></tr>`).join('')}
+    $('lb').innerHTML = `<table class="lb"><thead><tr><th>#</th><th>Player</th><th>W</th><th>T</th><th>L</th><th>Win %</th><th>Score</th></tr></thead><tbody>
+      ${j.rows.map((r, i) => `<tr class="${[acct && r.id === acct.id ? 'me' : '', i < top ? 'legend' : '', i === top - 1 && j.rows.length > top ? 'cut' : ''].join(' ').trim()}"><td class="num">${i + 1}</td><td>${nameplate(r.tag, r.title, 'row')}</td><td class="num">${r.w}</td><td class="num">${r.t}</td><td class="num">${r.l}</td><td class="num">${pct(r)}%</td><td class="num">${r.score != null ? Math.round(r.score) : ''}</td></tr>`).join('')}
       </tbody></table>`;
   }
 
@@ -3086,7 +3100,7 @@ html.pc .corner button span { display: inline; }
       head = 'Towers';
       const extra = (t) => [t.skill && [t.skill.name, t.skill.text, `skill · ${Game.TOWER_SKILL.cost} gold`], t.skill2 && [t.skill2.name, t.skill2.text, `skill · ${t.skill2.cost} gold${t.skill2.needs ? ` · needs ${t.skill.name}` : ''}`],
         t.mark && [t.mark.name, t.mark.text, `${t.mark.cost} gold`], t.fortify && [t.fortify.name, t.fortify.text, `every round · ${t.fortify.cost} gold`],
-        t.creditLine && [t.creditLine.name, t.creditLine.text, 'always on'], t.muster && [t.muster.name, t.muster.text, 'always on'], t.vault && [t.vault.name, t.vault.text, 'always on'], t.passive && [t.passive.name, t.passive.text, 'always on'],
+        t.creditLine && [t.creditLine.name, t.creditLine.text, 'always on'], t.muster && [t.muster.name, t.muster.text, 'always on'], t.vault && [t.vault.name, t.vault.text, 'always on'], t.freeMove && [t.freeMove.name, t.freeMove.text, 'always on'], t.passive && [t.passive.name, t.passive.text, 'always on'],
         ...(t.generals ? Game.MAGE_GENERALS.map(gn => [gn.name, gn.text, `${gn.extra ? 'once a match' : 'every round'} · ${gn.cost} gold`, gn.cost]) : []),
         ...(t.rounds || []).map(x => [x.name, x.text || '', `every round · ${+x.cost || 0} gold`, +x.cost || 0])].filter(Boolean)
         .map(x => x.length > 3 ? x : [...x, /always on/.test(x[2]) ? 0 : +((x[2].match(/(\d+) gold/) || [])[1] || 0)])
@@ -3258,15 +3272,17 @@ html.pc .corner button span { display: inline; }
     if (!m || phase === 'end' || mode === 'tutorial') { quitToMenu(); return; }
     $('sheet').innerHTML = `
       <div class="bar" data-keep><h3 id="sheet-h">Main menu</h3></div>
-      <p class="big" style="margin:0">${mode === 'net' && net.ranked ? 'You will forfeit and lose the ranked series. Are you sure?' : 'You will forfeit the match. Are you sure?'}</p>
+      <p class="big" style="margin:0">${foeAwayNow() ? `Your opponent is disconnected, so leaving doesn’t count as a loss for you${mode === 'net' && net.ranked ? ': they lose the ranked series' : ''}. Leave the match?` : mode === 'net' && net.ranked ? 'You will forfeit and lose the ranked series. Are you sure?' : 'You will forfeit the match. Are you sure?'}</p>
       <span class="btnrow"><button class="btn primary" id="forfeit-yes">Yes</button><button class="btn" id="forfeit-no">No</button></span>`;
     $('forfeit-yes').addEventListener('click', forfeit);
     $('forfeit-no').addEventListener('click', openSoundSheet);
   }
+  const foeAwayNow = () => !!m && !solo() && (mode === 'net' ? !net.foeHere : !net.connected);
   function quitToMenu() { if (mode === 'host') clearHost(); closeSheet(true); showStart(); }
   function forfeit() {
     if (!m || phase === 'end') { quitToMenu(); return; }
-    if (tourLive() && mode !== 'net') tourReport(foe()); // a tournament match: the opponent wins (the server reports its own)
+    const foeGone = foeAwayNow(); // the opponent is disconnected: leaving isn't a loss (they went away first)
+    if (tourLive() && mode !== 'net') tourReport(foeGone ? me : foe()); // a tournament match (the server reports its own)
     if (mode === 'net') { send({ t: 'forfeit' }); srvForget(); quitToMenu(); return; } // (a socket sends what it has before it closes)
     if (!solo() && net.connected) {
       send({ t: 'forfeit' });
@@ -3767,7 +3783,7 @@ html.pc .corner button span { display: inline; }
     if (!sampleFn) { startAiMatch(); return; }
     leaveNet();
     mode = 'claude'; me = 0; restoreSet();
-    m = Game.createMatch(units, M, (now() ^ (Math.random() * 1e9)) >>> 0, curMap(), m && m.map ? m.map.id : null, matchChars(), matchOpts());
+    m = Game.createMatch(units, M, (now() ^ (Math.random() * 1e9)) >>> 0, playMap(), m && m.map ? m.map.id : null, matchChars(), matchOpts());
     nextReady = [false, false]; rematch = [false, false];
     claude.off = false; claude.history = [];
     startReport();
@@ -3902,7 +3918,7 @@ Worst choices against it: ${answers.slice(-3).reverse().map(([i, v]) => `${units
     return `You are playing No Mans Land, a small auto-battler, against a human player. You are the RED side. Decide your moves for round ${m.round}. The human places their new squads at the same time and can't see yours until the fight. You only see their squads from earlier rounds. Play to win: build counters to what they have, protect your damage dealers, and think about what they are likely to add next.
 
 RULES
-- Board: columns 0-${Game.COLS - 1}, rows 0-${Game.ROWS - 1}, tiles ${Game.TILE} m wide. Your zone is rows 0-${Game.ZONE - 1}; row ${Game.ZONE - 1} is your front line, nearest the enemy, and row 0 is the back. Rows ${Game.ZONE}-${Game.ROWS - Game.ZONE - 1} are no man's land. From round ${Game.FLANK.round} each player may also deploy on flank tiles: columns ${Game.FLANK.cols.join(' and ')}, on the OPPONENT's half of the board: their whole zone plus their half of no man's land (yours: rows ${Math.min(...Game.flankRows(1))}-${Math.max(...Game.flankRows(1))}; theirs: rows ${Math.min(...Game.flankRows(0))}-${Math.max(...Game.flankRows(0))})${Game.flankOpen(m) ? ', OPEN NOW' : ''}. You can't use a tile the opponent already holds with a squad or their tower. Their flank columns on YOUR half (columns ${Game.FLANK.cols.join(' and ')}, rows ${Math.min(...Game.flankRows(0))}-${Math.max(...Game.flankRows(0))}) are reserved for them for the whole match: you can never place a squad or your tower there. Squads there start inside the enemy's lines, good for hitting their tower or backline from the side, so guard your own edges against theirs. A squad placed on a flank can't move or attack for the first ${Game.FLANK.delay} s of the first fight after it was placed; from the next round on it starts normally. The enemy zone is rows ${Game.ROWS - Game.ZONE}-${Game.ROWS - 1}; row ${Game.ROWS - Game.ZONE} is their front. One squad per tile. Squads keep their tile, except: once per round you may move ONE of your squads from an earlier round to another free tile you could place on, for ${Game.CONFIG.moveCost} gold ("move"). The opponent sees it on its old tile until the fight.
+- Board: columns 0-${Game.COLS - 1}, rows 0-${Game.ROWS - 1}, tiles ${Game.TILE} m wide. Your zone is rows 0-${Game.ZONE - 1}; row ${Game.ZONE - 1} is your front line, nearest the enemy, and row 0 is the back. Rows ${Game.ZONE}-${Game.ROWS - Game.ZONE - 1} are no man's land. From round ${Game.FLANK.round} each player may also deploy on flank tiles: columns ${Game.FLANK.cols.join(' and ')}, on the OPPONENT's half of the board: their whole zone plus their half of no man's land (yours: rows ${Math.min(...Game.flankRows(1))}-${Math.max(...Game.flankRows(1))}; theirs: rows ${Math.min(...Game.flankRows(0))}-${Math.max(...Game.flankRows(0))})${Game.flankOpen(m) ? ', OPEN NOW' : ''}. You can't use a tile the opponent already holds with a squad or their tower. Their flank columns on YOUR half (columns ${Game.FLANK.cols.join(' and ')}, rows ${Math.min(...Game.flankRows(0))}-${Math.max(...Game.flankRows(0))}) are reserved for them for the whole match: you can never place a squad or your tower there. Squads there start inside the enemy's lines, good for hitting their tower or backline from the side, so guard your own edges against theirs. A squad placed on a flank can't move or attack for the first ${Game.FLANK.delay} s of the first fight after it was placed; from the next round on it starts normally. The enemy zone is rows ${Game.ROWS - Game.ZONE}-${Game.ROWS - 1}; row ${Game.ROWS - Game.ZONE} is their front. One squad per tile. Squads keep their tile, except: once per round you may move ONE of your squads from an earlier round to another free tile you could place on, for ${Game.CONFIG.moveCost} gold ("move"). The opponent sees it on its old tile until the fight.${Game.freeMoves(m, 1) ? ` You also get ${Game.freeMoves(m, 1)} FREE move(s) every round (Bastion's March order or Otto's horseshoe): the first move(s) you make each round cost nothing.` : ''}
 - The fight is automatic. Every body marches straight ahead in its own column (a squad on a flank tile marches sideways, toward the middle of the board, instead) until an enemy comes within its range + ${Game.SETTINGS.sight} m in any direction (at least ${Game.SETTINGS.minSight} m), then turns toward the nearest enemy and attacks once in range, staying on that enemy until it dies or leaves its range. Within ${Game.SETTINGS.drift} m beyond that it already starts curving toward the nearest enemy. Once no enemy is ahead of it, it turns toward the nearest one. So columns are lanes: a squad fights what stands in or near its lane, a squad in an empty lane far from the enemy walks past and hits the enemy from the side or behind, and long-range units in the back only get attacked once the front is gone. Short-range units in front shield long-range units behind. Spreading out limits splash damage.
 - The round's loser loses health: for each surviving enemy squad, by its tier (${Object.entries(Game.TIER_DMG).map(([t, d]) => `tier ${t}: ${d}`).join(', ')}), scaled by the share of its bodies alive. If time runs out, both sides take damage. A round costs the loser at most ${Game.MAX_ROUND_DMG} health. Health starts at ${Game.START_HP} and the match ends at 0.
 - Gold: both players get ${Game.incomeFor(2)} going into round 2, and ${Game.CONFIG.incomeStep} more every round after that (next round: +${Game.incomeFor(m.round + 1)}). From round ${Game.LOSER_BONUS_ROUND}, the round's loser gets +${Game.LOSER_BONUS} extra. A player whose tower falls in a fight also loses ${Game.TOWER_FALL_HP} health, but the round's damage and the tower's together are at most ${Game.MAX_ROUND_DMG}. At most ${Game.CARRY_CAP} unspent gold carries over; the rest is lost. Breaking a streak of ${Game.SHUTDOWN.from}+ wins in a row pays ${Game.SHUTDOWN.gold}, +${Game.SHUTDOWN.step} for each win past ${Game.SHUTDOWN.from} (current streaks: you ${(m.streak || [0, 0])[1]}, them ${(m.streak || [0, 0])[0]}).
@@ -4170,6 +4186,65 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     nextReady = [false, false]; rematch = [false, false];
     enterDeploy(0);
   }
+  // ---------- tutorial puzzles (2026-11-03) ----------
+  // One fight against an army you can see, with a set budget and a small shop: win it to solve the puzzle. Played in
+  // the tutorial's mode (tut.puzzle = the puzzle's index): the Old standard board, fights at 1x, no clock, no AI.
+  // The enemy's squads are placed as if from an earlier round, so they show while you deploy. Each puzzle was checked
+  // headlessly (tools/tests/puzzles.js): its answer wins from most placements, the tempting wrong answers lose.
+  const PUZZLE_STORE = 'phonebellum.puzzles.v1';
+  const PUZZLES = [
+    { name: 'The horde', gold: 200, shop: ['Goblin Swarm', 'Sniper', 'Fire Mage', 'Brute'],
+      foe: [['Goblin Swarm', 5, 4], ['Goblin Swarm', 6, 4], ['Skeleton Archers', 5, 2]],
+      goal: 'Two Goblin Swarms and Skeleton Archers: a crowd of small bodies. You have 200 gold.',
+      hint: 'Splash hits many bodies at once. Fire Mage beats crowds.', why: 'Fire Mage’s splash hits a whole crowd with every shot.' },
+    { name: 'Two giants', gold: 300, shop: ['Fire Mage', 'Sniper', 'Goblin Swarm', 'Skeleton Archers', 'Ember Imps'],
+      foe: [['Brute', 5, 4], ['Brute', 6, 4]],
+      goal: 'Two Brutes: huge health, huge hits. You have 300 gold.',
+      hint: 'A Brute hits one body at a time. Many cheap bodies swamp it: Goblin Swarms, up front.', why: 'A Brute kills one goblin a hit while the whole swarm hits back.' },
+    { name: 'Out of reach', gold: 300, shop: ['Goblin Swarm', 'Fire Mage', 'Sniper', 'Skeleton Archers', 'Ember Imps'],
+      foe: [['Fire Mage', 5, 3], ['Fire Mage', 6, 3], ['Brute', 5, 4]],
+      goal: 'Two Fire Mages behind a Brute. Crowds melt in their splash. You have 300 gold.',
+      hint: 'Few targets, all of them single bodies: Snipers outrange Fire Mages and land one big hit each shot.', why: 'Snipers shoot from beyond the Fire Mages’ reach, and their splash finds no crowd.' },
+  ];
+  let puzSolved = [];
+  try { puzSolved = JSON.parse(localStorage.getItem(PUZZLE_STORE) || '[]') || []; } catch (e) { puzSolved = []; }
+  const puzzle = () => (mode === 'tutorial' && tut && tut.puzzle != null) ? PUZZLES[tut.puzzle] : null;
+  function startPuzzle(k) {
+    const P = PUZZLES[k];
+    if (!P) { showStart(); return; }
+    leaveNet(); closeSheet(true);
+    mode = 'tutorial'; me = 0; report = null; lastAiLevels = []; tutHint = '';
+    if (speed !== 1) { tutSpeed = speed; speed = 1; }
+    if (customSet && !standardSet) standardSet = { set: rawSet, custom: customSet };
+    useSet(BUILTIN, false);
+    m = Game.createMatch(units, M, 1, 'standard');
+    m.packages = [[], []];
+    for (const n of P.shop) m.unlocks[0][unitIx(n)] = 1;
+    tutEnemy(P.foe);
+    for (const q of m.armies[1]) q.round = 0; // as if placed in an earlier round: in plain sight
+    m.gold = [P.gold, 0];
+    tut = { intro: 2, wrong: false, tskillSeen: true, sheetSeen: true, puzzle: k, hint: false };
+    nextReady = [false, false]; rematch = [false, false];
+    enterDeploy(0);
+  }
+  // the menu's list of puzzles
+  function openPuzzles() {
+    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Puzzles</h3><button class="btn small" id="close">Close</button></div>
+      <p class="hint" style="margin:0">One fight each. You see the whole enemy army; win with the gold you have.</p>
+      <div style="display:grid;gap:8px">${PUZZLES.map((P, k) => `<button class="btn" data-puz="${k}" style="display:flex;justify-content:space-between;gap:8px;text-align:left"><span><b>${k + 1}. ${esc(P.name)}</b><br><span class="hint">${esc(P.goal)}</span></span><span style="color:var(--gold)">${puzSolved.includes(k) ? '✓ Solved' : ''}</span></button>`).join('')}</div>`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', closeSheet);
+    $('sheet').querySelectorAll('[data-puz]').forEach(b => b.addEventListener('click', () => startPuzzle(+b.dataset.puz)));
+  }
+  // the fight is over: solved, or try again (with a hint)
+  function puzResult(sum) {
+    const P = puzzle(), k = tut.puzzle, won = sum.winner === me && !sum.timeout;
+    if (won && !puzSolved.includes(k)) { puzSolved.push(k); try { localStorage.setItem(PUZZLE_STORE, JSON.stringify(puzSolved)); } catch (e) {} }
+    const more = k + 1 < PUZZLES.length;
+    if (won) coach(`<b>Solved!</b> ${esc(P.why)}`, [['Main menu', showStart], ...(more ? [['Next puzzle', () => startPuzzle(k + 1), true]] : [['Play vs AI', () => { matchKind = 'standard'; startAiMatch(); }, true]])]);
+    else coach(`<b>Not this time.</b> ${tut.hint ? esc(P.hint) : 'Look at what they have, and what beats it.'}`, [['Main menu', showStart], ...(tut.hint ? [] : [['Hint', () => { const h = tut.hint = true; coach(`<b>Hint:</b> ${esc(P.hint)}`, [['Try again', () => { startPuzzle(k); tut.hint = h; panelDeploy(); }, true]]); }]]), ['Try again', () => { const h = tut.hint; startPuzzle(k); tut.hint = h; panelDeploy(); }, true]]);
+  }
+
   // the enemy's scripted squads (they don't pay for them)
   function tutEnemy(list) {
     for (const [n, c, r] of list) { m.unlocks[1][unitIx(n)] = m.round; m.gold[1] = Game.SQUAD_COST * 9; Game.place(m, 1, unitIx(n), c, r); }
@@ -4188,6 +4263,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (mode !== 'tutorial' || !m) return null;
     if (phase === 'result') return 'result';
     if (phase !== 'deploy') return null;
+    if (tut.puzzle != null) return 'puzzle';
     const r = m.round;
     if (r === 1 && tut.intro < 2) return tut.intro ? 'tower' : 'zone';
     if (r <= 2) return m.armies[me].some(s => s.round === r) ? 'fight' : selected !== null ? 'place' : r === 1 ? 'pick' : 'counter';
@@ -4223,6 +4299,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (!text) { el.hidden = true; boardMarks(); return; }
     if (el.hidden || $('coach-text').innerHTML !== text) { el.hidden = true; void el.offsetWidth; } // each new line slides in
     el.hidden = false;
+    el.classList.toggle('mid', !!puzzle());
     $('coach-text').innerHTML = text;
     $('coach-btns').innerHTML = btns.map(([label, , primary], k) => `<button class="btn small${primary ? ' primary' : ''}" data-cb="${k}">${label}</button>`).join('');
     $('coach-btns').querySelectorAll('[data-cb]').forEach(b => b.addEventListener('click', btns[+b.dataset.cb][1]));
@@ -4242,9 +4319,9 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // the tutorial's deploy panel: only what the current step needs, built up as the steps go
   function panelTutorial() {
     const step = tutStep(), r = m.round, g = m.gold[me], left = Game.deploysLeft(m, me);
-    const open = step === 'free' || step === 'flank'; // the freer rounds: the shop, the deployment cap, a squad picked stays picked
+    const P = puzzle(), open = step === 'free' || step === 'flank' || step === 'puzzle'; // the freer rounds: the shop, the deployment cap, a squad picked stays picked
     if (step === 'fight' && r === 1) Game.ensureTower(m, foe());
-    const cards = step === 'pick' ? [TUT.start] : step === 'counter' ? [TUT.counter, TUT.wrong] : open ? TUT.shop : [];
+    const cards = step === 'pick' ? [TUT.start] : step === 'counter' ? [TUT.counter, TUT.wrong] : P ? P.shop : open ? TUT.shop : [];
     const canBuy = (i) => !open || (g >= Game.shopCost(m, me, i) && left > 0);
     if (selected !== null && !canBuy(selected)) selected = null;
     const sel = selected !== null && esc(units[selected].name);
@@ -4252,9 +4329,9 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       : step === 'place' ? { text: '', x: false } // the coach says it; the drawer goes down, so the whole zone is in sight
       : open && sel ? { text: step === 'flank' ? `Tap a blinking flank tile to place ${sel}.` : `Tap a tile in your zone to place ${sel}.`, x: true } : null;
     $('panel').innerHTML = step === 'tower' || step === 'zone' || step === 'towerpick' ? '' : `
-      ${r >= 3 ? `<div class="bar"><span class="deploys num">${Math.max(0, left)} of ${Game.deploysAllowed(m, me)} deployments left</span><span class="xbtns" style="display:flex;gap:6px">${Game.deployBuyable(m, me) ? `<button class="btn small" id="buy-deploy" ${editable() && Game.canBuyDeploy(m, me) ? '' : 'disabled'}>+1 deployment · ${Game.deployCost(m, me)}</button>` : ''}${towerBtn()}</span></div>` : ''}
+      ${r >= 3 || P ? `<div class="bar"><span class="deploys num">${Math.max(0, left)} of ${Game.deploysAllowed(m, me)} deployments left</span><span class="xbtns" style="display:flex;gap:6px">${Game.deployBuyable(m, me) && !P ? `<button class="btn small" id="buy-deploy" ${editable() && Game.canBuyDeploy(m, me) ? '' : 'disabled'}>+1 deployment · ${Game.deployCost(m, me)}</button>` : ''}${towerBtn()}</span></div>` : ''}
       ${cards.length ? `<div class="shop" id="shop">${cards.map(n => shopCard(unitIx(n), !canBuy(unitIx(n)))).join('')}</div>` : ''}
-      <div class="bar"><span class="gold num">${g} gold</span>${step === 'fight' || step === 'free' ? '<button class="btn primary" id="fight">Fight</button>' : ''}</div>`;
+      <div class="bar"><span class="gold num">${g} gold</span>${step === 'fight' || step === 'free' || (P && m.armies[me].length) ? '<button class="btn primary" id="fight">Fight</button>' : ''}</div>`;
     $('panel').querySelectorAll('.ucard').forEach(b => b.addEventListener('click', () => {
       const i = +b.dataset.i;
       if (b.getAttribute('aria-disabled') === 'true') return;
@@ -4271,6 +4348,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const card = (n) => $('panel').querySelector(`.ucard[data-i="${unitIx(n)}"]`);
     const next = () => { tut.intro++; panelDeploy(); render(); };
     if (dockTask && dockTask.text) coach(null); // the task line on the board says what the next tap does
+    else if (P) coach(`<b>Puzzle ${tut.puzzle + 1} of ${PUZZLES.length} · ${esc(P.name)}.</b> ${esc(P.goal)} Win the fight.${tut.hint ? ` <b>Hint:</b> ${esc(P.hint)}` : ''}`, tut.hint ? [] : [['Hint', () => { tut.hint = true; panelDeploy(); }]]);
     else if (step === 'tower') coach('This is your <b>Tower</b>. Protect it.', [['Next', next, true]]);
     else if (step === 'zone') coach('This is your <b>deployment zone</b>. You can put troops here.', [['Next', next, true]]);
     else if (step === 'pick') { coach(`Tap <b>${esc(TUT.start)}</b> to recruit your first squad.`); glow(card(TUT.start)); }
@@ -4300,6 +4378,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function tutResult(sum) {
     phase = 'result'; resultShownAt = 0; // no clock moving on by itself: the player reads at their own pace
     overlay(null); $('panel').innerHTML = ''; hud(); netStatus();
+    if (puzzle()) { puzResult(sum); return; }
     const won = sum.winner === me && !sum.timeout, lost = sum.winner === foe() && !sum.timeout;
     let line = lost ? `<b>Round lost: −${sum.dmg[me]} health</b> (top left), a hit for each enemy squad left standing. At 0, you lose.`
       : won ? `<b>Round won: −${sum.dmg[foe()]} for them</b>, a hit for each of your squads left standing.`
@@ -4314,7 +4393,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       tutDone = true;
       try { localStorage.setItem(TUT_STORE, 'done'); } catch (e) {}
       coach(`${line} That’s the basics. From here the enemy plays for real, and every unit is in the shop. Finish the match!`,
-        [['Main menu', showStart], ['Keep playing', tutHandover, true]]);
+        [['Main menu', showStart], ['Puzzles', () => startPuzzle(Math.max(0, PUZZLES.findIndex((_, k) => !puzSolved.includes(k))))], ['Keep playing', tutHandover, true]]);
     }
     glow(document.querySelector(`.hud .side.${lost ? 'you' : 'foe'}`));
   }
@@ -4333,7 +4412,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (matchKind === 'factions' && factionsReady()) { startDraft(); return; }
     if (matchKind === 'devtest' && devReady()) { startDraft(); return; }
     restoreSet();
-    m = Game.createMatch(units, M, (now() ^ (Math.random() * 1e9)) >>> 0, curMap(), m && m.map ? m.map.id : null, matchChars(), matchOpts());
+    m = Game.createMatch(units, M, (now() ^ (Math.random() * 1e9)) >>> 0, playMap(), m && m.map ? m.map.id : null, matchChars(), matchOpts());
     nextReady = [false, false]; rematch = [false, false];
     startReport();
     beginAiRound();
@@ -4536,7 +4615,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const sq = Game.squadAt(m, me, t.col, t.row);
     if (!sq) return false;
     sfx('pressBoard');
-    const denied = (sq.round < m.round && !(moveMode || Game.movedId(m, me) === sq.id || Game.freeMover(m, me, sq) || Game.freeOut(m, me, sq) || (Game.movedId(m, me) == null && m.gold[me] >= Game.CONFIG.moveCost)))
+    const denied = (sq.round < m.round && !(moveMode || Game.movedId(m, me) === sq.id || Game.freeMover(m, me, sq) || Game.freeOut(m, me, sq) || sq.luckMove === m.round || Game.freeMovesLeft(m, me) > 0 || (Game.movedId(m, me) == null && m.gold[me] >= Game.CONFIG.moveCost)))
       || !Game.canMove(m, me, sq);
     if (denied) { if (!editable()) return false; drag = { id: sq.id, from: t, over: t, moved: false, denied: true }; return true; } // a drag of it only says no (a tap still opens it)
     drag = { id: sq.id, from: t, over: t, moved: false };
@@ -4627,7 +4706,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (m.round < 4) { // only placing and taking back, so no sheet pulls the player off the script
         if (own) return; // its X takes it back
         if (selected !== null && editable() && Game.place(m, me, selected, t.col, t.row)) {
-          if (m.round < 3 || m.gold[me] < Game.shopCost(m, me, selected) || Game.deploysLeft(m, me) <= 0) selected = null;
+          if ((m.round < 3 && !puzzle()) || m.gold[me] < Game.shopCost(m, me, selected) || Game.deploysLeft(m, me) <= 0) selected = null;
           changed();
         }
         return;
@@ -4709,6 +4788,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (towerVisible(foe()) && Game.towerAt(m, foe(), t.col, t.row) && Game.towerUp(m, foe())) { openTowerSheet(foe()); return; }
     const elf = Game.elfSpot(m);
     if (elf && t.col === elf.col && (t.row === Game.ROWS / 2 - 1 || t.row === Game.ROWS / 2) && !Game.occupied(m, me, t.col, t.row)) { openMapSheet(); return; }
+    // Zoe's buff tiles: a tap on an empty one says what it gives now and what it grows to
+    for (const sd of [me, foe()]) if (selected === null && Game.onBuffTile(m, sd, t.col, t.row) && !Game.squadAt(m, sd, t.col, t.row) && (sd === me || charVisible(sd))) { openZoeSheet(sd); return; }
     const freeTile = !Game.occupied(m, me, t.col, t.row);
     if (Game.altarRound(m) && selected === null && freeTile && Math.abs(t.col - (Game.COLS - 1) / 2) < 1 && Math.abs(t.row - (Game.ROWS - 1) / 2) < 1) { openAltarSheet(); return; }
     if (Game.hailRound(m) && selected === null && freeTile && Game.hailTiles(m).some(h => h.col === t.col && h.row === t.row)) { openMapSheet(); return; }
@@ -5433,7 +5514,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   // ---------- Otto - The Gambler: the slot machine ----------
   const SLOT_NAME = { skull: 'skulls', shoe: 'horseshoes', coin: 'coins', goblin: 'goblins', chest: 'chests' };
-  const SLOT_PAYS = { skull: `−${Game.SLOT.skullHp} health`, shoe: 'a free move and +1 deployment this round', coin: `+${Game.SLOT.coinGold} gold`, goblin: 'a random tier 1 squad at level 2, unlocked', chest: `+${Game.SLOT.chestGold} gold` };
+  const SLOT_PAYS = { skull: `−${Game.SLOT.skullHp} health`, shoe: `+1 deployment or +1 free move every round, for the match (one of each; ${Game.SLOT.shoeGold} gold once you have both)`, coin: `+${Game.SLOT.coinGold} gold`, goblin: 'a random tier 1 squad at level 2, unlocked', chest: `+${Game.SLOT.chestGold} gold` };
   // a reel symbol as a small picture (40 x 40)
   function slotSvg(sym, size = 40) {
     const body = {
@@ -5445,7 +5526,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     }[sym] || '';
     return `<svg width="${size}" height="${size}" viewBox="0 0 40 40" aria-label="${esc(sym)}">${body}</svg>`;
   }
-  const slotLine = (rec) => rec.win ? `three ${SLOT_NAME[rec.win]}${rec.win === 'goblin' && rec.unit != null && units[rec.unit] ? ` (${esc(units[rec.unit].name)})` : ''}: ${SLOT_PAYS[rec.win]}` : 'no luck';
+  const SHOE_GOT = { deploy: '+1 deployment every round for the rest of the match', move: '+1 free move every round for the rest of the match', gold: `+${Game.SLOT.shoeGold} gold (you have both horseshoe perks)` };
+  const slotLine = (rec) => rec.win ? `three ${SLOT_NAME[rec.win]}${rec.win === 'goblin' && rec.unit != null && units[rec.unit] ? ` (${esc(units[rec.unit].name)})` : ''}: ${rec.win === 'shoe' && SHOE_GOT[rec.shoe] ? SHOE_GOT[rec.shoe] : SLOT_PAYS[rec.win]}` : 'no luck';
   // the opponent's spins: a banner over the board when new ones show up
   let foeSlotSeen = '';
   function foeSlotNews() {
@@ -5490,6 +5572,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       sfx(rec.win === 'skull' ? 'nope' : rec.win ? 'skill' : 'release');
       if ($('reels')) { openSlots(); const r = $('slot-res'); if (r) r.innerHTML = rec.win ? `<b>${rec.win === 'skull' ? 'Ouch!' : 'Winner!'}</b> ${slotLine(rec)}` : 'No luck.'; }
       if (rec.win === 'chest') banner('Jackpot!', `+${Game.SLOT.chestGold} gold`);
+      if (rec.win === 'shoe' && SHOE_GOT[rec.shoe]) banner('Horseshoe!', SHOE_GOT[rec.shoe]);
       hud(); panelDeploy(); render();
     }, 600 + 2 * 350 + 250);
   }
@@ -5635,7 +5718,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // an always-on tower ability (slime tower: the slime skills it gets)
   function passiveBlock(side, tt) {
     const ALWAYS = `<span class="chip" style="color:var(--ink);border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px">Always on</span>`;
-    const traits = [tt.muster, tt.vault].filter(Boolean).map(x => abilityRow(x.name, ALWAYS, esc(x.text))).join('');
+    const traits = [tt.muster, tt.vault, tt.freeMove].filter(Boolean).map(x => abilityRow(x.name, ALWAYS, esc(x.text))).join('');
     if (!tt.passive) return traits;
     let on = '';
     if (tt.id === 'slime' && (side === me || phase !== 'deploy')) {
@@ -5774,9 +5857,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (c && r) { openPairSheet(c, r); return; }
     }
     const p = sheetPane(i, sq, side);
+    const zq = sq && m && (owner === me ? sq : charVisible(owner) ? Game.seenAt(m, sq) : null); // Zoe: the squad stands on a buff tile
+    const zoeNote = zq && phase === 'deploy' && Game.onBuffTile(m, owner, zq.col, zq.row) ? `<p class="hint" style="margin:0;color:var(--gold)">★ On a buff tile. ${esc(zoeText(owner))}</p>` : '';
     $('sheet').innerHTML = `
       <div class="bar"><h3 id="sheet-h"><span style="color:${p.u.color}">${Shapes.svg(p.u.shape, 18)}</span> ${esc(p.u.name)}</h3><button class="btn small" id="close">Close</button></div>
-      ${p.html}`;
+      ${zoeNote}${p.html}`;
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', closeSheet);
     bindPane($('sheet'), i, sq, side, () => openSheet(i, sq, side));
@@ -5841,7 +5926,9 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         if (editable() && sq.charmGiven === m.round && sq.charm === 1) btns.push(`<button class="btn" data-act="charm-undo">Take back Charisma</button>`);
         if (sq.round === m.round && editable()) { const back = sq.cost + (sq.awaken > 0 ? Game.awakenCost(m, sq.unit) : 0); btns.push(`<button class="btn" data-act="take-back">Take back${back ? ` · +${back}` : ''}</button>`); }
         if (sq.round === m.round && editable() && Game.isRider(sq)) btns.push(`<button class="btn" data-act="move-sq">Take out</button>`);
+        const freeMv = sq.round < m.round && (sq.luckMove === m.round || Game.freeMovesLeft(m, me) > 0); // a free move: just drag it there
         if (sq.round < m.round && editable() && Game.movedId(m, me) === sq.id) btns.push(`<button class="btn" data-act="move-undo">Undo move · +${Game.CONFIG.moveCost}</button>`);
+        else if (freeMv && editable() && !Game.isRider(sq)) btns.push(`<button class="btn" data-act="move-sq">Move · free</button>`);
         else if (sq.round < m.round && editable() && Game.isRider(sq)) btns.push(`<button class="btn" data-act="move-sq">Take out · free</button>`);
         else if (sq.round < m.round && editable() && Game.movedId(m, me) == null) btns.push(`<button class="btn" data-act="move-sq" ${m.gold[me] >= Game.CONFIG.moveCost || Game.freeOut(m, me, sq) ? '' : 'disabled'}>Move${Game.freeOut(m, me, sq) ? ' · free' : ` · ${Game.CONFIG.moveCost} gold`}</button>`);
         if (sq.round < m.round && editable()) btns.push(`<button class="btn" data-act="sell">Sell · ${Game.sellValue(m, sq)} gold</button>`);
@@ -6221,7 +6308,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const tx = tourLive();
     if (!tx && matchKind === 'factions' && factionsReady()) { startDraft(); return; }
     restoreSet();
-    m = tx ? tourCreateMatch(tx) : Game.createMatch(units, M, (now() ^ (Math.random() * 1e9)) >>> 0, curMap(), m && m.map ? m.map.id : null, matchChars(), matchOpts());
+    m = tx ? tourCreateMatch(tx) : Game.createMatch(units, M, (now() ^ (Math.random() * 1e9)) >>> 0, playMap(), m && m.map ? m.map.id : null, matchChars(), matchOpts());
     lastSummary = null; nextReady = [false, false]; rematch = [false, false];
     startReport();
     hostBeginRound();
@@ -6370,7 +6457,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     // the guest's move this round: one squad at most
     if (!m.moved) m.moved = [null, null];
     m.moved[1] = null;
-    let luck = Game.slotWins(m, 1, 'shoe'); // Otto's horseshoe moves are free, one per horseshoe
+    let luck = Game.freeMoves(m, 1); // free moves this round (Bastion's March order, Otto's horseshoe)
     for (const q of m.armies[1]) if (q.movedRound === m.round && !Game.freeMover(m, 1, q) && !(q.from && q.from.in != null)) {
       if (q.luckMove === m.round && luck > 0) { luck--; continue; }
       delete q.luckMove;
@@ -6762,7 +6849,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   function srvRetry() { clearTimeout(net.retryTimer); net.tries++; net.retryTimer = setTimeout(() => { if (net.alive && !net.ws) srvOpen(); }, Math.min(8000, 600 * net.tries)); }
   // the match settings from this phone's menu (map, look, units, leaders and towers left out)
-  const srvSettings = () => ({ map: curMap() || '', skin: skinPick || '', offUnits: matchOff().map(i => units[i].name), offChars: matchChars().slice(), offTowers: packOn() ? SP.offTowers.slice() : [], late: lateGame });
+  const srvSettings = () => ({ map: playMap() || '', skin: skinPick || '', offUnits: matchOff().map(i => units[i].name), offChars: matchChars().slice(), offTowers: packOn() ? SP.offTowers.slice() : [], late: lateGame });
   // one of this phone's own actions (a Game call that worked): to the server, and kept until it says it has it
   function srvAct(fn, a) {
     net.seq++;

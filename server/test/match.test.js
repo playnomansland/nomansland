@@ -5,7 +5,8 @@
 //  - hidden info: a phone's view and a watcher's never show the opponent's new squads while they deploy
 //  - cheating over the wire: unknown functions, extra arguments, the other side's squads, locked units, bad tiles,
 //    a made-up gold amount, actions after Ready: all refused, and the server's view comes back to put the phone right
-//  - a phone that reloads gets its side back with its key; the clock waits while it is away
+//  - a phone that reloads gets its side back with its key; the clock waits while it is away; leaving while the
+//    opponent is away counts as their loss
 //  - the clock: when it runs out, the server starts the fight by itself
 //  - a tournament match: only the two players (with their tournament keys) get in, it starts by itself, and the
 //    result goes from the server to the tournament (a forfeit here)
@@ -174,6 +175,21 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 5 * 60 *
       await waitFor(() => b2.inbox.find((x) => x.t === 'fight'), 5000);
       for (const s of [a, b2, stranger]) s.close();
       console.log('cheating refused, reconnect and clock ok');
+    }
+
+    // ----- leaving while the opponent is disconnected: they lose, not the one who leaves (2026-11-03) -----
+    {
+      const code = newCode();
+      const a = await phone(code, { create: true }), b = await phone(code);
+      a.json({ t: 'start', settings: {} });
+      await syncOf(a, (x) => x.phase === 'deploy');
+      b.close();
+      await waitFor(() => [...a.inbox].reverse().find((x) => (x.t === 'status' || x.t === 'sync') && x.here && !x.here[1]), 8000);
+      a.json({ t: 'forfeit' });
+      const ff = await a.next('forfeit', 8000);
+      assert.deepStrictEqual([ff.side, ff.left], [1, 0], 'the disconnected side loses');
+      a.close();
+      console.log('leaving while the opponent is away: their loss');
     }
 
     // ----- a tournament match -----

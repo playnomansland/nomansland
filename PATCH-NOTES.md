@@ -16,6 +16,35 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 3 November 2026 – Puzzles, tower perks, a stealth fix and a fairer leaderboard
+
+### New: Puzzles
+- A **Puzzles** tile on the main menu (it's also offered when you finish the tutorial). Three one-fight puzzles: you see the **whole enemy army**, get a set amount of gold and a small shop, and have to **win the fight**.
+  - **The horde:** two Goblin Swarms and Skeleton Archers, 200 gold.
+  - **Two giants:** two Brutes, 300 gold.
+  - **Out of reach:** two Fire Mages behind a Brute, 300 gold.
+- Stuck? **Hint** on the coach line. A loss offers the hint and **Try again**; a win is saved as solved and takes you to the next puzzle.
+
+### Towers
+- **Bastion: March order.** One **free move every round**. No button to press: just drag an older squad and the free move is used first (before the paid one). Its sheet says *Move · free*.
+- **Mage tower: Muster.** +1 deployment every round, for free, like the Keep.
+
+### Leaders
+- **Otto's horseshoe** now lasts the whole match: three horseshoes give, at random, **+1 deployment every round** or **+1 free move every round**. You can own one of each; the next horseshoe always gives the one you don't have, and with both it pays **200 gold** instead.
+- **Zoe:** tap a starred buff tile to see its **current bonus**, how many fights you've used it in, and what it grows to next. A squad standing on one shows the same line on its sheet.
+
+### Fixes
+- **Stealth: a Sniper could hide between its own shots.** Stealth came back 1.5 s after an attack, and a Sniper reloads for 4 s or more, so it was almost never hittable. A stealthed unit now hides again only once it has **stopped attacking** (1.5 s, or its reload plus 0.5 s for slow shooters). Fast attackers play as before; slow ones (Sniper with Hunter, the Assassin) stay visible a little longer between hits.
+- **Leaving a match while your opponent is disconnected** no longer counts as your loss: they went away first, so it's theirs (in ranked too). The leave prompt tells you so.
+
+### Leaderboard
+- The order is now a **score out of 100: 75% wins, 25% win share**. Wins count against the most wins on the board (the leader in wins gets the full 75), and win share counts a tie as half a win. A player with 1 win and no losses no longer tops someone with 20 wins. The score shows in its own column. This also decides the monthly Legend top 5.
+
+### Developer
+- **DEVTESTLATEGAME** always plays on the Standard map (with treasuries), whatever map is picked.
+
+---
+
 ## 3 November 2026 – Rewards: invite a friend, join the Discord
 
 A new **Rewards** card sits on the main menu, right under Play, with a picture of each reward. Tap it to see how to get them.

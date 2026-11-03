@@ -6,7 +6,7 @@
 // cap (a squad picked stays picked); the result names the enemy's hidden Brute. Round 4: a squad ready to level up (the
 // ring on it, a touch tap opens its sheet and the click after it doesn't close it, the sheet levels it), the flanks
 // blink with the coach line between them and only a flank tile takes the next squad, Fight. Then the
-// tutorial is saved as done and Keep playing hands the match to the AI with the full shop.
+// tutorial is saved as done (the end also offers Puzzles) and Keep playing hands the match to the AI with the full shop.
 // Range: with the mouse over a squad (yours or the enemy's) while deploying, and over a body in a fight, a dotted circle
 // shows its reach; off it, none. Screenshots go to the current folder.
 const { chromium } = require('playwright-core');
@@ -119,7 +119,7 @@ const { chromium } = require('playwright-core');
     check(s.fresh === 1 && /Spend the rest/.test(await coach()), `${board}: a flank tile does (${s.fresh}), and the next line shows`);
     await p.click('#fight'); await wait(p, 600); await p.click('#skip').then(() => p.click('#skip')); await wait(p);
     check(/That’s the basics/.test(await coach()) && await p.evaluate(() => localStorage.getItem('phonebellum.tutorial.v1') === 'done'), `${board}: after round 4 the tutorial is saved as done`);
-    await p.click('#coach-btns .btn >> nth=1'); await wait(p, 800);
+    await p.click('#coach-btns .btn >> text=Keep playing'); await wait(p, 800);
     s = await st();
     check(s.round === 5 && /unlock for gold/.test(await coach()) && await p.locator('#panel .shop2').count() === 1 && await p.locator('#coach-x').isHidden(), `${board}: Keep playing: round 5 against the AI, the full shop, one line about it`);
     await p.screenshot({ path: `tutorial-${board}-handover.png` });
