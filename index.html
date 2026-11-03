@@ -11111,7 +11111,11 @@ Floors.floor = (() => {
   }
   const taskEl = $('task'); // kept by reference: in the drawer it is taken out with the panel's old rows, then put back (dock)
   taskEl.addEventListener('click', () => { if (!taskEl.disabled) stopTask(); });
-  $('coach-x').addEventListener('click', () => { if (mode === 'tutorial') showStart(); }); // leave the tutorial
+  $('coach-x').addEventListener('click', () => { // leave the tutorial; in a puzzle it only folds the coach line away (the Puzzle button brings it back)
+    if (mode !== 'tutorial') return;
+    if (puzzle()) { tut.coachOff = true; coach(null); panelDeploy(); return; }
+    showStart();
+  });
   // the pull tab: hold and slide the drawer, or tap it. While sliding, the drawer shows all of it, moved down by t px
   // (0 = up, range = down to its last row), and follows the finger; on letting go it settles on the nearer end.
   {
@@ -13780,7 +13784,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     $('coach-text').innerHTML = text;
     $('coach-btns').innerHTML = btns.map(([label, , primary], k) => `<button class="btn small${primary ? ' primary' : ''}" data-cb="${k}">${label}</button>`).join('');
     $('coach-btns').querySelectorAll('[data-cb]').forEach(b => b.addEventListener('click', btns[+b.dataset.cb][1]));
-    $('coach-x').hidden = mode !== 'tutorial';
+    $('coach-x').hidden = mode !== 'tutorial' || (!!puzzle() && phase !== 'deploy'); // a puzzle's result: pick one of its buttons
+    $('coach-x').setAttribute('aria-label', puzzle() ? 'Hide' : 'Leave the tutorial');
     boardMarks();
   }
   const glow = (el) => { if (el) el.classList.add('tut-glow'); };
@@ -13806,7 +13811,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       : step === 'place' ? { text: '', x: false } // the coach says it; the drawer goes down, so the whole zone is in sight
       : open && sel ? { text: step === 'flank' ? `Tap a blinking flank tile to place ${sel}.` : `Tap a tile in your zone to place ${sel}.`, x: true } : null;
     $('panel').innerHTML = step === 'tower' || step === 'zone' || step === 'towerpick' ? '' : `
-      ${r >= 3 || P ? `<div class="bar"><span class="deploys num">${Math.max(0, left)} of ${Game.deploysAllowed(m, me)} deployments left</span><span class="xbtns" style="display:flex;gap:6px">${Game.deployBuyable(m, me) && !P ? `<button class="btn small" id="buy-deploy" ${editable() && Game.canBuyDeploy(m, me) ? '' : 'disabled'}>+1 deployment · ${Game.deployCost(m, me)}</button>` : ''}${towerBtn()}</span></div>` : ''}
+      ${r >= 3 || P ? `<div class="bar"><span class="deploys num">${Math.max(0, left)} of ${Game.deploysAllowed(m, me)} deployments left</span><span class="xbtns" style="display:flex;gap:6px">${P && tut.coachOff ? '<button class="btn small" id="puz-show">Puzzle</button>' : ''}${Game.deployBuyable(m, me) && !P ? `<button class="btn small" id="buy-deploy" ${editable() && Game.canBuyDeploy(m, me) ? '' : 'disabled'}>+1 deployment · ${Game.deployCost(m, me)}</button>` : ''}${towerBtn()}</span></div>` : ''}
       ${cards.length ? `<div class="shop" id="shop">${cards.map(n => shopCard(unitIx(n), !canBuy(unitIx(n)))).join('')}</div>` : ''}
       <div class="bar"><span class="gold num">${g} gold</span>${step === 'fight' || step === 'free' || (P && m.armies[me].length) ? '<button class="btn primary" id="fight">Fight</button>' : ''}</div>`;
     $('panel').querySelectorAll('.ucard').forEach(b => b.addEventListener('click', () => {
@@ -13817,6 +13822,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     }));
     $('panel').querySelectorAll('[data-info]').forEach(el => el.addEventListener('click', () => openSheet(+el.dataset.info)));
     if ($('fight')) $('fight').addEventListener('click', runFight);
+    if ($('puz-show')) $('puz-show').addEventListener('click', () => { tut.coachOff = false; panelDeploy(); });
     if ($('buy-deploy')) $('buy-deploy').addEventListener('click', () => { if (editable() && Game.buyDeploy(m, me)) changed(); });
     if ($('t-skill')) $('t-skill').addEventListener('click', () => { if (editable() && Game.buyTowerSkill(m, me)) { tut.tskillSeen = true; changed(); } });
     if ($('t-loan')) $('t-loan').addEventListener('click', () => { if (editable() && Game.takeLoan(m, me)) { tut.tskillSeen = true; changed(); } });
@@ -13825,7 +13831,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const card = (n) => $('panel').querySelector(`.ucard[data-i="${unitIx(n)}"]`);
     const next = () => { tut.intro++; panelDeploy(); render(); };
     if (dockTask && dockTask.text) coach(null); // the task line on the board says what the next tap does
-    else if (P) coach(`<b>Puzzle ${tut.puzzle + 1} of ${PUZZLES.length} · ${esc(P.name)}.</b> ${esc(P.goal)} Win the fight.${tut.hint ? ` <b>Hint:</b> ${esc(P.hint)}` : ''}`, tut.hint ? [] : [['Hint', () => { tut.hint = true; panelDeploy(); }]]);
+    else if (P && tut.coachOff) coach(null); // folded away with its X
+    else if (P) coach(`<b>Puzzle ${tut.puzzle + 1} of ${PUZZLES.length} · ${esc(P.name)}.</b> ${esc(P.goal)} Win the fight.${tut.hint ? ` <b>Hint:</b> ${esc(P.hint)}` : ''}`, tut.hint ? [] : [['Hint', () => { tut.hint = true; tut.coachOff = false; panelDeploy(); }]]);
     else if (step === 'tower') coach('This is your <b>Tower</b>. Protect it.', [['Next', next, true]]);
     else if (step === 'zone') coach('This is your <b>deployment zone</b>. You can put troops here.', [['Next', next, true]]);
     else if (step === 'pick') { coach(`Tap <b>${esc(TUT.start)}</b> to recruit your first squad.`); glow(card(TUT.start)); }

@@ -1,5 +1,5 @@
 // The tutorial puzzles in the browser (2D board, phone size): the Puzzles tile opens the list, a puzzle starts with
-// the enemy army in sight and the puzzle's gold and shop; a wrong answer loses and offers a hint and Try again; the
+// the enemy army in sight and the puzzle's gold and shop; the coach's X folds it away (not back to the menu); a wrong answer loses and offers a hint and Try again; the
 // answer (two Fire Mages in "The horde") wins, is saved as solved and offers the next puzzle.
 // Needs: python3 -m http.server 8766 in the repo root. Run: node tools/tests/puzzles-ui.js
 const { chromium } = require('playwright-core');
@@ -27,6 +27,11 @@ const { chromium } = require('playwright-core');
   check(s.gold === 200 && s.foe === 3 && s.mine === 0, 'gold 200, their 3 squads');
   check(await p.evaluate(() => { const { m } = window.__pb(); return m.armies[1].every(q => q.round < m.round); }), 'their squads are in sight (an earlier round)');
   check(s.cards.length === 4, 'the puzzle\'s shop of four');
+  // the X only folds the coach line away; the Puzzle button brings it back
+  await p.click('#coach-x'); await p.waitForTimeout(200);
+  check(await coach() === '' && await p.evaluate(() => window.__pb().m != null && document.documentElement.classList.contains('home') === false), 'the X hides the coach line and stays in the puzzle');
+  await p.click('#puz-show'); await p.waitForTimeout(200);
+  check(/Puzzle 1 of 3/.test(await coach()), 'the Puzzle button shows it again');
   // a wrong answer: two Snipers
   await card('Sniper'); await tile(4, 12); await tile(7, 12);
   s = await st();

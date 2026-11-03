@@ -24,6 +24,7 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
   - **Two giants:** two Brutes, 300 gold.
   - **Out of reach:** two Fire Mages behind a Brute, 300 gold.
 - Stuck? **Hint** on the coach line. A loss offers the hint and **Try again**; a win is saved as solved and takes you to the next puzzle.
+- The **✕** on the puzzle's line only hides it so you can see the board; the **Puzzle** button brings it back. Leave through the menu.
 
 ### Towers
 - **Bastion: March order.** One **free move every round**. No button to press: just drag an older squad and the free move is used first (before the paid one). Its sheet says *Move · free*.
