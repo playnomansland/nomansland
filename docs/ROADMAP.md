@@ -8,6 +8,8 @@ Today: each unit has a few skill slots (2 normal plus a master/Awaken slot on so
 
 Goal: a real tree per unit, with branches and milestones, so a unit can be built in clearly different directions during a match.
 
+**Current direction (draft): families and classes, see `docs/CLASSES.md`.** Buy a family, pick its Level 1 unit or an unlocked class, XP unlocks classes instead of level-ups. The questions below are mostly carried over into that doc.
+
 Open questions:
 - Paid with gold as now, with a separate currency (XP, skill points per round), or both?
 - How many nodes per unit, and how many can one match realistically fill?

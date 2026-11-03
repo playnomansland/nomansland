@@ -7,7 +7,7 @@ Newest first. Each entry says what changed for players; technical details live i
 ## Coming up (PC focus)
 
 Planned for the next updates (details in `docs/ROADMAP.md`):
-- **Skill trees:** a much bigger skill tree for every unit.
+- **Families and classes (draft):** buy a unit family, pick a class for it, and unlock classes with XP instead of levelling up (plan in `docs/CLASSES.md`, nothing decided yet).
 - **Factions in the trees:** spec into a faction through your units' skills.
 - **New looks:** units change model at tree milestones (an Ent grows into a different tree depending on its spec).
 - **More lore** for the world, factions and units.
