@@ -152,9 +152,10 @@ Messages (WebSocket `/lobby`):
 
 1. **Lobby list:** LobbyRoom, rooms register when public (Standard and Ranked), the lobby screen, Join / Watch, Quick play, spectate toggle.
 2. **Chat and emotes:** messages in Room, the chat panel and emote wheel, muting, reporting, the three emote pictures.
-3. **2v2 listings** (developer only), Team / All chat.
-4. Later, once there are players: the ranked queue (rating, queue, paired rooms).
-5. Later: block list, lobby-wide chat channel (not planned; moderation load).
+3. **Friends, game invites and private messages:** see `docs/FRIENDS.md`.
+4. **2v2 listings** (developer only), Team / All chat.
+5. Later, once there are players: the ranked queue (rating, queue, paired rooms).
+6. Later: block list, lobby-wide chat channel (not planned; moderation load).
 
 Tests to add: `server/test/lobby.test.js` (listings appear and vanish, dev filter, ranked rooms need an account, heartbeat expiry, limits), chat checks in `match.test.js` (signed-in only, limits, filter, watchers isolated during the match, merge at the end, split on rematch), `tools/tests/lobby-ui.js`.
 

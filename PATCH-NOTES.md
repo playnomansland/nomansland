@@ -14,6 +14,7 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 - **More balancing.**
 - **Damage types (idea):** physical and magic.
 - **Online lobby (design):** one *Rooms* list of public games (Standard and Ranked together, sortable by name, time, category and mode), Quick play, chat for signed-in players (spectators get their own chat that joins the players' when the match ends), and three cartoon emotes the opponent can mute: Flame Wizard *BABABABA*, a happy Ether Golem and a shell-shocked Sniper. Spectating on by default. Plan in `docs/LOBBY.md`; built after the tournament.
+- **Friends (design):** add friends (they accept), remove them, see who's online or in a match, **invite a friend** straight into a room, and **private messages**. For signed-in players. Plan in `docs/FRIENDS.md`; built after the tournament, together with the lobby.
 
 ---
 

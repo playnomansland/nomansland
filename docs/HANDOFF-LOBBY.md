@@ -1,6 +1,6 @@
-# Handoff: build the online lobby, chat and emotes
+# Handoff: build the online lobby, chat, emotes and friends
 
-For the Claude Code session building this (written 2026-11-04). The design is `docs/LOBBY.md`; read it first, then `docs/SERVER.md` (Room, DuoRoom, TourRoom, accounts, limits). Where this file and LOBBY.md differ, LOBBY.md wins.
+For the Claude Code session building this (written 2026-11-04). The design is `docs/LOBBY.md` (lobby, chat, emotes) and `docs/FRIENDS.md` (friends, game invites, private messages); read them first, then `docs/SERVER.md` (Room, DuoRoom, TourRoom, accounts, limits). Where this file and those two differ, they win.
 
 ## Timing and branches
 - Tournament on **Sunday 2026-11-08**. Nothing that changes how online matches start or run may reach the server or the site before **Monday 2026-11-09** (server deploy runs on every push to main that touches `server/`, `src/engine.js`, `src/game.js`, `src/referee.js`, `src/tournament.js` or `src/*.json`).
@@ -27,17 +27,18 @@ For the Claude Code session building this (written 2026-11-04). The design is `d
    - Page: emote button in the tray row → wheel with the 3 emotes and a chat line; chat sheet; emote sticker by the sender's nameplate and over their tower (~1.5 s, CSS pop / shake / fade). Opponent's nameplate → Mute emotes, Mute chat (separately, saved per match code), Report (last 20 lines + gamertags + match id through the bug-report webhook path, own channel and limit). Settings: Chat on/off, Emotes on/off.
    - **Emote art:** three hand-drawn SVGs in `img/emotes/` (bababa, golem, shock), **cartoonish 2D** (thick dark outlines, flat colours, one shade, big exaggerated faces), based on the units' 3D models in `src/models3d.js` so they're recognisable: Flame Wizard shouting "BABABABA!" in a comic speech burst, a happy Ether Golem with a closed-eye smile and sparkles, a shell-shocked Sniper with huge eyes, soot, smoke and ring lines. Render each model once for reference (as for `img/skins/`). **No sounds.**
    - PeerJS matches get no chat or emotes.
-3. **2v2 listings** (developer only) and Team / All chat in DuoRoom.
-4. Not now: the ranked queue (LobbyRoom §5 in LOBBY.md), block list, lobby-wide chat.
+3. **Friends** (`docs/FRIENDS.md` §7 for the steps): D1 tables `friends`, `friend_requests`, `dms`, `dm_read`; account endpoints (add by gamertag or id, accept, decline, cancel, remove); the Friends sheet; a new **PlayerHub** Durable Object per player (`/hub`) for presence, live requests, **game invites** (Invite makes a private room and sends the friend's account an invite; online friends only, 5 min expiry; badge only during a match) and **private messages** (friends only, last 100 per pair kept, same filter and limits as chat). Signed-in players only; friends are stored by player id so renames keep them. Not the same as the existing "Invite a friend" referral (tables `invites` / `referrals`): leave that alone.
+4. **2v2 listings** (developer only) and Team / All chat in DuoRoom.
+5. Not now: the ranked queue (LobbyRoom §5 in LOBBY.md), block list, lobby-wide chat.
 
 ## Tests
-- `server/test/lobby.test.js` (listings appear and vanish, dev filter, ranked needs an account, heartbeat expiry, sort data present, limits); chat checks in `server/test/match.test.js` (signed-in only, limits, filter, watchers isolated during the match, merge at the end, split on rematch); `tools/tests/lobby-ui.js` and `tools/tests/chat-ui.js` (browser).
+- `server/test/lobby.test.js` (listings appear and vanish, dev filter, ranked needs an account, heartbeat expiry, sort data present, limits); chat checks in `server/test/match.test.js` (signed-in only, limits, filter, watchers isolated during the match, merge at the end, split on rematch); `tools/tests/lobby-ui.js` and `tools/tests/chat-ui.js` (browser); for friends `server/test/friends.test.js`, `server/test/hub.test.js`, `tools/tests/friends-ui.js` (two signed-in test accounts).
 - Run `cd server && npm test` and the existing referee/tournament/duo tests before merging: the lobby must not change match play.
 - Ports 8784-8798 are taken by other tests; use 8780-8783.
 - Local notes (from earlier sessions): `wrangler dev` keeps Durable Object storage between runs (use fresh codes); kill leftovers with `pkill -f "[w]orkerd"` and `pkill -f "[w]rangler-dist"`; browser tests need `python3 -m http.server 8766` and pages with `?server=http://127.0.0.1:<port>`.
 
 ## When done
 - Patch notes: rewrite the "Online lobby (design)" line under Coming up into a proper dated entry (what players get), and keep the file tidy (project rule).
-- README: a short "Online lobby" section; docs/SERVER.md: LobbyRoom, messages, limits, the `lobby_duo` key.
-- Ask Vilhelm to try it on his iPhone (room list, sort, chat signed in vs guest, emotes, mute, watcher chat merging at the end).
+- README: short "Online lobby" and "Friends" sections; docs/SERVER.md: LobbyRoom, PlayerHub, the new tables and endpoints, messages, limits, the `lobby_duo` key.
+- Ask Vilhelm to try it on his iPhone (room list, sort, chat signed in vs guest, emotes, mute, watcher chat merging at the end; friends: add, accept, invite into a room, message, remove).
 - Plain-text replies to Vilhelm, no bold markers; direct answers.
