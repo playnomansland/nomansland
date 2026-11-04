@@ -561,6 +561,62 @@ html.pc .corner button span { display: inline; }
 .pop-back.auto { position: relative; inset: auto; background: none; padding: 0; overflow: visible; } /* the UI tests: in the page's flow, so the menu stays clickable */
 .pop { width: min(100%, 460px); max-height: calc(100dvh - 32px); overflow-y: auto; background: rgba(21, 33, 37, 0.97); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55); animation: popin 0.16s ease-out; }
 @keyframes popin { from { transform: translateY(10px) scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
+/* the online lobby (2026-11-04, docs/LOBBY.md): PLAY → Online · Rooms */
+.home .online-btn { width: 100%; }
+.lobby-top { width: 100%; max-width: 640px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; }
+.lobby-top h2 { text-align: center; font: 700 22px var(--font-display); letter-spacing: 0.08em; text-transform: uppercase; color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45); }
+.lobby-mid { width: 100%; max-width: 640px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.lob-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.home .lob-acts .hbtn { font-size: 16px; padding: 10px 12px; }
+.lob-join { display: flex; gap: 8px; justify-content: center; }
+.lob-msg { margin: 0; text-align: center; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); min-height: 1em; }
+.lob-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.room-card { background: rgba(21, 33, 37, 0.94); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; text-align: left; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
+.room-card > div:not(.rc-btns) { grid-column: 1; min-width: 0; }
+.rc-top { display: flex; align-items: center; gap: 8px; }
+.rc-score { font-size: 12px; color: var(--gold); white-space: nowrap; }
+.rc-name { font: 600 15px var(--font-display); color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-btns { grid-column: 2; grid-row: 1 / span 4; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+.rc-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.rtag { font-style: normal; font-size: 11px; line-height: 16px; padding: 0 7px; border-radius: 99px; border: 1px solid currentColor; color: var(--muted); }
+.rtag.ranked { color: var(--gold); } .rtag.duo { color: #7FD3FF; } .rtag.dev { color: #FF5FC4; } .rtag.off { color: #D9A08F; }
+.rc-facts { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12px; color: var(--muted); }
+.lob-empty { text-align: center; color: #fff; background: rgba(13, 19, 21, 0.6); border-radius: 10px; padding: 18px 12px; }
+.sort-list { display: grid; gap: 8px; }
+.sort-list .btn { display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left; }
+.sort-list small { color: var(--muted); font-weight: 400; }
+.sort-list .btn.primary small { color: inherit; opacity: 0.75; }
+/* chat and emotes in server matches */
+.talk-fab { position: absolute; left: 8px; bottom: 8px; z-index: 6; width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--line); background: rgba(13, 19, 21, 0.85); color: #fff; display: grid; place-items: center; cursor: pointer; }
+.talk-fab svg { width: 20px; height: 20px; }
+.talk-fab .dot, .cog.talk .dot { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; background: var(--foe); color: #fff; font: 700 10px/16px system-ui, sans-serif; font-style: normal; }
+.cog.talk { position: relative; }
+.chat-tick { position: fixed; left: 50%; transform: translateX(-50%); top: calc(70px + env(safe-area-inset-top, 0px)); z-index: 40; display: grid; gap: 4px; justify-items: center; width: max-content; max-width: min(92vw, 460px); pointer-events: none; }
+.chat-tick .cl { background: rgba(13, 19, 21, 0.88); border: 1px solid var(--line); border-radius: 10px; padding: 4px 10px; font-size: 13px; color: #fff; overflow-wrap: anywhere; animation: popin 0.16s ease-out; }
+.cl b { color: var(--gold); } .cl.me b { color: var(--you); } .cl.foe b { color: var(--foe); } .cl.w b { color: #9FE3B4; }
+.cl.sys { color: var(--muted); font-style: italic; }
+.ct { font-style: normal; font-size: 10px; border: 1px solid currentColor; border-radius: 99px; padding: 0 5px; margin-right: 4px; color: var(--muted); }
+.talk-wheel { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 60; width: min(94vw, 400px); background: rgba(21, 33, 37, 0.98); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 10px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55); }
+.tw-emotes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tw-e { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line); border-radius: 12px; padding: 6px; display: grid; place-items: center; cursor: pointer; }
+.tw-e:active { transform: scale(0.95); }
+.tw-e img { width: 64px; height: 64px; }
+.tw-line { display: flex; gap: 6px; }
+.tw-line input { flex: 1; min-width: 0; font-size: 16px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3); color: #fff; }
+.tw-sign { margin: 0; }
+.tw-foot { display: flex; justify-content: space-between; }
+.chat-lines { display: grid; gap: 4px; max-height: 45vh; overflow-y: auto; font-size: 14px; align-content: start; }
+.np-menu { position: fixed; z-index: 61; background: rgba(21, 33, 37, 0.98); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 6px; min-width: 170px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5); }
+#foe-name.np-tap { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.emote-layer { position: fixed; inset: 0; pointer-events: none; z-index: 55; overflow: hidden; }
+.emote-st { position: fixed; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5)); animation: em-shake 1.5s ease-out forwards; }
+.emote-st.golem { animation-name: em-bounce; } .emote-st.shock { animation-name: em-twitch; }
+@keyframes em-shake { 0% { transform: scale(0.2); opacity: 0; } 12% { transform: scale(1.12); opacity: 1; } 20%, 40%, 60% { transform: translateX(-5px) rotate(-5deg); } 30%, 50%, 70% { transform: translateX(5px) rotate(5deg); } 85% { transform: none; opacity: 1; } 100% { transform: scale(0.9); opacity: 0; } }
+@keyframes em-bounce { 0% { transform: scale(0.2); opacity: 0; } 12% { transform: scale(1.1); opacity: 1; } 28% { transform: translateY(-14px); } 44% { transform: translateY(0) scaleY(0.92); } 60% { transform: translateY(-9px); } 76% { transform: none; } 85% { opacity: 1; } 100% { transform: scale(0.9); opacity: 0; } }
+@keyframes em-twitch { 0% { transform: scale(0.2); opacity: 0; } 12% { transform: scale(1.1); opacity: 1; } 24% { transform: translate(2px, -1px) rotate(2deg); } 28% { transform: none; } 46% { transform: translate(-3px, 1px) rotate(-3deg); } 50% { transform: none; } 64% { transform: translate(2px, 0) rotate(1deg); } 68%, 85% { transform: none; opacity: 1; } 100% { transform: scale(0.9); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .emote-st, .emote-st.golem, .emote-st.shock { animation: em-fade 1.5s linear forwards; } }
+@keyframes em-fade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+
 .pop-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .pop-modes .hbtn { font-size: 16px; }
 .pop .bar { flex-wrap: wrap; }
@@ -657,6 +713,7 @@ html.pc .corner button span { display: inline; }
     <svg class="marks" id="marks" aria-hidden="true"></svg>
     <div class="unx" id="unx"></div>
     <div class="board-banner" id="banner" aria-live="polite" hidden></div>
+    <button class="talk-fab" id="talk-fab" hidden aria-label="Chat and emotes"></button>
   </div>
 
   <div class="panel" id="panel"></div>
@@ -666,6 +723,7 @@ html.pc .corner button span { display: inline; }
 <div class="home" id="home" hidden><canvas class="home-bg" id="home-bg" aria-hidden="true"></canvas><div class="home-wiz" id="home-wiz" hidden aria-hidden="true"><canvas id="home-wiz-cv"></canvas><div class="baba">BABABABABA</div></div><div class="home-in" id="home-in"></div></div>
 
 <div class="dd" id="stats-dd" hidden role="dialog" aria-label="Damage last round"></div>
+<div class="chat-tick" id="chat-tick" hidden aria-live="polite"></div><div class="talk-wheel" id="talk-wheel" hidden role="dialog" aria-label="Emotes and chat"></div><div class="np-menu" id="np-menu" hidden role="menu"></div><div class="emote-layer" id="emote-layer" aria-hidden="true"></div>
 <div class="sheet-back" id="sheet-back" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-h"></div></div>
 
 <script src="peerjs.min.js"></script>
@@ -961,7 +1019,7 @@ html.pc .corner button span { display: inline; }
   let snd = { vol: DEFAULT_VOL, muted: false, song: '', solo: false };
   try {
     const p = JSON.parse(localStorage.getItem(SOUND_STORE) || 'null');
-    if (p && isFinite(p.vol)) snd = { vol: Math.max(0, Math.min(100, +p.vol)), muted: !!p.muted, song: SONGS[p.song] ? p.song : '', solo: !!p.solo, shuffle: !!p.shuffle, repeat: !!p.repeat };
+    if (p && isFinite(p.vol)) snd = { vol: Math.max(0, Math.min(100, +p.vol)), muted: !!p.muted, song: SONGS[p.song] ? p.song : '', solo: !!p.solo, shuffle: !!p.shuffle, repeat: !!p.repeat, chatOn: p.chatOn !== false, emotesOn: p.emotesOn !== false }; // chatOn, emotesOn: online matches (the lobby)
     else if (localStorage.getItem('phonebellum.music.v1') === 'off') snd.muted = true; // the old On/Off switch
   } catch (e) {}
   const saveSound = () => { try { localStorage.setItem(SOUND_STORE, JSON.stringify(snd)); } catch (e) {} };
@@ -1382,6 +1440,24 @@ html.pc .corner button span { display: inline; }
           <button data-rk="1" aria-pressed="${home.rankedOn === true}">On</button><button data-rk="0" aria-pressed="${home.rankedOn === false}">Off</button>
         </div>
       </div><p class="hint" id="rk-msg" style="margin:0" aria-live="polite"></p>` : ''}
+      <div class="bar">
+        <span class="hint">Chat in online matches</span>
+        <div class="seg" role="group" aria-label="Chat">
+          <button data-chat="1" aria-pressed="${snd.chatOn !== false}">On</button><button data-chat="0" aria-pressed="${snd.chatOn === false}">Off</button>
+        </div>
+      </div>
+      <div class="bar">
+        <span class="hint">Emotes</span>
+        <div class="seg" role="group" aria-label="Emotes">
+          <button data-emo="1" aria-pressed="${snd.emotesOn !== false}">On</button><button data-emo="0" aria-pressed="${snd.emotesOn === false}">Off</button>
+        </div>
+      </div>
+      ${inMatch && mode === 'net' && net.srv && me === 0 && !net.tourCode && !net.duo ? `<div class="bar">
+        <span class="hint">Spectators</span>
+        <div class="seg" role="group" aria-label="Spectators">
+          <button data-spec="1" aria-pressed="${talk.spectate}">On</button><button data-spec="0" aria-pressed="${!talk.spectate}">Off</button>
+        </div>
+      </div>` : ''}
       <div class="bar"><span class="hint">Something broken?</span><button class="btn small" id="bug-open">Report a bug</button></div>
       <span class="hint">Menu music: tap a song to play it, the list carries on from there</span>
       ${songList()}
@@ -1389,6 +1465,9 @@ html.pc .corner button span { display: inline; }
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', () => closeSheet(true));
     $('bug-open').addEventListener('click', openBugSheet);
+    $('sheet').querySelectorAll('[data-chat]').forEach(b => b.addEventListener('click', () => { snd.chatOn = b.dataset.chat === '1'; saveSound(); $('sheet').querySelectorAll('[data-chat]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); if (!snd.chatOn) { talk.tick = []; tickDraw(); } }));
+    $('sheet').querySelectorAll('[data-emo]').forEach(b => b.addEventListener('click', () => { snd.emotesOn = b.dataset.emo === '1'; saveSound(); $('sheet').querySelectorAll('[data-emo]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }));
+    $('sheet').querySelectorAll('[data-spec]').forEach(b => b.addEventListener('click', () => { send({ t: 'spectate', on: b.dataset.spec === '1' }); $('sheet').querySelectorAll('[data-spec]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }));
     const showOn = () => $('sheet').querySelectorAll('[data-mute]').forEach(x => x.setAttribute('aria-pressed', String((x.dataset.mute === '0') === musicOn())));
     $('vol').addEventListener('input', (e) => {
       snd.vol = +e.target.value; $('vol-n').textContent = snd.vol;
@@ -1925,6 +2004,8 @@ html.pc .corner button span { display: inline; }
     document.querySelector('.hud').hidden = phase === 'start' || phase === 'lobby' || phase === 'draft'; // no match yet: nothing to show
     if ((mode !== 'tutorial' && !(tutHint && phase === 'deploy')) || phase === 'battle') coach(null); // the fight speaks for itself
     syncPick(); syncMusic();
+    if (typeof talk === 'object' && talk) talkSync(); // chat and emotes (server matches)
+    $('foe-name').classList.toggle('np-tap', typeof talk === 'object' && !!talk && talkOn() && mode === 'net' && !net.duo);
   }
 
   function setNet(text, state) {
@@ -2522,6 +2603,7 @@ html.pc .corner button span { display: inline; }
         ${Game.deployBuyable(m, me) ? `<button class="chip2" id="buy-deploy" ${can && Game.canBuyDeploy(m, me) ? '' : 'disabled'} aria-label="One more deployment for ${Game.deployCost(m, me)} gold">+1 <span class="num">${Game.deployCost(m, me)}</span></button>` : ''}
         <span class="sp"></span>
         <span class="timer" id="timer">${deadline ? fmtClock(deadline - now()) : ''}</span>
+        ${talkBtn()}
         <button class="cog help${news && helpSeen !== m.round ? ' new' : ''}" id="help-btn" aria-label="${news && helpSeen !== m.round ? 'Help, news this round' : 'Help'}">?</button>
         ${action}
       </div>
@@ -2714,6 +2796,8 @@ html.pc .corner button span { display: inline; }
     overlay(null); $('panel').innerHTML = '';
     home.ctx = { resume, netBack, newcomer };
     if (!home.screen || home.screen === 'menu' || !home.welcomeNeeded()) home.screen = home.welcomeNeeded() ? 'welcome' : 'menu';
+    if (home.back === 'lobby' && home.screen === 'menu') { home.screen = 'lobby'; home.pop = false; } // a match from the lobby: back to the Rooms list
+    home.back = '';
     drawHome();
     size(); render();
   }
@@ -2901,6 +2985,7 @@ html.pc .corner button span { display: inline; }
     const el = $('home-in');
     if (home.screen === 'welcome') drawWelcome(el);
     else if (home.screen === 'signup' || home.screen === 'login') drawSignIn(el);
+    else if (home.screen === 'lobby') drawLobbyScreen(el); // the online lobby (Rooms)
     else drawMenu(el);
   }
   function homeMsg(t) { home.msg = t || ''; const x = $('home-msg'); if (x) x.textContent = home.msg; }
@@ -3066,6 +3151,7 @@ html.pc .corner button span { display: inline; }
         <button class="hbtn gold" id="friend">Play vs Friend</button>
         <button class="hbtn" id="go" ${rk ? 'disabled' : ''}>Play vs AI</button>
       </div>
+      ${srvOk() ? '<button class="hbtn gold online-btn" id="online">Online · Rooms</button>' : ''}
       <div class="bar">
         <span class="hint">Mode</span>
         <div class="seg" role="group" aria-label="Normal or ranked">
@@ -3103,6 +3189,7 @@ html.pc .corner button span { display: inline; }
     const root = $('home-in');
     const close = () => { home.pop = false; drawHome(); };
     $('pop-close').addEventListener('click', close);
+    if ($('online')) $('online').addEventListener('click', openLobby); // the online lobby: public rooms, Quick play, Create room
     $('pop-back').addEventListener('click', (e) => { if (e.target === $('pop-back')) close(); });
     $('friend').addEventListener('click', () => { matchKind = 'standard'; lateGame = false; if (ranked()) rankedHost(); else hostLobby(); });
     $('go').addEventListener('click', () => { if (ranked()) return; matchKind = 'standard'; lateGame = false; startAiMatch(); });
@@ -6388,6 +6475,9 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     net.peer = null; net.conn = null; net.connected = false; net.code = ''; net.tries = 0;
     Object.assign(net, { srv: false, ws: null, key: '', create: false, typed: false, welcomed: false, tourCode: '', watch: false, foeHere: false, seq: 0, pending: [], replaying: false, duo: false, duoInfo: null, duoPres: null, duoTeam: null, duoHost: false, duoLobby: null });
     duoRestore(); duoPings = []; duoToast = null;
+    if (typeof lob === 'object' && lob) lobbyClose(); // the lobby's socket closes when a match starts (drawLobbyScreen opens it again)
+    if (typeof talk === 'object' && talk) talkReset();
+    net.pub = false; net.spectate = true; net.quick = false;
     liveSpeed = [1, 1]; // a new live match starts at 1x
     // the address bar, not qs: joinMatch puts join= back in it after the first leaveNet
     const u = new URLSearchParams(location.search);
@@ -6472,6 +6562,14 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         </span>
         <button class="btn" id="cancel">Cancel</button>
       </div>
+      ${srv && !net.tourCode ? `<div class="bar">
+        <span class="hint">Rooms list</span>
+        <div class="seg" role="group" aria-label="Listed in Rooms"><button data-pub="1" aria-pressed="${talk.pub}">Public</button><button data-pub="0" aria-pressed="${!talk.pub}">Private</button></div>
+      </div>
+      <div class="bar">
+        <span class="hint">Spectators</span>
+        <div class="seg" role="group" aria-label="Spectators"><button data-spec="1" aria-pressed="${talk.spectate}">On</button><button data-spec="0" aria-pressed="${!talk.spectate}">Off</button></div>
+      </div>` : ''}
       ${rk ? `<p class="ranked-note">Ranked: the Standard map and pack, the same 5 leaders and 3 towers for you both. Win 2 games to take the series; only ranked series count on the leaderboard. Your friend needs an account too (they get a guest one when they join).</p>${lookSeg()}`
       : `${srv ? '<span class="hint">The game server referees this match. <button class="btn small" id="use-peer">Phone to phone instead</button> (for Factions).</span>' : ''}
       ${packSeg()}
@@ -6489,6 +6587,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     $('start').addEventListener('click', hostStartMatch);
     $('overlay').querySelectorAll('[data-kind]').forEach(b => b.addEventListener('click', () => { matchKind = b.dataset.kind; if (srv && matchKind === 'factions') hostLobby(true); else drawLobby(); }));
     if ($('use-peer')) $('use-peer').addEventListener('click', () => hostLobby(true));
+    $('panel').querySelectorAll('[data-pub]').forEach(b => b.addEventListener('click', () => { talk.pub = b.dataset.pub === '1'; send({ t: 'public', on: talk.pub }); drawLobby(); }));
+    $('panel').querySelectorAll('[data-spec]').forEach(b => b.addEventListener('click', () => { talk.spectate = b.dataset.spec === '1'; send({ t: 'spectate', on: talk.spectate }); drawLobby(); }));
     if (rk) wireLookSeg(); else { wireMapSeg(); wireCharSeg(); wirePackSeg(); wireSettings(); }
   }
   function selectLink() { const r = document.createRange(); r.selectNodeContents($('link')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
@@ -6990,6 +7090,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     mode = 'net'; me = 0; m = null; phase = 'lobby'; bt = null; matchKind = 'standard';
     net.players = null; net.wantRanked = !!o.ranked; net.ranked = o.ranked ? { tags: [acct ? acct.tag : 'You', ''], wins: [0, 0], ties: 0, games: 0, best: 3, done: false } : null;
     net.srv = true; net.create = true; net.key = ''; net.tourCode = ''; net.code = newCode();
+    net.pub = !!o.pub; net.spectate = o.spectate !== false; // the lobby: listed in Rooms, spectators on or off
     hud(); netStatus(); render();
     drawLobby();
     srvOpen();
@@ -7017,7 +7118,9 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       net.connected = true; net.tries = 0;
       const hello = net.watch ? { watch: true } : net.tourCode ? { id: tour.myId, tkey: tour.key } : net.key ? { key: net.key } : net.create ? { create: true, ...(net.wantRanked ? { ranked: true } : {}) } : {};
       if (net.duo) delete hello.ranked;
-      if (acct && !net.watch && !net.tourCode) hello.session = acct.session; // who this is: ranked needs it, and the other phone shows the username (never in the URL)
+      if (net.create && !net.key && net.pub) Object.assign(hello, { public: true, ...(net.duo ? {} : { map: playMap() || '', skin: skinPick || '' }) }); // a public room (the lobby)
+      if (net.create && !net.key && !net.duo && net.spectate === false) hello.spectate = false;
+      if (acct && !net.tourCode) hello.session = acct.session; // who this is: ranked needs it, the other phone shows the username, and chat needs it (never in the URL)
       ws.send(JSON.stringify({ t: 'hello', ...hello }));
       clearInterval(net.ping); net.ping = setInterval(() => { if (net.ws === ws && ws.readyState === 1) ws.send('{"t":"ping"}'); }, 30000);
       netStatus();
@@ -7070,9 +7173,17 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (me === 0) drawLobby(); else guestWaiting(net.foeHere ? 'Connected. Waiting for your friend to start the match' : 'Connected');
   }
   function srvRecv(d) {
+    if (chatRecv(d)) return; // chat and emotes (the lobby, 2026-11-04)
     if (net.duo && duoRecv(d)) return;
     if ('ranked' in d && d.t !== 'ack') net.ranked = d.ranked || null;
-    if ('players' in d && d.t !== 'ack') { net.players = d.players || null; hud(); }
+    if ('players' in d && d.t !== 'ack') {
+      net.players = d.players || null;
+      if (mode === 'spec' && tour.spec && tour.spec.lobby) { // watching from the lobby: both names as the room knows them
+        const tg = (sd) => (net.ranked && net.ranked.tags && net.ranked.tags[sd]) || (net.players && net.players[sd] && net.players[sd].tag) || '';
+        tour.spec.host = tg(0) || tour.spec.host; tour.spec.foe = tg(1) || tour.spec.foe;
+      }
+      hud();
+    }
     if (d.t === 'welcome') {
       net.welcomed = true;
       if (d.side >= 0) { me = d.side; net.key = d.key || net.key; net.seq = Math.max(net.seq, d.seq | 0); srvSave(); }
@@ -7173,6 +7284,344 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
 
   // =====================================================================
+  // The online lobby (2026-11-04, docs/LOBBY.md; server/src/lobby.js). PLAY → Online opens home.screen 'lobby': one
+  // Rooms list of the public rooms (Standard and Ranked; 2v2 for developers), with a Sort sheet (Name, Date/time,
+  // Category, Mode; the active one again flips the order; pb-lobby-sort), Quick play, Create room and join by code.
+  // One WebSocket to /lobby while the screen is open (lobbyOpen / lobbyRecv / lobbyDraw); it closes when a match starts
+  // (leaveNet). Join is the usual srvJoin, Watch the usual hello { watch } (tour.spec with lobby: true).
+  // =====================================================================
+  var LOBBY_SORT = 'pb-lobby-sort';
+  var SORTS = [['name', 'Name'], ['time', 'Date/time'], ['cat', 'Category'], ['mode', 'Mode']];
+  var lob = { ws: null, alive: false, list: new Map(), dev: false, ok: null, tries: 0, timer: 0, ping: 0, sort: { k: 'time', flip: false }, msg: '', quick: false };
+  try { const s = JSON.parse(localStorage.getItem(LOBBY_SORT) || 'null'); if (s && SORTS.some(x => x[0] === s.k)) lob.sort = { k: s.k, flip: !!s.flip }; } catch (e) {}
+  function openLobby() { home.pop = false; home.screen = 'lobby'; lob.msg = ''; drawHome(); }
+  function lobbyOpen() {
+    if (lob.alive && lob.ws) return;
+    lob.alive = true;
+    clearTimeout(lob.timer);
+    let ws;
+    try { ws = new WebSocket(`${SERVER_URL.replace(/^http/, 'ws')}/lobby`); } catch (e) { lobbyRetry(); return; }
+    lob.ws = ws;
+    ws.onopen = () => {
+      if (lob.ws !== ws) return;
+      lob.tries = 0;
+      ws.send(JSON.stringify({ t: 'hello', ...(acct ? { session: acct.session } : {}) }));
+      clearInterval(lob.ping); lob.ping = setInterval(() => { if (lob.ws === ws && ws.readyState === 1) ws.send('{"t":"ping"}'); }, 30000);
+    };
+    ws.onmessage = (e) => { if (lob.ws !== ws) return; let d = null; try { d = JSON.parse(e.data); } catch (er) {} if (d) lobbyRecv(d); };
+    ws.onclose = () => { if (lob.ws !== ws) return; lob.ws = null; clearInterval(lob.ping); if (!lob.alive) return; lob.ok = false; lobbyDraw(); lobbyRetry(); };
+  }
+  function lobbyRetry() { clearTimeout(lob.timer); lob.tries++; lob.timer = setTimeout(() => { if (lob.alive && !lob.ws) lobbyOpen(); }, Math.min(10000, 800 * lob.tries)); }
+  function lobbyClose() {
+    lob.alive = false; clearTimeout(lob.timer); clearInterval(lob.ping);
+    const ws = lob.ws; lob.ws = null;
+    try { if (ws) ws.close(); } catch (e) {}
+  }
+  function lobbyRecv(d) {
+    if (d.t === 'rooms') { lob.list = new Map((d.list || []).map(l => [l.code, l])); lob.dev = !!d.dev; lob.ok = true; }
+    else if (d.t === 'room' && d.listing) lob.list.set(d.listing.code, d.listing);
+    else if (d.t === 'gone') lob.list.delete(d.code);
+    else if (d.t === 'quick') {
+      if (!lob.quick) return;
+      lob.quick = false;
+      home.back = 'lobby';
+      if (d.code) srvJoin(d.code, { quick: true }); else { matchKind = 'standard'; lateGame = false; srvHost({ pub: true, spectate: true }); }
+      return;
+    }
+    else return;
+    lobbyDraw();
+  }
+  // the list in the chosen order: within a group (or the same name) newest first
+  function lobbySorted() {
+    const k = lob.sort.k, f = lob.sort.flip ? -1 : 1, rank = { standard: 0, ranked: 1, '2v2': 2 };
+    const key = (l) => k === 'name' ? l.host.tag.toLowerCase() : k === 'cat' ? (l.mode === 'ranked' ? 1 : 0) : k === 'mode' ? (l.kind === 'duo' ? 1 : 0) : 0;
+    return [...lob.list.values()].sort((a, b) => {
+      if (k === 'time') return (b.at - a.at) * f;
+      const x = key(a), y = key(b);
+      if (x !== y) return (x < y ? -1 : 1) * f;
+      return b.at - a.at || (rank[a.mode] - rank[b.mode]);
+    });
+  }
+  var sortLabel = () => { const s = SORTS.find(x => x[0] === lob.sort.k); const arrow = lob.sort.k === 'time' ? (lob.sort.flip ? '↑' : '↓') : (lob.sort.flip ? '↓' : '↑'); return `${s ? s[1] : 'Date/time'} ${arrow}`; };
+  var roomName = (l) => `${l.host.tag}’s room`;
+  function boardScore(tag) { const r = home.board && home.board.rows ? home.board.rows.find(x => x.tag === tag) : null; return r ? r.score : null; }
+  function roomCard(l) {
+    const open = l.phase === 'waiting' && l.players < l.seats;
+    const watch = l.phase === 'playing' && l.spectate && l.kind === 'match';
+    const tags = [l.mode === 'ranked' ? '<i class="rtag ranked">Ranked</i>' : l.kind === 'duo' ? '<i class="rtag duo">2v2</i>' : '<i class="rtag">Standard</i>'];
+    if (l.kind === 'duo' && l.dev) tags.push('<i class="rtag dev">DEV</i>');
+    if (!l.spectate) tags.push('<i class="rtag off">No watchers</i>');
+    const sc = l.mode === 'ranked' ? boardScore(l.host.tag) : null;
+    const age = Math.max(0, Math.round((Date.now() - l.at) / 60000));
+    return `<li class="room-card" data-code="${esc(l.code)}">
+      <div class="rc-top">${nameplate(l.host.tag, l.host.title, 'rc-np')}${sc != null ? `<span class="rc-score" title="Leaderboard score">★ ${esc(sc)}</span>` : ''}</div>
+      <div class="rc-name">${esc(roomName(l))}</div>
+      <div class="rc-tags">${tags.join('')}</div>
+      <div class="rc-facts"><span>${esc(l.map || 'Random')}</span><span>${l.players}/${l.seats} players</span>${l.phase === 'playing' ? `<span>Round ${l.round}</span>` : `<span>${age < 1 ? 'just now' : age + ' min ago'}</span>`}${l.spectate && l.kind === 'match' ? `<span title="Watching">👁 ${l.watchers}</span>` : ''}</div>
+      <div class="rc-btns">${open ? `<button class="btn primary small" data-join="${esc(l.code)}">Join</button>` : ''}${watch ? `<button class="btn small" data-watch="${esc(l.code)}">Watch</button>` : ''}${!open && !watch ? '<span class="hint">Full</span>' : ''}</div>
+    </li>`;
+  }
+  function drawLobbyScreen(el) {
+    el.innerHTML = `<div class="lobby-top">
+        <button class="btn small" id="lob-back">Back</button>
+        <h2>Rooms</h2>
+        <button class="btn small" id="lob-sort" aria-label="Sort the rooms">Sort: ${esc(sortLabel())}</button>
+      </div>
+      <div class="lobby-mid">
+        <div class="lob-acts"><button class="hbtn gold" id="lob-quick">Quick play</button><button class="hbtn" id="lob-create">Create room</button></div>
+        <span class="joinrow lob-join"><input id="lob-code" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Match code" placeholder="CODE"><button class="btn" id="lob-join">Join by code</button></span>
+        <p class="hint lob-msg" id="lob-msg" aria-live="polite">${esc(lob.msg)}</p>
+        <ul class="lob-list" id="lob-list"></ul>
+      </div><div></div>`;
+    $('lob-back').addEventListener('click', () => { lobbyClose(); home.screen = 'menu'; drawHome(); });
+    $('lob-sort').addEventListener('click', openSortSheet);
+    $('lob-create').addEventListener('click', openCreateSheet);
+    $('lob-quick').addEventListener('click', () => {
+      if (!lob.ws || lob.ws.readyState !== 1) { lobMsg('Can’t reach the game server right now.'); return; }
+      lob.quick = true; lob.ws.send(JSON.stringify({ t: 'quick' })); lobMsg('Finding a room…');
+    });
+    const joinNow = () => {
+      const c = $('lob-code').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (c.length === 4) { lobbyClose(); tourJoin(c); return; }
+      if (c.length === DUO_CODE_LEN) { home.back = 'lobby'; duoJoin(c); return; }
+      if (c.length !== 5) { lobMsg('Match codes are 5 letters and numbers, tournament codes 4.'); return; }
+      home.back = 'lobby'; srvJoin(c, { typed: true });
+    };
+    $('lob-join').addEventListener('click', joinNow);
+    $('lob-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinNow(); });
+    $('lob-list').addEventListener('click', (e) => {
+      const j = e.target.closest('[data-join]'), w = e.target.closest('[data-watch]');
+      const l = lob.list.get((j || w || {}).dataset ? (j || w).dataset.join || (j || w).dataset.watch : '');
+      if (!l) return;
+      home.back = 'lobby';
+      if (j) { if (l.kind === 'duo') duoJoin(l.code); else srvJoin(l.code); }
+      else lobbyWatch(l);
+    });
+    lobbyOpen();
+    if (!home.asked) rankedCheck(); // the leaderboard, for ranked rooms' scores
+    lobbyDraw();
+  }
+  function lobMsg(t) { lob.msg = t || ''; const x = $('lob-msg'); if (x) x.textContent = lob.msg; }
+  function lobbyDraw() {
+    const ul = $('lob-list');
+    if (!ul || home.screen !== 'lobby') return;
+    const rows = lobbySorted();
+    ul.innerHTML = rows.length ? rows.map(roomCard).join('')
+      : `<li class="lob-empty">${lob.ok === false ? 'Can’t reach the game server. Retrying…' : lob.ok == null ? 'Loading rooms…' : 'No open rooms right now. Tap Quick play or Create room, and others can join you.'}</li>`;
+    const sb = $('lob-sort'); if (sb) sb.textContent = 'Sort: ' + sortLabel();
+  }
+  function lobbyWatch(l) {
+    tour.spec = { id: '', host: l.host.tag, foe: 'Opponent', pending: null, timer: 0, lobby: true };
+    me = 0;
+    srvJoin(l.code, { watch: true });
+  }
+  function openSortSheet() {
+    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Sort rooms</h3><button class="btn small" id="close">Close</button></div>
+      <p class="hint" style="margin:0">Tap the active one again to flip the order. Within a group, newest first.</p>
+      <div class="sort-list">${SORTS.map(([k, t]) => `<button class="btn ${lob.sort.k === k ? 'primary' : ''}" data-sort="${k}">${t}${lob.sort.k === k ? ' · ' + esc(sortLabel().split(' ').pop()) : ''}<small>${k === 'name' ? 'A–Z' : k === 'time' ? 'newest first' : k === 'cat' ? 'Standard, then Ranked' : '1v1, then 2v2'}</small></button>`).join('')}</div>`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', closeSheet);
+    $('sheet').querySelectorAll('[data-sort]').forEach(b => b.addEventListener('click', () => {
+      const k = b.dataset.sort;
+      lob.sort = lob.sort.k === k ? { k, flip: !lob.sort.flip } : { k, flip: false };
+      try { localStorage.setItem(LOBBY_SORT, JSON.stringify(lob.sort)); } catch (e) {}
+      openSortSheet(); lobbyDraw();
+    }));
+  }
+  var create = { mode: 'standard', pub: true, spectate: true };
+  function openCreateSheet() {
+    const rkOk = rankedAllowed(), duoOk = lob.dev || devMode();
+    if (create.mode === 'ranked' && !rkOk) create.mode = 'standard';
+    if (create.mode === '2v2' && !duoOk) create.mode = 'standard';
+    const seg = (name, key, opts) => `<div class="bar"><span class="hint">${name}</span><div class="seg" role="group" aria-label="${name}">${opts.map(([v, t, off]) => `<button data-${key}="${v}" aria-pressed="${String(create[key === 'cm' ? 'mode' : key === 'cp' ? 'pub' : 'spectate']) === String(v)}" ${off ? 'disabled' : ''}>${t}</button>`).join('')}</div></div>`;
+    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Create room</h3><button class="btn small" id="close">Close</button></div>
+      ${seg('Mode', 'cm', [['standard', 'Standard'], ['ranked', 'Ranked', !rkOk], ...(duoOk ? [['2v2', '2v2']] : [])])}
+      ${create.mode === 'ranked' ? '<p class="ranked-note">Ranked: a best of 3 on the Standard map and pack. You and whoever joins both need an account; only ranked series count on the leaderboard.</p>' : create.mode === '2v2' ? '<p class="hint" style="margin:0">2v2 (developers only for now): seats left empty when you start are played by the AI.</p>' : '<p class="hint" style="margin:0">Pick the map, look and leaders in the room before you start.</p>'}
+      ${seg('Who can find it', 'cp', [[true, 'Public: in Rooms'], [false, 'Private: code only']])}
+      ${create.mode === '2v2' ? '' : seg('Spectators', 'cs', [[true, 'On'], [false, 'Off']])}
+      <button class="btn primary" id="create-go">Create room</button>
+      <span class="hint" id="create-msg" aria-live="polite"></span>`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', closeSheet);
+    $('sheet').querySelectorAll('[data-cm]').forEach(b => b.addEventListener('click', () => { create.mode = b.dataset.cm; openCreateSheet(); }));
+    $('sheet').querySelectorAll('[data-cp]').forEach(b => b.addEventListener('click', () => { create.pub = b.dataset.cp === 'true'; openCreateSheet(); }));
+    $('sheet').querySelectorAll('[data-cs]').forEach(b => b.addEventListener('click', () => { create.spectate = b.dataset.cs === 'true'; openCreateSheet(); }));
+    $('create-go').addEventListener('click', async () => {
+      const o = { pub: create.pub, spectate: create.spectate };
+      home.back = 'lobby';
+      if (create.mode === '2v2') { closeSheet(true); duoHost(o); return; }
+      matchKind = 'standard'; lateGame = false;
+      if (create.mode === 'ranked') {
+        if (!acct) { const r = await acctCall('guest', {}); if (r.status !== 200) { $('create-msg').textContent = acctFail(r); return; } acctTake(r); }
+        closeSheet(true); srvHost({ ...o, ranked: true }); return;
+      }
+      closeSheet(true); srvHost(o);
+    });
+  }
+
+  // =====================================================================
+  // Chat and emotes in server matches (2026-11-04, docs/LOBBY.md §6; server/src/chat.js). Text chat is for phones
+  // signed in with Google (the room says so in roomset.chat); guests read it and send emotes. Watchers chat among
+  // themselves while the match runs; when it ends the players get those lines (chatMerge). The talk button (in the
+  // tray row while deploying, on the board otherwise) opens the wheel: the three emotes and a chat line. Emotes show
+  // ~1.5 s by the sender's nameplate and over their side of the board. The opponent's nameplate: Mute emotes, Mute
+  // chat (kept per match code, pb-mute-<code>), Report. Settings: Chat and Emotes on/off (snd.chatOn, snd.emotesOn).
+  // PeerJS matches get none of it.
+  // =====================================================================
+  var EMOTES = [['bababa', 'BABABABA!'], ['golem', 'Happy Golem'], ['shock', 'Shell-shocked']];
+  var talk = { lines: [], can: false, pub: false, spectate: true, team: false, unread: 0, wheel: false, tick: [], tickTimer: 0 };
+  var talkOn = () => !!(net.srv && net.welcomed && (mode === 'net' || mode === 'spec'));
+  var chatShown = () => snd.chatOn !== false, emotesShown = () => snd.emotesOn !== false;
+  function muteOf() { try { return JSON.parse(localStorage.getItem('pb-mute-' + net.code) || 'null') || { e: false, c: false }; } catch (e) { return { e: false, c: false }; } }
+  function setMute(k, v) { const x = muteOf(); x[k] = v; try { localStorage.setItem('pb-mute-' + net.code, JSON.stringify(x)); } catch (e) {} }
+  // is this sender on the other side? (1v1: the other side; 2v2: the other team; watchers never)
+  var fromFoe = (from) => from >= 0 && (net.duo ? Duo.SEATS[from] && Duo.SEATS[from].side !== me : mode === 'net' && from !== me);
+  var fromMe = (from) => mode === 'net' && (net.duo ? net.duoInfo && from === net.duoInfo.seat : from === me);
+  function talkReset() { Object.assign(talk, { lines: [], can: false, pub: false, spectate: true, team: false, unread: 0, wheel: false, tick: [] }); clearTimeout(talk.tickTimer); talkSync(); }
+  // the messages a match room sends about chat (true: handled)
+  function chatRecv(d) {
+    if (d.t === 'roomset') { talk.can = !!d.chat; talk.pub = !!d.pub; talk.spectate = d.spectate !== false; talkSync(); if (phase === 'lobby' && !m && mode === 'net' && me === 0 && !net.duo && !net.tourCode) drawLobby(); return true; }
+    if (d.t === 'chat') { chatAdd(d); return true; }
+    if (d.t === 'chatLog') { talk.lines = (d.lines || []).slice(-50); talkSync(); return true; }
+    if (d.t === 'chatMerge') { // the match is over: the watchers' lines from it, in time order
+      talk.lines = talk.lines.concat(d.lines || []).sort((a, b) => a.at - b.at).slice(-50);
+      if ((d.lines || []).length) tickShow({ sys: 'The spectators’ chat is open to you now.' });
+      chatSheetDraw(); talkSync(); return true;
+    }
+    if (d.t === 'emote' && EMOTES.some(x => x[0] === d.id)) { if (emotesShown() && !(fromFoe(d.from) && muteOf().e)) emoteShow(d.from, d.id); return true; }
+    if (d.t === 'reported') { tickShow({ sys: d.ok ? 'Report sent. Thanks.' : d.why === 'slow down' ? 'You’ve sent enough reports from this match.' : 'Couldn’t send the report right now.' }); return true; }
+    if (d.t === 'denied' && (d.why === 'slow down' || d.why === 'sign in')) { tickShow({ sys: d.why === 'slow down' ? 'Slow down a little.' : 'Sign in with Google to chat.' }); return true; }
+    if (d.t === 'denied' && d.why === 'no watchers') {
+      leaveNet(); tour.spec = null;
+      overlayMsg('No spectators', 'The host has turned watching off for this match.');
+      return true;
+    }
+    return false;
+  }
+  function chatAdd(l) {
+    talk.lines.push(l); if (talk.lines.length > 50) talk.lines.shift();
+    if (!(fromFoe(l.from) && muteOf().c) && chatShown()) { tickShow(l); if (!chatSheetOpen()) talk.unread++; }
+    chatSheetDraw(); talkSync();
+  }
+  var lineHtml = (l) => l.sys ? `<span class="cl sys">${esc(l.sys)}</span>`
+    : `<span class="cl${l.w ? ' w' : ''}${fromMe(l.from) ? ' me' : fromFoe(l.from) ? ' foe' : ''}">${l.team ? '<i class="ct">Team</i>' : ''}${l.w ? '<i class="ct" title="Spectator">👁</i>' : ''}<b>${esc(l.tag)}</b> ${esc(l.text)}</span>`;
+  // a short-lived line under the HUD
+  function tickShow(l) {
+    talk.tick.push({ l, until: Date.now() + 6000 }); talk.tick = talk.tick.slice(-2);
+    tickDraw();
+  }
+  function tickDraw() {
+    const el = $('chat-tick'), now = Date.now();
+    talk.tick = talk.tick.filter(x => x.until > now);
+    el.hidden = !talk.tick.length || !talkOn();
+    el.innerHTML = talk.tick.map(x => lineHtml(x.l)).join('');
+    clearTimeout(talk.tickTimer);
+    if (talk.tick.length) talk.tickTimer = setTimeout(tickDraw, Math.max(200, Math.min(...talk.tick.map(x => x.until)) - now));
+  }
+  // the talk button: in the deploy tray (#talk-btn) or on the board (#talk-fab)
+  var talkBtn = () => talkOn() ? `<button class="cog talk" id="talk-btn" aria-label="Chat and emotes">${TALK_SVG}${talk.unread ? `<i class="dot">${Math.min(9, talk.unread)}</i>` : ''}</button>` : '';
+  var TALK_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-8l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2m3 5.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3"/></svg>';
+  function talkSync() {
+    const on = talkOn(), fab = $('talk-fab'), inTray = $('talk-btn');
+    fab.hidden = !on || !!inTray;
+    if (on) fab.innerHTML = TALK_SVG + (talk.unread ? `<i class="dot">${Math.min(9, talk.unread)}</i>` : '');
+    if (inTray) { if (!on) inTray.remove(); else inTray.innerHTML = TALK_SVG + (talk.unread ? `<i class="dot">${Math.min(9, talk.unread)}</i>` : ''); }
+    if (!on) { $('talk-wheel').hidden = true; talk.wheel = false; $('chat-tick').hidden = true; $('np-menu').hidden = true; }
+  }
+  function wheelOpen(open) {
+    const w = $('talk-wheel');
+    talk.wheel = open; w.hidden = !open;
+    if (!open) return;
+    const player = mode === 'net';
+    w.innerHTML = `${player ? `<div class="tw-emotes">${EMOTES.map(([id, t]) => `<button class="tw-e" data-emote="${id}" aria-label="${esc(t)}"><img src="img/emotes/${id}.svg" alt="" width="64" height="64"></button>`).join('')}</div>` : ''}
+      ${talk.can ? `<form class="tw-line" id="tw-form">${net.duo ? `<button type="button" class="btn small" id="tw-team" aria-pressed="${talk.team}">${talk.team ? 'Team' : 'All'}</button>` : ''}<input id="tw-in" maxlength="120" autocomplete="off" enterkeyhint="send" placeholder="${mode === 'spec' && !talkMerged() ? 'Chat with the other spectators' : 'Say something'}" aria-label="Chat message"><button class="btn primary small" type="submit">Send</button></form>`
+        : '<p class="hint tw-sign">Sign in with Google to chat (Profile on the main menu).</p>'}
+      <div class="tw-foot"><button class="btn small" id="tw-chat">Chat${talk.lines.length ? ` (${talk.lines.length})` : ''}</button><button class="btn small" id="tw-close">Close</button></div>`;
+    w.querySelectorAll('[data-emote]').forEach(b => b.addEventListener('click', () => { send({ t: 'emote', id: b.dataset.emote }); wheelOpen(false); }));
+    if ($('tw-form')) $('tw-form').addEventListener('submit', (e) => { e.preventDefault(); chatSend($('tw-in').value); $('tw-in').value = ''; });
+    if ($('tw-team')) $('tw-team').addEventListener('click', () => { talk.team = !talk.team; wheelOpen(true); });
+    $('tw-chat').addEventListener('click', () => { wheelOpen(false); openChatSheet(); });
+    $('tw-close').addEventListener('click', () => wheelOpen(false));
+  }
+  var talkMerged = () => !m || phase === 'lobby' || !!m.over;
+  function chatSend(text) {
+    const t = String(text || '').trim();
+    if (!t) return;
+    send({ t: 'chat', text: t.slice(0, 120), ...(net.duo && talk.team ? { team: true } : {}) });
+  }
+  var chatSheetOpen = () => !$('sheet-back').hidden && !!$('chat-lines');
+  function openChatSheet() {
+    talk.unread = 0; talkSync();
+    const foe = mode === 'net' && !net.duo ? foeName() : '';
+    const mu = muteOf();
+    $('sheet').innerHTML = `<div class="bar" data-keep><h3 id="sheet-h">Chat</h3><button class="btn small" id="close">Close</button></div>
+      ${!chatShown() ? '<p class="hint" style="margin:0">Chat is off in Settings: lines don’t pop up on the board.</p>' : ''}
+      <div class="chat-lines" id="chat-lines"></div>
+      ${talk.can ? `<form class="tw-line" id="cs-form">${net.duo ? `<button type="button" class="btn small" id="cs-team" aria-pressed="${talk.team}">${talk.team ? 'Team' : 'All'}</button>` : ''}<input id="cs-in" maxlength="120" autocomplete="off" enterkeyhint="send" placeholder="Say something" aria-label="Chat message"><button class="btn primary small" type="submit">Send</button></form>`
+        : '<p class="hint" style="margin:0">Sign in with Google to chat (Profile on the main menu). You can still send emotes.</p>'}
+      ${mode === 'spec' && !talkMerged() ? '<p class="hint" style="margin:0">While the match runs, spectators chat among themselves. The players see it when the match is over.</p>' : ''}
+      ${foe ? `<div class="bar"><span class="hint">${esc(foe)}</span><span class="btnrow"><button class="btn small" id="cs-me" aria-pressed="${mu.e}">${mu.e ? 'Unmute emotes' : 'Mute emotes'}</button><button class="btn small" id="cs-mc" aria-pressed="${mu.c}">${mu.c ? 'Unmute chat' : 'Mute chat'}</button><button class="btn small" id="cs-rep">Report</button></span></div>` : ''}`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', () => closeSheet(true));
+    if ($('cs-form')) $('cs-form').addEventListener('submit', (e) => { e.preventDefault(); chatSend($('cs-in').value); $('cs-in').value = ''; });
+    if ($('cs-team')) $('cs-team').addEventListener('click', () => { talk.team = !talk.team; const b = $('cs-team'); b.textContent = talk.team ? 'Team' : 'All'; b.setAttribute('aria-pressed', String(talk.team)); });
+    if ($('cs-me')) $('cs-me').addEventListener('click', () => { setMute('e', !muteOf().e); openChatSheet(); });
+    if ($('cs-mc')) $('cs-mc').addEventListener('click', () => { setMute('c', !muteOf().c); openChatSheet(); });
+    if ($('cs-rep')) $('cs-rep').addEventListener('click', reportChat);
+    chatSheetDraw();
+  }
+  function chatSheetDraw() {
+    const box = $('chat-lines');
+    if (!box || $('sheet-back').hidden) return;
+    const mc = muteOf().c;
+    const rows = talk.lines.filter(l => !(mc && fromFoe(l.from)));
+    box.innerHTML = rows.length ? rows.map(lineHtml).join('') : '<span class="hint">No messages yet.</span>';
+    box.scrollTop = box.scrollHeight;
+  }
+  function reportChat() {
+    if (!confirm(`Report ${foeName()}'s chat? The last 20 lines of this match go to the moderators.`)) return;
+    send({ t: 'report' });
+  }
+  // the opponent's nameplate: Mute emotes / Mute chat / Report
+  function npMenu(anchor) {
+    const el = $('np-menu');
+    if (!talkOn() || mode !== 'net' || net.duo) { el.hidden = true; return; }
+    const mu = muteOf(), r = anchor.getBoundingClientRect();
+    el.innerHTML = `<b>${esc(foeName())}</b><button class="btn small" data-np="e">${mu.e ? 'Unmute emotes' : 'Mute emotes'}</button><button class="btn small" data-np="c">${mu.c ? 'Unmute chat' : 'Mute chat'}</button><button class="btn small" data-np="r">Report</button>`;
+    el.style.left = Math.max(8, Math.min(innerWidth - 200, r.left)) + 'px'; el.style.top = (r.bottom + 6) + 'px';
+    el.hidden = false;
+    el.querySelectorAll('[data-np]').forEach(b => b.addEventListener('click', (e) => {
+      e.stopPropagation(); el.hidden = true;
+      if (b.dataset.np === 'r') reportChat(); else { setMute(b.dataset.np, !muteOf()[b.dataset.np]); tickShow({ sys: b.dataset.np === 'e' ? (muteOf().e ? 'Their emotes are muted.' : 'Their emotes are back.') : (muteOf().c ? 'Their chat is muted.' : 'Their chat is back.') }); }
+    }));
+  }
+  // an emote: a sticker by the sender's nameplate and a bigger one over their side of the board
+  function emoteShow(from, id) {
+    const layer = $('emote-layer'), mine = net.duo ? Duo.SEATS[from] && Duo.SEATS[from].side === me : from === me;
+    const bottom = mode === 'spec' ? from === 0 : mine; // the bottom of the board is this phone's side (spectating: side 0)
+    const np = $(bottom ? 'you-name' : 'foe-name'), wrap = $('wrap').getBoundingClientRect();
+    const put = (x, y, size, cls) => {
+      const img = document.createElement('img');
+      img.src = `img/emotes/${id}.svg`; img.alt = ''; img.className = `emote-st ${id} ${cls}`;
+      img.style.left = (x - size / 2) + 'px'; img.style.top = (y - size / 2) + 'px'; img.style.width = img.style.height = size + 'px';
+      layer.appendChild(img);
+      setTimeout(() => img.remove(), 1600);
+    };
+    const nr = np && !document.querySelector('.hud').hidden ? np.getBoundingClientRect() : null;
+    if (nr && nr.width) put(nr.left + nr.width / 2, nr.bottom + 30, 64, 'small');
+    if (wrap.width) put(wrap.left + wrap.width / 2, bottom ? wrap.bottom - Math.min(110, wrap.height * 0.22) : wrap.top + Math.min(110, wrap.height * 0.22), Math.min(150, wrap.width * 0.4), 'big');
+    if (net.duo && from !== (net.duoInfo || {}).seat) { const nm = net.duoInfo && net.duoInfo.names ? net.duoInfo.names[from] : ''; if (nm) tickShow({ sys: `${nm}: ${EMOTES.find(x => x[0] === id)[1]}` }); }
+  }
+  if (qs.has('test')) window.__talk = () => ({ talk, lob: { list: [...lob.list.values()], dev: lob.dev, sort: lob.sort, open: !!lob.ws }, code: net.code, mode, send, mute: muteOf() }); // UI tests
+  $('talk-fab').addEventListener('click', (e) => { e.stopPropagation(); talk.unread = 0; talkSync(); wheelOpen(!talk.wheel); });
+  $('panel').addEventListener('click', (e) => { if (e.target.closest('#talk-btn')) { e.stopPropagation(); talk.unread = 0; talkSync(); wheelOpen(!talk.wheel); } });
+  $('foe-name').addEventListener('click', (e) => { if (!talkOn()) return; e.stopPropagation(); npMenu($('foe-name')); });
+  document.addEventListener('click', (e) => {
+    if (!$('np-menu').hidden && !$('np-menu').contains(e.target)) $('np-menu').hidden = true;
+    if (talk.wheel && !$('talk-wheel').contains(e.target) && !e.target.closest('#talk-fab, #talk-btn')) wheelOpen(false);
+  });
+
+  // =====================================================================
   // 2v2 (developer test, 2026-11-02; one shared board since 2026-11-03; src/duo.js, server/src/duo.js). One wide
   // board (Game's 'duo' map): both players of a team deploy in the same zone and share one tower and treasury. Each
   // phone plays its own part as a server match (mode 'net' with net.duo: the same deploy screen, actions and Ready as
@@ -7191,9 +7640,10 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   var duoToast = null; // a line from the team for the status bar: { text, until }
   var duoPick = -1;   // the host's first tap when swapping two seats
   var duoVoteSeen = ''; // the tower vote already announced on this phone
-  function duoHost() {
+  function duoHost(o = {}) {
     if (!devMode()) { overlayMsg('2v2', 'Only developer accounts can make a 2v2 lobby for now. Ask a developer for the code.'); return; }
     leaveNet();
+    net.pub = !!o.pub; // listed in the lobby's Rooms (developers only while config lobby_duo is 'dev')
     mode = 'net'; me = 0; m = null; phase = 'lobby'; bt = null; battlePre = null; lastSummary = null; matchKind = 'standard';
     net.srv = true; net.duo = true; net.create = true; net.key = ''; net.code = newDuoCode(); net.players = null; net.ranked = null;
     duoPick = -1;
@@ -7711,7 +8161,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       <span class="eyebrow">Spectating</span>
       <h2>${esc(tour.spec.host)} <small>vs</small> ${esc(tour.spec.foe)}</h2>
       <p class="status wait">${esc(text)}</p>
-      <button class="btn" id="spec-leave">Back to the tournament</button>
+      <button class="btn" id="spec-leave">${tour.spec.lobby ? 'Leave' : 'Back to the tournament'}</button>
     </div>`);
     $('panel').innerHTML = '';
     $('spec-leave').addEventListener('click', specLeave);
@@ -7756,7 +8206,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       <span class="eyebrow">Spectating · round ${sum.round}</span>
       <h2>${over ? `${esc(m.winner === 0 ? sp.host : m.winner === 1 ? sp.foe : 'Nobody')} wins${m.winner < 0 ? '' : ' the game'}` : hostWon ? `${esc(sp.host)} takes it` : guestWon ? `${esc(sp.foe)} takes it` : 'Draw'}</h2>
       <p class="big">${dmg.join(' ') || 'Nobody takes damage.'} Health: ${esc(sp.host)} ${m.hp[0]}, ${esc(sp.foe)} ${m.hp[1]}.</p>
-      <div class="btnrow"><button class="btn" id="look">Look at board</button><button class="btn" id="spec-leave">Back to the tournament</button></div>
+      <div class="btnrow"><button class="btn" id="look">Look at board</button><button class="btn" id="spec-leave">${sp.lobby ? 'Leave' : 'Back to the tournament'}</button></div>
     </div>`);
     $('panel').innerHTML = '';
     $('spec-leave').addEventListener('click', specLeave);
