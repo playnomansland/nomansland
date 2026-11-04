@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Flame Wizard shouting BABABABA (lobby emote, 2026-11-04): models3d.js wizard:flame, drawn flat -->
+  <g stroke="#1b1512" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
+    <!-- speech burst -->
+    <path d="M14 22 L46 34 L58 6 L80 30 L108 4 L118 32 L150 10 L150 40 L184 30 L168 58 L196 70 L164 82 L176 108 L140 96 L128 122 L110 96 L80 112 L82 86 L48 96 L60 72 L24 66 L46 50 Z" fill="#ffd23f"/>
+    <path d="M60 30 L80 46 L104 22 L114 48 L144 34 L138 60 L166 66 L140 76 L146 92 L124 84 L112 102 L102 82 L78 92 L80 72 L56 70 L66 54 Z" fill="#ff8a3d" stroke="none"/>
+    <!-- staff, shaking -->
+    <path d="M214 250 L226 118" stroke-width="9" fill="none"/>
+    <path d="M214 250 L226 118" stroke="#8a5a32" stroke-width="4" fill="none"/>
+    <path d="M226 72 C206 92 210 112 226 122 C244 112 248 92 226 72 Z" fill="#ff8a3d"/>
+    <path d="M226 92 C218 102 220 112 226 116 C233 112 235 102 226 92 Z" fill="#ffd27a" stroke-width="4"/>
+    <path d="M196 96 L188 90 M198 112 L188 112 M246 82 L252 74" fill="none" stroke-width="5"/>
+    <!-- robe -->
+    <path d="M78 256 C86 214 104 196 140 194 C176 196 194 214 200 256 Z" fill="#b95018"/>
+    <path d="M140 196 C164 198 186 214 200 256 L164 256 C160 226 152 208 140 196 Z" fill="#8f3c12" stroke="none"/>
+    <!-- head -->
+    <ellipse cx="140" cy="168" rx="48" ry="44" fill="#d9a27a"/>
+    <path d="M176 140 C192 160 190 192 168 206 C182 186 184 160 176 140 Z" fill="#b97f5a" stroke="none"/>
+    <!-- beard -->
+    <path d="M98 176 C102 222 124 244 140 250 C156 244 180 222 184 176 C170 192 110 192 98 176 Z" fill="#e9e3cf"/>
+    <!-- mouth wide open -->
+    <path d="M112 172 C114 214 166 214 170 172 C152 180 130 180 112 172 Z" fill="#6b1410"/>
+    <path d="M124 196 C132 186 152 186 160 198 C150 206 134 206 124 196 Z" fill="#e0574a" stroke="none"/>
+    <path d="M116 174 L166 174" stroke="#fff" stroke-width="5"/>
+    <!-- eyes and brows -->
+    <path d="M110 140 L130 150 M172 140 L152 150" stroke-width="8"/>
+    <circle cx="124" cy="156" r="5" fill="#1b1512"/>
+    <circle cx="158" cy="156" r="5" fill="#1b1512"/>
+    <!-- hat -->
+    <path d="M84 132 C120 120 166 120 200 130 L196 144 C160 136 120 136 88 146 Z" fill="#4fa3ff"/>
+    <path d="M92 132 C110 92 130 60 176 28 C164 66 168 98 192 128 C158 120 124 122 92 132 Z" fill="#b95018"/>
+    <path d="M176 28 C164 66 168 98 192 128 C180 126 170 124 160 124 C150 90 156 60 176 28 Z" fill="#8f3c12" stroke="none"/>
+  </g>
+  <text x="102" y="68" text-anchor="middle" font-family="Impact, 'Arial Black', 'Helvetica Neue', sans-serif" font-weight="900" font-size="27" fill="#fff" stroke="#1b1512" stroke-width="5" paint-order="stroke" transform="rotate(-8 102 68)" letter-spacing="-0.5">BABABABA!</text>
+</svg>

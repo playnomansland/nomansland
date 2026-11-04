@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Happy Ether Golem (lobby emote, 2026-11-04): models3d.js golem, drawn flat -->
+  <g stroke="#1b1512" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
+    <!-- sparkles -->
+    <path d="M34 54 L40 70 L56 76 L40 82 L34 98 L28 82 L12 76 L28 70 Z" fill="#8fe3ff"/>
+    <path d="M218 26 L223 40 L237 45 L223 50 L218 64 L213 50 L199 45 L213 40 Z" fill="#ffe9a8"/>
+    <path d="M226 132 L230 142 L240 146 L230 150 L226 160 L222 150 L212 146 L222 142 Z" fill="#8fe3ff" stroke-width="5"/>
+    <path d="M22 150 L26 160 L36 164 L26 168 L22 178 L18 168 L8 164 L18 160 Z" fill="#ffe9a8" stroke-width="5"/>
+    <!-- floating rune shards -->
+    <path d="M80 20 L92 52 L70 48 Z" fill="#8fe3ff"/>
+    <path d="M182 72 L194 98 L174 96 Z" fill="#8fe3ff" stroke-width="5"/>
+    <!-- legs -->
+    <path d="M82 206 L80 246 L118 246 L118 206 Z" fill="#6e6a64"/>
+    <path d="M140 206 L140 246 L178 246 L176 206 Z" fill="#6e6a64"/>
+    <!-- arms up, cheering -->
+    <path d="M60 150 C40 130 30 104 38 88 C50 80 66 92 76 122 Z" fill="#6a1a78"/>
+    <path d="M198 150 C218 130 228 104 220 88 C208 80 192 92 182 122 Z" fill="#6a1a78"/>
+    <circle cx="40" cy="84" r="20" fill="#6e6a64"/>
+    <circle cx="218" cy="84" r="20" fill="#6e6a64"/>
+    <!-- body: a heap of boulders -->
+    <path d="M44 166 C38 112 78 86 129 86 C182 86 222 112 214 166 C208 208 176 222 129 222 C82 222 50 208 44 166 Z" fill="#6a1a78"/>
+    <path d="M168 92 C204 104 222 132 214 166 C208 204 180 220 140 222 C186 200 196 148 168 92 Z" fill="#51005c" stroke="none"/>
+    <path d="M56 186 C92 200 166 200 204 186 L200 204 C164 216 96 216 60 204 Z" fill="#4fa3ff"/>
+    <!-- shoulders -->
+    <circle cx="62" cy="122" r="22" fill="#7d2a8c"/>
+    <circle cx="196" cy="122" r="22" fill="#7d2a8c"/>
+    <!-- the glowing core -->
+    <circle cx="129" cy="168" r="15" fill="#8fe3ff"/>
+    <circle cx="124" cy="163" r="5" fill="#fff" stroke="none"/>
+    <!-- face: closed eyes, big smile -->
+    <path d="M82 124 C88 110 104 110 110 124" fill="none" stroke="#8fe3ff" stroke-width="9"/>
+    <path d="M148 124 C154 110 170 110 176 124" fill="none" stroke="#8fe3ff" stroke-width="9"/>
+    <path d="M94 138 C104 160 154 160 164 138 Z" fill="#2a0030"/>
+    <path d="M110 150 C120 144 140 144 150 150 C142 156 118 156 110 150 Z" fill="#e06a9a" stroke="none"/>
+    <ellipse cx="78" cy="142" rx="10" ry="6" fill="#c44c9a" stroke="none" opacity="0.8"/>
+    <ellipse cx="180" cy="142" rx="10" ry="6" fill="#c44c9a" stroke="none" opacity="0.8"/>
+  </g>
+</svg>
