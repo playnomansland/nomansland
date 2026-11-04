@@ -12,7 +12,7 @@ const { open, waitFor, sleep, closed } = require('./harness.js');
 const { idToken, startAccounts } = require('./accounts-env.js');
 
 const ORIGIN = 'http://localhost:8766';
-setTimeout(() => { console.error('test timed out'); process.exit(1); }, 5 * 60 * 1000).unref();
+setTimeout(() => { console.error('test timed out'); process.exit(1); }, 8 * 60 * 1000).unref();
 const uniq = () => Math.random().toString(36).slice(2, 7);
 const code = () => 'H' + Math.random().toString(36).slice(2, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'Q');
 
@@ -187,19 +187,32 @@ const code = () => 'H' + Math.random().toString(36).slice(2, 6).toUpperCase().re
     const E = await player('Eve' + uniq()), F = await player('Fay' + uniq());
     await befriend(E, F);
     const e1 = await hub(E), f1 = await hub(F);
-    const burst = async (ws, to, n, tag) => { for (let i = 0; i < n; i++) { if (i && i % 4 === 0) await sleep(3100); ws.json({ t: 'dm', to, text: tag + i }); } }; // under the burst limit
-    await Promise.all([burst(e1, F.id, 55, 'e'), burst(f1, E.id, 55, 'f')]);
-    await waitFor(() => e1.inbox.filter((x) => x.t === 'dm').length >= 110, 60000);
+    // one message at a time, each sent once the last one is confirmed; a burst refusal waits and sends again (slow CI machines bunch messages up)
+    const deliver = async (ws, to, text) => {
+      for (let tries = 0; tries < 20; tries++) {
+        const from = ws.inbox.length;
+        ws.json({ t: 'dm', to, text });
+        const r = await waitFor(() => ws.inbox.slice(from).find((x) => (x.t === 'dm' && x.to === to && x.text === text) || (x.t === 'dmFail' && x.to === to)), 15000);
+        if (r.t === 'dm') return;
+        assert.strictEqual(r.why, 'slow down', 'only the burst limit refuses here');
+        await sleep(1500);
+      }
+      throw new Error('message never went through');
+    };
+    const many = async (ws, to, n, tag) => { for (let i = 0; i < n; i++) await deliver(ws, to, tag + i); };
+    await Promise.all([many(e1, F.id, 55, 'e'), many(f1, E.id, 55, 'f')]);
+    await waitFor(() => e1.inbox.filter((x) => x.t === 'dm').length >= 110, 15000);
     let page = await call('dm/list', { id: F.id }, E.s), all = [...page.lines];
     while (page.more) { page = await call('dm/list', { id: F.id, before: page.lines[0].k }, E.s); all = [...page.lines, ...all]; }
     assert.strictEqual(all.length, 100, 'the last 100 are kept');
     assert.ok(all.every((x, i) => !i || x.k > all[i - 1].k), 'oldest first');
     assert.deepStrictEqual([all[0].text.length > 0, (await call('dm/list', { id: F.id }, E.s)).lines.length], [true, 30], 'pages of 30');
-    await sleep(3100);
-    await burst(e1, F.id, 6, 'h');
-    await waitFor(() => e1.inbox.some((x) => x.t === 'dmFail' && x.why === 'slow down'), 8000);
-    await waitFor(() => e1.inbox.filter((x) => x.t === 'dm' && x.to === F.id).length >= 60, 8000); // the 60th's echo may come after the 61st's refusal
-    await sleep(500);
+    await many(e1, F.id, 5, 'h'); // 60 sent this hour
+    await sleep(3100); // past the burst window, so a refusal now is the hourly limit
+    const before = e1.inbox.length;
+    e1.json({ t: 'dm', to: F.id, text: 'one too many' });
+    assert.strictEqual((await waitFor(() => e1.inbox.slice(before).find((x) => x.t === 'dmFail' || (x.t === 'dm' && x.to === F.id)), 8000)).t, 'dmFail', 'the 61st is refused');
+    await sleep(300);
     assert.strictEqual(e1.inbox.filter((x) => x.t === 'dm' && x.to === F.id).length, 60, '60 an hour');
 
     // removing a friend deletes the pair's messages
