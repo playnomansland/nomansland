@@ -154,7 +154,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
     if (!v.m) return;
     // while deploying, the board changes with what the player buys (mushrooms, buff tiles, the altar): look again twice a second
     floorAge += dt;
-    const key = [idOf(v.m), idOf(v.battlePre), v.m.round, v.me, v.phase, uiOff, v.dev ? JSON.stringify([v.dev, v.editable, v.m.dev.casts.length, v.m.armies[v.me].map(q => q.guide || 0)]) : ''].join('|'); // devtest: arrows, spells and placing show at once
+    const key = [idOf(v.m), idOf(v.battlePre), v.m.round, v.me, v.phase, uiOff, v.dev ? JSON.stringify([v.dev, v.editable, v.m.dev.casts.length, v.m.armies[v.me].map(q => q.guide || 0)]) : '', v.phase === 'deploy' ? JSON.stringify([v.aim, v.m.armies[v.me].map(q => q.aim ? [q.col, q.row, q.aim.dc, q.aim.dr] : 0)]) : ''].join('|'); // devtest: arrows, spells and placing show at once; direction arrows too
     if (key === floorKey && !(v.phase === 'deploy' && floorAge > 0.5)) return;
     floorKey = key; floorAge = 0;
     floorView = { ...v, bt: v.phase === 'battle' ? null : v.bt, fx: [], selected: null, moving: null, drag: null, hoverTile: null, placingElf: false, placingTower: false, placingWall: false, placingBuilding: null };

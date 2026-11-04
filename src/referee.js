@@ -39,6 +39,7 @@
     buyMageGen: 's', undoMageGen: '?s', buyTround: 's', undoTround: 's',
     giveCharm: 'i', undoCharm: 'i', buyAltar: 's', undoAltar: 's', bribe: '', undoBribe: '',
     buyElfOwn: 'ii', undoElfOwn: '', removeShroom: 'ii', undoRemoveShroom: 'ii',
+    setAim: 'iii', clearAim: 'i',
     buyBuilding: 'iiii', buyBuildingSkill: 'xs', undoBuildingSkill: 'x', levelBuilding: 'x', undoLevelBuilding: 'x',
   };
   const okArg = (k, v) => k === 'i' ? Number.isInteger(v) && Math.abs(v) < 1e6
@@ -67,7 +68,7 @@
     s.armies[h] = G.foeSeen(s, h).map(q => { // a squad sold this round still shows; a squad moved this round shows on its old tile
       delete q.soldRound; delete q.outRound;
       if (q.from && q.movedRound === round) { q.col = q.from.col; q.row = q.from.row; if (q.from.in != null) q.in = q.from.in; else delete q.in; }
-      delete q.from; delete q.movedRound; delete q.luckMove;
+      delete q.from; delete q.movedRound; delete q.luckMove; delete q.aim; // a direction arrow shows in the fight
       if (q.charmGiven === round) { delete q.charm; delete q.charmGiven; } // Matteo's first stack, given this round
       if (q.awaken === round) delete q.awaken; // an awakening bought this round
       if (q.prey) { const p = G.preyShown(s, -2, true, h, q); if (p == null) delete q.prey; else q.prey = { squad: p, round: Math.min(q.prey.round, round - 1) }; } // a Hunter's mark moved this round shows where it was

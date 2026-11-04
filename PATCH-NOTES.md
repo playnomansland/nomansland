@@ -16,6 +16,19 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 4 November 2026 – Direction arrows for melee units
+
+### New: point your melee squads where to go
+- Every **melee squad** (range 5 m or less: Brute, Goblin Swarm, Spiders, Ether Golem, War Mammoth and the rest) gets **Set direction** in its sheet. Tap where it should walk first, or drag the arrow out of the squad. Ranged squads don't get one.
+- An arrow is at most **5 tiles** long. Aim further and it's cut down along the same line. The dashed ring while you aim shows how far it can reach.
+- **In the fight the squad walks the arrow first and ignores sight and awareness on the way**, so it walks past enemies it would normally turn to. Each body keeps its place in the formation. It still fights an enemy that comes **into its reach**, then walks on once that enemy is gone. From the end of the arrow on it fights as usual.
+- If it can't get there (a wall, a crowd) it gives up after a while and fights as usual.
+- **Free**, and it stays from round to round until you change it or tap **Clear direction**. It moves with the squad when you move it.
+- **Your opponent doesn't see your arrows** until the fight. Your arrows show on the board while you deploy, and the squad's sheet says *Direction: walks its arrow first*.
+- Works in every match type: server matches, tournaments and phone-to-phone.
+
+---
+
 ## 4 November 2026 – New music
 
 - **Eyes in the front 2** is in the menu playlist (the whole song).

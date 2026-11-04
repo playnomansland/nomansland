@@ -3,6 +3,7 @@
 // screen shows right now:
 //   { m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf,
 //     editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev }
+// aim: { id, end } while a melee squad's direction arrow is being set (end: the tile under the finger, or null); see aimFloor.
 // dev (Factions devtest only): { bPlacing, castMode, guideMode, guideId, guide }: the building being placed, the spell being
 // cast, and the arrow being drawn (guide: its points so far, for squad guideId).
 // fx: short-lived battle effects as plain data (shots, flames, bolts, heals, deaths), in board metres.
@@ -20,8 +21,8 @@
 const Render2D = (cv, view, opts = {}) => {
   let ctx = cv.getContext('2d'); // swapped for a moment while drawing map thumbnails (thumb)
   let m = null, me = 0, phase = 'start', units = [], mode = 'ai', bt = null, battlePre = null, fx = [], battleCam = null, win = null;
-  let selected = null, moving = null, drag = null, hoverTile = null, rangeOf = null, editable = false, placingUnit = null, placingElf = false, placingTower = false, placingWall = false, dev = null, placingBuilding = null;
-  const pull = () => { ({ m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf, editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev, win = null } = view()); };
+  let selected = null, moving = null, drag = null, hoverTile = null, rangeOf = null, editable = false, placingUnit = null, placingElf = false, placingTower = false, placingWall = false, dev = null, placingBuilding = null, aim = null;
+  const pull = () => { ({ m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf, editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev, aim = null, win = null } = view()); };
   // win (a 2v2 fight on a phone): { aspect, cols, x } the canvas is shaped for `aspect` columns, shows `cols` of them
   // (zoomed out up to the whole wide board) and starts at screen column x; the board sits in the middle top to bottom
   const foe = () => 1 - me;
@@ -444,6 +445,7 @@ const Render2D = (cv, view, opts = {}) => {
       }
     }
     if (v && v.dev) devFloor(v, plain);
+    if (v && !plain && phase === 'deploy') aimFloor(v);
     if (plain) return;
     if (v && v.buff) for (const side of [0, 1]) { // Zoe's buff tiles: a gold tile with a star
       if (!charVisible(side)) continue;
@@ -511,6 +513,18 @@ const Render2D = (cv, view, opts = {}) => {
       for (let row = 0; row < Game.ROWS; row++) for (let c = 0; c < Game.COLS; c++) if (Game.castSpotOk(v, me, sp, c, row)) ctx.strokeRect(scol(c) * t + 4, srow(row) * t + 4, t - 8, t - 8);
     }
     ctx.globalAlpha = 1;
+  }
+  // melee squads' direction arrows (Game.AIM), yours only: each squad's, and while one is being set (aim: { id, end })
+  // how far it may go (a dashed ring of AIM.maxTiles tiles) and the arrow to the tile under the finger, cut down as it will be
+  function aimFloor(v) {
+    const draft = aim && v.armies[me].find(q => q.id === aim.id);
+    for (const sq of v.armies[me]) if (sq.aim && sq !== draft && Game.canAim(v, me, sq)) drawArrow(v, sq, [Game.aimEnd(v, sq)], 0.75);
+    if (!draft) return;
+    const t = tilePx(), cx = (scol(draft.col) + 0.5) * t, cy = (srow(draft.row) + 0.5) * t;
+    ctx.strokeStyle = css('--you'); ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.arc(cx, cy, Game.AIM.maxTiles * t, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const end = aim.end ? Game.aimTo(v, draft, aim.end.col, aim.end.row) : Game.aimEnd(v, draft);
+    if (end) drawArrow(v, draft, [end], 1);
   }
   // a squad's arrow: from its tile through its points, with a head at the end, and the squad's speed written along
   // its longest leg
