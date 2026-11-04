@@ -3276,15 +3276,34 @@ html.pc .corner button span { display: inline; }
     }));
     if (ranked()) wireLookSeg(); else { wireMapSeg(); wireCharSeg(); wirePackSeg(); }
   }
-  // Play vs Friend in ranked: needs an account (a guest is made on the spot if this phone has none)
+  // Play vs Friend in ranked: needs a Google login (2026-11-04: guests play Standard only)
   async function rankedHost() {
     if (!srvOk()) { homeMsgPop('Ranked needs the game server.'); return; }
-    if (!acct) {
-      const r = await acctCall('guest', {});
-      if (r.status !== 200) { homeMsgPop(acctFail(r)); return; }
-      acctTake(r);
-    }
+    if (!rankedReady()) { rankedLogin(() => srvHost({ ranked: true })); return; }
     srvHost({ ranked: true });
+  }
+  // Ranked needs an account logged in with Google on both phones (the server checks it too: denied { why: 'login' }).
+  // Developers are always let through.
+  const rankedReady = () => !!(acct && (acct.google || acct.dev));
+  // The "log in to play ranked" sheet: Google's button; once signed in (a guest keeps its username and history), `then` runs
+  function rankedLogin(then, join) {
+    const google = GOOGLE_CLIENT_ID && !acctUi.off;
+    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Log in to play ranked</h3><button class="btn small" id="close">Close</button></div>
+      <p style="margin:0">Ranked matches count on the leaderboard, so both players need to be logged in with Google. Standard matches work without logging in.</p>
+      ${acct && !acct.google ? `<p class="hint" style="margin:0">You’re playing as the guest ${esc(acct.tag)}. Log in and your username and match history come with you.</p>` : ''}
+      ${google ? '<div id="acct-google" class="acct-google"></div><p class="acct-trust">Sign-in is handled by Google. We never see your password or email.</p>'
+        : '<p class="hint" style="margin:0">Logging in isn’t available right now.</p>'}
+      <p class="hint" id="acct-msg" aria-live="polite" style="margin:0;color:var(--gold)"></p>
+      ${join ? '' : '<button class="btn" id="rl-std">Play Standard instead</button>'}`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', () => { acctUi.after = null; closeSheet(true); });
+    if ($('rl-std')) $('rl-std').addEventListener('click', () => { acctUi.after = null; closeSheet(true); matchKind = 'standard'; lateGame = false; hostLobby(); });
+    acctUi.after = async () => {
+      if (!rankedReady()) return;
+      if (home.screen !== 'menu' && home.screen !== 'lobby') { welcomed(); home.screen = 'menu'; home.msg = ''; } // came by a link: the menu after the match
+      closeSheet(true); then();
+    };
+    if (google) acctGoogleButton('signin_with');
   }
   function homeMsgPop(t) { const x = $('join-msg'); if (x) { x.hidden = false; x.textContent = t; } }
 
@@ -7148,7 +7167,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         <div class="seg" role="group" aria-label="Spectators"><button data-spec="1" aria-pressed="${talk.spectate}">On</button><button data-spec="0" aria-pressed="${!talk.spectate}">Off</button></div>
       </div>` : ''}
       ${srv && frOk() ? '<span class="btnrow"><button class="btn" id="fr-room">Invite friend</button></span>' : ''}
-      ${rk ? `<p class="ranked-note">Ranked: the Standard map and pack, the same 5 leaders and 3 towers for you both. Win 2 games to take the series; only ranked series count on the leaderboard. Your friend needs an account too (they get a guest one when they join).</p>${lookSeg()}`
+      ${rk ? `<p class="ranked-note">Ranked: the Standard map and pack, the same 5 leaders and 3 towers for you both. Win 2 games to take the series; only ranked series count on the leaderboard. Your friend needs to be logged in with Google too (guests are asked to log in when they join).</p>${lookSeg()}`
       : `${srv ? '<span class="hint">The game server referees this match. <button class="btn small" id="use-peer">Phone to phone instead</button> (for Factions).</span>' : ''}
       ${packSeg()}
       ${settingsBox(`
@@ -7781,15 +7800,15 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (peerAvailable()) joinMatch(code); else overlayMsg('No such match', `Nobody is hosting match ${code}.`);
       return;
     }
-    if (d.t === 'denied' && d.why) { // a ranked match: no account (one is made on the spot and the join tried again), switched off, or yourself
+    if (d.t === 'denied' && d.why) { // a ranked match: not logged in with Google (log in, then the join is tried again), switched off, or yourself
       const code = net.code, create = net.create;
-      if (d.why === 'account' && !acct && !create && !net.retriedAcct) {
-        leaveNet(); net.retriedAcct = true;
-        acctCall('guest', {}).then(r => { if (r.status === 200) { acctTake(r); srvJoin(code, { typed: true }); } else overlayMsg('Ranked match', 'Ranked matches need an account. Make one on the main menu (Play as guest is enough).'); });
+      if (d.why === 'account' || d.why === 'login') {
+        srvForget(); showStart();
+        rankedLogin(() => create ? srvHost({ ranked: true }) : srvJoin(code, { typed: true }), !create);
         return;
       }
       leaveNet(); srvForget();
-      overlayMsg('Ranked match', d.why === 'ranked off' ? 'Ranked play is switched off right now.' : d.why === 'self' ? 'That’s your own ranked match: send the link to a friend.' : 'Ranked matches need an account. Make one on the main menu (Play as guest is enough).');
+      overlayMsg('Ranked match', d.why === 'ranked off' ? 'Ranked play is switched off right now.' : d.why === 'self' ? 'That’s your own ranked match: send the link to a friend.' : 'You can’t join this ranked match.');
       return;
     }
     if (d.t === 'full' || d.t === 'denied') { const code = net.code; leaveNet(); srvForget(); overlayMsg(d.t === 'full' ? 'Match is full' : 'Not your match', d.t === 'full' ? `Two players are already in match ${code}.` : 'This match is for two other players.'); return; }
@@ -8022,7 +8041,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const seg = (name, key, opts) => `<div class="bar"><span class="hint">${name}</span><div class="seg" role="group" aria-label="${name}">${opts.map(([v, t, off]) => `<button data-${key}="${v}" aria-pressed="${String(create[key === 'cm' ? 'mode' : key === 'cp' ? 'pub' : 'spectate']) === String(v)}" ${off ? 'disabled' : ''}>${t}</button>`).join('')}</div></div>`;
     $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Create room</h3><button class="btn small" id="close">Close</button></div>
       ${seg('Mode', 'cm', [['standard', 'Standard'], ['ranked', 'Ranked', !rkOk], ...(duoOk ? [['2v2', '2v2']] : [])])}
-      ${create.mode === 'ranked' ? '<p class="ranked-note">Ranked: a best of 3 on the Standard map and pack. You and whoever joins both need an account; only ranked series count on the leaderboard.</p>' : create.mode === '2v2' ? '<p class="hint" style="margin:0">2v2 (developers only for now): seats left empty when you start are played by the AI.</p>' : '<p class="hint" style="margin:0">Pick the map, look and leaders in the room before you start.</p>'}
+      ${create.mode === 'ranked' ? '<p class="ranked-note">Ranked: a best of 3 on the Standard map and pack. You and whoever joins both need to be logged in with Google; only ranked series count on the leaderboard.</p>' : create.mode === '2v2' ? '<p class="hint" style="margin:0">2v2 (developers only for now): seats left empty when you start are played by the AI.</p>' : '<p class="hint" style="margin:0">Pick the map, look and leaders in the room before you start.</p>'}
       ${seg('Who can find it', 'cp', [[true, 'Public: in Rooms'], [false, 'Private: code only']])}
       ${create.mode === '2v2' ? '' : seg('Spectators', 'cs', [[true, 'On'], [false, 'Off']])}
       <button class="btn primary" id="create-go">Create room</button>
@@ -8038,7 +8057,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (create.mode === '2v2') { closeSheet(true); duoHost(o); return; }
       matchKind = 'standard'; lateGame = false;
       if (create.mode === 'ranked') {
-        if (!acct) { const r = await acctCall('guest', {}); if (r.status !== 200) { $('create-msg').textContent = acctFail(r); return; } acctTake(r); }
+        if (!rankedReady()) { rankedLogin(() => srvHost({ ...o, ranked: true })); return; }
         closeSheet(true); srvHost({ ...o, ranked: true }); return;
       }
       closeSheet(true); srvHost(o);

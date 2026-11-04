@@ -10,7 +10,8 @@
 //   tournament key and says which side they are. The match starts by itself once both are in, and the result goes
 //   straight from here to the tournament (TourRoom.serverResult): no phone reports it.
 // - A ranked match (hello { create, ranked, session }): a friend's match played as a best of 3 with fixed settings
-//   (RANKED). Both players need an account: each phone sends its session in hello and the room checks it
+//   (RANKED). Both players need an account logged in with Google (a guest gets denied { why: 'login' }): each phone
+//   sends its session in hello and the room checks it
 //   (accounts.js sessionPlayer); the same player can't take both sides. Rematch plays the next game of the series;
 //   once it is decided (2 wins, or 3 games played) the result goes to the leaderboard (recordSeries) and a rematch
 //   starts a new series. Leaving a ranked match (forfeit) loses the whole series.
@@ -440,6 +441,8 @@ export class Room extends DurableObject {
       if (wantsRanked && !(k && this.meta && this.meta.keys.includes(k))) {
         try { if (d.create && who && !who.dev) on = await rankedOn(this.env); } catch (e) { on = false; } // developers may play while it is off
         if (!who) { this.send(ws, { t: 'denied', why: 'account' }); return; }
+        // a guest can't play ranked (2026-11-04): a Google login on both sides; developers are always let through
+        if (!who.google && !who.dev) { this.send(ws, { t: 'denied', why: 'login' }); return; }
         if (!on) { this.send(ws, { t: 'denied', why: 'ranked off' }); return; }
       }
       const keys = (this.meta && this.meta.keys) || ['', ''];

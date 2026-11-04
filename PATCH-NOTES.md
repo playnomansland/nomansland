@@ -19,6 +19,14 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 4 November 2026 – Ranked needs a login
+
+- **Ranked is for logged-in players only.** Both players need to be logged in with Google. Guests can still play Standard matches with friends and against the AI.
+- Picking **Ranked → Play vs Friend** (or making a Ranked room) without a login opens **Log in to play ranked**. Log in there and the ranked room opens straight away. A guest keeps its username and match history when it logs in.
+- A friend who opens a ranked link without a login gets the same screen, and joins the match as soon as they've logged in.
+
+---
+
 ## 4 November 2026 – Friends, game invites and private messages
 
 ### New: a friends list

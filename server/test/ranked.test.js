@@ -1,6 +1,7 @@
 // Ranked play (2026-11-02): a friend's match played as a best of 3 with fixed settings, results on the leaderboard.
 // Checks:
-//  - a ranked match needs an account on both sides (session in hello), and not the same player twice
+//  - a ranked match needs an account logged in with Google on both sides (session in hello; a guest is denied 'login'),
+//    and not the same player twice; a guest still plays a normal friend's match
 //  - the developer switch: only a developer can turn ranked off and on; while off, nobody can make a ranked match
 //  - the creator's settings are ignored except the look: Standard map (testgrid), 5 mirrored packages, no Blixten
 //  - games are counted, rematch plays the next game, a decided series goes to GET /leaderboard once, a rematch after
@@ -115,8 +116,27 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 9 * 60 *
     assert.deepStrictEqual([ws.first.t, ws.first.why], ['denied', 'account'], 'a made-up session: no ranked match');
     ws.close();
 
+    // ----- a guest can't play ranked (2026-11-04): a Google login is needed on both sides -----
+    ws = await phone(newCode(), { create: true, ranked: true, session: A.session });
+    assert.deepStrictEqual([ws.first.t, ws.first.why], ['denied', 'login'], 'a guest can\'t make a ranked match');
+    ws.close();
+    const gHost = newCode(), gh = await phone(gHost, { create: true, ranked: true, session: dev.session });
+    assert.strictEqual(gh.first.t, 'welcome', 'a developer can');
+    const gj = await phone(gHost, { session: B.session });
+    assert.deepStrictEqual([gj.first.t, gj.first.why], ['denied', 'login'], 'a guest can\'t join one');
+    gj.close(); gh.close();
+    const std = await phone(newCode(), { create: true, session: A.session });
+    assert.strictEqual(std.first.t, 'welcome', 'a guest still plays a normal friend\'s match');
+    std.close();
+    // Alpha and Bravo log in with Google (the guest is kept: same player, same session)
+    for (const P of [A, B]) {
+      const g = await call('google', { credential: idToken({ email: P.player.tag.toLowerCase() + '@example.com', email_verified: true }) }, P.session);
+      assert.deepStrictEqual([g.status, g.linked, g.player.id, g.player.google], [200, 'guest', P.player.id, true], 'the guest gets a Google login');
+      P.session = g.session;
+    }
+
     // ----- the developer switch -----
-    assert.strictEqual((await call('ranked', { on: false }, A.session)).status, 403, 'a guest is not a developer');
+    assert.strictEqual((await call('ranked', { on: false }, A.session)).status, 403, 'not a developer');
     assert.strictEqual((await board()).on, true, 'ranked is on to begin with');
     assert.deepStrictEqual(await call('ranked', { on: false }, dev.session), { status: 200, on: false });
     assert.strictEqual((await board()).on, false);
