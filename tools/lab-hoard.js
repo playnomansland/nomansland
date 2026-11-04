@@ -17,6 +17,9 @@
 //   node tools/lab-hoard.js --matches 300 --seed 810000 --cap on --out hoard-on.json
 // Options: --hoarder pure|none (none: normal v normal, a control), --hoard-rounds 3, --keep all|<gold>,
 //          --map testgrid|random|<id>, --no-mirror, --max-rounds 30.
+// --ban-skill "Sniper:hunter" (with --hoarder none): an A/B on a skill. The AI on one side (even seeds side 0, odd
+//          seeds side 1) is shown the unit without that skill and so never buys it; compare that side's win rate with a
+//          normal run on the same seeds (paired).
 // The hoarder plays side 0 on even seeds and side 1 on odd seeds (side bias cancels out).
 
 const fs = require('fs');
@@ -26,7 +29,7 @@ const Ref = require('../src/referee.js');
 const Lab = require('./balance-lab.js');
 
 function parseArgs(argv) {
-  const o = { matches: 10, seed: 810000, cap: true, hoarder: 'pure', hoardRounds: 3, keep: Infinity, map: 'testgrid', mirror: true, maxRounds: 30, out: null };
+  const o = { banSkill: null, matches: 10, seed: 810000, cap: true, hoarder: 'pure', hoardRounds: 3, keep: Infinity, map: 'testgrid', mirror: true, maxRounds: 30, out: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--matches') o.matches = Number(argv[++i]);
@@ -39,6 +42,7 @@ function parseArgs(argv) {
     else if (a === '--no-mirror') o.mirror = false;
     else if (a === '--max-rounds') o.maxRounds = Number(argv[++i]);
     else if (a === '--out') o.out = argv[++i];
+    else if (a === '--ban-skill') o.banSkill = argv[++i]; // "Unit:skillId": that side's AI never sees the skill (on the hoarder's side)
     else throw new Error('Unknown argument: ' + a);
   }
   return o;
@@ -47,8 +51,8 @@ function parseArgs(argv) {
 const copy = (o) => JSON.parse(JSON.stringify(o));
 
 // One side's moves on a view the policy may change. tweak(view) returns { held } (gold hidden from the AI).
-function playSide(R, side, prepared, T, step, log, tweak) {
-  const view = Ref.withUnits(copy(Ref.viewOf(R, side)), prepared.units, prepared.matrix);
+function playSide(R, side, prepared, T, step, log, tweak, viewUnits) {
+  const view = Ref.withUnits(copy(Ref.viewOf(R, side)), viewUnits || prepared.units, prepared.matrix);
   const t = tweak ? tweak(view) : { held: 0 };
   const acts = [];
   if (step === 'deploy') Game.aiDeploy(view, side, acts); else Game.aiLevel(view, side, acts);
@@ -83,17 +87,26 @@ function simulateMatch(prepared, seed, o) {
   const picks = { leaders: [null, null], towers: [null, null] };
   const hs = o.hoarder === 'none' ? -1 : seed % 2; // the hoarder's side
   const capLostTotal = [0, 0];
+  // --ban-skill: the AI on side bs (even seeds side 0, odd seeds side 1) plays as if the unit had no such skill
+  const bs = o.banSkill ? seed % 2 : -1;
+  let banned = null;
+  if (o.banSkill) {
+    const [un, sid] = o.banSkill.split(':');
+    banned = units.map(u => u.name !== un ? u : { ...u, skillDefs: (u.skillDefs || []).map(d => d && d.id === sid ? null : d) });
+    if (banned.every((u, i) => u === units[i])) throw new Error('--ban-skill: no unit ' + un);
+  }
+  const vu = (side) => side === bs ? banned : null;
 
   while (R.phase === 'deploy' && !R.m.over && R.m.round <= o.maxRounds) {
     const round = R.m.round, goldStart = R.base.gold.slice();
     const tw = hoarderTweaks(o, units, round);
     const bought = [0, 1].map(side => {
-      if (side !== hs) return playSide(R, side, prepared, T, 'deploy', log, null);
+      if (side !== hs) return playSide(R, side, prepared, T, 'deploy', log, null, vu(side));
       let all = [];
       for (const f of tw.deploy) all = all.concat(playSide(R, side, prepared, T, 'deploy', log, f ? (v) => f(v, side) : null));
       return all;
     });
-    const levels = [0, 1].map(side => playSide(R, side, prepared, T, 'level', log, side === hs && tw.level ? (v) => tw.level(v, side) : null));
+    const levels = [0, 1].map(side => playSide(R, side, prepared, T, 'level', log, side === hs && tw.level ? (v) => tw.level(v, side) : null, vu(side)));
     const goldAtFight = R.m.gold.slice();
     const spentOn = [0, 1].map(side => {
       const d = { units: [], skills: [], levelUps: 0, unlocks: [], other: {} };
@@ -133,7 +146,7 @@ function simulateMatch(prepared, seed, o) {
   return {
     seed: seed >>> 0, map: m.map ? m.map.id : null, winner: m.over ? m.winner : -1, completed: !!m.over,
     rounds: roundLog.length, hp: m.hp.slice(), gold: m.gold.slice(), armySizes: m.armies.map(a => a.length),
-    leaders: picks.leaders, towers: picks.towers, hoarderSide: hs, cap: o.cap,
+    leaders: picks.leaders, towers: picks.towers, hoarderSide: hs, bannedSide: bs, cap: o.cap,
     capLost: o.cap ? capLostTotal : [0, 0],
     referee: { accepted: log.accepted, refused: log.refused, desyncs: log.desyncs },
     roundLog
