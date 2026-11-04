@@ -2,7 +2,9 @@
 //  - public rooms appear in the list (snapshot on hello, GET /lobby) and changes come as room / gone; private rooms never
 //  - a card has what the page sorts and shows: host, mode, players, phase, round, watchers, made time
 //  - Join is the usual hello {}; a room leaves the list when the host leaves the waiting room, and when the match is over
-//  - Quick play: the oldest open public Standard room, else create
+//  - Quick play: the oldest open public Standard room (never your own), else create
+//  - nobody is in the same room twice: the account that has side 0 is refused side 1 (denied 'here'), its own phone
+//    still comes back by its key; a room nobody is in closes by itself (its code answers nomatch after that)
 //  - ranked rooms: an account is needed to make one and to join one; they list as mode 'ranked'
 //  - 2v2 rooms list only for developer sockets (config lobby_duo = 'dev'); lobby_duo 'all' shows them to everyone;
 //    2v2 chat: Team to the teammate only, All and emotes to everyone
@@ -19,7 +21,7 @@ const newCode = () => 'L' + Math.random().toString(36).slice(2, 6).toUpperCase()
 setTimeout(() => { console.error('test timed out'); process.exit(1); }, 6 * 60 * 1000).unref();
 
 (async () => {
-  const srv = global.srv = await startAccounts(8780, { DEV_EMAILS: 'dev@example.com', LOBBY_TEST: '1', LOBBY_HEARTBEAT_MS: 1500, LOBBY_STALE_MS: 4000 });
+  const srv = global.srv = await startAccounts(8780, { DEV_EMAILS: 'dev@example.com', LOBBY_TEST: '1', LOBBY_HEARTBEAT_MS: 1500, LOBBY_STALE_MS: 4000, ROOM_EMPTY_MS: 2500 });
   const step = (x) => process.env.VERBOSE && console.log(x);
   const call = async (route, body, token) => {
     const headers = { 'content-type': 'application/json', Origin: ORIGIN };
@@ -146,6 +148,36 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 6 * 60 *
   assert.strictEqual(qb.create, true, 'none open: make one');
   q.close();
   step('quick');
+
+  // ----- nobody is in the same room twice, and a room nobody is in closes by itself -----
+  const mine = newCode();
+  const h5 = await phone(mine, { create: true, public: true, session: g2.session });
+  assert.strictEqual(h5.first.t, 'welcome');
+  await waitFor(() => listOf(L).has(mine), 8000);
+  // the host's own account is refused the other side (another phone, another tab, the list or the code)
+  const self1 = await phone(mine, { session: g2.session });
+  assert.deepStrictEqual([self1.first.t, self1.first.why], ['denied', 'here'], 'the same account can\'t take both sides');
+  self1.close();
+  // its own phone comes back by its key as side 0, of course
+  const back = await phone(mine, { key: h5.first.key, session: g2.session });
+  assert.strictEqual(back.first.side, 0, 'a reconnect with the key gets side 0 back');
+  // quick play hands that room to anyone but its own host
+  const q2 = await lobby(g2.session), q3 = await lobby(g1.session);
+  q2.json({ t: 'quick' });
+  assert.strictEqual((await q2.next('quick')).create, true, 'quick play never picks your own room');
+  q3.json({ t: 'quick' });
+  assert.strictEqual((await q3.next('quick')).code, mine, 'another player gets it');
+  q2.close(); q3.close();
+  const foe2 = await phone(mine, { session: g1.session });
+  assert.strictEqual(foe2.first.side, 1, 'another account takes side 1');
+  // everyone leaves: the room goes off the list and closes itself (ROOM_EMPTY_MS = 2.5 s here, a minute for real)
+  back.close(); foe2.close();
+  await waitFor(() => !listOf(L).has(mine), 8000);
+  await sleep(4000);
+  const after = await phone(mine, { session: g1.session });
+  assert.strictEqual(after.first.t, 'nomatch', 'the room closed by itself: its code is free again');
+  after.close();
+  step('one room once, empty rooms close');
 
   // ----- ranked: an account to make and to join -----
   const rk = newCode();

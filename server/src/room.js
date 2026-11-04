@@ -21,6 +21,11 @@
 // LOBBY.heartbeatMs, and drops it when the match is over, the host leaves the waiting room or it sits idle. A public
 // waiting room lets a new player take side 1 when the one who had it left before the start. Spectating is on unless
 // the host turns it off (spectate { on }); off turns watchers away with denied { why: 'no watchers' }.
+// Nobody is in the same room twice (2026-11-04): the account that has side 0 is refused side 1 from another phone or
+// tab with denied { why: 'here' } (a ranked room says 'self' for the same thing); its own phone comes back by its key.
+// A room nobody is in at all closes by itself EMPTY_MS after the last phone went: it leaves the lobby, its storage is
+// deleted and its code stops working (nomatch). A match that has started is never closed that way: it plays on
+// without the players and ends by itself, and only then does the room close.
 // Chat and emotes (server/src/chat.js): chat { text } from a phone signed in with Google, emote { id } from a player.
 // Players' lines go to everyone; a watcher's line goes to watchers only while the match runs, and when it ends the
 // players get them (chatMerge { lines }) and from then on every line goes to everyone, until a rematch starts.
@@ -35,7 +40,8 @@
 //               ([side 0, side 1]: { tag, title, skins } of a phone that sent its account session, or null).
 //               Lobby and chat: roomset { pub, spectate, chat (this phone may type) }, chat { from, tag, text, at, w? },
 //               chatLog { lines } (on hello), chatMerge { lines }, emote { from, id }, reported { ok, why? },
-//               denied { why: 'slow down' | 'sign in' | 'no watchers' } (the first two leave the phone in the room).
+//               denied { why: 'slow down' | 'sign in' | 'no watchers' } (the first two leave the phone in the room),
+//               denied { why: 'here' } (you already have the other side of this room).
 import { DurableObject } from 'cloudflare:workers';
 import Game from '../../src/game.js';
 import Ref from '../../src/referee.js';
@@ -47,6 +53,10 @@ import { sessionPlayer, rankedOn, recordSeries, countOnline, recordGG, chatRepor
 import { VERSION } from './version.js';
 
 const KEEP_MS = 24 * 3600 * 1000; // a match nobody touched for a day is deleted
+// A room nobody is in closes by itself this soon after the last phone went (2026-11-04): its code stops working and it
+// leaves the lobby. The minute's grace is for a phone that lost its connection and comes back with its key. A match
+// that has started is never closed this way: it plays on without the players (Ref.AWAY_MAX_MS) and ends by itself.
+const EMPTY_MS = 60_000;          // ROOM_EMPTY_MS (tests only) makes it short
 const SPEEDS = [1, 1.5, 2];
 // Ranked: the Standard map, all units, every leader but Blixten, and both players draw from the same 5 packages
 // (leaders) and the same 3 towers, as in the tournaments. Only the look is the creator's pick.
@@ -97,10 +107,34 @@ export class Room extends DurableObject {
     const due = this.R ? Ref.due(this.R, Date.now()) : 0;
     let at = due || Date.now() + KEEP_MS;
     if (this.listing()) at = Math.min(at, Date.now() + this.hbMs()); // a listed room's heartbeat (alarm)
+    if (!this.sockets().length) at = Math.min(at, Date.now() + this.emptyMs()); // nobody here: look again, then close
     await this.ctx.storage.setAlarm(at);
+  }
+  // moves the alarm earlier (never later)
+  async alarmAt(t) {
+    const cur = await this.ctx.storage.getAlarm();
+    if (!cur || cur > t) await this.ctx.storage.setAlarm(t);
   }
 
   hbMs() { return +this.env.LOBBY_HEARTBEAT_MS || LOBBY.heartbeatMs; } // LOBBY_HEARTBEAT_MS: tests only
+  emptyMs() { return +this.env.ROOM_EMPTY_MS || EMPTY_MS; }            // ROOM_EMPTY_MS: tests only
+  // Nobody is in the room: may it close now? A match in play stays (it runs on by itself and both phones may be
+  // reconnecting), and a tournament match whose result hasn't reached the tournament yet stays too.
+  canClose() {
+    if (this.sockets().length) return false;
+    const R = this.R, t = this.meta && this.meta.tour;
+    if (R && R.m && R.phase !== 'lobby' && !R.m.over) return false;
+    if (t && !t.reported && R && R.m && R.m.over) return false;
+    return true;
+  }
+  // closes the room: off the lobby list, everything forgotten, the code free again (a join gets nomatch)
+  async close() {
+    if (this.meta) { this.meta.pub = false; this.report({ force: true }); } // takes the card down (listing() is null now)
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+    this.R = null; this.meta = null; this.chat.lines = []; this.listed = null;
+    this.sent.clear(); this.rate.clear();
+  }
   // ----- the online lobby (docs/LOBBY.md) -----
   isPub() { return !!(this.meta && this.meta.pub && !this.meta.tour); }
   watchers(gone) { return this.sockets(gone).filter((s) => this.att(s).role === 'w'); }
@@ -458,7 +492,12 @@ export class Room extends DurableObject {
       if (side == null) {
         if (d.create) { if (keys[0]) { this.send(ws, { t: 'taken' }); return; } side = 0; }
         else if (!keys[0]) { this.send(ws, { t: 'nomatch' }); return; } // nobody made this match here (maybe a phone-to-phone one)
-        else if (!keys[1] || reopen) { side = 1; if (reopen && this.meta.players) this.meta.players[1] = null; }
+        else if (!keys[1] || reopen) {
+          // nobody is in the same room twice: the account that has side 0 can't take side 1 too, from another phone
+          // or another tab (a ranked room says 'self' for the same thing). Its own phone comes back by its key above.
+          if (who && !this.meta.ranked && this.meta.pids && this.meta.pids[0] === who.id) { this.send(ws, { t: 'denied', why: 'here' }); return; }
+          side = 1; if (reopen && this.meta.players) this.meta.players[1] = null;
+        }
         else { this.send(ws, { t: 'full' }); return; } // two players already: Watch instead
         if (!this.meta) this.meta = { tour: null, keys: ['', ''], code: a.code || '' };
         if (side === 0 && d.create) { // the lobby's settings for this room
@@ -516,8 +555,13 @@ export class Room extends DurableObject {
     if (this.meta && this.meta.pub && !(this.R && this.R.m && this.R.phase !== 'lobby')) this.meta.waitAt = Date.now();
     this.report({ gone: ws });
   }
-  webSocketClose(ws) { return this.left(ws); }
-  webSocketError(ws) { return this.left(ws); }
+  // a socket went: whatever it was, if it was the last one the room closes by itself a moment from now (alarm -> canClose)
+  async gone(ws) {
+    await this.left(ws);
+    if (!this.sockets(ws).length) await this.alarmAt(Date.now() + this.emptyMs());
+  }
+  webSocketClose(ws) { return this.gone(ws); }
+  webSocketError(ws) { return this.gone(ws); }
 
   // the clock ran out (or a player away for too long), or the match has been idle for a day
   async alarm() {
@@ -536,9 +580,13 @@ export class Room extends DurableObject {
       return;
     }
     const active = (await this.ctx.storage.get('active')) || 0;
+    // nobody is in the room (and no match is running): close it, so the code stops working and nothing is left behind
+    if (this.canClose() && now - active >= Math.min(this.emptyMs(), KEEP_MS)) return this.close();
     if (now - active >= KEEP_MS && !this.sockets().length) { await this.ctx.storage.deleteAlarm(); await this.ctx.storage.deleteAll(); this.R = null; this.meta = null; this.chat.lines = []; return; }
     if (this.isPub()) this.report({ force: true }); // the heartbeat (or the drop, once it shouldn't be listed any more)
-    await this.ctx.storage.setAlarm(this.listing() ? now + this.hbMs() : now + KEEP_MS);
+    let at = this.listing() ? now + this.hbMs() : now + KEEP_MS;
+    if (!this.sockets().length) at = Math.min(at, now + this.emptyMs()); // a match playing on alone: look again
+    await this.ctx.storage.setAlarm(at);
   }
 
   // a tournament match that is over: the result goes to the tournament, once. A friend's match that is over counts

@@ -17,6 +17,8 @@
 //               bababa, golem, shock (the lobby's emotes: to everyone)
 // The online lobby (2026-11-04, docs/LOBBY.md): hello { create, public: true } lists the 2v2 room in the lobby
 // (kind 'duo', dev while config 'lobby_duo' is 'dev'); when it is 'all', anyone may make a 2v2 room.
+// A room nobody is in closes by itself EMPTY_MS after the last phone went (its code stops working), unless a match is
+// running: that one plays on without the players and ends by itself.
 // Messages out: welcome { side, key, seq, seat, lane, host }, duolobby { seats, host, seat }, full, denied { why },
 //               mark { from, kind, col, row }, emote { from, id }, chat { from, tag, text, at, team? }, chatLog { lines },
 //               roomset { pub, spectate: false, chat }, team { team } (only the other lane changed: m.team),
@@ -32,6 +34,7 @@ import { builtin } from './units.js';
 import { sessionPlayer, lobbyDuo } from './accounts.js';
 
 const KEEP_MS = 24 * 3600 * 1000;
+const EMPTY_MS = 60_000; // a 2v2 room nobody is in closes by itself this soon after the last phone went (room.js EMPTY_MS)
 
 export class DuoRoom extends DurableObject {
   constructor(ctx, env) {
@@ -70,9 +73,25 @@ export class DuoRoom extends DurableObject {
     const due = this.D && this.D.lanes[0] ? Duo.due(this.D, Date.now()) : 0;
     let at = due || Date.now() + KEEP_MS;
     if (this.listing()) at = Math.min(at, Date.now() + this.hbMs()); // a listed room's heartbeat
+    if (!this.sockets().length) at = Math.min(at, Date.now() + this.emptyMs()); // nobody here: look again, then close
     await this.ctx.storage.setAlarm(at);
   }
+  async alarmAt(t) { const cur = await this.ctx.storage.getAlarm(); if (!cur || cur > t) await this.ctx.storage.setAlarm(t); }
   hbMs() { return +this.env.LOBBY_HEARTBEAT_MS || LOBBY.heartbeatMs; } // LOBBY_HEARTBEAT_MS: tests only
+  emptyMs() { return +this.env.ROOM_EMPTY_MS || EMPTY_MS; }            // ROOM_EMPTY_MS: tests only
+  // nobody is in the room: may it close now? (a match in play stays: it runs on by itself)
+  canClose() {
+    if (this.sockets().length) return false;
+    const D = this.D;
+    return !(D && D.lanes[0] && D.phase !== 'lobby' && D.phase !== 'end');
+  }
+  async close() {
+    if (this.meta) { this.meta.pub = false; this.report({ force: true }); } // off the lobby list
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+    this.D = null; this.meta = null; this.chat.lines = []; this.listed = null;
+    this.sent.clear(); this.teamSent.clear(); this.rate.clear();
+  }
   // ----- the online lobby (docs/LOBBY.md): this room's card, sent to LobbyRoom like a 1v1 room's (room.js report) -----
   listing(gone) {
     const M = this.meta, D = this.D, now = Date.now();
@@ -337,8 +356,13 @@ export class DuoRoom extends DurableObject {
     if (this.meta && this.meta.pub) this.meta.waitAt = Date.now();
     this.report({ gone: ws });
   }
-  webSocketClose(ws) { return this.left(ws); }
-  webSocketError(ws) { return this.left(ws); }
+  // the last phone went: the room closes by itself a moment from now (alarm -> canClose)
+  async gone(ws) {
+    await this.left(ws);
+    if (!this.sockets(ws).length) await this.alarmAt(Date.now() + this.emptyMs());
+  }
+  webSocketClose(ws) { return this.gone(ws); }
+  webSocketError(ws) { return this.gone(ws); }
 
   async alarm() {
     const D = this.D, now = Date.now();
@@ -356,8 +380,12 @@ export class DuoRoom extends DurableObject {
       return;
     }
     const active = (await this.ctx.storage.get('active')) || 0;
+    // nobody is in the room (and no match is running): close it, so the code stops working
+    if (this.canClose() && now - active >= Math.min(this.emptyMs(), KEEP_MS)) return this.close();
     if (now - active >= KEEP_MS && !this.sockets().length) { await this.ctx.storage.deleteAlarm(); await this.ctx.storage.deleteAll(); this.D = null; this.meta = null; this.chat.lines = []; return; }
     if (this.meta && this.meta.pub) this.report({ force: true });
-    await this.ctx.storage.setAlarm(this.listing() ? now + this.hbMs() : now + KEEP_MS);
+    let at = this.listing() ? now + this.hbMs() : now + KEEP_MS;
+    if (!this.sockets().length) at = Math.min(at, now + this.emptyMs());
+    await this.ctx.storage.setAlarm(at);
   }
 }

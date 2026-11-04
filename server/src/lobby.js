@@ -11,7 +11,8 @@
 // WebSocket /lobby
 //   in:  hello { session? }, quick, ping
 //   out: rooms { list } (on hello), then room { listing } / gone { code } (changes, batched once a second),
-//        quick { code } (the oldest open public Standard room) or quick { create: true } (none: make one), pong
+//        quick { code } (the oldest open public Standard room, never this player's own) or quick { create: true }
+//        (none: make one), pong
 // GET /lobby: the same list without a socket (developer-only listings left out), for a quick first paint.
 // RPC (match rooms): upsert(listing, owner), drop(code), claim(ip) (may this IP make one more public room?)
 import { DurableObject } from 'cloudflare:workers';
@@ -136,12 +137,14 @@ export class LobbyRoom extends DurableObject {
     if (d.t === 'hello') {
       let who = null;
       if (typeof d.session === 'string' && d.session) { try { who = await sessionPlayer(this.env, d.session); } catch (e) { who = null; } }
-      ws.serializeAttachment({ ...this.att(ws), dev: !!(who && who.dev), hello: true });
+      ws.serializeAttachment({ ...this.att(ws), dev: !!(who && who.dev), pid: who ? who.id : '', hello: true });
       return this.send(ws, { t: 'rooms', list: this.view(!!(who && who.dev)), dev: !!(who && who.dev) });
     }
     if (d.t === 'quick') {
-      // the oldest open public Standard room (never ranked, never 2v2); none: the phone makes one
-      const open = [...this.list.values()].filter((l) => l.kind === 'match' && l.mode === 'standard' && l.phase === 'waiting' && l.players < l.seats && l.code !== (typeof d.not === 'string' ? d.not : ''))
+      // the oldest open public Standard room (never ranked, never 2v2, never this player's own room: nobody is in a
+      // room twice); none: the phone makes one
+      const pid = this.att(ws).pid, mine = pid ? this.owner.get('p:' + pid) || '' : '';
+      const open = [...this.list.values()].filter((l) => l.kind === 'match' && l.mode === 'standard' && l.phase === 'waiting' && l.players < l.seats && l.code !== mine && l.code !== (typeof d.not === 'string' ? d.not : ''))
         .sort((a, b) => a.at - b.at)[0];
       return this.send(ws, open ? { t: 'quick', code: open.code } : { t: 'quick', create: true });
     }

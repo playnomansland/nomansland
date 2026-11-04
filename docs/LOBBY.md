@@ -42,7 +42,7 @@ Builds on the server described in `docs/SERVER.md` (Room, DuoRoom, TourRoom, acc
 Mode (Standard, Ranked; 2v2 for developers), public / private, map, look, timers, **Spectators on/off** (default on).
 
 ### Waiting room
-Both nameplates, ready check, the host's settings (host can change them until both are ready), **Kick** (host only), the chat panel and the emote button. A waiting room closes after 10 min idle, or when the host leaves before the start.
+Both nameplates, ready check, the host's settings (host can change them until both are ready), **Kick** (host only), the chat panel and the emote button. A waiting room leaves the list after 10 min idle, or when the host leaves before the start; once nobody is in it at all it closes for good a minute later (§4).
 
 ### In a match
 - An **emote button** (small speech bubble) in the tray row opens a wheel: the 3 emotes plus a chat line.
@@ -74,6 +74,10 @@ Messages (WebSocket `/lobby`):
 - `Room` and `DuoRoom` get a `public` setting. When public, they call `LobbyRoom.upsert(listing)` (DO RPC, like `TourRoom.serverResult`) on: created, a player joins or leaves, start, each new round, watcher count change (throttled), settings change; and `LobbyRoom.drop(code)` when the match ends, the room closes or goes private.
 - Heartbeat: every room re-sends its listing each 60 s while public; the lobby's alarm drops listings older than 3 min (a crashed or evicted room disappears by itself).
 - No change to how a match is played: joining a listed room is the existing `hello {}` to `/room/CODE`; watching is the existing `hello { watch }`.
+
+### One room once, and rooms that close themselves (built 2026-11-04)
+- **Nobody is in the same room twice.** The account holding side 0 is refused side 1 of that room — from another phone, another tab, the list, Quick play or the code — with `denied { why: 'here' }`; the page says so and leaves the room alone. Its own phone still gets its side back with its key (a reload or a lost connection), and a ranked room keeps answering `'self'` for the same thing. `LobbyRoom.quick` leaves the asking account's own listing out of Quick play, so it never hands a player their own room. Guests (no account) aren't checked: two phones behind one IP may well be two people.
+- **A room nobody is in closes itself.** `EMPTY_MS` (a minute; `ROOM_EMPTY_MS` makes it short in tests) after the last socket goes, the room drops its card, deletes its storage and forgets its keys, so its code answers `nomatch`. The minute's grace is for a phone that lost its connection and comes back with its key. A match that has started is never closed this way: it plays on without the players and ends by itself (`Ref.AWAY_MAX_MS`), and the room closes once it is over. A tournament match waits until its result has reached the tournament. `DuoRoom` does the same.
 
 ### Spectating toggle
 - Room setting `spectate` (default `true`). Host can flip it in the waiting room or during the match (`{ t: 'spectate', on }`, host only).
@@ -116,6 +120,7 @@ Messages (WebSocket `/lobby`):
   - **when the match ends** (the result is in, or a forfeit), the two chats **merge**: everyone in the room (players and watchers) gets the watchers' lines from that match, interleaved by time, and from then on every line goes to everyone. A rematch starting splits them again. Message: `chatMerge { lines }` to players, then normal `chat` to all;
   - 2v2: a *Team* / *All* switch. Team goes to the teammate only (as the current quick lines); All to everyone in the room.
 - The room keeps the last 50 lines in memory (for a reconnecting phone and for reports). Chat is **not** saved in match history.
+- The room echoes a line back to the phone that sent it (that is where you see your own). It shows under the HUD like any other, but it never counts towards the **badge** on the talk button: the badge is for messages that came in (fixed 2026-11-04; a spectator's own line is matched by the account name it was sent under).
 - PeerJS matches (the fallback) get no chat or emotes.
 
 ### Muting and reporting (on the phone)
