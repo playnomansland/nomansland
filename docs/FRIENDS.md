@@ -1,6 +1,6 @@
 # Friends, game invites and private messages (design, 2026-11-04)
 
-Status: **design only, nothing built.** Companion to `docs/LOBBY.md` (lobby, chat, emotes). Built by its own agent: see `docs/HANDOFF-FRIENDS.md`. Decisions are Vilhelm's (2026-11-04) unless marked *proposal*.
+Status: **built 2026-11-04** (sections 1-4; the Watch button in 3b is not built yet) (server side: `docs/SERVER.md` "Friends"). Mute is kept (stored on the server); "Messages in matches: show" isn't built (badge only). Companion to `docs/LOBBY.md` (lobby, chat, emotes). Built by its own agent: see `docs/HANDOFF-FRIENDS.md`. Decisions are Vilhelm's (2026-11-04) unless marked *proposal*.
 
 Not to be confused with **Invite a friend** (the referral that gives the Aquamarine Golem skin, tables `invites` / `referrals`). That stays as it is.
 

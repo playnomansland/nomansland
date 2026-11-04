@@ -14,8 +14,32 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 - **More balancing.**
 - **Damage types (idea):** physical and magic.
 - **Ranked queue (later):** *Find ranked match* pairs you with someone near your level, once there are enough players (plan in `docs/LOBBY.md`).
-- **Friends (design):** add friends (they accept), remove them, see who's online (green dot) or offline (grey), **invite a friend** straight into a room, **watch a friend's match**, and **private messages**. For signed-in players. Plan in `docs/FRIENDS.md`; built after the tournament, together with the lobby.
+- **Watch a friend's match (design):** from the friends list, straight into a friend's match as a spectator. Plan in `docs/FRIENDS.md`.
 - **Player profile:** tap any username to see their title, skins, ranked record, recent matches and favourite units, with Add friend and Watch.
+
+---
+
+## 4 November 2026 – Friends, game invites and private messages
+
+### New: a friends list
+- A **Friends** button (people icon) sits next to Profile at the top of the main menu, and in a match under the cog. A **red badge** counts friend requests, unread messages and invites.
+- **Add a friend** by typing their **username** (any capitals), or tap a player's name in a match or on the leaderboard and pick **Add friend**. They get a request to **Accept** or **Decline**. If you both ask, you're friends at once.
+- **Remove friend** (under ⋯, tap twice). It's silent: they aren't told, and your messages with them are deleted.
+- Friends stay friends when someone changes their username.
+- For players signed in with Google. Guests see "Sign in to add friends".
+
+### See who's online
+- A **green dot** by a friend's name means they're online, a **grey dot** that they're offline. Next to it: *Online*, *In a room*, *In a match · round 4*, or *Last seen 2 h ago*. Online friends come first.
+
+### Invite a friend into a match
+- **Invite** by an online friend makes a private room and sends them the invite. Inside a waiting room, **Invite friend** sends that room.
+- Your friend gets a banner: "**Ann** invites you to a Standard match" with **Join** and **Decline**. If they're in a match, they only see the badge, and the banner comes when their match is over.
+- An invite lasts 5 minutes, and goes away if you leave the room. If the room has already filled or started, joining says so.
+
+### Private messages
+- **Message** opens a chat with that friend. Messages are kept on the server (the last 100 per friend), so you see them on any phone. Unread messages show on the friend's row and the Friends button.
+- During a match messages only add to the badge, nothing pops up.
+- **Mute messages** (under ⋯) hides a friend's messages without removing them. **Report** sends the last 20 messages to the moderators.
 
 ---
 

@@ -652,6 +652,34 @@ html.home .app { visibility: hidden; }
 .corner button span { display: none; }
 html.pc .corner button { width: auto; padding: 0 14px 0 10px; border-radius: 8px; }
 html.pc .corner button span { display: inline; }
+/* friends (2026-11-04): the Friends button's badge, the sheet's rows and dots, the message thread, the invite banner */
+.fr-btn { position: relative; }
+.fr-badge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #E5484D; color: #fff; font: 700 11px/18px var(--font-body, system-ui); text-align: center; box-shadow: 0 0 0 2px rgba(13, 19, 21, 0.9); }
+.btn .fr-badge { position: static; display: inline-block; margin-left: 4px; box-shadow: none; }
+.fr-badge[hidden] { display: none; }
+.fr-count { display: inline-block; min-width: 16px; padding: 0 4px; border-radius: 8px; background: #E5484D; color: #fff; font-size: 11px; line-height: 16px; text-align: center; }
+.fr-sheet { display: grid; gap: 10px; }
+.fr-add, .fr-send { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.fr-list { display: grid; gap: 6px; }
+.fr-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.fr-row > .btnrow, .fr-row > .fr-more { grid-column: 1 / -1; justify-content: flex-end; }
+.fr-row > .fr-who:first-child { grid-column: 1 / -1; }
+@media (min-width: 520px) { .fr-row { grid-template-columns: auto minmax(0, 1fr) auto; } .fr-row > .btnrow:not(.fr-more) { grid-column: auto; } .fr-row > .fr-who:first-child { grid-column: 1 / 3; } }
+.fr-who { display: grid; gap: 2px; min-width: 0; }
+.fr-who small { font-size: 12px; }
+.fr-dot { width: 12px; height: 12px; border-radius: 50%; background: #6B7478; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08); }
+.fr-dot.on { background: #3DD66B; box-shadow: 0 0 0 2px rgba(61, 214, 107, 0.25), 0 0 8px rgba(61, 214, 107, 0.6); }
+.fr-inv { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--gold); border-radius: 10px; }
+.fr-thread { display: grid; gap: 6px; align-content: start; max-height: 46vh; max-height: 46dvh; overflow-y: auto; padding: 4px 2px; }
+.fr-line { justify-self: start; max-width: 85%; display: grid; gap: 2px; padding: 6px 10px; border-radius: 12px 12px 12px 4px; background: rgba(255, 255, 255, 0.07); overflow-wrap: anywhere; }
+.fr-line.me { justify-self: end; border-radius: 12px 12px 4px 12px; background: color-mix(in srgb, var(--you, #4FA3E0) 30%, transparent); }
+.fr-line small { font-size: 10px; opacity: 0.6; justify-self: end; }
+@keyframes fr-in { from { opacity: 0; translate: 0 -12px; } to { opacity: 1; translate: 0 0; } }
+.fr-banner { position: fixed; z-index: 40; top: calc(10px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px; margin: 0 auto; max-width: 420px; display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--gold); border-radius: 12px; background: rgba(13, 19, 21, 0.96); color: var(--ink, #fff); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55); animation: fr-in 0.25s ease both; }
+.fr-banner p { margin: 0; }
+.fr-toast { position: fixed; z-index: 39; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); left: 16px; right: 16px; margin: 0 auto; max-width: 420px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: rgba(13, 19, 21, 0.96); color: var(--ink, #fff); font: inherit; font-size: 14px; text-align: left; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); cursor: pointer; }
+#foe-name { cursor: pointer; }
+.lb tr[data-pid] { cursor: pointer; }
 .home-foot { width: 100%; max-width: 760px; display: grid; gap: 10px; justify-items: center; }
 .tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .tiles button { display: grid; justify-items: center; gap: 4px; min-width: 84px; padding: 10px 10px 8px; border: 1px solid rgba(255, 255, 255, 0.35); background: rgba(13, 19, 21, 0.62); color: #fff; border-radius: 10px; font: 600 12px var(--font-display); letter-spacing: 0.04em; }
@@ -10863,7 +10891,7 @@ Floors.floor = (() => {
   // ----- Report a bug (2026-11-04): a new post in the Discord forum #bug-reports with the game version and match id
   // filled in. The server posts it through a webhook (/account/bug, accounts.js BUG); when that's off or fails, the report
   // is copied and the Discord server opens, so it can be pasted there by hand.
-  const GAME_VERSION = '4 Nov 2026 · ad7a98d'; // src/build.js: the newest patch notes date and a hash of this page
+  const GAME_VERSION = '4 Nov 2026 · 5d8b60e'; // src/build.js: the newest patch notes date and a hash of this page
   const DISCORD_FALLBACK = 'https://discord.gg/TBpDKSBWsY';
   const bug = { draft: '', busy: false };
   // the id the server's match history uses (room.js historyInfo: <room>-<seed>), or one made the same way for other matches
@@ -10988,6 +11016,7 @@ Floors.floor = (() => {
           ${Q3D.map(q => `<button data-q3d="${q}" aria-pressed="${meter.q === q}">${q[0].toUpperCase() + q.slice(1)}</button>`).join('')}
         </div>
       </div>
+      <div class="bar"><span class="hint">Friends</span><button class="btn small" id="fr-open2">Friends <b class="fr-badge" hidden></b></button></div>
       <button class="btn" id="to-menu">Main menu</button>` : ''}
       ${!inMatch ? `<div class="bar">
         <span class="hint">Stay logged in on this device</span>
@@ -11030,6 +11059,7 @@ Floors.floor = (() => {
     $('sheet').querySelectorAll('[data-chat]').forEach(b => b.addEventListener('click', () => { snd.chatOn = b.dataset.chat === '1'; saveSound(); $('sheet').querySelectorAll('[data-chat]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); if (!snd.chatOn) { talk.tick = []; tickDraw(); } }));
     $('sheet').querySelectorAll('[data-emo]').forEach(b => b.addEventListener('click', () => { snd.emotesOn = b.dataset.emo === '1'; saveSound(); $('sheet').querySelectorAll('[data-emo]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }));
     $('sheet').querySelectorAll('[data-spec]').forEach(b => b.addEventListener('click', () => { send({ t: 'spectate', on: b.dataset.spec === '1' }); $('sheet').querySelectorAll('[data-spec]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }));
+    if ($('fr-open2')) { $('fr-open2').addEventListener('click', () => openFriends()); frBadge(); }
     const showOn = () => $('sheet').querySelectorAll('[data-mute]').forEach(x => x.setAttribute('aria-pressed', String((x.dataset.mute === '0') === musicOn())));
     $('vol').addEventListener('input', (e) => {
       snd.vol = +e.target.value; $('vol-n').textContent = snd.vol;
@@ -12628,6 +12658,7 @@ Floors.floor = (() => {
     el.innerHTML = `<div class="home-top">
         ${titleImg()}
         <div class="corner">
+          ${frButton('fr-open')}
           <button id="acct-open" aria-label="Profile">${HICON.user}<span>Profile</span></button>
           <button id="music-open" aria-label="Settings">${HICON.cog}<span>Settings</span></button>
         </div>
@@ -12683,6 +12714,7 @@ Floors.floor = (() => {
     $('play').addEventListener('click', () => { home.pop = true; drawHome(); });
     $('music-open').addEventListener('click', openSoundSheet);
     $('acct-open').addEventListener('click', openAccountSheet);
+    $('fr-open').addEventListener('click', () => openFriends()); frBadge(); // friends (2026-11-04)
     $('ency-open').addEventListener('click', () => openEncyclopedia());
     $('how').addEventListener('click', openHowTo);
     $('puzzles-open').addEventListener('click', openPuzzles); // the guided tutorial (startTutorial) is switched off: no button leads to it
@@ -12838,8 +12870,9 @@ Floors.floor = (() => {
     if (!j.rows.length) return;
     const top = lg ? lg.top : 0;
     $('lb').innerHTML = `<table class="lb"><thead><tr><th>#</th><th>Player</th><th>W</th><th>T</th><th>L</th><th>Win %</th><th>Score</th></tr></thead><tbody>
-      ${j.rows.map((r, i) => `<tr class="${[acct && r.id === acct.id ? 'me' : '', i < top ? 'legend' : '', i === top - 1 && j.rows.length > top ? 'cut' : ''].join(' ').trim()}"><td class="num">${i + 1}</td><td>${nameplate(r.tag, r.title, 'row')}</td><td class="num">${r.w}</td><td class="num">${r.t}</td><td class="num">${r.l}</td><td class="num">${pct(r)}%</td><td class="num">${r.score != null ? Math.round(r.score) : ''}</td></tr>`).join('')}
+      ${j.rows.map((r, i) => `<tr data-pid="${esc(r.id)}" class="${[acct && r.id === acct.id ? 'me' : '', i < top ? 'legend' : '', i === top - 1 && j.rows.length > top ? 'cut' : ''].join(' ').trim()}"><td class="num">${i + 1}</td><td>${nameplate(r.tag, r.title, 'row')}</td><td class="num">${r.w}</td><td class="num">${r.t}</td><td class="num">${r.l}</td><td class="num">${pct(r)}%</td><td class="num">${r.score != null ? Math.round(r.score) : ''}</td></tr>`).join('')}
       </tbody></table>`;
+    $('lb').querySelectorAll('tr[data-pid]').forEach(tr => tr.addEventListener('click', () => { const r = j.rows.find(x => x.id === tr.dataset.pid); if (r && !(acct && r.id === acct.id)) frPlayerMenu({ id: r.id, tag: r.tag, title: r.title }); })); // friends
   }
 
   // the rules, kept out of the way: the menu only has a one-line pitch and this button
@@ -13509,6 +13542,7 @@ Floors.floor = (() => {
   function acctTake(r) {
     if (typeof r.rankedOn === 'boolean' && typeof home !== 'undefined') home.rankedOn = r.rankedOn;
     if (r.discord !== undefined) rw.discord = r.discord && typeof r.discord.clientId === 'string' ? r.discord : null;
+    try { if (r.friends !== undefined) { fr.counts = r.friends; frBadge(); } } catch (e) {} // friends: the badge (fr is set up further down)
     if (!r.player) return;
     acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, dev: !!r.player.dev, titles: Array.isArray(r.player.titles) ? r.player.titles.filter(t => TITLES[t]) : [], title: TITLES[r.player.title] ? r.player.title : '', tagNext: +r.player.tagNext || 0,
       skins: Array.isArray(r.player.skins) ? r.player.skins.filter(k => k && Shapes.SKINS[k.id]).map(k => ({ id: k.id, worn: !!k.worn })) : [], discord: !!r.player.discord, puzzles: Array.isArray(r.player.puzzles) ? r.player.puzzles.filter(k => Number.isInteger(k)) : [], gg: Math.max(0, r.player.gg | 0), session: r.session || acct.session, ts: now() });
@@ -13651,6 +13685,319 @@ Floors.floor = (() => {
     acctRefresh();
   }
   if (qs.has('test')) window.__acct = () => ({ acct, ui: acctUi, google: acctGoogle, dev: devMode() });
+
+  // ---------- friends, game invites and private messages (2026-11-04; docs/FRIENDS.md, server/src/hub.js) ----------
+  // Signed-in (Google) players only. The lists come from /account/friends; the live part (green / grey dots, requests,
+  // invites and messages arriving) from this player's PlayerHub: one socket per page (hubOpen / hubRecv / hubSend),
+  // reconnecting with backoff. frTick (every 2 s) keeps the socket and the status (menu / room / match) up to date.
+  // Invites and messages during a match: only the badge on the Friends button; the invite banner shows after it.
+  const fr = { ws: null, tries: 0, timer: 0, stop: '', sent: '', sentAt: 0, data: null, counts: null, tab: 'friends', more: '', msg: '', invites: [], invited: {}, pending: null, joining: '', thread: null, busy: false, toast: null };
+  const frOk = () => !!(acct && acct.google);
+  const frInMatch = () => !!m && ['draft', 'deploy', 'battle', 'result'].includes(phase);
+  const frBadgeN = () => fr.data ? fr.data.incoming.length + fr.data.friends.reduce((n, f) => n + (f.unread || 0), 0) + fr.invites.length
+    : fr.counts ? (fr.counts.requests || 0) + (fr.counts.unread || 0) + fr.invites.length : fr.invites.length;
+  function frBadge() {
+    const n = frOk() ? frBadgeN() : 0;
+    document.querySelectorAll('.fr-badge').forEach(b => { b.hidden = !n; b.textContent = n > 99 ? '99+' : String(n); });
+  }
+  const frIcon = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="9" cy="8" r="3.6" fill="currentColor"/><path d="M2 20c0-3.9 3.1-6.3 7-6.3s7 2.4 7 6.3z" fill="currentColor"/><circle cx="17" cy="9" r="2.8" fill="currentColor" opacity="0.75"/><path d="M15.6 13.9c3.4-.4 6.4 1.6 6.4 5.1h-4.4c0-2-.7-3.7-2-5.1" fill="currentColor" opacity="0.75"/></svg>';
+  const frButton = (id) => `<button id="${id}" class="fr-btn" aria-label="Friends">${frIcon}<span>Friends</span><b class="fr-badge" hidden></b></button>`;
+  // where this phone is, for friends' dots: the menu, a room (waiting for a match) or a match (with its round)
+  function frWhere() {
+    if (m && phase !== 'start' && phase !== 'lobby') return { where: 'match', ...(mode === 'net' && net.code && !net.tourCode ? { code: net.code } : {}), ...(m.round ? { round: m.round } : {}) };
+    if (phase === 'lobby' && net.code) return { where: 'room', ...(net.srv && net.welcomed && !net.tourCode && !net.duo ? { code: net.code } : {}) }; // the code once the server has the room
+    return { where: 'menu' };
+  }
+  function hubSend(o) { if (fr.ws && fr.ws.readyState === 1 && fr.ws.ok) { try { fr.ws.send(JSON.stringify(o)); return true; } catch (e) {} } return false; }
+  function hubOpen() {
+    if (fr.ws || !frOk() || fr.stop === acct.session || typeof WebSocket !== 'function') return;
+    let ws;
+    try { ws = new WebSocket(`${SERVER_URL.replace(/^http/, 'ws')}/hub?p=${encodeURIComponent(acct.id)}`); } catch (e) { hubRetry(); return; }
+    fr.ws = ws; ws.ok = false; ws.pid = acct.id;
+    ws.onopen = () => { if (fr.ws === ws) ws.send(JSON.stringify({ t: 'hello', session: acct.session })); };
+    ws.onmessage = (e) => { if (fr.ws !== ws) return; let d = null; try { d = JSON.parse(e.data); } catch (er) {} if (d && typeof d.t === 'string') hubRecv(d, ws); };
+    ws.onclose = () => { if (fr.ws !== ws) return; fr.ws = null; fr.sent = ''; hubRetry(); };
+    clearInterval(fr.ping); fr.ping = setInterval(() => { if (fr.ws === ws && ws.readyState === 1) ws.send('{"t":"ping"}'); }, 30000);
+  }
+  function hubRetry() { clearTimeout(fr.timer); fr.tries++; fr.timer = setTimeout(() => { fr.timer = 0; hubOpen(); }, Math.min(30000, 1000 * 2 ** Math.min(5, fr.tries))); }
+  function hubClose() { const ws = fr.ws; fr.ws = null; fr.sent = ''; if (ws) { try { ws.close(); } catch (e) {} } clearTimeout(fr.timer); fr.timer = 0; }
+  function hubRecv(d, ws) {
+    if (d.t === 'welcome') { ws.ok = true; fr.tries = 0; fr.invites = (d.invites || []).filter(frInvOk); fr.sent = ''; frTick(); frLoad(); frBanner(); return; }
+    if (d.t === 'denied') { fr.stop = acct ? acct.session : ''; return; } // this session can't have a hub (signed out, a guest): until it changes
+    if (d.t === 'status') {
+      const f = fr.data && fr.data.friends.find(x => x.id === d.id);
+      if (f) { f.online = !!d.online; f.status = d.status || null; if (d.seen) f.seen = d.seen; frSort(); frRedraw(); }
+      return;
+    }
+    if (d.t === 'request' || d.t === 'accepted' || d.t === 'removed') { frLoad(); return; } // the list changed (removed: silently)
+    if (d.t === 'invite') {
+      if (!frInvOk(d)) return;
+      fr.invites = fr.invites.filter(x => x.from.id !== d.from.id).concat([{ from: d.from, code: d.code, mode: d.mode, expires: d.expires }]);
+      frBadge(); frBanner(); frRedraw(); return;
+    }
+    if (d.t === 'inviteGone') { fr.invites = fr.invites.filter(x => x.code !== d.code || (d.from && x.from.id !== d.from)); frBadge(); frBanner(); frRedraw(); return; }
+    if (d.t === 'invited') { fr.invited[d.to] = { code: d.code, expires: d.expires }; frNote(`Invite sent to ${frName(d.to)}.`); frRedraw(); return; }
+    if (d.t === 'inviteFail') { frNote({ offline: `${frName(d.to)} is offline now.`, open: `${frName(d.to)} already has an invite from you.`, 'slow down': 'Too many invites. Wait a minute.', 'not friends': 'You can only invite friends.', room: 'Open a room first.' }[d.why] || 'The invite didn’t go through.'); return; }
+    if (d.t === 'declined') { delete fr.invited[d.by.id]; frNote(`${d.by.tag || 'Your friend'} declined.`); frRedraw(); return; }
+    if (d.t === 'dm') { frDm(d); return; }
+    if (d.t === 'dmFail') { frThreadMsg(d.why === 'slow down' ? 'Slow down a little: too many messages.' : d.why === 'not friends' ? 'You can only message friends.' : 'The message didn’t go through.'); return; }
+  }
+  const frInvOk = (x) => x && x.from && typeof x.code === 'string' && /^[A-Z0-9]{4,8}$/.test(x.code) && x.expires > now();
+  const frName = (id) => { const f = fr.data && fr.data.friends.find(x => x.id === id); return f ? f.tag : 'Your friend'; };
+  function frSort() { if (fr.data) fr.data.friends.sort((x, y) => (y.online - x.online) || (y.seen - x.seen)); }
+  // every 2 s: the socket, this phone's status (sent when it changes, and every 2 minutes so the dot stays green),
+  // expired invites, and the banner once a match is over
+  function frTick() {
+    if (!frOk()) { if (fr.ws) hubClose(); fr.data = null; fr.counts = null; fr.invites = []; frBadge(); frBanner(); return; }
+    if (fr.ws && fr.ws.pid !== acct.id) hubClose();
+    if (!fr.ws && !fr.timer) hubOpen();
+    const st = frWhere(), key = JSON.stringify(st);
+    if (fr.ws && fr.ws.ok && (key !== fr.sent || now() - fr.sentAt > 120e3)) {
+      const old = fr.sent ? JSON.parse(fr.sent) : null;
+      if (old && old.code && old.code !== st.code) { hubSend({ t: 'inviteCancel', code: old.code }); fr.invited = {}; } // left the room: its invites go
+      if (hubSend({ t: 'status', ...st })) { fr.sent = key; fr.sentAt = now(); }
+      if (fr.pending && st.where === 'room' && st.code) { const p = fr.pending; fr.pending = null; hubSend({ t: 'invite', to: p.to, code: st.code, mode: p.mode }); }
+    }
+    const n = fr.invites.length;
+    fr.invites = fr.invites.filter(frInvOk);
+    if (n !== fr.invites.length) frRedraw();
+    frBadge(); frBanner();
+  }
+  setInterval(frTick, 2000);
+  async function frLoad() {
+    if (!frOk()) return;
+    const r = await acctCall('friends', {}, true);
+    if (r.status === 200 && Array.isArray(r.friends)) { fr.data = r; frSort(); }
+    else if (r.status === 403) fr.data = null;
+    frBadge(); frRedraw();
+  }
+  // a live message: in the open thread it shows at once (and counts as read); else the badge
+  function frDm(d) {
+    const own = d.from && acct && d.from.id === acct.id, other = own ? d.to : d.from && d.from.id;
+    const t = fr.thread;
+    if (t && t.id === other && !$('sheet-back').hidden && $('fr-thread')) {
+      if (!t.lines.some(x => x.k === d.k)) t.lines.push({ k: d.k, from: own ? acct.id : other, text: d.text, at: d.at });
+      frThreadDraw(true);
+      if (!own) frReadSoon(other);
+      return;
+    }
+    if (own) return;
+    const f = fr.data && fr.data.friends.find(x => x.id === other);
+    if (f) f.unread = (f.unread || 0) + 1; else if (fr.counts) fr.counts.unread = (fr.counts.unread || 0) + 1;
+    frBadge(); frRedraw();
+    if (!frInMatch()) frToast(`${esc(d.from.tag || 'A friend')}: ${esc(String(d.text).slice(0, 60))}`, () => frThread(other));
+  }
+  let frReadT = 0;
+  function frReadSoon(id) { clearTimeout(frReadT); frReadT = setTimeout(() => acctCall('dm/read', { id }, true), 800); }
+
+  // the invite banner (outside matches), over everything
+  function frBanner() {
+    let el = $('fr-banner');
+    const inv = frOk() && !frInMatch() && !fr.joining ? fr.invites[0] : null;
+    if (!inv) { if (el) el.remove(); return; }
+    if (el && el.dataset.code === inv.code) return;
+    if (!el) { el = document.createElement('div'); el.id = 'fr-banner'; el.className = 'fr-banner'; el.setAttribute('role', 'alertdialog'); document.body.appendChild(el); }
+    el.dataset.code = inv.code;
+    el.innerHTML = `<p><b>${esc(inv.from.tag || 'A friend')}</b> invites you to a ${inv.mode === 'ranked' ? 'Ranked' : 'Standard'} match</p>
+      <span class="btnrow"><button class="btn primary small" id="fr-join">Join</button><button class="btn small" id="fr-decline">Decline</button></span>`;
+    $('fr-join').addEventListener('click', () => frJoin(inv));
+    $('fr-decline').addEventListener('click', () => { hubSend({ t: 'decline', code: inv.code }); fr.invites = fr.invites.filter(x => x !== inv); frBadge(); frBanner(); frRedraw(); });
+  }
+  // Join = the normal join of that room's code. A room that has filled or started answers full / nomatch (srvRecv: frJoinFailed).
+  function frJoin(inv) {
+    fr.invites = fr.invites.filter(x => x !== inv);
+    fr.joining = inv.code; frBadge(); frBanner();
+    closeSheet(true);
+    srvJoin(inv.code, {});
+    setTimeout(() => { if (fr.joining === inv.code) fr.joining = ''; }, 15000);
+  }
+  function frJoinFailed(code) {
+    if (!fr.joining || fr.joining !== code) return false;
+    fr.joining = ''; leaveNet(); srvForget();
+    overlayMsg('Invite', 'That match has already started.');
+    return true;
+  }
+  // the inviter: a private room made the normal way (hello { create }), then the invite goes over the hub (frTick)
+  function frInvite(f, ranked) {
+    if (!f.online) return;
+    closeSheet(true);
+    if (phase === 'lobby' && mode === 'net' && net.srv && net.welcomed && net.code && !net.tourCode && !net.duo) { hubSend({ t: 'invite', to: f.id, code: net.code, mode: net.ranked ? 'ranked' : 'standard' }); return; } // already in a room
+    fr.pending = { to: f.id, mode: ranked ? 'ranked' : 'standard' };
+    matchKind = 'standard'; lateGame = false;
+    if (ranked) rankedHost(); else srvHost();
+  }
+  function frToast(html, onTap) {
+    if (fr.toast) { fr.toast.remove(); fr.toast = null; }
+    const el = document.createElement('button'); el.className = 'fr-toast'; el.innerHTML = html;
+    el.addEventListener('click', () => { el.remove(); fr.toast = null; if (onTap) onTap(); });
+    document.body.appendChild(el); fr.toast = el;
+    setTimeout(() => { if (fr.toast === el) { el.remove(); fr.toast = null; } }, 5000);
+  }
+  function frNote(t) { fr.msg = t; const x = $('fr-msg'); if (x) x.textContent = t; else if (!frInMatch()) frToast(esc(t)); }
+  const frAgo = (t) => { const s = Math.max(0, (now() - t) / 1000); return s < 90 ? 'just now' : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago`; };
+  const frStatus = (f) => !f.online ? (f.seen ? `Last seen ${frAgo(f.seen)}` : 'Offline') : !f.status || f.status.where === 'menu' ? 'Online' : f.status.where === 'room' ? 'In a room' : `In a match${f.status.round ? ' · round ' + f.status.round : ''}`;
+  const frFail = (r) => ({ 'not found': 'No signed-in player has that username.', 'bad tag': 'Usernames are 2–16 letters, digits, spaces, _ . or -.', self: 'That’s you.', 'too many friends': 'Your friends list is full (100).', 'their list is full': 'Their friends list is full.', 'too many requests': 'You have 20 requests waiting. Cancel some first.', 'slow down': 'Too many tries. Wait a while and try again.', 'no request': 'That request is gone.', 'not friends': 'You’re not friends any more.', 'reports off': 'Reports aren’t switched on yet.' }[r.error] || acctFail(r));
+
+  // the Friends sheet: tabs Friends and Requests, Add by username at the top
+  function openFriends(tab) {
+    if (tab) fr.tab = tab;
+    fr.msg = ''; fr.more = ''; fr.thread = null;
+    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Friends</h3><button class="btn small" id="close">Close</button></div><div id="fr-sheet" class="fr-sheet"></div>`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', () => closeSheet(true));
+    frDraw();
+    if (frOk()) frLoad();
+  }
+  const frRedraw = () => { if (!$('sheet-back').hidden && $('fr-sheet')) frDraw(); };
+  function frDraw() {
+    const el = $('fr-sheet'); if (!el) return;
+    if (!frOk()) {
+      el.innerHTML = `<p class="hint" style="margin:0">Sign in to add friends. Friends, invites and messages are for players signed in with Google.</p><button class="btn primary" id="fr-signin">Sign in</button>`;
+      $('fr-signin').addEventListener('click', openAccountSheet);
+      return;
+    }
+    const d = fr.data, inc = d ? d.incoming.length : 0;
+    const typed = $('fr-tag') ? $('fr-tag').value : '', focused = document.activeElement && document.activeElement.id === 'fr-tag'; // a live redraw keeps what is being typed
+    el.innerHTML = `<div class="fr-add"><input class="tour-in" id="fr-tag" maxlength="16" autocomplete="off" spellcheck="false" aria-label="Add by username" placeholder="Add by username"><button class="btn" id="fr-add">Add</button></div>
+      <p class="hint" id="fr-msg" aria-live="polite" style="margin:0;color:var(--gold)">${esc(fr.msg)}</p>
+      ${fr.invites.length ? fr.invites.map(x => `<div class="fr-inv"><span><b>${esc(x.from.tag)}</b> invites you to a ${x.mode === 'ranked' ? 'Ranked' : 'Standard'} match</span><span class="btnrow">${frInMatch() ? '<span class="hint">After this match</span>' : `<button class="btn primary small" data-join="${x.code}">Join</button>`}<button class="btn small" data-decline="${x.code}">Decline</button></span></div>`).join('') : ''}
+      <div class="seg" role="tablist" aria-label="Friends"><button role="tab" data-tab="friends" aria-pressed="${fr.tab === 'friends'}">Friends${d ? ` (${d.friends.length})` : ''}</button><button role="tab" data-tab="requests" aria-pressed="${fr.tab === 'requests'}">Requests${inc ? ` <b class="fr-count">${inc}</b>` : ''}</button></div>
+      <div class="fr-list" id="fr-list">${!d ? '<p class="hint">Loading…</p>' : fr.tab === 'friends' ? frFriendsHtml(d) : frRequestsHtml(d)}</div>`;
+    const add = async () => {
+      const tag = $('fr-tag').value.trim();
+      if (!tag) return;
+      frNote('One moment…');
+      const r = await acctCall('friend/add', { tag }, true);
+      frAddDone(r);
+    };
+    if (typed) $('fr-tag').value = typed;
+    if (focused) $('fr-tag').focus();
+    $('fr-add').addEventListener('click', add);
+    $('fr-tag').addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
+    el.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => { fr.tab = b.dataset.tab; frDraw(); }));
+    el.querySelectorAll('[data-join]').forEach(b => b.addEventListener('click', () => { const x = fr.invites.find(i => i.code === b.dataset.join); if (x) frJoin(x); }));
+    el.querySelectorAll('[data-decline]').forEach(b => b.addEventListener('click', () => { hubSend({ t: 'decline', code: b.dataset.decline }); fr.invites = fr.invites.filter(i => i.code !== b.dataset.decline); frBadge(); frBanner(); frDraw(); }));
+    el.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => frAct(b.dataset.act, b.dataset.id)));
+  }
+  function frFriendsHtml(d) {
+    if (!d.friends.length) return '<p class="hint" style="margin:0">No friends yet. Add one by username above, or from a player’s name in a match or on the leaderboard.</p>';
+    return d.friends.map(f => {
+      const inv = fr.invited[f.id] && fr.invited[f.id].expires > now();
+      return `<div class="fr-row${f.online ? ' on' : ''}">
+        <span class="fr-dot ${f.online ? 'on' : 'off'}" role="img" aria-label="${f.online ? 'Online' : 'Offline'}"></span>
+        <span class="fr-who">${nameplate(f.tag, f.title, 'row')}<small class="hint">${esc(frStatus(f))}</small></span>
+        <span class="btnrow">
+          <button class="btn small" data-act="invite" data-id="${f.id}" ${f.online && !inv ? '' : 'disabled'}>${inv ? 'Invited' : 'Invite'}</button>
+          <button class="btn small" data-act="message" data-id="${f.id}">Message${f.unread ? ` <b class="fr-count">${f.unread}</b>` : ''}</button>
+          <button class="btn small" data-act="more" data-id="${f.id}" aria-label="More" aria-expanded="${fr.more === f.id}">⋯</button>
+        </span>
+        ${fr.more === f.id ? `<span class="fr-more btnrow">
+          <button class="btn small" data-act="remove" data-id="${f.id}">${fr.sure === f.id ? 'Tap again to remove' : 'Remove friend'}</button>
+          <button class="btn small" data-act="mute" data-id="${f.id}">${f.muted ? 'Unmute messages' : 'Mute messages'}</button></span>` : ''}
+        ${fr.pick === f.id ? `<span class="fr-more btnrow"><span class="hint">Invite to</span><button class="btn small primary" data-act="inv-std" data-id="${f.id}">Standard</button><button class="btn small" data-act="inv-rk" data-id="${f.id}">Ranked</button></span>` : ''}
+      </div>`;
+    }).join('');
+  }
+  function frRequestsHtml(d) {
+    const row = (p, btns) => `<div class="fr-row"><span class="fr-who">${nameplate(p.tag, p.title, 'row')}<small class="hint">${frAgo(p.created)}</small></span><span class="btnrow">${btns}</span></div>`;
+    return (d.incoming.length ? `<span class="hint">Asking to be your friend</span>${d.incoming.map(p => row(p, `<button class="btn small primary" data-act="accept" data-id="${p.id}">Accept</button><button class="btn small" data-act="decline" data-id="${p.id}">Decline</button>`)).join('')}` : '<p class="hint" style="margin:0">No requests.</p>')
+      + (d.outgoing.length ? `<span class="hint">Waiting for them</span>${d.outgoing.map(p => row(p, `<button class="btn small" data-act="cancel" data-id="${p.id}">Cancel</button>`)).join('')}` : '');
+  }
+  function frAddDone(r) {
+    if (r.status === 200 && r.several) { // several players have that username: pick one
+      fr.msg = 'Several players have that username. Pick one:';
+      frDraw();
+      $('fr-msg').insertAdjacentHTML('afterend', `<div class="fr-list">${r.several.map(p => `<div class="fr-row"><span class="fr-who">${nameplate(p.tag, p.title, 'row')}</span><button class="btn small" data-addid="${p.id}">Add</button></div>`).join('')}</div>`);
+      $('fr-sheet').querySelectorAll('[data-addid]').forEach(b => b.addEventListener('click', async () => frAddDone(await acctCall('friend/add', { id: b.dataset.addid }, true))));
+      return;
+    }
+    if (r.status !== 200) { frNote(frFail(r)); return; }
+    fr.msg = r.friends ? `You and ${r.player.tag} are friends.` : `Request sent to ${r.player.tag}.`;
+    if ($('fr-tag')) $('fr-tag').value = '';
+    frLoad();
+    frNote(fr.msg);
+  }
+  async function frAct(act, id) {
+    const f = fr.data && fr.data.friends.find(x => x.id === id);
+    if (act === 'more') { fr.more = fr.more === id ? '' : id; fr.sure = ''; fr.pick = ''; frDraw(); return; }
+    if (act === 'message') { frThread(id); return; }
+    if (act === 'invite') { if (!f || !f.online) return; if (rankedAllowed()) { fr.pick = fr.pick === id ? '' : id; fr.more = ''; frDraw(); } else frInvite(f, false); return; }
+    if (act === 'inv-std' || act === 'inv-rk') { fr.pick = ''; if (f) frInvite(f, act === 'inv-rk'); return; }
+    if (act === 'remove' && fr.sure !== id) { fr.sure = id; frDraw(); return; }
+    if (fr.busy) return;
+    fr.busy = true;
+    try {
+      const route = { remove: 'friend/remove', accept: 'friend/accept', decline: 'friend/decline', cancel: 'friend/cancel', mute: 'friend/mute' }[act];
+      if (!route) return;
+      const r = await acctCall(route, act === 'mute' ? { id, on: !(f && f.muted) } : { id }, true);
+      if (r.status !== 200) { frNote(frFail(r)); return; }
+      fr.more = ''; fr.sure = '';
+      fr.msg = { remove: 'Removed.', accept: 'You’re friends now.', mute: r.muted ? 'Their messages are muted.' : 'Messages on again.' }[act] || '';
+      await frLoad();
+    } finally { fr.busy = false; }
+  }
+
+  // a private-message thread (its own small sheet; the lobby's chat panel can replace it later)
+  async function frThread(id) {
+    if (!frOk()) { openFriends(); return; }
+    const f = fr.data && fr.data.friends.find(x => x.id === id);
+    fr.thread = { id, tag: f ? f.tag : 'Friend', title: f ? f.title : '', lines: [], more: false, msg: '', sure: false };
+    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">${nameplate(fr.thread.tag, fr.thread.title)}</h3><span class="btnrow"><button class="btn small" id="fr-back">Friends</button><button class="btn small" id="close">Close</button></span></div>
+      <div id="fr-thread" class="fr-thread"><p class="hint">Loading…</p></div>
+      <p class="hint" id="fr-tmsg" aria-live="polite" style="margin:0;color:var(--gold)"></p>
+      <div class="fr-send"><input class="tour-in" id="fr-text" maxlength="300" autocomplete="off" aria-label="Message" placeholder="Message"><button class="btn primary" id="fr-go">Send</button></div>
+      <span class="btnrow"><button class="btn small" id="fr-report">Report</button></span>`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', () => { fr.thread = null; closeSheet(true); });
+    $('fr-back').addEventListener('click', () => openFriends('friends'));
+    const go = () => { const t = $('fr-text').value.trim(); if (!t) return; if (!hubSend({ t: 'dm', to: id, text: t })) { frThreadMsg('Not connected. Try again in a moment.'); return; } $('fr-text').value = ''; };
+    $('fr-go').addEventListener('click', go);
+    $('fr-text').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    $('fr-report').addEventListener('click', async () => {
+      if (!fr.thread.sure) { fr.thread.sure = true; $('fr-report').textContent = 'Tap again to report'; frThreadMsg('Report sends the last 20 messages and both usernames to the moderators.'); return; }
+      const r = await acctCall('dm/report', { id }, true);
+      fr.thread.sure = false; $('fr-report').textContent = 'Report';
+      frThreadMsg(r.status === 200 ? 'Reported. Thanks.' : frFail(r));
+    });
+    const r = await acctCall('dm/list', { id }, true);
+    if (!fr.thread || fr.thread.id !== id) return;
+    if (r.status !== 200) { $('fr-thread').innerHTML = `<p class="hint">${esc(frFail(r))}</p>`; return; }
+    fr.thread.lines = r.lines; fr.thread.more = r.more;
+    frThreadDraw(true);
+    acctCall('dm/read', { id }, true);
+    if (f && f.unread) { f.unread = 0; frBadge(); }
+  }
+  function frThreadDraw(bottom) {
+    const t = fr.thread, el = $('fr-thread'); if (!t || !el) return;
+    el.innerHTML = (t.more ? '<button class="btn small" id="fr-older">Older messages</button>' : '')
+      + (t.lines.length ? t.lines.map(x => `<div class="fr-line${acct && x.from === acct.id ? ' me' : ''}"><span>${esc(x.text)}</span><small>${new Date(x.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small></div>`).join('') : '<p class="hint" style="margin:0">No messages yet. Say hi.</p>');
+    if (bottom) el.scrollTop = el.scrollHeight;
+    if ($('fr-older')) $('fr-older').addEventListener('click', async () => {
+      const r = await acctCall('dm/list', { id: t.id, before: t.lines[0].k }, true);
+      if (r.status !== 200 || fr.thread !== t) return;
+      t.lines = r.lines.concat(t.lines); t.more = r.more; frThreadDraw(false);
+    });
+  }
+  function frThreadMsg(s) { const x = $('fr-tmsg'); if (x) x.textContent = s; }
+  // a player's name tapped (a match's opponent, the leaderboard): Add friend / Message. By id when known, else by username.
+  function frPlayerMenu(p) {
+    if (!p || !p.tag || (acct && p.id === acct.id)) return;
+    const f = fr.data && fr.data.friends.find(x => (p.id ? x.id === p.id : x.tag.toLowerCase() === p.tag.toLowerCase()));
+    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">${nameplate(p.tag, p.title)}</h3><button class="btn small" id="close">Close</button></div>
+      ${!frOk() ? '<p class="hint" style="margin:0">Sign in to add friends.</p>' : f ? `<span class="btnrow"><button class="btn primary" id="np-msg">Message</button></span><p class="hint" style="margin:0">You’re friends.</p>` : '<span class="btnrow"><button class="btn primary" id="np-add">Add friend</button></span>'}
+      <p class="hint" id="fr-msg" aria-live="polite" style="margin:0;color:var(--gold)"></p>`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', () => closeSheet(true));
+    if ($('np-msg')) $('np-msg').addEventListener('click', () => frThread(f.id));
+    if ($('np-add')) $('np-add').addEventListener('click', async () => {
+      const r = await acctCall('friend/add', p.id ? { id: p.id } : { tag: p.tag }, true);
+      const x = $('fr-msg'); if (!x) return;
+      if (r.status === 200 && r.several) { x.textContent = 'Several players have that username: add them from the Friends sheet.'; return; }
+      x.textContent = r.status === 200 ? (r.friends ? 'You’re friends now.' : 'Request sent.') : frFail(r);
+      if (r.status === 200) frLoad();
+    });
+  }
+  if (qs.has('test')) window.__fr = () => ({ fr, ok: frOk(), where: frWhere(), badge: frBadgeN() });
 
   // ---------- rewards sheet and the main menu's rewards card (2026-11-03; state and links: see rw above) ----------
   const INVITE_SKIN = 'golem-aquamarine';
@@ -16205,6 +16552,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   $('sheet-back').addEventListener('click', (e) => { if (e.target.id === 'sheet-back') closeSheet(true); });
   $('cog').addEventListener('click', openSoundSheet);
+  $('foe-name').addEventListener('click', () => { if (talkOn() && mode === 'net') return; const p = foePlayer(); if (p && p.tag && !net.duo) frPlayerMenu({ tag: p.tag, title: p.title }); }); // friends: Add friend / Message (with chat on, from the chat's name menu)
   // ---------- damage stats: a dropdown under the HUD with what each unit dealt in the last fight, as a share of its team's total ----------
   const statsShow = { ally: true, foe: false }; // which teams to list (ticked boxes), for the rest of the visit
   const STAT_EXTRA = { // what isn't a squad: [label, shape, colour]
@@ -16376,6 +16724,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         <span class="hint">Spectators</span>
         <div class="seg" role="group" aria-label="Spectators"><button data-spec="1" aria-pressed="${talk.spectate}">On</button><button data-spec="0" aria-pressed="${!talk.spectate}">Off</button></div>
       </div>` : ''}
+      ${srv && frOk() ? '<span class="btnrow"><button class="btn" id="fr-room">Invite friend</button></span>' : ''}
       ${rk ? `<p class="ranked-note">Ranked: the Standard map and pack, the same 5 leaders and 3 towers for you both. Win 2 games to take the series; only ranked series count on the leaderboard. Your friend needs an account too (they get a guest one when they join).</p>${lookSeg()}`
       : `${srv ? '<span class="hint">The game server referees this match. <button class="btn small" id="use-peer">Phone to phone instead</button> (for Factions).</span>' : ''}
       ${packSeg()}
@@ -16390,6 +16739,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       else selectLink();
     });
     $('cancel').addEventListener('click', () => { clearHost(); showStart(); });
+    if ($('fr-room')) $('fr-room').addEventListener('click', () => openFriends('friends')); // friends: Invite sends this room's code
     $('start').addEventListener('click', hostStartMatch);
     $('overlay').querySelectorAll('[data-kind]').forEach(b => b.addEventListener('click', () => { matchKind = b.dataset.kind; if (srv && matchKind === 'factions') hostLobby(true); else drawLobby(); }));
     if ($('use-peer')) $('use-peer').addEventListener('click', () => hostLobby(true));
@@ -16769,10 +17119,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       <span class="eyebrow">Live match</span>
       <span class="code">${esc(net.code)}</span>
       <p class="status wait">${esc(text)}</p>
-      <button class="btn" id="leave">Leave</button>
+      <span class="btnrow">${net.srv && !net.tourCode && !net.duo && frOk() ? '<button class="btn" id="fr-room">Invite friend</button>' : ''}<button class="btn" id="leave">Leave</button></span>
     </div>`);
     panelInfo('Keep this page open.', '', null);
     $('leave').addEventListener('click', showStart);
+    if ($('fr-room')) $('fr-room').addEventListener('click', () => openFriends('friends'));
   }
 
   function sendSide() {
@@ -17001,6 +17352,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       return;
     }
     if (d.t === 'taken') { net.code = newCode(); net.create = true; const ws = net.ws; net.ws = null; try { ws.close(); } catch (e) {} drawLobby(); srvOpen(); return; }
+    if ((d.t === 'nomatch' || d.t === 'full') && frJoinFailed(net.code)) return; // from a friend's invite: that room has filled or started
     if (d.t === 'nomatch') { // not a server match: an older phone-to-phone one (PeerJS) with this code
       const code = net.code; leaveNet();
       if (peerAvailable()) joinMatch(code); else overlayMsg('No such match', `Nobody is hosting match ${code}.`);
@@ -17398,11 +17750,12 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const el = $('np-menu');
     if (!talkOn() || mode !== 'net' || net.duo) { el.hidden = true; return; }
     const mu = muteOf(), r = anchor.getBoundingClientRect();
-    el.innerHTML = `<b>${esc(foeName())}</b><button class="btn small" data-np="e">${mu.e ? 'Unmute emotes' : 'Mute emotes'}</button><button class="btn small" data-np="c">${mu.c ? 'Unmute chat' : 'Mute chat'}</button><button class="btn small" data-np="r">Report</button>`;
+    el.innerHTML = `<b>${esc(foeName())}</b><button class="btn small" data-np="e">${mu.e ? 'Unmute emotes' : 'Mute emotes'}</button><button class="btn small" data-np="c">${mu.c ? 'Unmute chat' : 'Mute chat'}</button><button class="btn small" data-np="r">Report</button>${frOk() && foePlayer() ? '<button class="btn small" data-np="f">Add friend / Message</button>' : ''}`;
     el.style.left = Math.max(8, Math.min(innerWidth - 200, r.left)) + 'px'; el.style.top = (r.bottom + 6) + 'px';
     el.hidden = false;
     el.querySelectorAll('[data-np]').forEach(b => b.addEventListener('click', (e) => {
       e.stopPropagation(); el.hidden = true;
+      if (b.dataset.np === 'f') { const p = foePlayer(); if (p) frPlayerMenu({ tag: p.tag, title: p.title }); return; } // friends
       if (b.dataset.np === 'r') reportChat(); else { setMute(b.dataset.np, !muteOf()[b.dataset.np]); tickShow({ sys: b.dataset.np === 'e' ? (muteOf().e ? 'Their emotes are muted.' : 'Their emotes are back.') : (muteOf().c ? 'Their chat is muted.' : 'Their chat is back.') }); }
     }));
   }

@@ -5,7 +5,7 @@
 # Optional: DEV_EMAILS - comma-separated Google emails that get developer mode (put into a Cloudflare secret).
 #           DISCORD_CLIENT_SECRET - the Discord app's client secret, for the BABABABA title (also a Cloudflare secret).
 #           DISCORD_BUG_WEBHOOK - a webhook URL on the #bug-reports forum channel, for in-game bug reports (Cloudflare secret BUG_WEBHOOK).
-#           DISCORD_REPORT_WEBHOOK - a webhook URL on a moderators' channel, for chat reports from matches (Cloudflare secret REPORT_WEBHOOK).
+#           DISCORD_REPORT_WEBHOOK - a webhook URL on a moderators' channel, for chat reports from matches and reported private messages (Cloudflare secret REPORT_WEBHOOK).
 # Without them the tests still run and the deploy step is skipped.
 name: Server deploy
 
