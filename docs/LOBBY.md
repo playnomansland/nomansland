@@ -1,4 +1,4 @@
-# Online lobby, ranked queue, chat and emotes (design, 2026-11-04)
+# Online lobby, chat and emotes (design, 2026-11-04)
 
 Status: **design only, nothing built.** Decisions are Vilhelm's (2026-11-04) unless marked *proposal* or *open*.
 Builds on the server described in `docs/SERVER.md` (Room, DuoRoom, TourRoom, accounts).
@@ -10,7 +10,7 @@ Builds on the server described in `docs/SERVER.md` (Room, DuoRoom, TourRoom, acc
 | Topic | Decision |
 |---|---|
 | Room list | A global list of open rooms, tagged Standard / Ranked / 2v2, public / private. |
-| Ranked | Explained queue vs list; the design below uses a **queue** (*proposal*, waiting on Vilhelm's pick). |
+| Ranked | **In the list** for the test season (no real player base yet). A queue replaces or joins it once there are enough players (§5). |
 | 2v2 | Built into the lobby architecture now, but **developer only** until 2v2 works as intended. |
 | Chat | Text chat, in the lobby rooms and in matches. |
 | Emotes | Three emotes the opponent sees, mutable by the opponent: **Flame Wizard "BABABABA"**, **Happy Ether Golem**, **Shell-shocked Sniper**. In the lobby and in matches. |
@@ -18,25 +18,26 @@ Builds on the server described in `docs/SERVER.md` (Room, DuoRoom, TourRoom, acc
 
 ---
 
-## 2. Queue vs list for ranked (why the queue)
+## 2. Queue vs list for ranked
 
 - **List:** ranked rooms sit in the lobby and anyone picks one. You see the host's name and rating before joining, so you can farm weak players, dodge strong ones, or trade wins with a friend (take turns losing).
 - **Queue:** you press *Find ranked match*; the server picks an opponent near your rating. You can't choose who you play, so none of the above works.
-- Today's ranked is started from a match code, which is effectively the list version (a friend can make a ranked room and join it). The queue replaces that: ranked rooms can no longer be created by code.
-- Playing a specific friend stays possible in Standard (private room, code or link).
+- Decision for the test season: **list**. With few players a queue would mostly sit waiting, and win trading matters little before rankings mean anything. Today's ranked-by-code keeps working too.
+- Once the player base grows: add the queue (§5), and either drop ranked rooms from the list or keep them with safeguards (a rating band for who may join; a cap on ranked games against the same player per day).
 
 ---
 
 ## 3. What players see
 
 ### Lobby screen (PLAY → Online)
-- **Top:** filter chips: *Standard*, *Ranked* (in-progress only, for watching), *2v2* (developers only), *Open only*. Then **Quick play**, **Find ranked match**, **Create room**, and the join-by-code box.
+- **Top:** filter chips: *Standard*, *Ranked*, *2v2* (developers only), *Open only*. Then **Quick play**, **Create room**, and the join-by-code box.
 - **Room cards:** host's nameplate (gamertag + title), room name (auto: "Vilhelm's room"; no free text, nothing to moderate), tags, map, players (1/2, or 3/4 for 2v2), round if in progress, a 👁 count of watchers, and **Join** / **Watch**.
 - Private rooms are never listed. They work as today: code or `?play=CODE` link.
 - **Quick play:** joins the oldest open public Standard room; if there is none, creates one and waits in it.
+- **Ranked rooms:** created with Mode *Ranked* (account needed, fixed RANKED settings, best of 3, as today). Joining one needs an account too; the card shows the host's leaderboard score.
 
 ### Create room (sheet)
-Mode (Standard; 2v2 for developers), public / private, map, look, timers, **Spectators on/off** (default on).
+Mode (Standard, Ranked; 2v2 for developers), public / private, map, look, timers, **Spectators on/off** (default on).
 
 ### Waiting room
 Both nameplates, ready check, the host's settings (host can change them until both are ready), **Kick** (host only), the chat panel and the emote button. A waiting room closes after 10 min idle, or when the host leaves before the start.
@@ -48,7 +49,7 @@ Both nameplates, ready check, the host's settings (host can change them until bo
 - Tapping the opponent's nameplate: **Mute emotes**, **Mute chat** (separately), **Report**.
 - After the match **Rematch** keeps the room (and the chat).
 
-### Ranked queue
+### Ranked queue (later)
 *Find ranked match* (account needed) → a searching banner with the time and a Cancel button; the lobby stays usable. When paired, both phones go straight into the match (no waiting room).
 
 ---
@@ -59,11 +60,11 @@ Both nameplates, ready check, the host's settings (host can change them until bo
 Holds three things in memory (rebuilt from the rooms' reports after a restart):
 1. **Listings** `{ code → listing }`: `{ code, kind: 'match'|'duo', mode: 'standard'|'ranked'|'2v2', host: { tag, title }, map, look, players, seats, phase: 'waiting'|'playing'|'ended', round, watchers, spectate, dev: bool, at }`. Public rooms only.
 2. **Subscribers:** lobby sockets, each with `{ dev }` from its session (accounts.js `sessionPlayer`, the server's own dev column, never the phone's word).
-3. **Ranked queue** (§5).
+3. **Ranked queue** (§5, later; not in the first build).
 
 Messages (WebSocket `/lobby`):
-- in: `hello { session? }`, `quick`, `queue`, `unqueue`, `ping`
-- out: `rooms { list }` (snapshot on hello), then `room { listing }` / `gone { code }` diffs, batched once a second; `quick { code, create? }`; `queued { since }`, `paired { code, side, key }`; `pong`.
+- in: `hello { session? }`, `quick`, `ping` (later: `queue`, `unqueue`)
+- out: `rooms { list }` (snapshot on hello), then `room { listing }` / `gone { code }` diffs, batched once a second; `quick { code, create? }`; `pong` (later: `queued { since }`, `paired { code, side, key }`).
 - Listings with `dev: true` (2v2 for now) are only sent to sockets whose session is a developer.
 - `GET /lobby` returns the same snapshot without a socket (for a quick first paint; dev listings left out).
 
@@ -76,7 +77,7 @@ Messages (WebSocket `/lobby`):
 - Room setting `spectate` (default `true`). Host can flip it in the waiting room or during the match (`{ t: 'spectate', on }`, host only).
 - Off: new `hello { watch }` gets `denied { why: 'no watchers' }`, connected watchers are closed with the same reason, and the listing's Watch button goes away.
 - Watchers see `Referee.view(m, -1)`, which already hides what each player placed this round.
-- Ranked matches: spectating on, not changeable (*proposal*; keeps the queue's matches watchable).
+- Ranked rooms: the host's choice, like any room.
 
 ### 2v2 in the lobby (developer only)
 - `DuoRoom` registers listings with `kind: 'duo', mode: '2v2', seats: 4, dev: true`.
@@ -90,13 +91,13 @@ Messages (WebSocket `/lobby`):
 
 ---
 
-## 5. Ranked queue
+## 5. Ranked queue (later, once there are players)
 
 - In `LobbyRoom`. Entry: `{ player, rating, since, socket }`; only accounts (`sessionPlayer`), one entry per player.
 - Every 2 s: pair the two longest waiters whose ratings are within a band that widens with waiting time: ±100 at first, +50 every 10 s, unlimited after 60 s.
 - Never pair the same two players twice within 30 min if anyone else is waiting (*proposal*).
 - On a pair: create a ranked Room with both players assigned in advance (like `TourRoom.matchFor`: side, key), send `paired` to both, and remove them from the queue. If a phone doesn't connect within 30 s, the other is put back at the front of the queue.
-- Ranked from a code (`hello { create, ranked }`) is switched off for players; developers keep it for testing.
+- When the queue arrives, ranked rooms in the list and ranked-by-code are either switched off for players (developers keep them for testing) or kept with the safeguards in §2.
 - *Open:* what "rating" is. Today's leaderboard is a score from wins and games, not a rating. The queue needs one number per player: either Elo (new column, updated by `recordSeries`) or today's score as a stand-in.
 
 ---
@@ -144,13 +145,13 @@ Messages (WebSocket `/lobby`):
 
 ## 8. Build order (*proposal*)
 
-1. **Lobby list:** LobbyRoom, rooms register when public, the lobby screen, Join / Watch, Quick play, spectate toggle.
+1. **Lobby list:** LobbyRoom, rooms register when public (Standard and Ranked), the lobby screen, Join / Watch, Quick play, spectate toggle.
 2. **Chat and emotes:** messages in Room, the chat panel and emote wheel, muting, reporting, the three emote pictures.
-3. **Ranked queue:** rating, queue, paired rooms; switch off ranked-by-code for players.
-4. **2v2 listings** (developer only), Team / All chat.
+3. **2v2 listings** (developer only), Team / All chat.
+4. Later, once there are players: the ranked queue (rating, queue, paired rooms).
 5. Later: block list, lobby-wide chat channel (not planned; moderation load).
 
-Tests to add: `server/test/lobby.test.js` (listings appear and vanish, dev filter, heartbeat expiry, queue pairing and band widening, limits), chat checks in `match.test.js` (limits, filter, watcher isolation), `tools/tests/lobby-ui.js`.
+Tests to add: `server/test/lobby.test.js` (listings appear and vanish, dev filter, ranked rooms need an account, heartbeat expiry, limits), chat checks in `match.test.js` (limits, filter, watcher isolation), `tools/tests/lobby-ui.js`.
 
 Timing: all of this changes how online matches start and adds messages to match rooms, so it goes in **after the tournament on Sunday 2026-11-08** (match-play freeze from Saturday).
 
@@ -158,8 +159,7 @@ Timing: all of this changes how online matches start and adds messages to match 
 
 ## 9. Open questions
 
-1. Ranked: queue (proposal) or list?
-2. Rating for the queue: Elo or today's leaderboard score?
-3. Chat for guests too, or signed-in players only (proposal)?
-4. Should watchers be able to chat at all, or only read?
-5. Real sounds for the emotes, or placeholders for now?
+1. Rating for the later queue: Elo or today's leaderboard score?
+2. Chat for guests too, or signed-in players only (proposal)?
+3. Should watchers be able to chat at all, or only read?
+4. Real sounds for the emotes, or placeholders for now?
