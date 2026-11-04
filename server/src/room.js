@@ -392,6 +392,7 @@ export class Room extends DurableObject {
         if (this.meta) this.meta.left = { seed: R.seed, side }; // who left this match (countOnline)
         this.tally(loser);
         await this.save();
+        await this.mergeChat(); // before the forfeit: the winner's phone leaves the room on it
         const text = JSON.stringify({ t: 'forfeit', side: loser, left: side, ranked: this.rankedView() });
         for (const s of this.sockets()) this.send(s, text);
         this.record(null, loser);

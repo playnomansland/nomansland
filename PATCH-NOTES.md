@@ -13,9 +13,37 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 - **More lore** for the world, factions and units.
 - **More balancing.**
 - **Damage types (idea):** physical and magic.
-- **Online lobby (design):** one *Rooms* list of public games (Standard and Ranked together, sortable by name, time, category and mode), Quick play, chat for signed-in players (spectators get their own chat that joins the players' when the match ends), and three cartoon emotes the opponent can mute: Flame Wizard *BABABABA*, a happy Ether Golem and a shell-shocked Sniper. Spectating on by default. Plan in `docs/LOBBY.md`; built after the tournament.
+- **Ranked queue (later):** *Find ranked match* pairs you with someone near your level, once there are enough players (plan in `docs/LOBBY.md`).
 - **Friends (design):** add friends (they accept), remove them, see who's online (green dot) or offline (grey), **invite a friend** straight into a room, **watch a friend's match**, and **private messages**. For signed-in players. Plan in `docs/FRIENDS.md`; built after the tournament, together with the lobby.
 - **Player profile:** tap any username to see their title, skins, ranked record, recent matches and favourite units, with Add friend and Watch.
+
+---
+
+## 4 November 2026 – Online lobby, chat and emotes
+
+### New: Rooms, a list of games to join
+- **PLAY → Online · Rooms** shows every open public game: Standard and Ranked together.
+- Each room shows the host's name and title, the map, how many players are in, the round if it has started, and how many are watching. **Join** a waiting room, or **Watch** one that's playing.
+- **Sort** the list by name, date/time (newest first, the default), category (Standard / Ranked) or mode. Tap the active one again to flip the order. Your phone remembers it.
+- **Quick play** puts you in the oldest open Standard room, or makes one and waits for someone to join.
+- **Create room:** Standard or Ranked, public (in Rooms) or private (code only), spectators on or off. You still pick the map, look and leaders in the room before you start.
+- Codes and links work as before.
+
+### New: spectators
+- **Spectating is on** for every room unless the host turns it off: in the waiting room, or in Settings during the match.
+
+### New: chat and emotes in online matches
+- The **speech bubble** (in the shop row while you deploy, on the board otherwise) opens three emotes and a chat line.
+- **Emotes:** the Flame Wizard shouting *BABABABA!*, a happy Ether Golem and a shell-shocked Sniper. They pop up by your name and over your side of the board. No sounds.
+- **Chat** is for players signed in with Google. Guests can read it and send emotes.
+- **Spectators** chat among themselves while the match runs, so nobody can tip off a player. When the match ends, the players see what they said and everyone chats together. A rematch splits the chats again.
+- Tap your **opponent's name** to mute their emotes or their chat (separately), or to **report** their chat to the moderators.
+- **Settings:** turn Chat or Emotes off for every match.
+- Not in phone-to-phone matches.
+
+### Developer
+- 2v2 rooms show in Rooms for developers only, with Team / All chat. The server key `lobby_duo` opens them to everyone when 2v2 is ready.
+- Server: `LobbyRoom` at `/lobby`, rooms report their own listings. Details in the README and `docs/SERVER.md`.
 
 ---
 

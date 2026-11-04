@@ -2873,7 +2873,7 @@ html.pc .corner button span { display: inline; }
     document.documentElement.classList.toggle('home', on);
     $('home').hidden = !on;
     if (on) paintHomeBg();
-    homeWiz(on && WIZ_PC && home.screen !== 'welcome' && home.screen !== 'signup' && home.screen !== 'login');
+    homeWiz(on && WIZ_PC && home.screen !== 'welcome' && home.screen !== 'signup' && home.screen !== 'login' && home.screen !== 'lobby');
   }
   // the Flame Wizard on the main menu: the 3D model as a still picture and its fire cone, frozen; a tap on him (or the text)
   // plays the blast for 1 second (WIZ_PLAY_MS): the cone flickers, sparks fly and BABABABABA shakes, then it freezes again

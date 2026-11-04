@@ -4,7 +4,8 @@
 //  - Join is the usual hello {}; a room leaves the list when the host leaves the waiting room, and when the match is over
 //  - Quick play: the oldest open public Standard room, else create
 //  - ranked rooms: an account is needed to make one and to join one; they list as mode 'ranked'
-//  - 2v2 rooms list only for developer sockets (config lobby_duo = 'dev'); lobby_duo 'all' shows them to everyone
+//  - 2v2 rooms list only for developer sockets (config lobby_duo = 'dev'); lobby_duo 'all' shows them to everyone;
+//    2v2 chat: Team to the teammate only, All and emotes to everyone
 //  - spectating: on by default; the host turns it off and watchers are turned away (denied 'no watchers')
 //  - heartbeat: a listed room stays while it sends its heartbeat; a listing that stops (a fake one) goes after LOBBY_STALE_MS
 //  - limits: 3 lobby sockets per IP, 10 public rooms per 10 minutes per IP
@@ -168,6 +169,18 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 6 * 60 *
   assert.strictEqual(dNo.first.t, 'denied'); assert.strictEqual(dNo.first.why, 'dev', 'only developers make 2v2 rooms');
   const dh = await phone(duo, { create: true, public: true, session: dev.session }, 'duo');
   assert.strictEqual(dh.first.t, 'welcome');
+  // 2v2 chat: Team goes to the teammate only, All to everyone; the lobby's emotes go to everyone
+  const mate = await phone(duo, { session: g1.session }, 'duo'), foe = await phone(duo, { session: g2.session }, 'duo');
+  assert.deepStrictEqual([dh.first.seat, mate.first.seat, foe.first.seat], [0, 1, 2]);
+  dh.json({ t: 'chat', text: 'push left', team: true });
+  assert.strictEqual((await mate.next('chat')).team, true);
+  dh.json({ t: 'chat', text: 'hello all' });
+  const all = await foe.next('chat');
+  assert.strictEqual(all.text, 'hello all', 'the other team gets All, never Team');
+  assert.ok(!foe.inbox.some((x) => x.t === 'chat' && x.text === 'push left'));
+  foe.json({ t: 'emote', id: 'bababa' });
+  assert.deepStrictEqual([(await dh.next('emote')).from, (await mate.next('emote')).id], [2, 'bababa']);
+  mate.close(); foe.close();
   card = await waitFor(() => listOf(D).get(duo), 8000);
   assert.strictEqual(card.mode, '2v2'); assert.strictEqual(card.seats, 4); assert.strictEqual(card.dev, true);
   await sleep(1500);

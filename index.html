@@ -10863,7 +10863,7 @@ Floors.floor = (() => {
   // ----- Report a bug (2026-11-04): a new post in the Discord forum #bug-reports with the game version and match id
   // filled in. The server posts it through a webhook (/account/bug, accounts.js BUG); when that's off or fails, the report
   // is copied and the Discord server opens, so it can be pasted there by hand.
-  const GAME_VERSION = '4 Nov 2026 · 6ca03d3'; // src/build.js: the newest patch notes date and a hash of this page
+  const GAME_VERSION = '4 Nov 2026 · ad7a98d'; // src/build.js: the newest patch notes date and a hash of this page
   const DISCORD_FALLBACK = 'https://discord.gg/TBpDKSBWsY';
   const bug = { draft: '', busy: false };
   // the id the server's match history uses (room.js historyInfo: <room>-<seed>), or one made the same way for other matches
@@ -12421,7 +12421,7 @@ Floors.floor = (() => {
     document.documentElement.classList.toggle('home', on);
     $('home').hidden = !on;
     if (on) paintHomeBg();
-    homeWiz(on && WIZ_PC && home.screen !== 'welcome' && home.screen !== 'signup' && home.screen !== 'login');
+    homeWiz(on && WIZ_PC && home.screen !== 'welcome' && home.screen !== 'signup' && home.screen !== 'login' && home.screen !== 'lobby');
   }
   // the Flame Wizard on the main menu: the 3D model as a still picture and its fire cone, frozen; a tap on him (or the text)
   // plays the blast for 1 second (WIZ_PLAY_MS): the cone flickers, sparks fly and BABABABABA shakes, then it freezes again

@@ -1,6 +1,6 @@
 # Online lobby, chat and emotes (design, 2026-11-04)
 
-Status: **design only, nothing built.** Build handoff: `docs/HANDOFF-LOBBY.md`. Decisions are Vilhelm's (2026-11-04) unless marked *proposal* or *open*.
+Status: **built and live 2026-11-04** (lobby list, chat and emotes, 2v2 listings for developers). Not built: the ranked queue (§5), block list. Server details: `docs/SERVER.md` "Online lobby". Build handoff: `docs/HANDOFF-LOBBY.md`. Decisions are Vilhelm's (2026-11-04) unless marked *proposal* or *open*.
 Builds on the server described in `docs/SERVER.md` (Room, DuoRoom, TourRoom, accounts).
 
 ---
