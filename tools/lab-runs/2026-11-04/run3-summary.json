@@ -3373,5 +3373,832 @@
       ],
       "hoarderWinRate": 51.7
     }
+  },
+  "run3-tieronly": {
+    "config": {
+      "banSkill": null,
+      "matches": 300,
+      "seed": 810000,
+      "cap": true,
+      "hoarder": "pure",
+      "hoardRounds": 0,
+      "keep": "all",
+      "map": "testgrid",
+      "mirror": true,
+      "maxRounds": 30,
+      "out": "tools/lab-runs/2026-11-04/run3-tieronly.json"
+    },
+    "summary": {
+      "matches": 300,
+      "completed": 300,
+      "unfinished": 0,
+      "wins": [
+        149,
+        151
+      ],
+      "winRate": [
+        49.7,
+        50.3
+      ],
+      "averageRounds": 9.01,
+      "averageHpRemaining": [
+        31.5,
+        32.2
+      ],
+      "damageTaken": [
+        22677,
+        22215
+      ],
+      "referee": {
+        "accepted": 27399,
+        "refused": 1,
+        "desyncs": 6,
+        "refusedBy": {
+          "place (rules)": 1
+        }
+      },
+      "economy": {
+        "sideRounds": 5404,
+        "avgGoldAtRoundStart": 682.2,
+        "avgGoldLeftAtFight": 21.8,
+        "avgGoldSpentPerRound": 660.5,
+        "avgGoldEarnedPerRound": 714.7,
+        "levelUps": 8712,
+        "otherPurchases": {
+          "choosePack": 600,
+          "setTowerType": 600,
+          "takeLoan": 35,
+          "buyTowerSkill2": 342,
+          "buyDeploy": 109,
+          "awaken": 406,
+          "buyTowerSkill": 292,
+          "huntMark": 159,
+          "fortify": 356,
+          "placeMark": 91,
+          "buyMageGen": 454,
+          "spin": 610
+        }
+      },
+      "leaders": [
+        {
+          "name": "Otto - The Gambler",
+          "games": 66,
+          "wins": 33,
+          "winRate": 50
+        },
+        {
+          "name": "Noah - The Bog",
+          "games": 64,
+          "wins": 32,
+          "winRate": 50
+        },
+        {
+          "name": "Emile",
+          "games": 61,
+          "wins": 30,
+          "winRate": 49.2
+        },
+        {
+          "name": "Enzo",
+          "games": 54,
+          "wins": 27,
+          "winRate": 50
+        },
+        {
+          "name": "Matteo - the Gentleman",
+          "games": 52,
+          "wins": 26,
+          "winRate": 50
+        },
+        {
+          "name": "Yot-Yot",
+          "games": 49,
+          "wins": 24,
+          "winRate": 49
+        },
+        {
+          "name": "Zoe",
+          "games": 48,
+          "wins": 24,
+          "winRate": 50
+        },
+        {
+          "name": "Phil",
+          "games": 47,
+          "wins": 24,
+          "winRate": 51.1
+        },
+        {
+          "name": "Frickolas Cage",
+          "games": 46,
+          "wins": 23,
+          "winRate": 50
+        },
+        {
+          "name": "Mubarak - Slime Lord",
+          "games": 46,
+          "wins": 23,
+          "winRate": 50
+        },
+        {
+          "name": "Wilhelm",
+          "games": 45,
+          "wins": 23,
+          "winRate": 51.1
+        },
+        {
+          "name": "Felix",
+          "games": 22,
+          "wins": 11,
+          "winRate": 50
+        }
+      ],
+      "towers": [
+        {
+          "name": "Mage tower",
+          "games": 110,
+          "wins": 42,
+          "winRate": 38.2
+        },
+        {
+          "name": "Keep",
+          "games": 107,
+          "wins": 58,
+          "winRate": 54.2
+        },
+        {
+          "name": "Slime tower",
+          "games": 99,
+          "wins": 48,
+          "winRate": 48.5
+        },
+        {
+          "name": "Bank tower",
+          "games": 97,
+          "wins": 52,
+          "winRate": 53.6
+        },
+        {
+          "name": "Bastion",
+          "games": 96,
+          "wins": 30,
+          "winRate": 31.3
+        },
+        {
+          "name": "Sniper tower",
+          "games": 91,
+          "wins": 70,
+          "winRate": 76.9
+        }
+      ],
+      "skills": [
+        {
+          "name": "Ember Imps: Spitfire",
+          "games": 288,
+          "wins": 126,
+          "winRate": 43.8
+        },
+        {
+          "name": "Fire Mage: Long reach",
+          "games": 259,
+          "wins": 110,
+          "winRate": 42.5
+        },
+        {
+          "name": "Earth Wizard: Regeneration",
+          "games": 243,
+          "wins": 119,
+          "winRate": 49
+        },
+        {
+          "name": "Fire Mage: Armor and health",
+          "games": 242,
+          "wins": 101,
+          "winRate": 41.7
+        },
+        {
+          "name": "Skeleton Archers: Longbones",
+          "games": 231,
+          "wins": 119,
+          "winRate": 51.5
+        },
+        {
+          "name": "Sniper: Ranger scope",
+          "games": 223,
+          "wins": 102,
+          "winRate": 45.7
+        },
+        {
+          "name": "Fire Mage: Dual Flame",
+          "games": 222,
+          "wins": 104,
+          "winRate": 46.8
+        },
+        {
+          "name": "Ember Imps: Flare",
+          "games": 188,
+          "wins": 79,
+          "winRate": 42
+        },
+        {
+          "name": "Skeleton Archers: Graverot arrows",
+          "games": 169,
+          "wins": 77,
+          "winRate": 45.6
+        },
+        {
+          "name": "Sniper: Deadeye",
+          "games": 162,
+          "wins": 72,
+          "winRate": 44.4
+        },
+        {
+          "name": "Earth Wizard: Stone spikes",
+          "games": 158,
+          "wins": 90,
+          "winRate": 57
+        },
+        {
+          "name": "Goblin Swarm: AAARGH!",
+          "games": 152,
+          "wins": 70,
+          "winRate": 46.1
+        },
+        {
+          "name": "Slime Wizard: Slow",
+          "games": 125,
+          "wins": 67,
+          "winRate": 53.6
+        },
+        {
+          "name": "Ember Imps: Ember Mortar",
+          "games": 118,
+          "wins": 53,
+          "winRate": 44.9
+        },
+        {
+          "name": "Slimeshots: Long reach",
+          "games": 109,
+          "wins": 50,
+          "winRate": 45.9
+        },
+        {
+          "name": "Goblin Swarm: Tacticalness",
+          "games": 106,
+          "wins": 50,
+          "winRate": 47.2
+        },
+        {
+          "name": "Slimeshots: Heavy shot",
+          "games": 103,
+          "wins": 45,
+          "winRate": 43.7
+        },
+        {
+          "name": "Earth Wizard: Living armor",
+          "games": 95,
+          "wins": 31,
+          "winRate": 32.6
+        },
+        {
+          "name": "Slime Wizard: Long reach",
+          "games": 94,
+          "wins": 54,
+          "winRate": 57.4
+        },
+        {
+          "name": "Skeleton Archers: Dread rangers",
+          "games": 81,
+          "wins": 54,
+          "winRate": 66.7
+        },
+        {
+          "name": "Sniper: Assaultgunner",
+          "games": 68,
+          "wins": 34,
+          "winRate": 50
+        },
+        {
+          "name": "Meteor Caller: Slow",
+          "games": 65,
+          "wins": 41,
+          "winRate": 63.1
+        },
+        {
+          "name": "Steel Wizard: Heavy metal",
+          "games": 65,
+          "wins": 40,
+          "winRate": 61.5
+        },
+        {
+          "name": "Goblin Swarm: More where that came from",
+          "games": 62,
+          "wins": 26,
+          "winRate": 41.9
+        },
+        {
+          "name": "Meteor Caller: Long reach",
+          "games": 49,
+          "wins": 35,
+          "winRate": 71.4
+        },
+        {
+          "name": "Steel Wizard: Reforge",
+          "games": 42,
+          "wins": 23,
+          "winRate": 54.8
+        },
+        {
+          "name": "Flame Wizard: Long reach",
+          "games": 36,
+          "wins": 16,
+          "winRate": 44.4
+        },
+        {
+          "name": "Wisps: Sightweavers",
+          "games": 36,
+          "wins": 18,
+          "winRate": 50
+        },
+        {
+          "name": "Ent: Forward planting",
+          "games": 35,
+          "wins": 13,
+          "winRate": 37.1
+        },
+        {
+          "name": "Flame Wizard: Armor and health",
+          "games": 33,
+          "wins": 10,
+          "winRate": 30.3
+        },
+        {
+          "name": "Ent: Reinforced Bark",
+          "games": 27,
+          "wins": 11,
+          "winRate": 40.7
+        },
+        {
+          "name": "Wisps: Spirit walk",
+          "games": 26,
+          "wins": 15,
+          "winRate": 57.7
+        },
+        {
+          "name": "Steel Wizard: Shape Titanium spears",
+          "games": 25,
+          "wins": 16,
+          "winRate": 64
+        },
+        {
+          "name": "Wisps: Transphysical",
+          "games": 22,
+          "wins": 13,
+          "winRate": 59.1
+        },
+        {
+          "name": "Ent: Explode on death",
+          "games": 21,
+          "wins": 9,
+          "winRate": 42.9
+        },
+        {
+          "name": "Frost Wizard: Deepfreeze",
+          "games": 15,
+          "wins": 8,
+          "winRate": 53.3
+        },
+        {
+          "name": "Wisps: Shadowborn",
+          "games": 15,
+          "wins": 6,
+          "winRate": 40
+        },
+        {
+          "name": "Water Mage: Waterbomb",
+          "games": 13,
+          "wins": 6,
+          "winRate": 46.2
+        },
+        {
+          "name": "Frost Wizard: Multibeam",
+          "games": 12,
+          "wins": 7,
+          "winRate": 58.3
+        },
+        {
+          "name": "Ent: Grasping roots",
+          "games": 10,
+          "wins": 3,
+          "winRate": 30
+        },
+        {
+          "name": "Water Mage: Pool shaper",
+          "games": 8,
+          "wins": 4,
+          "winRate": 50
+        },
+        {
+          "name": "Frost Wizard: Snow storm",
+          "games": 5,
+          "wins": 3,
+          "winRate": 60
+        },
+        {
+          "name": "Water Mage: Summon water elemental",
+          "games": 5,
+          "wins": 4,
+          "winRate": 80
+        },
+        {
+          "name": "Frost Wizard: Glacial gaze",
+          "games": 4,
+          "wins": 3,
+          "winRate": 75
+        },
+        {
+          "name": "Water Mage: Flow state",
+          "games": 4,
+          "wins": 2,
+          "winRate": 50
+        },
+        {
+          "name": "Brute: Rampager",
+          "games": 2,
+          "wins": 0,
+          "winRate": 0
+        },
+        {
+          "name": "Brute: Tuff skin",
+          "games": 2,
+          "wins": 0,
+          "winRate": 0
+        },
+        {
+          "name": "Brute: Berserkers",
+          "games": 1,
+          "wins": 0,
+          "winRate": 0
+        }
+      ]
+    },
+    "hoard": {
+      "matches": 300,
+      "decided": 300,
+      "hoarderWins": 171,
+      "capLost": {
+        "hoarder": 0,
+        "normal": 0,
+        "matchesWithLossHoarder": 0
+      },
+      "byRound": [
+        {
+          "round": 1,
+          "matchesStillGoing": 300,
+          "hoarderRoundWinPct": 44.7,
+          "normalRoundWinPct": 55,
+          "goldStart": [
+            250,
+            250
+          ],
+          "spent": [
+            238.5,
+            236.7
+          ],
+          "armyValue": [
+            477.3,
+            478.3
+          ],
+          "dmgTaken": [
+            4.1,
+            3.5
+          ],
+          "capWouldLoseHoarder": 0
+        },
+        {
+          "round": 2,
+          "matchesStillGoing": 300,
+          "hoarderRoundWinPct": 51.7,
+          "normalRoundWinPct": 48.3,
+          "goldStart": [
+            311.5,
+            312.8
+          ],
+          "spent": [
+            286.3,
+            287
+          ],
+          "armyValue": [
+            666.5,
+            669.5
+          ],
+          "dmgTaken": [
+            4.8,
+            5
+          ],
+          "capWouldLoseHoarder": 0
+        },
+        {
+          "round": 3,
+          "matchesStillGoing": 300,
+          "hoarderRoundWinPct": 49.7,
+          "normalRoundWinPct": 49.7,
+          "goldStart": [
+            426,
+            428.2
+          ],
+          "spent": [
+            403.5,
+            406.8
+          ],
+          "armyValue": [
+            905.8,
+            886.8
+          ],
+          "dmgTaken": [
+            5.6,
+            6.1
+          ],
+          "capWouldLoseHoarder": 0
+        },
+        {
+          "round": 4,
+          "matchesStillGoing": 300,
+          "hoarderRoundWinPct": 49.7,
+          "normalRoundWinPct": 49,
+          "goldStart": [
+            556.7,
+            559.7
+          ],
+          "spent": [
+            536.8,
+            538
+          ],
+          "armyValue": [
+            1237.2,
+            1179.5
+          ],
+          "dmgTaken": [
+            6.6,
+            7.7
+          ],
+          "capWouldLoseHoarder": 0
+        },
+        {
+          "round": 5,
+          "matchesStillGoing": 300,
+          "hoarderRoundWinPct": 54.3,
+          "normalRoundWinPct": 44.7,
+          "goldStart": [
+            678.8,
+            675.2
+          ],
+          "spent": [
+            656.8,
+            651.2
+          ],
+          "armyValue": [
+            1671.2,
+            1530
+          ],
+          "dmgTaken": [
+            6.4,
+            9.7
+          ],
+          "capWouldLoseHoarder": 0
+        },
+        {
+          "round": 6,
+          "matchesStillGoing": 296,
+          "hoarderRoundWinPct": 52.7,
+          "normalRoundWinPct": 47.3,
+          "goldStart": [
+            778.2,
+            823
+          ],
+          "spent": [
+            755.4,
+            798
+          ],
+          "armyValue": [
+            2168.1,
+            1995.8
+          ],
+          "dmgTaken": [
+            8.5,
+            10.3
+          ],
+          "capWouldLoseHoarder": 0
+        },
+        {
+          "round": 7,
+          "matchesStillGoing": 276,
+          "hoarderRoundWinPct": 53.6,
+          "normalRoundWinPct": 46.4,
+          "goldStart": [
+            889.3,
+            894.2
+          ],
+          "spent": [
+            869.9,
+            871.4
+          ],
+          "armyValue": [
+            2776.3,
+            2505.4
+          ],
+          "dmgTaken": [
+            9.7,
+            11.8
+          ],
+          "capWouldLoseHoarder": 0
+        },
+        {
+          "round": 8,
+          "matchesStillGoing": 231,
+          "hoarderRoundWinPct": 53.7,
+          "normalRoundWinPct": 46.3,
+          "goldStart": [
+            986.4,
+            987.9
+          ],
+          "spent": [
+            964.3,
+            962.1
+          ],
+          "armyValue": [
+            3440,
+            3099.1
+          ],
+          "dmgTaken": [
+            10.4,
+            13.3
+          ],
+          "capWouldLoseHoarder": 0
+        },
+        {
+          "round": 9,
+          "matchesStillGoing": 177,
+          "hoarderRoundWinPct": 53.1,
+          "normalRoundWinPct": 46.3,
+          "goldStart": [
+            1054.8,
+            1090.1
+          ],
+          "spent": [
+            1032.2,
+            1065.5
+          ],
+          "armyValue": [
+            4127.4,
+            3765
+          ],
+          "dmgTaken": [
+            11.3,
+            13.1
+          ],
+          "capWouldLoseHoarder": 0
+        },
+        {
+          "round": 10,
+          "matchesStillGoing": 117,
+          "hoarderRoundWinPct": 48.7,
+          "normalRoundWinPct": 51.3,
+          "goldStart": [
+            1170.1,
+            1170.9
+          ],
+          "spent": [
+            1151.7,
+            1147.9
+          ],
+          "armyValue": [
+            4914.1,
+            4582.1
+          ],
+          "dmgTaken": [
+            13.3,
+            13.3
+          ],
+          "capWouldLoseHoarder": 0
+        },
+        {
+          "round": 11,
+          "matchesStillGoing": 65,
+          "hoarderRoundWinPct": 46.2,
+          "normalRoundWinPct": 53.8,
+          "goldStart": [
+            1250.8,
+            1265.4
+          ],
+          "spent": [
+            1224.6,
+            1240
+          ],
+          "armyValue": [
+            5861.5,
+            5456.9
+          ],
+          "dmgTaken": [
+            13.6,
+            11.7
+          ],
+          "capWouldLoseHoarder": 0
+        },
+        {
+          "round": 12,
+          "matchesStillGoing": 27,
+          "hoarderRoundWinPct": 40.7,
+          "normalRoundWinPct": 55.6,
+          "goldStart": [
+            1375.9,
+            1366.7
+          ],
+          "spent": [
+            1359.3,
+            1329.6
+          ],
+          "armyValue": [
+            6772.2,
+            6281.5
+          ],
+          "dmgTaken": [
+            13.9,
+            11.4
+          ],
+          "capWouldLoseHoarder": 0
+        },
+        {
+          "round": 13,
+          "matchesStillGoing": 9,
+          "hoarderRoundWinPct": 77.8,
+          "normalRoundWinPct": 22.2,
+          "goldStart": [
+            1450,
+            1427.8
+          ],
+          "spent": [
+            1427.8,
+            1405.6
+          ],
+          "armyValue": [
+            7844.4,
+            7288.9
+          ],
+          "dmgTaken": [
+            5.2,
+            21.9
+          ],
+          "capWouldLoseHoarder": 0
+        },
+        {
+          "round": 14,
+          "matchesStillGoing": 3,
+          "hoarderRoundWinPct": 66.7,
+          "normalRoundWinPct": 33.3,
+          "goldStart": [
+            1583.3,
+            1600
+          ],
+          "spent": [
+            1550,
+            1566.7
+          ],
+          "armyValue": [
+            8766.7,
+            8783.3
+          ],
+          "dmgTaken": [
+            8,
+            19.7
+          ],
+          "capWouldLoseHoarder": 0
+        },
+        {
+          "round": 15,
+          "matchesStillGoing": 1,
+          "hoarderRoundWinPct": 100,
+          "normalRoundWinPct": 0,
+          "goldStart": [
+            1600,
+            1700
+          ],
+          "spent": [
+            1550,
+            1700
+          ],
+          "armyValue": [
+            10050,
+            9550
+          ],
+          "dmgTaken": [
+            0,
+            35
+          ],
+          "capWouldLoseHoarder": 0
+        }
+      ],
+      "hoarderWinRate": 57
+    }
   }
 }

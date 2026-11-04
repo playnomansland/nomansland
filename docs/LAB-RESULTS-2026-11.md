@@ -12,6 +12,35 @@ Files: merged summaries in tools/lab-runs/2026-11-04/*summary*.json and the prob
 (about 12 MB per 330 matches) are not committed. Tools: tools/lab-merge.js, lab-tables.js, lab-hoard.js,
 lab-probe-new.js.
 
+## Summary
+
+Five runs plus a paired A/B: about 5,000 matches and 1,120 probe battles. 0 refused and 0 desyncs in every normal run. The hoarder
+runs had at most 2% desyncs, all from one lab artefact (Otto's slot machine, explained in run 3).
+
+Clear signals
+- Sniper tower wins 84% on Standard (z 12) and 77-80% on every other map. Bastion (33%) and Mage tower (37-38%) are
+  weak everywhere.
+- Enzo wins 82-83% on every map (z 8-10), whichever tower he has.
+- No side bias on Standard (49.0%, n=1000; the 56/44 at n=200 was noise). On Cavern, Forest and Ice together side 1
+  wins about 54% (z -3).
+- Hunter costs the AI matches: banning it raises the side's win rate 2.7 points overall and 12 points where it was
+  used (paired, z 2.9).
+- The AI never buys a Sun Priest, and buys Water Mages (2%) and Spiders (5%) too rarely to rate in matches. In the
+  probe, Spiders are well below even unless they take Spiderlings, and the water elemental is a large upgrade.
+- The carry cap neutralises pure hoarding (77.7% without the cap, 50.7% with it). Floating 500 and spiking in round 4
+  still beats the normal AI 63.7% with the cap on, about half of that from buying tier 3-4 first.
+
+Noise
+- Most leaders (Yot-Yot, Cage, Phil, Matteo, Emile) are within the intervals of 50%. Felix and Zoe moving between
+  Standard and the other maps is 2-3 SE, could be chance.
+
+Top questions (details in each section)
+1. Sniper tower and Enzo: strong for humans too, or strong against this AI? A look at ranked match history would tell.
+2. Bastion and Mage tower: weak towers, or towers the AI doesn't use?
+3. Hunter: is the 300-gold price the problem, or how the AI picks its mark and when it awakens?
+4. Keep-500 hoarding at 64% with the cap on: a strategy you want to exist?
+5. Side 1 at about 54% on the non-Standard maps: map asymmetry, or AI placement?
+
 
 ## Run 1: leaders, towers, side bias (1000 matches, --no-mirror, seeds 800000-800999)
 
@@ -160,7 +189,25 @@ Questions
 
 ## Run 2b: Hunter A/B (paired)
 
-(pending: 1000 matches on run 1's seeds; one side's AI never sees Hunter)
+1000 matches on run 1's seeds (800000-800999, --no-mirror), tools/lab-hoard.js --hoarder none --ban-skill
+Sniper:hunter. On each seed one side's AI (side 0 on even seeds, side 1 on odd) is shown the Sniper without Hunter, so
+it never awakens one. Everything else is the same as run 1, so each match is compared with its own run 1 match.
+0 refused, 0 desyncs; the banned side awakened a Sniper 0 times. Matches where no Hunter was ever bought came out
+identical to run 1, which checks the setup.
+
+    Banned side's win rate        run 1 (Hunter allowed)   run 2b (no Hunter)
+    All 1000 matches              48.0%                    50.7%
+    The 266 where it used Hunter  36.8%                    49.2% (43-55)
+
+    Same result in both runs: 915. Flipped to a win without Hunter: 56. Flipped to a loss: 29. Sign test z = 2.93.
+
+Clear signal
+- Hunter, as the AI uses it, costs it matches: about +2.7 points of overall win rate when it can't buy it, +12 points
+  in the matches where it did. So about 12 of the 16-point gap in run 1 is caused by Hunter. The rest is which
+  matches the AI buys it in.
+- This measures the AI's use of Hunter (it awakens at random, 30% per eligible squad, and marks the priciest enemy
+  squad). The probe says Hunter on one squad is about worth its price in a straight fight at 3000 gold, so the loss
+  is probably the 300 gold spent mid-game rather than the effect itself.
 
 
 ## Run 3: carry cap and hoarding (300 matches per setup, seeds 810000-810299, mirrored offers)
@@ -213,17 +260,25 @@ Noise and limits
 - The opponent is the AI, which does not react to a hoarder (it sees the hoarder's empty board and spends as usual).
   A human seeing an empty board in round 2 might punish it or save too.
 
-Control: the same tier 3-4 preference with no hoarding (--hoard-rounds 0, cap on)
+Control: the same tier 3-4 preference with no hoarding (--hoard-rounds 0, cap on, same seeds)
 
-(pending)
+    Tier 3-4 first, no saving     171 / 300      57.0   51-63     2.42   0
+
+(No tier filter in round 1: a first attempt with it desynced every match, because the package's free squads are placed
+according to which units are left out. That attempt is kept as run3-tieronly-v1 in run3-summary.json, superseded.
+This run: 6 desyncs and 1 refused, all from Otto's slot machine as above.)
+
+So "buy tier 3-4 first" alone is worth about +7 points against the normal AI (borderline, z 2.4). Splitting the
+keep-500 hoarder's 63.7%: about 7 points from the tier preference, about 7 from saving to the cap and spiking. The
+pure hoarder with the cap off (77.7%) gets about 20 points from the saving itself.
 
 Questions
 1. Keep-500 hoarding beats the normal AI 64% with the cap on. Is "save 500, spike in round 4" a strategy you want
    to exist? If not, is the lever the cap's size, or the income curve?
 2. Pure hoarding takes about 47 damage in 3 rounds, nearly half a player's health, and still breaks even. Is the
    35-per-round damage cap (MAX_ROUND_DMG) making early losses too cheap?
-3. Does the normal AI under-buy tier 3-4 units? (The control answers this; if it does, the AI's drafting rather than
-   the economy is part of what this run measures.)
+3. The normal AI gains about 7 points by buying tier 3-4 first (control, 57%). Is the AI's drafting (spread over
+   cheap counters) holding back every lab number on late-game units, including the 500-gold units it never buys?
 
 
 ## Run 4: maps (1500 matches, --map random, --no-mirror, seeds 820000-821499)

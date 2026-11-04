@@ -1,0 +1,20 @@
+{
+  "n": 1000,
+  "refused": 0,
+  "desyncs": 0,
+  "bannedSideWinPct": {
+    "run1": 48,
+    "ban": 50.7
+  },
+  "sameOutcome": 915,
+  "flips": {
+    "toWin": 56,
+    "toLoss": 29
+  },
+  "signTestZ": 2.9285611805518585,
+  "hunterUsersInRun1": {
+    "n": 266,
+    "winPctRun1": 36.8421052631579,
+    "winPctBan": 49.24812030075188
+  }
+}
