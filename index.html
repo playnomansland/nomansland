@@ -486,6 +486,8 @@ html.dock .panel.shut .dock-gold { display: inline; font-size: 15px; }
 html.dock .bar > .task { position: static; flex: 1 1 0; min-width: 0; margin: 0; padding: 4px 4px 4px 8px; box-shadow: none; }
 html.dock .bar > .task .task-x { width: 28px; height: 28px; }
 html.dock .bar:has(> .task:not([hidden])) > .hint { display: none; }
+.task.through { pointer-events: none; } /* a direction arrow: a tap on the line goes to the tile under it, only the X cancels */
+.task.through .task-x { pointer-events: auto; cursor: pointer; }
 .task .task-x { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); font-size: 16px; line-height: 1; display: grid; place-items: center; }
 /* tutorial: the coach line over the board, a ring on what it talks about, and a glow on the next thing to tap */
 .board-banner { position: absolute; left: 0; right: 0; top: 42%; z-index: 4; pointer-events: none; text-align: center; padding: 14px 8px; background: linear-gradient(90deg, transparent, rgba(13, 19, 21, 0.88) 18%, rgba(13, 19, 21, 0.88) 82%, transparent); border-top: 1px solid var(--gold); border-bottom: 1px solid var(--gold); color: var(--gold); font-size: 26px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; animation: banner-in 3.2s ease both; }
@@ -11148,7 +11150,8 @@ Floors.floor = (() => {
     taskEl.hidden = !showTask;
     if (showTask) { // the whole line is the X: a tap anywhere on it stops placing (when there's something to stop)
       taskEl.querySelector('#task-text').innerHTML = dockTask.text;
-      taskEl.disabled = !dockTask.x; taskEl.querySelector('#task-x').hidden = taskEl.querySelector('#task-cancel').hidden = !dockTask.x;
+      taskEl.disabled = !dockTask.x; taskEl.querySelector('#task-x').hidden = !dockTask.x; taskEl.querySelector('#task-cancel').hidden = !dockTask.x || !!dockTask.through;
+      taskEl.classList.toggle('through', !!dockTask.through);
       taskEl.setAttribute('aria-label', dockTask.x ? `${taskEl.querySelector('#task-text').textContent} Tap to cancel.` : taskEl.querySelector('#task-text').textContent);
     }
     // a PC in a match on the 3D board: the board takes the rest of the window beside the side panel, deploy and fights alike
@@ -11900,6 +11903,7 @@ Floors.floor = (() => {
     helpTip = inline ? '' : hint;
     // phone: the task the next board tap is for, shown over the board while the drawer is down (dock())
     dockTask = !can ? null : placingTower() ? { text: hint, x: false }
+      : aimMode != null ? { text: `Direction: tap where it walks first (up to ${Game.AIM.maxTiles} tiles), or drag from the squad.`, x: true, through: true } // short, and a tap on it reaches the tile under it (a far tap on a phone lands there)
       : moveMode || (charmMode && Game.canGiveCharm(m, me)) || placingElf() || placingWall() || placingBuilding() || devTask ? { text: hint, x: !(bPlacing != null && Game.unplacedLesser(m, me)) } : null;
     const news = can && selected === null && !fresh && !inline && (Game.hailRound(m) || Game.altarRound(m) || m.round === Game.FLANK.round || (tskillOffer() && m.round === Game.TOWER_PICK_ROUND));
     if (can && !choosingPack() && !choosingTower() && !devPicking()) takeUndoSnap();

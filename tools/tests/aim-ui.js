@@ -82,6 +82,58 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     console.log(board, 'ok', JSON.stringify(walk.dx.map(d => +d.toFixed(1))));
     await p.close();
   }
+  // a phone (390 x 844, touch, the 2D board): the task line sits over the far end of the board, so a far tap lands on
+  // it; it must reach the tile under it (only its X cancels). A drag out of the squad with a finger sets the arrow
+  // without moving the squad, scrolling the page or folding the tray.
+  {
+    const p = await (await ctx2d(b, { viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true })).newPage();
+    p.on('pageerror', e => { errors.push(e.message); console.log('PAGE ERROR', e.message); });
+    const cdp = await p.context().newCDPSession(p);
+    const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y]) => ({ x, y, id: 1 })) });
+    const tapXY = async (x, y) => { await touch('touchStart', [[x, y]]); await sleep(40); await touch('touchEnd', []); await sleep(400); };
+    await p.goto('http://127.0.0.1:8766/?test'); await sleep(500);
+    await p.click('[data-tm="0"]').catch(() => {}); // no deploy clock
+    await p.click('#go'); await sleep(1500);
+    await p.dblclick('[data-pack="0"]'); await sleep(300);
+    const ids = await p.evaluate(() => {
+      const { m, me } = window.__pb(), foe = 1 - me, ix = (n) => m.units.findIndex(u => u.name === n);
+      m.round = 2; m.gold[me] = 5000; m.gold[foe] = 5000; m.armies = [[], []]; m.chars = [null, null];
+      m.unlocks[me][ix('Brute')] = 1;
+      const row = Game.zoneRows(me)[1], fwd = me === 0 ? -1 : 1, br = Game.place(m, me, ix('Brute'), 3, row);
+      window.__pbRedraw();
+      return { br: br.id, row, fwd, me, cols: Game.COLS, rows: Game.ROWS };
+    });
+    const at = (c, r) => p.locator('#board').boundingBox().then(bb => { const f = ids.me === 1, sc = f ? ids.cols - 1 - c : c, sr = f ? ids.rows - 1 - r : r; return [bb.x + (sc + .5) * bb.width / ids.cols, bb.y + (sr + .5) * bb.height / ids.rows]; });
+    const tap = async (c, r) => { const [x, y] = await at(c, r); await tapXY(x, y); };
+    const tapEl = async (sel) => { const bb = await p.locator(sel).boundingBox(); await tapXY(bb.x + bb.width / 2, bb.y + bb.height / 2); };
+    const st = () => p.evaluate((id) => { const { m, me } = window.__pb(), s = m.armies[me].find(q => q.id === id), t = document.getElementById('task');
+      return { pos: [s.col, s.row], aim: s.aim || null, scrollY, panel: document.getElementById('panel').className, task: !t.hidden }; }, ids.br);
+    const aimOn = async () => { await tap(3, ids.row); await tapEl('#sheet [data-act="aim"]'); await sleep(300); assert.ok((await st()).task, 'the task line shows'); };
+    // the X cancels
+    await aimOn();
+    const tb = await p.locator('#task-x').boundingBox();
+    await tapXY(tb.x + tb.width / 2, tb.y + tb.height / 2);
+    assert.ok(!(await st()).task && (await st()).aim === null, 'the X cancels');
+    // a far tap on the task line: it reaches the tile under it, the arrow cut down to its most
+    await aimOn();
+    const tr = await p.locator('#task').boundingBox(), fx = tr.x + 30, fy = tr.y + tr.height / 2; // on the task line's text, over the far tiles
+    await tapXY(fx, fy);
+    const fa = (await st()).aim;
+    assert.ok(fa && fa.dc * fa.dc + fa.dr * fa.dr <= 25 && Math.sign(fa.dr) === ids.fwd && !(await st()).task, `a tap on the task line sets the arrow (cut down): ${JSON.stringify(fa)}`);
+    // a finger drag out of the squad
+    await aimOn();
+    const s0 = await st(), [x0, y0] = await at(3, ids.row), [x1, y1] = await at(6, ids.row + ids.fwd * 2);
+    await touch('touchStart', [[x0, y0]]); await sleep(60);
+    for (let k = 1; k <= 10; k++) { await touch('touchMove', [[x0 + (x1 - x0) * k / 10, y0 + (y1 - y0) * k / 10]]); await sleep(30); }
+    await touch('touchEnd', []); await sleep(500);
+    const s1 = await st();
+    assert.deepStrictEqual(s1.aim, { dc: 3, dr: ids.fwd * 2 }, `finger drag: ${JSON.stringify(s1.aim)}`);
+    assert.deepStrictEqual(s1.pos, s0.pos, 'the squad stays');
+    assert.strictEqual(s1.scrollY, s0.scrollY, 'no scroll');
+    assert.strictEqual(s1.panel, s0.panel, 'the tray stays as it was');
+    console.log('phone ok');
+    await p.close();
+  }
   await b.close();
   assert.deepStrictEqual(errors, []);
   console.log('aim-ui ok');
