@@ -42,6 +42,11 @@ class_name = "HistoryRoom"
 name = "LOBBY"
 class_name = "LobbyRoom"
 
+# Friends (2026-11-04): one PlayerHub per player (named by the player id): online status, game invites, private messages.
+[[durable_objects.bindings]]
+name = "HUB"
+class_name = "PlayerHub"
+
 # Accounts (step 5): the D1 database nml-accounts (on since 2026-11-02). Without this block /account/* answers 503
 # 'accounts off' and nothing else changes. The tables are made by the Worker itself (accounts.js, ensureSchema).
 # Developer mode: the secret DEV_EMAILS (set by the deploy workflow from the GitHub secret of the same name).
@@ -74,6 +79,11 @@ new_sqlite_classes = ["DuoRoom"]
 [[migrations]]
 tag = "v5"
 new_sqlite_classes = ["LobbyRoom"]
+
+# friends (2026-11-04), after the lobby's "v5"
+[[migrations]]
+tag = "hub-1"
+new_sqlite_classes = ["PlayerHub"]
 
 [observability]
 enabled = true

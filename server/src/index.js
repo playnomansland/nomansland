@@ -14,6 +14,7 @@
 //   GET /lobby            -> WebSocket into the online lobby (LobbyRoom: the list of public rooms); without Upgrade: the list once
 //   GET /leaderboard       -> ranked players with wins, ties and losses, and whether ranked play is on (accounts.js)
 //   POST /account/<route>  -> accounts (step 5; guest, me, google, tag, signout, delete, title, skin, ranked, invite, discord): see accounts.js
+//   GET /hub?p=<PLAYER>    -> WebSocket into that player's PlayerHub (friends: online status, invites, private messages; hub.js)
 // Cron (wrangler.toml [triggers], hourly): month end, the Legend title for the leaderboard's top 5 (accounts.js awardLegends),
 // and skins given to a gamertag (accounts.js grantSkins)
 import { json } from './limits.js';
@@ -24,6 +25,7 @@ export { TourRoom } from './tour.js';
 export { HistoryRoom } from './history.js';
 export { DuoRoom } from './duo.js';
 export { LobbyRoom } from './lobby.js';
+export { PlayerHub } from './hub.js'; // friends (2026-11-04)
 
 const CODE_RE = /^[A-Z0-9]{4,8}$/;
 
@@ -88,6 +90,17 @@ export default {
       const headers = new Headers({ 'x-origin': request.headers.get('Origin'), 'x-ip': request.headers.get('CF-Connecting-IP') || '' });
       try { return await env.HISTORY.getByName('all').fetch(new Request('https://history/?' + q, { headers })); }
       catch (e) { console.warn('history read', e && e.message); return json({ error: 'history unavailable' }, 503, cors); }
+    }
+
+    // friends (2026-11-04): one hub per player, named by the (public) player id; hello { session } proves who it is
+    if (url.pathname === '/hub') {
+      const p = url.searchParams.get('p') || '';
+      if (!/^p[0-9a-f]{16}$/.test(p)) return json({ error: 'bad player' }, 400);
+      if (request.headers.get('Upgrade') !== 'websocket') return json({ error: 'websocket only' }, 426);
+      if (!allowedOrigin(request, env)) return json({ error: 'origin' }, 403);
+      if (!env.HUB || !env.ACCOUNTS) return json({ error: 'friends off' }, 503);
+      const headers = new Headers(request.headers); headers.set('x-player', p);
+      return env.HUB.getByName(p).fetch(new Request(request, { headers }));
     }
 
     const m = url.pathname.match(/^\/(room|tour|duo)\/([^/]+)$/);
