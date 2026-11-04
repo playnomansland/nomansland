@@ -15,12 +15,12 @@ Stages 1 and 2 are built, tested and live (switched on the same evening: D1 boun
 - Developer mode (Vilhelm, 2026-11-02): his Google account gets every feature now and later. Server flag `dev` from the secret DEV_EMAILS (GitHub secret -> Cloudflare secret in the deploy workflow; the sandbox can't set GitHub secrets). Page: `devMode()`. Any future per-player lock must let developers through.
 - New address (Vilhelm, 2026-11-02): the site moves to https://playnomansland.github.io after Sunday's tournament. Vilhelm made the GitHub organization playnomansland (2026-11-02) and transfers the repo after Sunday; then rename it playnomansland.github.io, change the server's "Play at" note (server/src/index.js), drop snetendare.github.io from ALLOWED_ORIGINS some weeks later, add the new origin to the Google OAuth client, update README/docs links. Already done: playnomansland.github.io is in ALLOWED_ORIGINS. Phones' saved data (tournament keys, settings, account session) does not follow to the new address.
 - Setup done 2026-11-02 (see docs/SERVER.md). Vilhelm still to check by hand: Sign in with Google on the live site shows Developer mode.
-- Flaky: server/test/match.test.js failed once in CI ('phone and server in step', the random map and leaders match); a rerun passed and it passed locally. Look at it after Sunday (a rare phone/server difference; real phones get resynced by the server). Then: uncomment and fill the `[[d1_databases]]` block, add `GOOGLE_CLIENT_ID` to `[vars]` and to the page, push, and check `/account/guest` from the live page (WebFetch can't, it has no game Origin). The accounts tests then use the real block's binding locally (accountsConfig() skips the copy).
-- Next (stage 3, after Sunday 2026-11-08): tournament joins and match history rows carry the player id; history per player.
+- Flaky: server/test/match.test.js failed once in CI ('phone and server in step', the random map and leaders match); a rerun passed and it passed locally. Look at it (a rare phone/server difference; real phones get resynced by the server). Then: uncomment and fill the `[[d1_databases]]` block, add `GOOGLE_CLIENT_ID` to `[vars]` and to the page, push, and check `/account/guest` from the live page (WebFetch can't, it has no game Origin). The accounts tests then use the real block's binding locally (accountsConfig() skips the copy).
+- Next (stage 3, no longer waiting for the tournament): tournament joins and match history rows carry the player id; history per player.
 
-## Hard rule this week
+## Freeze (cancelled)
 
-There is a real tournament on Sunday 2026-11-08 on server matches. Nothing that changes match play may be deployed after Saturday 2026-11-07: `src/referee.js`, the Room's act/ready/fight flow (`server/src/room.js`), the page's 'net' mode, and the tournament flow (`server/src/tour.js`, `src/tournament.js`). Accounts must be built beside them, not inside them, until after Sunday. If a step 5 change needs to touch any of these, do it after the tournament, or keep it behind a switch that is off and leaves today's code path unchanged.
+The match-play freeze planned for the Sunday 2026-11-08 tournament was cancelled by Vilhelm on 2026-11-05: the tournament is uncertain, and if it happens it's just for fun. Accounts can now be wired into room.js, tour.js and history whenever it suits.
 
 Also: every deploy runs the server tests first. A push that touches `server/**` or the game rules deploys within minutes.
 
@@ -54,7 +54,7 @@ Still to confirm by hand (once): play one online round on the live site and open
 
 1. Storage and API, headless: guest create, Google sign-in (verify the ID token; test with a locally signed token and a test key set, since tests can't reach Google), session check, rename username, sign out, delete account. Rate limits and origin check like the rest. Tests in `server/test/` in the style of `history.test.js` (fresh ids, `startServer` from `test/harness.js`, which takes extra wrangler args).
 2. Page: an account sheet from the start screen (guest name, Sign in with Google, sign out, delete). Loads Google's script only when the sheet opens. Browser test in `tools/tests/` like `server-history-ui.js`.
-3. After Sunday: link tournament players and match history rows to player ids; a guest who signs in keeps their history.
+3. Next: link tournament players and match history rows to player ids; a guest who signs in keeps their history.
 
 At the end: PATCH-NOTES.md, docs/SERVER.md (step 5 entry, what is stored and for how long), README, and this file.
 

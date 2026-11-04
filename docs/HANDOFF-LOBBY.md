@@ -3,8 +3,8 @@
 For the Claude Code session building this (written 2026-11-04). The design is `docs/LOBBY.md`; read it first, then `docs/SERVER.md` (Room, DuoRoom, TourRoom, accounts, limits). Where this file and LOBBY.md differ, LOBBY.md wins. Friends (`docs/FRIENDS.md`) is built at the same time by another agent: see "Working next to the friends agent" below. Players see the word **username**, never "gamertag".
 
 ## Timing and branches
-- Tournament on **Sunday 2026-11-08**. Nothing that changes how online matches start or run may reach the server or the site before **Monday 2026-11-09** (server deploy runs on every push to main that touches `server/`, `src/engine.js`, `src/game.js`, `src/referee.js`, `src/tournament.js` or `src/*.json`).
-- So: work on branch **`lobby`**, push the branch as you go, and merge to main from Monday on (Vilhelm's rule is otherwise "push everything to main").
+- No match-play freeze (Vilhelm cancelled it on 2026-11-05; the Sunday 2026-11-08 tournament is uncertain and just for fun if it happens). Merged to main on 2026-11-04.
+- Pushes to main deploy the server (`server/`, `src/engine.js`, `src/game.js`, `src/referee.js`, `src/tournament.js`, `src/*.json`) and the site, so run the tests before pushing.
 - Read `README.md`, `PATCH-NOTES.md` (top) and the newest commits on main first: other chats push to main while you work. Rebase the branch on main before merging.
 
 ## What to build (in this order; each step mergeable on its own)

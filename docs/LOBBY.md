@@ -159,7 +159,7 @@ Messages (WebSocket `/lobby`):
 
 Tests to add: `server/test/lobby.test.js` (listings appear and vanish, dev filter, ranked rooms need an account, heartbeat expiry, limits), chat checks in `match.test.js` (signed-in only, limits, filter, watchers isolated during the match, merge at the end, split on rematch), `tools/tests/lobby-ui.js`.
 
-Timing: all of this changes how online matches start and adds messages to match rooms, so it goes in **after the tournament on Sunday 2026-11-08** (match-play freeze from Saturday).
+Timing: merged to main on 2026-11-04. The match-play freeze planned around the Sunday 2026-11-08 tournament was cancelled on 2026-11-05.
 
 ---
 

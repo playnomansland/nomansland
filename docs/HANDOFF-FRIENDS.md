@@ -8,8 +8,8 @@ Another agent builds the online lobby, room chat and emotes at the same time (`d
 Players see **username**, never "gamertag" (code keeps the existing `tag` names: `players.tag`, `/account/tag`).
 
 ## Timing and branches
-- Tournament on **Sunday 2026-11-08**. Nothing that changes how online matches start or run may reach the server or the site before **Monday 2026-11-09**. Pushes to main deploy the server (any change under `server/`, `src/engine.js`, `src/game.js`, `src/referee.js`, `src/tournament.js`, `src/*.json`) and the site.
-- So: work on branch **`friends`**, push the branch as you go, merge to main from Monday on (Vilhelm's rule is otherwise "push everything to main").
+- No match-play freeze (Vilhelm cancelled it on 2026-11-05; the Sunday 2026-11-08 tournament is uncertain and just for fun if it happens). Merged to main on 2026-11-04.
+- Pushes to main deploy the server (`server/`, `src/engine.js`, `src/game.js`, `src/referee.js`, `src/tournament.js`, `src/*.json`) and the site, so run the tests before pushing.
 - Read `README.md`, `PATCH-NOTES.md` (top) and the newest commits on main first. Rebase on main before merging.
 
 ## What to build (in this order; each step mergeable on its own)
