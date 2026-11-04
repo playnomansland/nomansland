@@ -198,6 +198,8 @@ const code = () => 'H' + Math.random().toString(36).slice(2, 6).toUpperCase().re
     await sleep(3100);
     await burst(e1, F.id, 6, 'h');
     await waitFor(() => e1.inbox.some((x) => x.t === 'dmFail' && x.why === 'slow down'), 8000);
+    await waitFor(() => e1.inbox.filter((x) => x.t === 'dm' && x.to === F.id).length >= 60, 8000); // the 60th's echo may come after the 61st's refusal
+    await sleep(500);
     assert.strictEqual(e1.inbox.filter((x) => x.t === 'dm' && x.to === F.id).length, 60, '60 an hour');
 
     // removing a friend deletes the pair's messages
