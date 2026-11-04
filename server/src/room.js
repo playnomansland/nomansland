@@ -15,20 +15,34 @@
 //   once it is decided (2 wins, or 3 games played) the result goes to the leaderboard (recordSeries) and a rematch
 //   starts a new series. Leaving a ranked match (forfeit) loses the whole series.
 //
-// Messages in:  hello { create | key | (nothing: join) | tour id + tkey | watch }, start { settings }, act { seq, fn, a }, ready { v },
-//               next { round }, rematch, forfeit, speed { s }, sync, ping
+// The online lobby (2026-11-04, docs/LOBBY.md): hello { create, public: true } makes a public room, listed in the lobby
+// (LobbyRoom, server/src/lobby.js) while it is open: the room reports its card (listing()) on every change and every
+// LOBBY.heartbeatMs, and drops it when the match is over, the host leaves the waiting room or it sits idle. A public
+// waiting room lets a new player take side 1 when the one who had it left before the start. Spectating is on unless
+// the host turns it off (spectate { on }); off turns watchers away with denied { why: 'no watchers' }.
+// Chat and emotes (server/src/chat.js): chat { text } from a phone signed in with Google, emote { id } from a player.
+// Players' lines go to everyone; a watcher's line goes to watchers only while the match runs, and when it ends the
+// players get them (chatMerge { lines }) and from then on every line goes to everyone, until a rematch starts.
+//
+// Messages in:  hello { create | key | (nothing: join) | tour id + tkey | watch, session?, public?, spectate?, map?, skin? }, start { settings },
+//               act { seq, fn, a }, ready { v }, next { round }, rematch, forfeit, speed { s }, sync, ping,
+//               chat { text }, emote { id }, spectate { on } (host), public { on } (host, before the start), report
 // Messages out: welcome { side, key, seq }, taken, nomatch, lobby { here }, sync { phase, m (view), remaining, held, ready, nextReady,
 //               rematch, summary, ack, here }, ack { seq, ok, h }, status {...}, fight { pre, post, summary },
 //               speed { s }, forfeit { side }, full, denied { why? }, pong. welcome, lobby, sync and fight carry ranked
 //               (the series: { tags, wins, ties, games, best, done, result, forfeit }) in a ranked match, and players
 //               ([side 0, side 1]: { tag, title, skins } of a phone that sent its account session, or null).
+//               Lobby and chat: roomset { pub, spectate, chat (this phone may type) }, chat { from, tag, text, at, w? },
+//               chatLog { lines } (on hello), chatMerge { lines }, emote { from, id }, reported { ok, why? },
+//               denied { why: 'slow down' | 'sign in' | 'no watchers' } (the first two leave the phone in the room).
 import { DurableObject } from 'cloudflare:workers';
 import Game from '../../src/game.js';
 import Ref from '../../src/referee.js';
-import { LIMITS, json, readMessage, secret } from './limits.js';
+import { LIMITS, LOBBY, json, readMessage, secret, ipHash } from './limits.js';
+import { Chat } from './chat.js';
 import { builtin } from './units.js';
 import { roundRow, forfeitRow } from './history.js';
-import { sessionPlayer, rankedOn, recordSeries, countOnline } from './accounts.js';
+import { sessionPlayer, rankedOn, recordSeries, countOnline, chatReport } from './accounts.js';
 import { VERSION } from './version.js';
 
 const KEEP_MS = 24 * 3600 * 1000; // a match nobody touched for a day is deleted
@@ -46,7 +60,10 @@ export class Room extends DurableObject {
     this.rate = new Map();      // socket -> { start, count }; resets if the room hibernates, which is fine
     this.sent = new Map();      // socket -> fingerprint of the last view it got (resend after hibernation: harmless)
     this.lastSelftest = 0;
+    this.chat = new Chat(ctx.storage);
+    this.listed = null;         // the last listing sent to the lobby ({ key, at, l }), in memory
     ctx.blockConcurrencyWhile(async () => {
+      await this.chat.load();
       const { units, matrix } = builtin();
       this.meta = (await ctx.storage.get('meta')) || null;
       this.R = Ref.load(await ctx.storage.get('R'), units, matrix);
@@ -59,7 +76,7 @@ export class Room extends DurableObject {
     if (this.ctx.getWebSockets().length >= LIMITS.maxSockets) return json({ error: 'room full' }, 429);
     const [client, server] = Object.values(new WebSocketPair());
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ code: request.headers.get('x-code') || '', tour: request.headers.get('x-tour') || '' });
+    server.serializeAttachment({ code: request.headers.get('x-code') || '', tour: request.headers.get('x-tour') || '', ip: await ipHash(request.headers.get('CF-Connecting-IP') || '') });
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -77,7 +94,82 @@ export class Room extends DurableObject {
     this.tally();
     await this.ctx.storage.put({ meta: this.meta, R: this.R ? Ref.save(this.R) : null, active: Date.now() });
     const due = this.R ? Ref.due(this.R, Date.now()) : 0;
-    await this.ctx.storage.setAlarm(due || Date.now() + KEEP_MS);
+    let at = due || Date.now() + KEEP_MS;
+    if (this.listing()) at = Math.min(at, Date.now() + this.hbMs()); // a listed room's heartbeat (alarm)
+    await this.ctx.storage.setAlarm(at);
+  }
+
+  hbMs() { return +this.env.LOBBY_HEARTBEAT_MS || LOBBY.heartbeatMs; } // LOBBY_HEARTBEAT_MS: tests only
+  // ----- the online lobby (docs/LOBBY.md) -----
+  isPub() { return !!(this.meta && this.meta.pub && !this.meta.tour); }
+  watchers(gone) { return this.sockets(gone).filter((s) => this.att(s).role === 'w'); }
+  // this room's card in the lobby, or null when it shouldn't be listed
+  listing(gone) {
+    if (!this.isPub()) return null;
+    const R = this.R, M = this.meta, now = Date.now(), here = this.here(gone);
+    const playing = !!(R && R.m && R.phase !== 'lobby');
+    if (playing && R.m.over) return null;
+    if (!playing && (!here[0] || now - (M.waitAt || 0) > (+this.env.LOBBY_IDLE_MS || LOBBY.waitIdleMs))) return null; // the host left, or nobody came
+    const rk = M.ranked, p0 = M.players && M.players[0];
+    const mapId = playing && R.m.map ? R.m.map.id : M.map, map = Game.MAPS.find((x) => x.id === mapId);
+    return {
+      code: M.code || this.code || '', kind: 'match', mode: rk ? 'ranked' : 'standard',
+      host: { tag: rk ? rk.tags[0] : p0 ? p0.tag : 'Player', title: rk ? (rk.titles || [''])[0] : p0 ? p0.title : '' },
+      map: rk ? 'Standard' : map ? map.name : 'Random', look: (R && R.settings && R.settings.skin) || M.look || '',
+      players: playing ? 2 : here.filter(Boolean).length, phase: playing ? 'playing' : 'waiting', round: playing ? R.m.round : 0,
+      watchers: this.watchers(gone).length, spectate: M.spectate !== false, at: M.made || now,
+    };
+  }
+  // tells the lobby about a change of the card (force: the heartbeat). Never awaited by the match; errors are logged.
+  report(opts = {}) {
+    if (!this.env.LOBBY || !this.meta || this.meta.tour) return;
+    const l = this.listing(opts.gone), key = l ? JSON.stringify(l) : '', now = Date.now(), last = this.listed;
+    if (!l && !this.meta.listed) return; // never listed: nothing to take down
+    if (!opts.force && last && last.key === key) return;
+    // only the watcher count moved, and it was sent a moment ago: the next change or heartbeat brings it
+    if (!opts.force && l && last && last.l && now - last.at < LOBBY.watcherEveryMs && JSON.stringify({ ...last.l, watchers: 0 }) === JSON.stringify({ ...l, watchers: 0 })) return;
+    this.listed = { key, at: now, l };
+    this.meta.listed = !!l;
+    const lobby = this.env.LOBBY.getByName('all');
+    const run = (l ? lobby.upsert(l, this.meta.owner || '') : lobby.drop(this.meta.code || this.code || '')).catch((e) => console.warn('lobby report', e && e.message));
+    try { this.ctx.waitUntil(run); } catch {}
+  }
+  roomset(ws) {
+    const a = this.att(ws), side = a.role === 'p' ? a.side : -1;
+    const chat = side >= 0 ? !!(this.meta && this.meta.chatOk && this.meta.chatOk[side]) : !!a.chat;
+    return { t: 'roomset', pub: this.isPub(), spectate: !this.meta || this.meta.spectate !== false, chat };
+  }
+  // ----- chat and emotes -----
+  merged() { const R = this.R; return !R || !R.m || R.phase === 'lobby' || !!R.m.over; }
+  tagOf(side) {
+    const M = this.meta || {};
+    if (M.tour && M.tour.names) return M.tour.names[side] || 'Player';
+    if (M.ranked && M.ranked.tags[side]) return M.ranked.tags[side];
+    return (M.players && M.players[side] && M.players[side].tag) || 'Player ' + (side + 1);
+  }
+  visibleLines(ws) { const w = this.att(ws).role === 'w'; return this.chat.lines.filter((l) => w || !l.hid).slice(-50).map(Chat.out); }
+  async chatIn(ws, a, d) {
+    const side = a.role === 'p' ? a.side : -1, watcher = a.role === 'w';
+    const ok = watcher ? !!a.chat : !!(this.meta && this.meta.chatOk && this.meta.chatOk[side]);
+    if (!ok) return this.send(ws, { t: 'denied', why: 'sign in' });
+    const hidden = watcher && !this.merged();
+    const res = await this.chat.add(watcher ? 'w:' + a.ip + ':' + a.chat : 'p' + side, side, watcher ? a.chat : this.tagOf(side), d.text,
+      watcher ? { w: true, ...(hidden ? { hid: true, seed: this.R.seed } : {}) } : {});
+    if (res.why === 'slow down') return this.send(ws, { t: 'denied', why: 'slow down' });
+    if (!res.line) return;
+    const text = JSON.stringify(Chat.out(res.line));
+    for (const s of this.sockets()) { const r = this.att(s).role; if (r === 'w' || (r === 'p' && !hidden)) this.send(s, text); }
+  }
+  // the match is over: the players get the watchers' lines from it, and from now on every line goes to everyone
+  async mergeChat() {
+    const R = this.R;
+    if (!R || !this.merged()) return;
+    const lines = this.chat.lines.filter((l) => l.hid);
+    if (!lines.length) return;
+    for (const l of lines) delete l.hid;
+    await this.chat.save();
+    const text = JSON.stringify({ t: 'chatMerge', lines: lines.map(Chat.out) });
+    for (const s of this.sockets()) if (this.att(s).role === 'p') this.send(s, text);
   }
 
   // what one socket should know now
@@ -179,11 +271,47 @@ export class Room extends DurableObject {
     if (this.meta && !this.meta.code && a.code) this.meta.code = a.code; // kept for match history (saved with the next save)
     if (d.t === 'ping') return this.send(ws, { t: 'pong' });
     if (d.t === 'hello') return this.hello(ws, a, d);
+    if (a.role === 'w' && d.t === 'chat') return this.chatIn(ws, a, d); // watchers chat among themselves (see chatIn)
     if (a.role !== 'p') { if (d.t === 'sync') this.send(ws, this.syncMsg(ws)); return; } // watchers only listen
     const side = a.side, R = this.R, now = Date.now();
     const { units, matrix } = this.units();
     switch (d.t) {
       case 'sync': return this.send(ws, this.syncMsg(ws));
+      case 'chat': return this.chatIn(ws, a, d);
+      case 'emote': {
+        const res = this.chat.emote('p' + side, d.id);
+        if (res.why === 'slow down') return this.send(ws, { t: 'denied', why: 'slow down' });
+        if (!res.ok) return;
+        const text = JSON.stringify({ t: 'emote', from: side, id: d.id });
+        for (const s of this.sockets()) this.send(s, text);
+        return;
+      }
+      case 'spectate': { // the host lets watchers in or not (a tournament match always has them)
+        if (side !== 0 || !this.meta || this.meta.tour) return;
+        this.meta.spectate = d.on !== false;
+        if (!this.meta.spectate) for (const s of this.watchers()) { this.setAtt(s, { role: 'x' }); this.send(s, { t: 'denied', why: 'no watchers' }); try { s.close(1000, 'no watchers'); } catch {} }
+        await this.save();
+        for (const s of this.sockets()) this.send(s, this.roomset(s));
+        this.report();
+        return;
+      }
+      case 'public': { // the host lists the room in the lobby or takes it off (before the start)
+        if (side !== 0 || !this.meta || this.meta.tour || (R && R.m && R.phase !== 'lobby')) return;
+        this.meta.pub = d.on === true; this.meta.waitAt = now;
+        await this.save();
+        for (const s of this.sockets()) this.send(s, this.roomset(s));
+        this.report();
+        return;
+      }
+      case 'report': { // reports the opponent's chat: the room's own last lines go to the moderators (accounts.js chatReport)
+        if (!this.chat.report('p' + side)) return this.send(ws, { t: 'reported', ok: false, why: 'slow down' });
+        const info = this.historyInfo();
+        const run = chatReport(this.env, { ip: a.ip, room: info.room, match: info.matchId, by: this.tagOf(side), about: this.tagOf(1 - side),
+          lines: this.chat.lines.filter((l) => !l.hid).slice(-20) }).catch(() => ({ ok: false, why: 'error' }));
+        const res = await run;
+        this.send(ws, { t: 'reported', ok: !!res.ok, ...(res.why ? { why: res.why } : {}) });
+        return;
+      }
       case 'speed': {
         if (!SPEEDS.includes(d.s)) return;
         for (const s of this.players(1 - side)) this.send(s, { t: 'speed', s: d.s });
@@ -196,6 +324,7 @@ export class Room extends DurableObject {
         this.R = Ref.create(rk ? { ...RANKED, skin: d.settings && typeof d.settings.skin === 'string' ? d.settings.skin : '' } : d.settings, units);
         Ref.start(this.R, units, matrix, now, this.seed());
         await this.save(); this.push({ force: true });
+        this.report();
         return;
       }
       case 'act': {
@@ -219,6 +348,7 @@ export class Room extends DurableObject {
         const began = Ref.next(R, side, d.round | 0, now);
         await this.save();
         if (began) this.push({ force: true }); else this.status();
+        if (began) this.report();
         return;
       }
       case 'rematch': {
@@ -228,6 +358,7 @@ export class Room extends DurableObject {
         if (again && rk && rk.done) Object.assign(rk, { wins: [0, 0], ties: 0, games: 0, done: false, result: null, forfeit: null, counted: null }); // a new series
         await this.save();
         if (again) this.push({ force: true }); else this.status();
+        if (again) this.report(); // a rematch: listed again (and the watchers' chat apart again)
         return;
       }
       case 'forfeit': {
@@ -251,9 +382,15 @@ export class Room extends DurableObject {
   async hello(ws, a, d) {
     const now = Date.now();
     if (d.watch) {
-      this.setAtt(ws, { role: 'w', side: -1 });
+      if (this.meta && !this.meta.tour && this.meta.spectate === false) { this.send(ws, { t: 'denied', why: 'no watchers' }); try { ws.close(1000, 'no watchers'); } catch {} return; }
+      let who = null; // a watcher signed in with Google may chat with the other watchers
+      if (typeof d.session === 'string' && d.session) { try { who = await sessionPlayer(this.env, d.session); } catch (e) { who = null; } }
+      this.setAtt(ws, { role: 'w', side: -1, chat: who && who.google ? who.tag : '' });
       this.send(ws, { t: 'welcome', side: -1, version: VERSION });
       this.sent.delete(ws);
+      this.send(ws, this.roomset(ws));
+      if (this.chat.lines.length) this.send(ws, { t: 'chatLog', lines: this.visibleLines(ws) });
+      this.report();
       return this.send(ws, this.syncMsg(ws));
     }
     let side = -1, key = '';
@@ -282,12 +419,26 @@ export class Room extends DurableObject {
       }
       const keys = (this.meta && this.meta.keys) || ['', ''];
       side = [0, 1].find((sd) => k && keys[sd] === k);
+      // a public room (the lobby): at most LOBBY.createPerIp made per IP
+      if (side == null && d.create && d.public === true && !keys[0] && this.env.LOBBY) {
+        let ok = true;
+        try { ok = await this.env.LOBBY.getByName('all').claim(a.ip); } catch (e) { ok = true; } // the lobby being down never stops a match
+        if (!ok) { this.send(ws, { t: 'denied', why: 'slow down' }); return; }
+      }
+      // a public room that hasn't started: side 1 is free again once its player has gone (someone else from the list may take it)
+      const reopen = side == null && !d.create && this.isPub() && keys[0] && keys[1] && !(this.R && this.R.m && this.R.phase !== 'lobby') && !this.here()[1];
       if (side == null) {
         if (d.create) { if (keys[0]) { this.send(ws, { t: 'taken' }); return; } side = 0; }
         else if (!keys[0]) { this.send(ws, { t: 'nomatch' }); return; } // nobody made this match here (maybe a phone-to-phone one)
-        else if (!keys[1]) side = 1;
+        else if (!keys[1] || reopen) { side = 1; if (reopen && this.meta.players) this.meta.players[1] = null; }
         else { this.send(ws, { t: 'full' }); return; } // two players already: Watch instead
         if (!this.meta) this.meta = { tour: null, keys: ['', ''], code: a.code || '' };
+        if (side === 0 && d.create) { // the lobby's settings for this room
+          const M = this.meta;
+          M.pub = d.public === true; M.spectate = d.spectate !== false; M.made = now; M.waitAt = now;
+          M.map = typeof d.map === 'string' ? d.map.slice(0, 24) : ''; M.look = typeof d.skin === 'string' ? d.skin.slice(0, 24) : '';
+          M.owner = who ? 'p:' + who.id : 'g:' + a.ip; // one listed room per player (lobby.js upsert)
+        }
         if (side === 0 && wantsRanked) this.meta.ranked = { ids: [who.id, ''], tags: [who.tag, ''], titles: [who.title || '', ''], wins: [0, 0], ties: 0, games: 0, done: false, result: null, forfeit: null, counted: null };
         if (side === 1 && this.meta.ranked) {
           if (who.id === this.meta.ranked.ids[0]) { this.send(ws, { t: 'denied', why: 'self' }); return; }
@@ -300,6 +451,9 @@ export class Room extends DurableObject {
       if (who) this.meta.players[side] = { tag: who.tag, title: who.title || '', skins: who.skins || [] }; // skins: looks only (Shapes.SKINS)
       if (!this.meta.pids) this.meta.pids = [null, null];
       if (who) this.meta.pids[side] = who.id; // kept on the server only (countOnline: invite a friend)
+      if (!this.meta.chatOk) this.meta.chatOk = [false, false];
+      this.meta.chatOk[side] = !!(who && who.google); // text chat: signed in with Google
+      if (this.meta.pub && !(this.R && this.R.m && this.R.phase !== 'lobby')) this.meta.waitAt = now;
     }
     // one socket per side: an older one of this side (a reload) is let go
     for (const s of this.players(side)) if (s !== ws) { this.setAtt(s, { role: 'x' }); try { s.close(1000, 'replaced'); } catch {} }
@@ -315,11 +469,15 @@ export class Room extends DurableObject {
     }
     await this.save();
     this.push({ force: true });
+    this.send(ws, this.roomset(ws));
+    if (this.chat.lines.length) this.send(ws, { t: 'chatLog', lines: this.visibleLines(ws) });
+    this.report();
   }
 
   async left(ws) {
     this.rate.delete(ws); this.sent.delete(ws);
     const a = this.att(ws);
+    if (a.role === 'w') this.report({ gone: ws }); // the watcher count
     if (a.role !== 'p') return;
     if (this.players(a.side, ws).length) return; // still here on another socket
     if (this.R && this.R.m) {
@@ -327,6 +485,8 @@ export class Room extends DurableObject {
       await this.save();
       if (began) this.push({ gone: ws, force: true }); else this.status(ws);
     } else this.status(ws);
+    if (this.meta && this.meta.pub && !(this.R && this.R.m && this.R.phase !== 'lobby')) this.meta.waitAt = Date.now();
+    this.report({ gone: ws });
   }
   webSocketClose(ws) { return this.left(ws); }
   webSocketError(ws) { return this.left(ws); }
@@ -334,6 +494,13 @@ export class Room extends DurableObject {
   // the clock ran out (or a player away for too long), or the match has been idle for a day
   async alarm() {
     const R = this.R, now = Date.now();
+    // a listed room's heartbeat, before the match's own wake-up: only the listing, the match isn't touched
+    const dueAt = R ? Ref.due(R, now) : 0;
+    if (dueAt && dueAt > now + 20 && this.isPub()) {
+      this.report({ force: true });
+      await this.ctx.storage.setAlarm(this.listing() ? Math.min(dueAt, now + this.hbMs()) : dueAt);
+      return;
+    }
     if (R && Ref.due(R, now)) {
       const f = Ref.tick(R, now);
       await this.save();
@@ -341,14 +508,16 @@ export class Room extends DurableObject {
       return;
     }
     const active = (await this.ctx.storage.get('active')) || 0;
-    if (now - active >= KEEP_MS && !this.sockets().length) { await this.ctx.storage.deleteAlarm(); await this.ctx.storage.deleteAll(); this.R = null; this.meta = null; return; }
-    await this.ctx.storage.setAlarm(now + KEEP_MS);
+    if (now - active >= KEEP_MS && !this.sockets().length) { await this.ctx.storage.deleteAlarm(); await this.ctx.storage.deleteAll(); this.R = null; this.meta = null; this.chat.lines = []; return; }
+    if (this.isPub()) this.report({ force: true }); // the heartbeat (or the drop, once it shouldn't be listed any more)
+    await this.ctx.storage.setAlarm(this.listing() ? now + this.hbMs() : now + KEEP_MS);
   }
 
   // a tournament match that is over: the result goes to the tournament, once. A friend's match that is over counts
   // as an online match for each player's account (accounts.js countOnline: invite a friend), once per match.
   async ended() {
     const R = this.R, t = this.meta && this.meta.tour;
+    if (R && R.m && R.m.over) { await this.mergeChat(); this.report(); } // the watchers' chat joins the players'; off the list
     if (R && R.m && R.m.over && !t && this.meta && this.meta.pids && this.meta.onlineCounted !== R.seed) {
       this.meta.onlineCounted = R.seed;
       await this.save();

@@ -10,6 +10,7 @@
 //   GET /duo/<CODE>        -> WebSocket into a 2v2 match (DuoRoom; only a developer account can make one)
 //   GET /history?limit=&before= -> saved rounds of server matches, newest first, paged (HistoryRoom, step 4)
 //   GET /history/<MATCH>   -> one match's rounds (<ROOM>-<seed>, or a bare room code for that room's newest match)
+//   GET /lobby            -> WebSocket into the online lobby (LobbyRoom: the list of public rooms); without Upgrade: the list once
 //   GET /leaderboard       -> ranked players with wins, ties and losses, and whether ranked play is on (accounts.js)
 //   POST /account/<route>  -> accounts (step 5; guest, me, google, tag, signout, delete, title, skin, ranked, invite, discord): see accounts.js
 // Cron (wrangler.toml [triggers], hourly): month end, the Legend title for the leaderboard's top 5 (accounts.js awardLegends),
@@ -21,6 +22,7 @@ export { Room } from './room.js';
 export { TourRoom } from './tour.js';
 export { HistoryRoom } from './history.js';
 export { DuoRoom } from './duo.js';
+export { LobbyRoom } from './lobby.js';
 
 const CODE_RE = /^[A-Z0-9]{4,8}$/;
 
@@ -61,6 +63,19 @@ export default {
     }
     if (url.pathname === '/selftest') return env.ROOM.getByName('selftest').fetch(new Request('https://room/selftest'));
 
+    if (url.pathname === '/lobby') {
+      // the online lobby (docs/LOBBY.md): the same origin check as the rooms; the IP goes on only for its limits
+      if (!allowedOrigin(request, env)) return json({ error: 'origin' }, 403);
+      const headers = new Headers(request.headers);
+      headers.set('x-ip', request.headers.get('CF-Connecting-IP') || ''); headers.set('x-origin', request.headers.get('Origin') || '');
+      // LOBBY_TEST (tests only, never set in production): ?fake=CODE lists a room that sends no heartbeat
+      if (env.LOBBY_TEST === '1' && url.searchParams.has('fake')) {
+        await env.LOBBY.getByName('all').upsert({ code: url.searchParams.get('fake').toUpperCase(), kind: url.searchParams.get('kind') || 'match', host: { tag: 'Fake' }, players: 1, at: Date.now() }, '');
+        return json({ ok: true });
+      }
+      try { return await env.LOBBY.getByName('all').fetch(new Request(request, { headers })); }
+      catch (e) { console.warn('lobby', e && e.message); return json({ error: 'lobby unavailable' }, 503, cors); }
+    }
     const h = url.pathname.match(/^\/history(?:\/([^/]+))?\/?$/);
     if (h) {
       // Browsers send Origin on these cross-site reads, so only the game's own pages can read from a visitor's browser.

@@ -10,9 +10,15 @@
 //  - the clock: when it runs out, the server starts the fight by itself
 //  - a tournament match: only the two players (with their tournament keys) get in, it starts by itself, and the
 //    result goes from the server to the tournament (a forfeit here)
+//  - chat and emotes (lobby, 2026-11-04): text only from a phone signed in with Google, the word filter and length,
+//    the rate limits, emotes from guests too; watchers chat apart while the match runs, the players get those lines
+//    when it ends (chatMerge) and a rematch splits the chats again; a reconnect gets the lines it may see; Report
+//    posts the room's own last lines to the report webhook
 // Run: cd server && npm test
 const assert = require('assert');
-const { startServer, open, sleep, waitFor } = require('./harness.js');
+const http = require('http');
+const { open, sleep, waitFor } = require('./harness.js');
+const { idToken, startAccounts } = require('./accounts-env.js');
 const Game = require('../../src/game.js');
 const Engine = require('../../src/engine.js');
 const Ref = require('../../src/referee.js');
@@ -25,7 +31,17 @@ const newCode = () => 'M' + Math.random().toString(36).slice(2, 6).toUpperCase()
 
 setTimeout(() => { console.error('test timed out'); process.exit(1); }, 5 * 60 * 1000).unref(); // a test never hangs CI
 (async () => {
-  const srv = await startServer(8797);
+  // a stand-in for the Discord webhook that chat reports go to
+  const posts = [];
+  const hook = http.createServer((req, res) => { let b = ''; req.on('data', (c) => (b += c)); req.on('end', () => { posts.push(JSON.parse(b || '{}')); res.setHeader('content-type', 'application/json'); res.end('{"id":"1","channel_id":"2"}'); }); });
+  await new Promise((r) => hook.listen(0, '127.0.0.1', r));
+  const srv = await startAccounts(8797, { REPORT_WEBHOOK: `http://127.0.0.1:${hook.address().port}/api/webhooks/1/test` });
+  const call = async (route, body, token) => {
+    const headers = { 'content-type': 'application/json', Origin: 'http://localhost:8766' };
+    if (token) headers.Authorization = 'Bearer ' + token;
+    const r = await fetch(`${srv.base}/account/${route}`, { method: 'POST', headers, body: JSON.stringify(body || {}) });
+    return { status: r.status, ...(await r.json().catch(() => ({}))) };
+  };
   const step = (x) => process.env.VERBOSE && console.log(x);
   const roomUrl = (code, tour) => `${srv.ws}/room/${code}${tour ? '?t=' + tour : ''}`;
   // a phone: hello, then waits for its welcome
@@ -230,11 +246,92 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 5 * 60 *
       for (const s of [org, p1, fake, ph, pg]) s.close();
       console.log('tournament match: keys checked, started by itself, result from the server');
     }
+
+    // ----- chat and emotes -----
+    {
+      const ga = await call('google', { credential: idToken({ email: 'chat-a@example.com', email_verified: true }) });
+      const gb = await call('guest', {}); // a guest account: reads chat and sends emotes, never text
+      const gw = await call('google', { credential: idToken({ email: 'chat-w@example.com', email_verified: true }) });
+      const code = newCode();
+      const a = await phone(code, { create: true, session: ga.session }), b = await phone(code, { session: gb.session });
+      const w1 = await phone(code, { watch: true, session: gw.session }), w2 = await phone(code, { watch: true });
+      assert.strictEqual((await a.next('roomset')).chat, true, 'signed in with Google: may chat');
+      assert.strictEqual((await b.next('roomset')).chat, false, 'a guest may not');
+      assert.strictEqual((await w1.next('roomset')).chat, true);
+      const chats = (ws) => ws.inbox.filter((x) => x.t === 'chat');
+      const said = (ws, text) => waitFor(() => chats(ws).find((x) => x.text === text), 8000);
+      // a guest: no text, but emotes
+      b.json({ t: 'chat', text: 'hi' });
+      assert.strictEqual((await b.next('denied')).why, 'sign in');
+      b.json({ t: 'emote', id: 'golem' });
+      const em = await a.next('emote');
+      assert.deepStrictEqual([em.from, em.id], [1, 'golem']);
+      assert.strictEqual((await w2.next('emote')).id, 'golem', 'watchers see emotes');
+      b.json({ t: 'emote', id: 'shock' });
+      assert.strictEqual((await b.next('denied')).why, 'slow down', 'one emote per 3 s');
+      b.json({ t: 'emote', id: 'nope' });
+      w1.json({ t: 'emote', id: 'bababa' }); // watchers don't send emotes
+      await sleep(400);
+      assert.strictEqual(a.inbox.filter((x) => x.t === 'emote').length, 1);
+      // a line: control characters out, the filter, everyone gets it (the sender too)
+      a.json({ t: 'chat', text: '  well  played\u0007 fuck ' });
+      const l1 = await said(b, 'well played ***');
+      assert.strictEqual(l1.from, 0); assert.strictEqual(l1.tag, ga.player.tag); assert.ok(l1.at > 0);
+      await said(a, 'well played ***'); await said(w2, 'well played ***');
+      a.json({ t: 'chat', text: 'x'.repeat(200) });
+      assert.strictEqual((await waitFor(() => chats(b).find((x) => x.text.startsWith('xxx')), 8000)).text.length, 120, 'at most 120 characters');
+      a.json({ t: 'chat', text: 'three' });
+      a.json({ t: 'chat', text: 'four' });
+      assert.strictEqual((await a.next('denied')).why, 'slow down', '3 lines per 5 s');
+      await sleep(300);
+      assert.ok(!chats(b).some((x) => x.text === 'four'));
+      // before the start the watchers' chat is with everyone's
+      w1.json({ t: 'chat', text: 'good luck both' });
+      await said(a, 'good luck both');
+      // the match runs: a watcher's line goes to watchers only
+      a.json({ t: 'start', settings: { map: 'testgrid' } });
+      await syncOf(a, (x) => x.phase === 'deploy');
+      w1.json({ t: 'chat', text: 'side 0 is placing archers' });
+      const wl = await said(w2, 'side 0 is placing archers');
+      assert.strictEqual(wl.w, true); assert.strictEqual(wl.from, -1);
+      w2.json({ t: 'chat', text: 'me too' });
+      assert.strictEqual((await w2.next('denied')).why, 'sign in', 'watchers need Google too');
+      await sleep(500);
+      assert.ok(!chats(a).concat(chats(b)).some((x) => x.text === 'side 0 is placing archers'), 'players never see watchers\' lines during the match');
+      // a player who reloads gets the lines it may see
+      const a2 = await phone(code, { key: a.welcome.key, session: ga.session });
+      const log = await a2.next('chatLog');
+      assert.ok(log.lines.some((x) => x.text === 'good luck both') && !log.lines.some((x) => x.text === 'side 0 is placing archers'));
+      // the match ends (a forfeit): the players get the watchers' lines, then every line goes to everyone
+      b.json({ t: 'forfeit' });
+      const mg = await a2.next('chatMerge');
+      assert.deepStrictEqual(mg.lines.map((x) => x.text), ['side 0 is placing archers']);
+      assert.ok((await b.next('chatMerge')).lines.length === 1);
+      w1.json({ t: 'chat', text: 'gg' });
+      await said(a2, 'gg'); await said(b, 'gg');
+      // Report: the room's own lines go to the moderators' channel
+      a2.json({ t: 'report' });
+      const rp = await a2.next('reported');
+      assert.strictEqual(rp.ok, true);
+      const post = posts.pop();
+      assert.ok(post && post.content.includes(ga.player.tag) && post.content.includes('well played ***') && post.content.includes('(watcher)'));
+      assert.deepStrictEqual(post.allowed_mentions, { parse: [] });
+      // a rematch splits them again
+      a2.json({ t: 'rematch' }); b.json({ t: 'rematch' });
+      await syncOf(a2, (x) => x.phase === 'deploy' && x.round === 1 && !x.m.over);
+      await sleep(5100); // the watcher's 3 lines per 5 s
+      w1.json({ t: 'chat', text: 'round two' });
+      await said(w2, 'round two');
+      await sleep(500);
+      assert.ok(!chats(a2).some((x) => x.text === 'round two'), 'a rematch: the watchers chat apart again');
+      for (const s of [a, a2, b, w1, w2]) s.close();
+      console.log('chat: signed-in only, filter, limits, emotes, watchers apart during the match, merged at the end, split on rematch, report');
+    }
     console.log('server step 3 ok (the server referees live matches)');
   } catch (e) {
     console.log('--- server log (end) ---\n' + srv.log().slice(-4000));
     throw e;
   } finally {
-    srv.stop();
+    srv.stop(); hook.close();
   }
 })().then(() => process.exit(0), (e) => { console.error(e); process.exit(1); });

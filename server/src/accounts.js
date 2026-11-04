@@ -48,7 +48,7 @@ export const ACCOUNT = {
   MAX_SESSIONS: 10,        // per player; the oldest go first
   BODY_BYTES: 8 * 1024,    // a Google ID token is about 1.2 KB
   // per IP: [count, window ms]. A tournament on one wifi shares an IP, so these leave room for a full room of friends.
-  RATE: { guest: [20, 3600e3], google: [30, 600e3], other: [120, 60e3], bug: [5, 600e3] },
+  RATE: { guest: [20, 3600e3], google: [30, 600e3], other: [120, 60e3], bug: [5, 600e3], report: [5, 600e3] },
 };
 const DAY = 24 * 3600e3;
 
@@ -414,7 +414,37 @@ export async function sessionPlayer(env, token) {
   const p = await db.prepare('SELECT created, dev, title, legend, discord, initiate FROM players WHERE id = ?').bind(s.player).first();
   let skins = [];
   try { skins = await wornSkins(db, s.player, !!s.dev); } catch (e) { skins = []; } // a look only: never in the way of playing
-  return { id: s.player, tag: s.tag || 'Player', dev: !!s.dev, title: titleShown(p), skins };
+  let google = false;
+  try { google = await hasGoogle(db, s.player); } catch (e) { google = false; } // text chat in matches needs a Google login (lobby)
+  return { id: s.player, tag: s.tag || 'Player', dev: !!s.dev, title: titleShown(p), skins, google };
+}
+// The online lobby (2026-11-04, docs/LOBBY.md): config 'lobby_duo' = 'dev' (default: 2v2 rooms listed for developers
+// only, and only developers make them) or 'all'. Read by LobbyRoom and DuoRoom; flipped with POST /account/lobbyduo.
+export async function lobbyDuo(env) {
+  const db = env.ACCOUNTS;
+  if (!db) return 'dev';
+  await ensureSchema(db);
+  const r = await db.prepare(`SELECT v FROM config WHERE k = 'lobby_duo'`).first();
+  return r && r.v === 'all' ? 'all' : 'dev';
+}
+// Report a player's chat (lobby): the room's last 20 lines, both gamertags and the match id go to a Discord channel
+// through a webhook of its own (REPORT_WEBHOOK, a Cloudflare secret; same checks as BUG_WEBHOOK), at most
+// ACCOUNT.RATE.report per IP. Called by the match rooms (never with the phone's copy of the chat). -> { ok, why? }
+export async function chatReport(env, { ip, room, match, by, about, lines }) {
+  const hook = env.REPORT_WEBHOOK || '';
+  if (!(BUG_HOOK.test(hook) || BUG_HOOK_TEST.test(hook))) return { ok: false, why: 'reports off' };
+  const db = env.ACCOUNTS;
+  if (db) { await ensureSchema(db); if (!(await hit(db, 'report', ip, env))) return { ok: false, why: 'slow down' }; }
+  const f = (v, n = 40) => bugField(v, n);
+  const body = [`Chat report: ${f(by)} reports ${f(about)}`, `Match: ${f(match, 60)} (room ${f(room, 12)})`, '',
+    ...(lines || []).slice(-20).map((l) => `[${new Date(l.at).toISOString().slice(11, 19)}] ${l.w ? '(watcher) ' : ''}${f(l.tag)}: ${f(l.text, 140)}`)].join('\n').slice(0, 1990);
+  const msg = { content: body, username: 'Chat report', allowed_mentions: { parse: [] } };
+  if (/^\d{5,25}$/.test(env.REPORT_TAG || '')) { msg.thread_name = `Report: ${f(about)}`.slice(0, 90); msg.applied_tags = [env.REPORT_TAG]; }
+  let res;
+  try { res = await fetch(hook + '?wait=true', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(msg) }); }
+  catch (e) { return { ok: false, why: 'discord' }; }
+  if (!res.ok) { console.warn('chat report', res.status); return { ok: false, why: 'discord' }; }
+  return { ok: true };
 }
 // Ranked play is on unless a developer switched it off (config 'ranked' = 'off'). No database: off.
 export async function rankedOn(env) {
@@ -545,7 +575,7 @@ export async function handleAccount(request, env, cors) {
   const db = env.ACCOUNTS;
   if (!db) return json({ error: 'accounts off' }, 503, cors);
   const route = new URL(request.url).pathname.replace(/^\/account\/?/, '').replace(/\/$/, '');
-  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title', 'skin', 'invite', 'discord', 'puzzle', 'bug'].includes(route)) return json({ error: 'not found' }, 404, cors);
+  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title', 'skin', 'invite', 'discord', 'puzzle', 'bug', 'lobbyduo'].includes(route)) return json({ error: 'not found' }, 404, cors);
   if (request.method !== 'POST') return json({ error: 'method' }, 405, cors);
 
   let body = {};
@@ -628,6 +658,13 @@ export async function handleAccount(request, env, cors) {
       if (!p || !p.dev) return json({ error: 'not a developer' }, 403, cors);
       if (typeof body.on === 'boolean') await db.prepare(`INSERT OR REPLACE INTO config (k, v) VALUES ('ranked', ?)`).bind(body.on ? 'on' : 'off').run();
       return json({ on: await rankedOn(env) }, 200, cors);
+    }
+    if (route === 'lobbyduo') {
+      // a developer opens 2v2 rooms in the lobby to everyone ('all') or keeps them to developers ('dev')
+      const p = await db.prepare('SELECT dev FROM players WHERE id = ?').bind(me.player).first();
+      if (!p || !p.dev) return json({ error: 'not a developer' }, 403, cors);
+      if (body.v === 'all' || body.v === 'dev') await db.prepare(`INSERT OR REPLACE INTO config (k, v) VALUES ('lobby_duo', ?)`).bind(body.v).run();
+      return json({ v: await lobbyDuo(env) }, 200, cors);
     }
     if (route === 'invite') {
       if (!(await hasGoogle(db, me.player))) return json({ error: 'google needed' }, 403, cors);
