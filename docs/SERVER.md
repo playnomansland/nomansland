@@ -127,3 +127,13 @@ Built 2026-11-02 (`server/src/accounts.js`, routes in `server/src/index.js`):
 - Discord setup: discord.com/developers/applications -> New Application -> OAuth2: copy the Client ID and reset/copy the Client Secret, add the redirect https://playnomansland.github.io/ (exactly). The server (guild) id: Discord settings -> Advanced -> Developer Mode on, then right-click the server -> Copy Server ID.
 - DISCORD_API is a test-only stand-in (127.0.0.1 only).
 - Tests: server/test/invites.test.js (in npm test; invites, online matches, both orders, Discord with a fake API), tools/tests/rewards-ui.js (browser: menu card, sheet, invite link on a second phone, the Discord round trip; own accounts server on 8788).
+
+## Bug reports (2026-11-04)
+
+- `POST /account/bug { text, version, match, info }` (session optional) -> `{ ok, url }`. The Worker calls the Discord webhook `BUG_WEBHOOK` (a Cloudflare secret; the deploy workflow copies the GitHub secret `DISCORD_BUG_WEBHOOK`) with `?wait=true`, so a forum channel makes a new post: `thread_name` = the first line of the text (90 characters at most), `content` = the text plus Version, Match, the known `info` keys (mode, round, phase, map, board, device, screen, page) and the player (gamertag and id, or "not logged in"). `allowed_mentions: { parse: [] }`, so a report can't ping anyone. `url` = `https://discord.com/channels/<DISCORD_GUILD_ID>/<new post>`.
+- Optional var `BUG_TAG`: a forum tag id put on every post (needed if the forum requires tags).
+- Limits: per IP 5 reports per 10 minutes (bucket `bug`), text 3-1500 characters, other fields 160. Errors: 503 `bugs off` (no webhook set), 400 `too short`, 429, 502 `discord` (with `code` = Discord's status).
+- `/account/me`'s `discord` object carries `bugs` (true when the webhook is set).
+- The page falls back by itself (copies the report, opens the Discord invite) when the call fails for any reason.
+- To switch on: in Discord, #bug-reports > Edit channel > Integrations > Webhooks > New webhook > Copy webhook URL; on GitHub, add it as the repository secret `DISCORD_BUG_WEBHOOK`; then run the "Server deploy" workflow by hand (a deploy only runs on pushes that touch the server, and secrets are uploaded at deploy time).
+

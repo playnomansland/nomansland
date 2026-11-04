@@ -16,6 +16,20 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 4 November 2026 – Report a bug
+
+### New: Report a bug from inside the game
+- **Settings** (the cog in a match, or Settings on the main menu) has a **Report a bug** button.
+- Write what happened; the **game version, match id and round** (plus map, 2D/3D board, device and your gamertag) are **filled in for you**.
+- **Post the report** makes a new post in **#bug-reports** on our Discord, titled by your first line, and gives you a link to it so you can add screenshots or a video.
+- If the game can't post it, the whole report is **copied** and **Open Discord** takes you there to paste it.
+
+### Developer
+- The page now carries a version stamp (newest patch notes date plus a short hash of the build), also used in bug reports.
+- Server: `POST /account/bug`, posting through a Discord webhook (`DISCORD_BUG_WEBHOOK` GitHub secret). Off until the webhook is added.
+
+---
+
 ## 4 November 2026 – Balance: Sun Priest, Earth Wizard, Bullhead
 
 ### Sun Priest: slow to switch, deadly once locked on

@@ -14,6 +14,8 @@ GOOGLE_CLIENT_ID = "732949481177-ikom5gqq07pt0sg89km9mth5d9ibfvmi.apps.googleuse
 DISCORD_CLIENT_ID = "1567300349285502978"
 DISCORD_GUILD_ID = "1566427821184655380"
 DISCORD_INVITE = "https://discord.gg/TBpDKSBWsY"
+# Bug reports (2026-11-04, accounts.js BUG): BUG_WEBHOOK is a Cloudflare secret (a webhook on the #bug-reports forum; the
+# deploy workflow copies the GitHub secret DISCORD_BUG_WEBHOOK). Optional BUG_TAG = "<forum tag id>" if the forum requires tags.
 
 # One Room per match code. SQLite-backed, so it works on the Free plan.
 [[durable_objects.bindings]]

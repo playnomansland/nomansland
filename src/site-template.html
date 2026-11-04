@@ -1211,6 +1211,83 @@ html.pc .corner button span { display: inline; }
     sfx(clickInMatch ? 'button' : 'menu');
   });
 
+  // ----- Report a bug (2026-11-04): a new post in the Discord forum #bug-reports with the game version and match id
+  // filled in. The server posts it through a webhook (/account/bug, accounts.js BUG); when that's off or fails, the report
+  // is copied and the Discord server opens, so it can be pasted there by hand.
+  const GAME_VERSION = '/*BUILD*/'; // src/build.js: the newest patch notes date and a hash of this page
+  const DISCORD_FALLBACK = 'https://discord.gg/TBpDKSBWsY';
+  const bug = { draft: '', busy: false };
+  // the id the server's match history uses (room.js historyInfo: <room>-<seed>), or one made the same way for other matches
+  function bugMatchId() {
+    if (!m) return '';
+    const s = ((m.seed >>> 0) || 0).toString(36);
+    if (mode === 'net' && net.code) return `${net.duo ? 'duo-' : ''}${net.tourCode ? net.tourCode + '.' : ''}${net.code}-${s}`;
+    if ((mode === 'host' || mode === 'guest' || mode === 'spec') && net.code) return `peer-${net.code}-${s}`;
+    return `${mode}-${s}`;
+  }
+  function bugInfo() {
+    const inMatch = !!m && phase !== 'start' && phase !== 'lobby';
+    const mp = m && m.map ? Game.MAPS.find(x => x.id === m.map.id) : null;
+    const kind = [mode === 'net' ? (net.duo ? '2v2' : net.tourCode ? 'tournament' : 'online') : mode === 'host' || mode === 'guest' ? 'phone to phone' : mode,
+      typeof matchKind === 'string' && matchKind !== 'standard' ? matchKind : '', lateGame ? 'late game' : ''].filter(Boolean).join(', ');
+    return {
+      mode: inMatch ? kind : 'menu', round: inMatch ? String(m.round) : '', phase: inMatch ? phase : '', map: inMatch && mp ? mp.name : '',
+      board: inMatch ? (want3d ? '3D' : '2D') : '', device: navigator.userAgent,
+      screen: `${innerWidth}x${innerHeight} @${Math.round((devicePixelRatio || 1) * 100) / 100}x${document.documentElement.classList.contains('pc') ? ' (PC layout)' : ''}`,
+      page: location.host,
+    };
+  }
+  function bugText(text, info) {
+    const line = (k, v) => (v ? `${k}: ${v}` : '');
+    return [text.trim(), '', line('Version', GAME_VERSION), line('Match', bugMatchId() || 'none'),
+      ...Object.entries(info).map(([k, v]) => line(k[0].toUpperCase() + k.slice(1), v)),
+      line('Player', acct ? acct.tag : 'not logged in')].filter((x, k) => k < 2 || x).join('\n');
+  }
+  function openBugSheet() {
+    const info = bugInfo(), id = bugMatchId(), invite = (rw.discord && rw.discord.invite) || DISCORD_FALLBACK;
+    $('sheet').innerHTML = `
+      <div class="bar" data-keep><h3 id="sheet-h">Report a bug</h3><button class="btn small" id="close">Close</button></div>
+      <p class="hint" style="margin:0">What happened, and what did you expect? The first line becomes the post’s title in <b>#bug-reports</b> on our Discord.</p>
+      <textarea id="bug-text" maxlength="1500" rows="6" placeholder="The Brute walked through the wall in round 4…" aria-label="What happened"
+        style="min-height:120px;font:14px var(--font-body);background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:8px;width:100%;resize:vertical"></textarea>
+      <p class="hint" style="margin:0">Filled in for you: version <span class="num">${esc(GAME_VERSION)}</span>${id ? `, match <span class="num">${esc(id)}</span>${info.round ? ` (round ${esc(info.round)})` : ''}` : ''}, your device${acct ? ' and gamertag' : ''}.</p>
+      <div class="bar"><span></span><button class="btn primary" id="bug-send">Post the report</button></div>
+      <p class="hint" id="bug-msg" style="margin:0" aria-live="polite"></p>
+      <div class="bar" id="bug-after" hidden><span></span><a class="btn" id="bug-link" href="${esc(invite)}" target="_blank" rel="noopener">Open Discord</a></div>`;
+    $('sheet-back').hidden = false;
+    const t = $('bug-text'), msg = $('bug-msg');
+    t.value = bug.draft;
+    $('close').addEventListener('click', () => closeSheet(true));
+    t.addEventListener('input', () => { bug.draft = t.value; });
+    const after = (href, label) => { const a = $('bug-link'); a.href = href; a.textContent = label; $('bug-after').hidden = false; };
+    $('bug-send').addEventListener('click', async () => {
+      const text = t.value.trim();
+      if (text.length < 3) { msg.textContent = 'Write a few words about what went wrong first.'; t.focus(); return; }
+      if (bug.busy) return;
+      bug.busy = true; $('bug-send').disabled = true; msg.textContent = 'Posting…';
+      const r = await acctCall('bug', { text, version: GAME_VERSION, match: id, info }, true);
+      bug.busy = false;
+      if (!$('bug-send')) return; // the sheet was closed meanwhile
+      if (r.status === 200 && r.ok) {
+        bug.draft = ''; t.value = ''; t.disabled = true;
+        msg.textContent = 'Thanks, it’s posted! Screenshots or a video help a lot: add them in the post.';
+        if (r.url) after(r.url, 'Open the post'); else after(invite, 'Open Discord');
+        return;
+      }
+      $('bug-send').disabled = false;
+      if (r.status === 429) { msg.textContent = 'That’s a lot of reports in a short time. Try again in a few minutes.'; return; }
+      // posting from the game is off or failed: copy the whole report and send the player to Discord to paste it
+      const full = bugText(text, info);
+      let copied = false;
+      try { await navigator.clipboard.writeText(full); copied = true; } catch (e) {}
+      msg.textContent = copied ? 'Couldn’t post it from the game, so the report is copied: open Discord, make a new post in #bug-reports and paste it.'
+        : 'Couldn’t post it from the game. Copy your text, open Discord and make a new post in #bug-reports.';
+      after(invite, 'Open Discord');
+    });
+    setTimeout(() => t.focus(), 50);
+  }
+  if (qs.has('test')) window.__bug = () => ({ version: GAME_VERSION, match: bugMatchId(), info: bugInfo(), open: openBugSheet });
+
   // the cog in a match opens it as Settings (music, the 2D / 3D board and Main menu), the menu's Music button as music only.
   // data-keep: phase changes leave this sheet open (closeSheet)
   function openSoundSheet() {
@@ -1276,11 +1353,13 @@ html.pc .corner button span { display: inline; }
           <button data-rk="1" aria-pressed="${home.rankedOn === true}">On</button><button data-rk="0" aria-pressed="${home.rankedOn === false}">Off</button>
         </div>
       </div><p class="hint" id="rk-msg" style="margin:0" aria-live="polite"></p>` : ''}
+      <div class="bar"><span class="hint">Something broken?</span><button class="btn small" id="bug-open">Report a bug</button></div>
       <span class="hint">Menu music: tap a song to play it, the list carries on from there</span>
       ${songList()}
       `;
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', () => closeSheet(true));
+    $('bug-open').addEventListener('click', openBugSheet);
     const showOn = () => $('sheet').querySelectorAll('[data-mute]').forEach(x => x.setAttribute('aria-pressed', String((x.dataset.mute === '0') === musicOn())));
     $('vol').addEventListener('input', (e) => {
       snd.vol = +e.target.value; $('vol-n').textContent = snd.vol;

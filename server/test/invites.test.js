@@ -141,7 +141,7 @@ function fakeDiscord() {
 
     // ----- Discord -----
     const me1 = await call('me', {}, guest.session);
-    assert.deepStrictEqual(me1.discord, { clientId: 'cid', invite: 'https://discord.gg/test', check: true }, '/me tells the page how to reach Discord');
+    assert.deepStrictEqual(me1.discord, { clientId: 'cid', invite: 'https://discord.gg/test', check: true, bugs: false }, '/me tells the page how to reach Discord');
     const redirect = ORIGIN + '/';
     const out = await call('discord', { code: 'out-111', redirect }, guest.session);
     assert.deepStrictEqual([out.status, out.error, out.invite], [403, 'not in server', 'https://discord.gg/test'], 'not in the server: no title');

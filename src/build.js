@@ -33,12 +33,15 @@ ${lab.slice(cut)
 `;
 fs.writeFileSync('lab.html', labDoc);
 // Game
-const game = src('site-template.html').replace('/*BASECSS*/', () => src('game.css'))
+const game0 = src('site-template.html').replace('/*BASECSS*/', () => src('game.css'))
   .replace('/*SHAPES*/', () => shapes).replace('/*ENGINE*/', () => eng)
   .replace('/*GAME*/', () => src('game.js')).replace('/*REFEREE*/', () => src('referee.js')).replace('/*DUO*/', () => src('duo.js')).replace('/*TOUR*/', () => src('tournament.js'))
   .replace('/*ART*/', () => src('art.js')).replace('/*RENDER2D*/', () => src('render2d.js') + '\n' + src('floors.js')).replace('/*DATA*/', () => src('demo-units.json'))
   .replace('/*FACTIONS*/', () => src('faction-units.json')).replace('/*PUZZLES*/', () => src('puzzles.json'))
   .replace('/*V3D*/', () => require('crypto').createHash('sha1').update(['camera3d.js', 'kaykit3d.js', 'models3d.js', 'scenery3d.js', 'render3d.js', 'game.js', 'engine.js', 'floors.js'].map(src).join('')).digest('hex').slice(0, 10));
+// the game version shown in bug reports: the newest date in PATCH-NOTES.md and a hash of the page, e.g. "4 Nov 2026 · 1a2b3c4"
+const noteDate = (() => { try { const d = fs.readFileSync(path.join(__dirname, '..', 'PATCH-NOTES.md'), 'utf8').match(/^## (\d{1,2}) (\w{3})\w* (\d{4})/m); return d ? `${d[1]} ${d[2]} ${d[3]}` : ''; } catch (e) { return ''; } })();
+const game = game0.replace('/*BUILD*/', () => [noteDate, require('crypto').createHash('sha1').update(game0).digest('hex').slice(0, 7)].filter(Boolean).join(' · '));
 game.split('<script>').slice(1).map(s => s.split('</script>')[0]).forEach(s => new Function(s));
 // the 3D board's code is loaded on its own when 3D starts: make sure it parses too
 for (const f of ['camera3d.js', 'kaykit3d.js', 'models3d.js', 'scenery3d.js', 'render3d.js']) new Function(src(f));

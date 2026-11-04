@@ -25,6 +25,7 @@
 //   /account/invite  (auth, Google accounts) -> { code, friends, rewarded }  (this player's invite link; see INVITE below)
 //   /account/discord { code, redirect } (auth) -> { player }  (Discord check for the BABABABA title; see DISCORD below)
 //   /account/puzzle  { k, army } (auth)  -> { player, won, solved }  (a tutorial puzzle's fight, replayed here; see PUZZLE below)
+//   /account/bug     { text, version, match, info } (auth optional) -> { ok, url }  (a post in #bug-reports; see BUG below)
 // guest, google and me also take { invite: CODE }: a new account made through a friend's invite link (INVITE).
 //
 // Month end (2026-11-03): the Worker's hourly cron (wrangler.toml [triggers], index.js scheduled) calls awardLegends,
@@ -47,7 +48,7 @@ export const ACCOUNT = {
   MAX_SESSIONS: 10,        // per player; the oldest go first
   BODY_BYTES: 8 * 1024,    // a Google ID token is about 1.2 KB
   // per IP: [count, window ms]. A tournament on one wifi shares an IP, so these leave room for a full room of friends.
-  RATE: { guest: [20, 3600e3], google: [30, 600e3], other: [120, 60e3] },
+  RATE: { guest: [20, 3600e3], google: [30, 600e3], other: [120, 60e3], bug: [5, 600e3] },
 };
 const DAY = 24 * 3600e3;
 
@@ -242,7 +243,7 @@ async function inviteOut(db, id, now) {
 export const DISCORD = { title: 'bababa', api: 'https://discord.com/api/v10' };
 const discordOn = (env) => !!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET && env.DISCORD_GUILD_ID);
 const discordApi = (env) => (env.DISCORD_API && /^http:\/\/127\.0\.0\.1:\d+$/.test(env.DISCORD_API) ? env.DISCORD_API : DISCORD.api);
-const discordInfo = (env) => (env.DISCORD_CLIENT_ID && env.DISCORD_GUILD_ID ? { clientId: env.DISCORD_CLIENT_ID, invite: env.DISCORD_INVITE || '', check: discordOn(env) } : null);
+const discordInfo = (env) => (env.DISCORD_CLIENT_ID && env.DISCORD_GUILD_ID ? { clientId: env.DISCORD_CLIENT_ID, invite: env.DISCORD_INVITE || '', check: discordOn(env), bugs: bugOn(env) } : null);
 async function discordCheck(env, code, redirect) {
   const api = discordApi(env);
   const tok = await fetch(`${api}/oauth2/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -259,6 +260,51 @@ async function discordCheck(env, code, redirect) {
 }
 
 const enc = new TextEncoder();
+// ---------- bug reports (2026-11-04) ----------
+// POST /account/bug { text, version, match, info } -> a new post in the Discord forum #bug-reports, made through a webhook
+// on that channel (BUG_WEBHOOK, a Cloudflare secret the deploy workflow copies from the GitHub secret DISCORD_BUG_WEBHOOK).
+// The post's title is the first line of the player's text; the body has the game version, the match id and the rest of
+// `info` filled in. A session is optional (it names the player). No pings (allowed_mentions empty). Per IP: 5 per 10 min.
+// BUG_TAG (optional var): a forum tag id put on every post, for a forum that requires tags.
+// Off (503 'bugs off') until BUG_WEBHOOK is set; the page then copies the report and opens the Discord server instead.
+export const BUG = { textMax: 1500, titleMax: 90, fieldMax: 160, info: ['mode', 'round', 'phase', 'map', 'board', 'device', 'screen', 'page'] };
+const BUG_HOOK = /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+$/;
+const BUG_HOOK_TEST = /^http:\/\/127\.0\.0\.1:\d+\/api\/webhooks\/\d+\/[\w-]+$/;
+const bugField = (v, max = BUG.fieldMax) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f`]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+export function bugPost(body, who) {
+  const text = String(body.text == null ? '' : body.text).replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '')
+    .replace(/\n{3,}/g, '\n\n').trim().slice(0, BUG.textMax);
+  if (text.length < 3) return null;
+  const first = text.split('\n')[0].replace(/\s+/g, ' ').trim();
+  const title = (first.length > BUG.titleMax ? first.slice(0, BUG.titleMax - 1).trimEnd() + '…' : first) || 'Bug report';
+  const info = body.info && typeof body.info === 'object' && !Array.isArray(body.info) ? body.info : {};
+  const line = (k, v) => (v ? `${k}: \`${v}\`` : null);
+  const facts = [
+    line('Version', bugField(body.version, 60) || 'unknown'),
+    line('Match', bugField(body.match, 60) || 'none'),
+    ...BUG.info.map((k) => line(k[0].toUpperCase() + k.slice(1), bugField(info[k]))),
+    who ? line('Player', `${bugField(who.tag, 40)} (${who.player})`) : line('Player', 'not logged in'),
+  ].filter(Boolean);
+  return { title, content: (text + '\n\n' + facts.join('\n')).slice(0, 2000) };
+}
+const bugOn = (env) => BUG_HOOK.test(env.BUG_WEBHOOK || '') || BUG_HOOK_TEST.test(env.BUG_WEBHOOK || '');
+async function bugReport(db, request, body, env, cors) {
+  const hook = env.BUG_WEBHOOK || '';
+  if (!bugOn(env)) return json({ error: 'bugs off' }, 503, cors);
+  const post = bugPost(body, await auth(db, request));
+  if (!post) return json({ error: 'too short' }, 400, cors);
+  const msg = { thread_name: post.title, content: post.content, username: 'Bug report', allowed_mentions: { parse: [] } };
+  if (/^\d{5,25}$/.test(env.BUG_TAG || '')) msg.applied_tags = [env.BUG_TAG];
+  let res;
+  try { res = await fetch(hook + '?wait=true', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(msg) }); }
+  catch (e) { return json({ error: 'discord unavailable' }, 502, cors); }
+  if (!res.ok) { console.warn('bug report', res.status, (await res.text().catch(() => '')).slice(0, 300)); return json({ error: 'discord', code: res.status }, 502, cors); }
+  const out = await res.json().catch(() => ({}));
+  const thread = /^\d+$/.test(String(out.channel_id || '')) ? String(out.channel_id) : '';
+  const guild = /^\d+$/.test(env.DISCORD_GUILD_ID || '') ? env.DISCORD_GUILD_ID : '';
+  return json({ ok: true, url: guild && thread ? `https://discord.com/channels/${guild}/${thread}` : '' }, 200, cors);
+}
+
 async function sha256(s) {
   const d = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(s)));
   return [...d].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -499,7 +545,7 @@ export async function handleAccount(request, env, cors) {
   const db = env.ACCOUNTS;
   if (!db) return json({ error: 'accounts off' }, 503, cors);
   const route = new URL(request.url).pathname.replace(/^\/account\/?/, '').replace(/\/$/, '');
-  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title', 'skin', 'invite', 'discord', 'puzzle'].includes(route)) return json({ error: 'not found' }, 404, cors);
+  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title', 'skin', 'invite', 'discord', 'puzzle', 'bug'].includes(route)) return json({ error: 'not found' }, 404, cors);
   if (request.method !== 'POST') return json({ error: 'method' }, 405, cors);
 
   let body = {};
@@ -511,9 +557,11 @@ export async function handleAccount(request, env, cors) {
   try {
     await ensureSchema(db);
     const ip = request.headers.get('CF-Connecting-IP') || '';
-    const bucket = route === 'guest' ? 'guest' : route === 'google' ? 'google' : 'other';
+    const bucket = route === 'guest' ? 'guest' : route === 'google' ? 'google' : route === 'bug' ? 'bug' : 'other';
     if (!(await hit(db, bucket, ip, env))) return json({ error: 'slow down' }, 429, cors);
     const now = Date.now();
+
+    if (route === 'bug') return await bugReport(db, request, body, env, cors);
 
     if (route === 'guest') {
       const tag = body.tag == null ? guestTag() : cleanTag(body.tag);
