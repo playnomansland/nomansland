@@ -226,6 +226,62 @@ Questions
    the economy is part of what this run measures.)
 
 
-## Run 4: maps (--map random, --no-mirror)
+## Run 4: maps (1500 matches, --map random, --no-mirror, seeds 820000-821499)
 
-(pending)
+"random" picks among the maps that aren't plain: Mushroom Cavern, Forest and Ice. Standard (testgrid) is run 1.
+1500 of 1500 finished, 141,683 moves accepted, 0 refused, 0 desyncs.
+
+Side bias
+
+    Map              games  rounds  side 0 win%  95% CI    z
+    Cavern            517    9.17   45.1         41-49    -2.24
+    Forest            508    9.09   46.5         42-51    -1.60
+    Ice               475    8.88   46.9         43-51    -1.33
+    All three        1500    9.05   46.1         44-49    -3.00
+    Standard (run 1) 1000    8.88   49.0         46-52    -0.63
+
+Towers (all three maps)
+
+    Tower           games   win%   95% CI     z       Cavern / Forest / Ice
+    Sniper tower      529   79.0   75-82    13.35     80 / 79 / 77
+    Bank tower        514   55.6   51-60     2.56     55 / 58 / 54
+    Keep              492   46.7   42-51    -1.44     47 / 44 / 50
+    Slime tower       511   46.0   42-50    -1.81     46 / 44 / 49
+    Mage tower        466   36.7   32-41    -5.74     37 / 38 / 35
+    Bastion           488   32.8   29-37    -7.61     30 / 34 / 34
+
+Leaders (all three maps; run 1 on Standard for comparison)
+
+    Leader          games   win%   95% CI     z       Standard
+    Enzo              244   82.0   77-86     9.99     82.8
+    Felix             235   64.3   58-70     4.37     55.7
+    Yot-Yot           230   55.2   49-62     1.58     56.9
+    Phil              279   54.1   48-60     1.38     51.2
+    Matteo            270   52.2   46-58     0.73     49.4
+    Cage              238   49.6   43-56    -0.13     56.7
+    Emile             250   49.6   44-56    -0.13     45.9
+    Mubarak           274   43.4   38-49    -2.17     39.6
+    Wilhelm           258   38.8   33-45    -3.61     38.4
+    Noah              232   38.4   32-45    -3.55     36.5
+    Zoe               222   37.4   31-44    -3.76     48.2
+    Otto              268   36.2   31-42    -4.52     40.5
+
+Clear signals
+- The tower order is the same on every map, and the same as on Standard: Sniper tower about 80%, Bastion and Mage
+  tower 33-37%. It does not depend on the map.
+- Enzo is at 82% on every map (Forest 85%, Cavern 78%, Ice 82%).
+- Side 1 wins more on the three non-plain maps together: side 0 at 46.1%, z -3.0. Each map on its own leans the
+  same way, but none is significant alone. On Standard there is no bias.
+- Wilhelm, Noah and Otto are low on both Standard and the other maps (36-41%).
+
+Noise or worth a second look
+- Felix is 64% here vs 56% on Standard; Zoe is 37% here vs 48%. Each is 2-3 SE apart, with 12 leaders compared, so
+  it could be chance. Felix's gold income may matter more on the longer maps.
+
+Questions
+1. Side 1 at about 54% on Cavern, Forest and Ice together: is there something asymmetric about those maps (spawn
+   side, terrain, the mirrored tower spot on the Cavern), or the AI's placement on them? A paired run with sides
+   swapped would tell.
+2. Does a tower that is just as strong on every map point at the tower itself (Sniper tower) rather than at map
+   layout?
+3. Felix and Zoe moving with the map: worth a dedicated run per map before ranked uses other maps?

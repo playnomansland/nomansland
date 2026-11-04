@@ -73,6 +73,9 @@ function hoarderTweaks(o, units, round) {
   const low = units.map((u, i) => Game.tierOf(units, i) <= 2 ? i : -1).filter(i => i >= 0);
   const highOnly = (view) => { const was = view.off; view.off = (Array.isArray(was) ? was : []).concat(low); return { held: 0, off: was }; };
   if (round <= o.hoardRounds) return { deploy: [hide], level: hide };
+  // round 1 (only with --hoard-rounds 0): no tier filter. The package's free squads go down when it is picked, and
+  // where they go depends on which units are left out, so a filtered view would not match the referee's board.
+  if (round === 1) return { deploy: [null], level: null };
   return { deploy: [highOnly, null], level: null };
 }
 
