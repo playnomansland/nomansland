@@ -9,3 +9,9 @@ tools/lab-runs/**/*.json
 !tools/lab-runs/**/*summary*.json
 !tools/lab-runs/**/probe-*.json
 tools/lab-runs/**/*.log
+tools/exploit/runs/**/*.json
+!tools/exploit/runs/**/*summary*.json
+!tools/exploit/runs/**/check-*.json
+!tools/exploit/runs/**/fuzz.json
+tools/exploit/runs/**/*.jsonl
+tools/exploit/runs/**/*.log
