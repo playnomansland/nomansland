@@ -2,7 +2,8 @@
 // Checks: the Rooms screen opens and its socket closes when a match starts; Create room (public, the default) puts a
 // card in another phone's list with the host's name, Join takes the second phone into the waiting room, the card
 // fills (2/2) and once the match starts a third phone gets Watch and spectates; Sort (Name, Date/time, Category, Mode)
-// is remembered (pb-lobby-sort) and flips on a second tap; the host's Spectators switch in the waiting room; Quick play
+// is remembered (pb-lobby-sort) and flips on a second tap; the host's own account on a second phone can't join its own
+// room ("You're already in that room"); the host's Spectators switch in the waiting room; Quick play
 // makes a room when none is open, and a second phone's Quick play joins it; a private room is never listed.
 // Needs: python3 -m http.server 8766 (repo root). Starts its own game server with accounts on 8781.
 // Run: node tools/tests/lobby-ui.js
@@ -23,10 +24,10 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 5 * 60 *
   };
   const b = await chromium.launch();
   const URL = `http://127.0.0.1:8766/?test&server=${srv.base}`;
-  // a phone with an account (Google or guest) already on it
-  async function phone(name, google) {
-    const g = google ? await call('google', { credential: idToken({ email: name + '@example.com', email_verified: true }) }) : await call('guest', { tag: name });
-    if (google) await call('tag', { tag: name }, g.session);
+  // a phone with an account (Google or guest) already on it; `have`: another phone of the same player
+  async function phone(name, google, have) {
+    const g = have || (google ? await call('google', { credential: idToken({ email: name + '@example.com', email_verified: true }) }) : await call('guest', { tag: name }));
+    if (!have && google) await call('tag', { tag: name }, g.session);
     const ctx = await ctx2d(b, { viewport: { width: 390, height: 844 } });
     await ctx.addInitScript((a) => { if (!localStorage.getItem('phonebellum.account.v1')) localStorage.setItem('phonebellum.account.v1', JSON.stringify(a)); localStorage.setItem('pb-stay', '1'); },
       { id: g.player.id, tag: name, google: !!google, dev: false, titles: [], title: '', tagNext: 0, skins: [], session: g.session, ts: Date.now() });
@@ -34,6 +35,7 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 5 * 60 *
     p.on('pageerror', e => { console.log(`[${name}] PAGE ERROR`, e.message); bad++; });
     await p.goto(URL);
     await p.waitForSelector('#online', { timeout: 30000 });
+    p.acct = g;
     return p;
   }
   const T = (p) => p.evaluate(() => window.__talk());
@@ -57,6 +59,16 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 5 * 60 *
     const txt = await card(guest, code).textContent();
     ok(/Vilhelm/.test(txt) && /Vilhelm’s room/.test(txt) && /Standard/.test(txt) && /1\/2 players/.test(txt), 'the card: host, room name, Standard, 1/2 players');
     ok(await card(guest, code).locator('[data-join]').count() === 1 && await card(guest, code).locator('[data-watch]').count() === 0, 'a waiting room: Join, no Watch');
+
+    // nobody is in the same room twice: the host's own account, on another phone, is turned away (denied 'here')
+    const host2 = await phone('Vilhelm', true, host.acct);
+    await host2.click('#online');
+    await card(host2, code).waitFor({ timeout: 10000 });
+    await card(host2, code).locator('[data-join]').click();
+    await host2.waitForFunction(() => /already in that room/i.test(document.getElementById('overlay').textContent), null, { timeout: 15000 }).catch(() => {});
+    ok(/already in that room/i.test(await host2.textContent('#overlay')), `your own room on a second phone: turned away (${(await host2.textContent('#overlay')).replace(/\s+/g, ' ').trim().slice(0, 70)})`);
+    ok((await T(host)).code === code && await host.locator('#start[disabled]').count() === 1, 'the room itself is untouched: still waiting for an opponent');
+    await host2.close();
 
     // Sort: remembered, and flips on a second tap
     await guest.click('#lob-sort');

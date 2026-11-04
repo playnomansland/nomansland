@@ -1,7 +1,8 @@
 // Chat and emotes in the browser (2026-11-04, docs/LOBBY.md §6). Three phones: the host (signed in with Google), a
 // guest-account friend and a Google-signed-in spectator, in a public room made from the lobby.
 // Checks: the talk button shows in the waiting room; the host's line reaches the friend (the short line under the
-// HUD and the Chat sheet); the friend sees "Sign in to chat" but sends an emote, which pops up on the host's screen;
+// HUD and the Chat sheet) and gives the friend the badge, never the host who wrote it;
+// the friend sees "Sign in to chat" but sends an emote, which pops up on the host's screen;
 // muting the friend's emotes from their nameplate (kept per match code) hides the next one; the spectator's line
 // during the match stays with the spectators, and the players get it when the match ends (chatMerge); Settings has
 // Chat and Emotes on/off. SHOTS=dir saves screenshots (the lobby, the wheel, an emote).
@@ -62,6 +63,10 @@ const SHOTS = process.env.SHOTS || '';
     await host.press('#tw-in', 'Enter');
     await guest.waitForFunction(() => /good luck, have fun/.test(document.getElementById('chat-tick').textContent), null, { timeout: 8000 });
     ok(true, 'the line shows under the HUD on the other phone');
+    // the badge counts messages that came in, never the ones you wrote yourself (the room echoes those back to you)
+    await sleep(400);
+    ok((await T(host)).talk.unread === 0, 'your own line is no notification');
+    ok((await T(guest)).talk.unread === 1, 'the other phone gets the badge');
     // the guest: no text box, emotes
     await guest.click('#talk-fab');
     ok(await guest.isVisible('.tw-sign') && !(await guest.$('#tw-in')), 'a guest sees "Sign in to chat"');
@@ -97,6 +102,7 @@ const SHOTS = process.env.SHOTS || '';
     await fan.press('#tw-in', 'Enter');
     await fan.waitForFunction(() => window.__talk().talk.lines.some(l => l.text === 'nice opening'), null, { timeout: 8000 });
     await sleep(800);
+    ok((await T(fan)).talk.unread === 0, 'a spectator\'s own line is no notification either');
     ok(!(await T(host)).talk.lines.some(l => l.text === 'nice opening') && !(await T(guest)).talk.lines.some(l => l.text === 'nice opening'), 'players don\'t see the spectators\' chat during the match');
     // the match ends: the chats merge
     await guest.evaluate(() => window.__talk().send({ t: 'forfeit' }));

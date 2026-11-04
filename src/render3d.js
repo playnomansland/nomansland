@@ -26,7 +26,7 @@
 // side 1 like the 2D board, so your side is toward +z. Bodies glide between engine ticks on their own.
 // Layers: the low-poly models of Models3D (instanced, one mesh per model part), sprites (every small marker: health
 // bars, arcs, rings, tile outlines, icons, labels; one draw call), beams (shots, bolts, heals, streaks), flame fans,
-// ice walls, and a text overlay for the crippled-army notice.
+// ice walls, and a text overlay (the crippled-army notice and the gold a destroyed treasury hands over).
 const Render3D = (THREE, el, view, opts = {}) => {
   const BW = Game.COLS * Game.TILE, BD = Game.ROWS * Game.TILE, T = Game.TILE;
   const css = Art.css;
@@ -379,7 +379,8 @@ const Render3D = (THREE, el, view, opts = {}) => {
     walls.length = 0;
   }
 
-  // ---------- text over the board: a fallen tower cripples its army for a few seconds ----------
+  // ---------- text over the board: a fallen tower cripples its army for a few seconds, and the gold a destroyed
+  // treasury hands over (fx kind 'gold'), which rises from the treasury itself ----------
   const note = document.createElement('div');
   note.style.cssText = 'position:absolute;inset:0;pointer-events:none;font:600 13px "IBM Plex Mono",ui-monospace,monospace';
   el.appendChild(note);
@@ -391,6 +392,13 @@ const Render3D = (THREE, el, view, opts = {}) => {
       const s = Math.max(bt.crippled(sd, 0), bt.crippled(sd, 1) || 0); if (!(s > 0)) continue; // (2v2: per board)
       const txt = sd === me ? `Your tower fell · crippled ${Math.ceil(s)} s` : `${mode === 'claude' ? 'Claude’s' : 'Enemy'} tower fell · crippled ${Math.ceil(s)} s`;
       html += `<div style="position:absolute;left:50%;top:${sd === me ? 62 : 30}%;transform:translateX(-50%);background:rgba(0,0,0,.6);padding:4px 8px;white-space:nowrap;color:${Art.teamCol(sd, me)}">${txt}</div>`;
+    }
+    const f = me === 1 ? -1 : 1;
+    for (const e of v.fx || []) {
+      if (e.kind !== 'gold') continue;
+      const p = Math.max(0, Math.min(1, e.age / e.life));
+      const [x, y] = screenOf(e.x * f, -e.y * f, 4 + 5 * Math.min(1, p * 1.5)); // it rises above the chest
+      html += `<div style="position:absolute;left:${Math.round(x)}px;top:${Math.round(y)}px;transform:translate(-50%,-50%);opacity:${Math.min(1, (1 - p) * 3).toFixed(2)};white-space:nowrap;font:700 18px 'IBM Plex Mono',ui-monospace,monospace;color:${e.mine ? css('--foe') : css('--gold')};text-shadow:0 0 4px rgba(8,12,14,.95),0 1px 2px rgba(8,12,14,.95)">${e.text}</div>`;
     }
     if (html !== noteText) { note.innerHTML = html; noteText = html; }
   }
@@ -842,6 +850,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
     const newest = new Set(flames.values());
     const jag = (seed, k) => (Math.sin((seed * 97 + k) * 12.9898) * 43758.5453) % 1;
     for (const e of v.fx || []) {
+      if (e.kind === 'gold') continue; // text over a destroyed treasury: drawn by showNote, not on the board
       const a = Math.max(0, 1 - e.age / e.life), team = teamColor(e.side, v.me);
       if (e.kind === 'death') { arc(e.x * f, -e.y * f, size(e.u) * (1 + e.age / e.life), team, 0.6 * a, 1, 0.1); continue; }
       if (e.kind === 'freeze') { arc(e.x * f, -e.y * f, 1 + 2 * (1 - a), color(FROST_COL), a, 1, 0.15); continue; } // frozen solid: an icy ring bursts out
@@ -968,12 +977,18 @@ const Render3D = (THREE, el, view, opts = {}) => {
   const tileAt = (clientX, clientY) => tileOfGround(groundHit(clientX, clientY), view().me);
   // the tile a touch there picks (a squad's model in front of the ground wins, see pick()), for checks
   const pickAt = (clientX, clientY) => pick(groundHit(clientX, clientY), clientX, clientY);
-  // where the middle of a tile (model column / row), h metres above the ground, is on the screen: [clientX, clientY]
+  // where a world point (wx, wz), h metres above the ground, is in the canvas: [x, y] in CSS pixels from its top left
   const scrV = new THREE.Vector3();
+  function screenOf(wx, wz, h = 0) {
+    const r = renderer.domElement.getBoundingClientRect();
+    scrV.set(wx, h + groundY(wx, wz), wz).project(camera);
+    return [(scrV.x + 1) / 2 * r.width, (1 - scrV.y) / 2 * r.height];
+  }
+  // where the middle of a tile (model column / row), h metres above the ground, is on the screen: [clientX, clientY]
   function screenAt(col, row, h = 0) {
     const f = view().me === 1 ? -1 : 1, w = Game.tileToWorld(col, row), r = renderer.domElement.getBoundingClientRect();
-    scrV.set(w.x * f, h + groundY(w.x * f, -w.y * f), -w.y * f).project(camera);
-    return [r.left + (scrV.x + 1) / 2 * r.width, r.top + (1 - scrV.y) / 2 * r.height];
+    const [x, y] = screenOf(w.x * f, -w.y * f, h);
+    return [r.left + x, r.top + y];
   }
   const QUALITY = { high: [2, true], medium: [1.5, true], low: [1, false] };
   function quality(q) {

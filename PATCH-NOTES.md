@@ -114,6 +114,15 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 4 November 2026 – Treasury gold on the board, and tidier rooms
+
+- **The gold a treasury hands over shows on the board.** Break the enemy's treasury and **"+150 gold"** floats up from it in gold while the fight goes on; when yours is broken, **"−150 gold"** floats up from it in red. It's the same raid the results screen lists, now where it happens. On both the 2D and the 3D board, and it stays up long enough to read at any fight speed.
+- **Rooms close when nobody is in them.** A room everyone has left (a waiting room, or one whose match is over) closes by itself about a minute later: it leaves the Rooms list and its code stops working, instead of hanging about for a day. A match that has started is never closed this way — it plays on and ends by itself, as before, so a phone that lost its connection can come back.
+- **You can't be in the same room twice.** Opening your own room on a second phone or in another tab no longer puts you on the other side of it: it says so and leaves the room as it was. Your own phone still comes straight back to its own side after a reload or a lost connection. **Quick play** never hands you your own room either.
+- **No notification for messages you wrote yourself.** The chat badge in a match counted your own lines as unread. It now counts only what came in.
+
+---
+
 ## 4 November 2026 – Ranked needs a login
 
 - **Ranked is for logged-in players only.** Both players need to be logged in with Google. Guests can still play Standard matches with friends and against the AI.

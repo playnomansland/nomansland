@@ -9073,7 +9073,8 @@ const Art = (() => {
 // aim: { id, end } while a melee squad's direction arrow is being set (end: the tile under the finger, or null); see aimFloor.
 // dev (Factions devtest only): { bPlacing, castMode, guideMode, guideId, guide }: the building being placed, the spell being
 // cast, and the arrow being drawn (guide: its points so far, for squad guideId).
-// fx: short-lived battle effects as plain data (shots, flames, bolts, heals, deaths), in board metres.
+// fx: short-lived battle effects as plain data (shots, flames, bolts, heals, deaths, and 'gold': the text over a
+// treasury that fell), in board metres.
 // rangeOf: { side, id } of the squad last tapped, or null (its range ring is drawn by the page, over the board, with the
 // same measure as the ring under the mouse: boardMarks in site-template.html).
 // battleCam: { zoom, x, y } while the battle cam zooms in on the final seconds of a fight (board metres), else null.
@@ -10384,6 +10385,25 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x, y, tw, th);
       ctx.fillStyle = teamCol(sd); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, W / 2, y + th / 2);
     });
+    drawGold();
+  }
+  // Gold over a treasury that was destroyed in this fight (fx kind 'gold'): what the raider takes in gold with a plus,
+  // what the owner loses in red with a minus. It rises from the treasury and fades.
+  function drawGold() {
+    const t = tilePx();
+    for (const e of fx) {
+      if (e.kind !== 'gold') continue;
+      const p = Math.max(0, Math.min(1, e.age / e.life));
+      ctx.globalAlpha = Math.min(1, (1 - p) * 3);
+      ctx.font = `700 ${Math.max(12, Math.round(t * 0.5))}px "IBM Plex Mono", monospace`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const x = PX(e.x), y = PY(e.y) - t * (0.55 + 1.3 * Math.min(1, p * 1.5));
+      ctx.lineWidth = Math.max(2, t * 0.09); ctx.strokeStyle = 'rgba(8,12,14,0.9)';
+      ctx.strokeText(e.text, x, y);
+      ctx.fillStyle = e.mine ? css('--foe') : css('--gold');
+      ctx.fillText(e.text, x, y);
+    }
+    ctx.globalAlpha = 1;
   }
   function draw() {
     pull();
@@ -10685,7 +10705,7 @@ Floors.floor = (() => {
   const foe = () => 1 - me;
   let m = null;             // match state (on the guest: a copy kept in step by the host)
   let phase = 'start';      // start | lobby | draft | deploy | battle | result | end
-  try { if (/[?&]test\b/.test(location.search)) window.__tour = () => tour.t && JSON.parse(JSON.stringify(tour.t)); if (/[?&]test\b/.test(location.search)) window.__pb = () => ({ m, me, board3d, board, bt, phase, liveSpeed: liveSpeed.slice(), playSpeed: playSpeed(), away, timeUp, ready: ready.slice(), team: m && m.team ? JSON.parse(JSON.stringify(m.team)) : null, pings: duoPings.slice(), rings: duoOn() ? [0, 1, 2, 3].map(k => duoRing(k).col) : null, expireDeploy: () => { deadline = now() - 400; tick(); } }); } catch (e) {} // read-only peek and countdown trigger for UI tests
+  try { if (/[?&]test\b/.test(location.search)) window.__tour = () => tour.t && JSON.parse(JSON.stringify(tour.t)); if (/[?&]test\b/.test(location.search)) window.__pb = () => ({ m, me, board3d, board, bt, phase, fx, summary: lastSummary, liveSpeed: liveSpeed.slice(), playSpeed: playSpeed(), away, timeUp, ready: ready.slice(), team: m && m.team ? JSON.parse(JSON.stringify(m.team)) : null, pings: duoPings.slice(), rings: duoOn() ? [0, 1, 2, 3].map(k => duoRing(k).col) : null, expireDeploy: () => { deadline = now() - 400; tick(); } }); } catch (e) {} // read-only peek and countdown trigger for UI tests
   try { if (/[?&]test\b/.test(location.search)) window.__pbRedraw = () => { if (phase === 'deploy') panelDeploy(); render(); }; } catch (e) {} // UI tests that set up a board state: draw it
   let selected = null;      // unit index chosen in the shop
   let rangeOf = null;       // { side, id }: the squad last tapped on the board; its range shows as a dotted ring
@@ -11106,7 +11126,7 @@ Floors.floor = (() => {
   // ----- Report a bug (2026-11-04): a new post in the Discord forum #bug-reports with the game version and match id
   // filled in. The server posts it through a webhook (/account/bug, accounts.js BUG); when that's off or fails, the report
   // is copied and the Discord server opens, so it can be pasted there by hand.
-  const GAME_VERSION = '5 Nov 2026 · 5f91bc7'; // src/build.js: the newest patch notes date and a hash of this page
+  const GAME_VERSION = '5 Nov 2026 · a268c2e'; // src/build.js: the newest patch notes date and a hash of this page
   const DISCORD_FALLBACK = 'https://discord.gg/TBpDKSBWsY';
   const bug = { draft: '', busy: false };
   // the id the server's match history uses (room.js historyInfo: <room>-<seed>), or one made the same way for other matches
@@ -15167,7 +15187,21 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     else if (s[8] > 0) fx.push({ kind: 'flame', x1: s[0], y1: s[1], x2: s[2], y2: s[3], side: s[4], half: s[8], slam: s[11] === 1, spin: s[11] === 2, age: 0, life: s[11] === 1 ? 0.45 : 0.3 });
     else if (s[10] === 1) fx.push({ kind: 'bolt', x1: s[0], y1: s[1], x2: s[2], y2: s[3], side: s[4], age: 0, life: 0.22, seed: Math.random() });
     else fx.push({ kind: s[7] === 1 ? 'heal' : 'shot', x1: s[0], y1: s[1], x2: s[2], y2: s[3], side: s[4], splash: s[5], charged: s[6], spin: s[9] || 1, age: 0, life: s[7] === 1 ? 0.35 : 0.18 });
-    for (const b of bt.bodies) if (!b.alive && !b._gone) { b._gone = true; fx.push({ kind: 'death', x: b.x, y: b.y, u: b.u, side: b.side, age: 0, life: 0.5 }); }
+    for (const b of bt.bodies) if (!b.alive && !b._gone) {
+      b._gone = true;
+      fx.push({ kind: 'death', x: b.x, y: b.y, u: b.u, side: b.side, age: 0, life: 0.5 });
+      if (b.u && b.u.kind === 'treasury') goldFloat(b);
+    }
+  }
+  // A treasury destroyed in this fight: the gold that changes hands floats up from it while the fight goes on —
+  // "+150 gold" in gold over the enemy's (you take it), "−150 gold" in red over your own (they take it from you).
+  // The amount is the one the rules worked out for this fight (Game.resolve: summary.treasury[side].lost).
+  function goldFloat(b) {
+    const tr = lastSummary && battlePre && lastSummary.round === battlePre.round ? lastSummary.treasury : null;
+    const n = tr && tr[b.side] ? Math.round(tr[b.side].lost || 0) : 0;
+    if (n <= 0) return; // nothing to take (the owner had no gold left): no text
+    const mine = b.side === me;
+    fx.push({ kind: 'gold', x: b.x, y: b.y, text: `${mine ? '−' : '+'}${n} gold`, mine, age: 0, life: 2.2 });
   }
 
   const fighters = (side) => bt.bodies.filter(b => b.alive && b.side === side && !b.u.structure && !b.u.aloft);
@@ -15204,7 +15238,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (!bt.step()) break;
       absorb();
     }
-    for (const e of fx) e.age += dtReal * sp * boost;
+    for (const e of fx) e.age += e.kind === 'gold' ? dtReal : dtReal * sp * boost; // the gold text stays up in real time, so it can be read at any speed
     Art.frostFollow(fx);
     fx = fx.filter(e => e.age < e.life);
     $('clock').textContent = `${bt.time().toFixed(1)} s${cam && cam.on ? ' · final seconds' : boost > 1 ? ' · speeding up' : ''}${objectiveLine()}`;
@@ -15885,7 +15919,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // It falls back to the 2D board when it can't start (no WebGL), when the phone drops the WebGL context, and when
   // fights run under 20 fps at low quality (slower fights step the quality down first), with one line on the board.
   const THREE_URL = './vendor/three.module.min.js'; // the artifact build points this at jsDelivr
-  const V3D = '46731065cc'; // the 3D code's version (src/build.js puts a hash of it here)
+  const V3D = 'de457aefc0'; // the 3D code's version (src/build.js puts a hash of it here)
   const B3D_STORE = 'phone-bellum-board';
   const force2d = /[?&]board=2d\b/.test(location.search);
   const force3d = !force2d && (/[?&]board=3d\b/.test(location.search) || window.PB_FORCE3D === true);
@@ -17703,6 +17737,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     }
     if (d.t === 'denied' && d.why) { // a ranked match: not logged in with Google (log in, then the join is tried again), switched off, or yourself
       const code = net.code, create = net.create;
+      if (d.why === 'here') { // nobody is in the same room twice: this account already has the other side
+        leaveNet(); srvForget();
+        overlayMsg('You’re already in that room', `Your account has the other side of room ${code}, on this phone or another. Go back to it there, or send the code to a friend.`);
+        return;
+      }
       if (d.why === 'account' || d.why === 'login') {
         srvForget(); showStart();
         rankedLogin(() => create ? srvHost({ ranked: true }) : srvJoin(code, { typed: true }), !create);
@@ -17973,7 +18012,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // tray row while deploying, on the board otherwise) opens the wheel: the three emotes and a chat line. Emotes show
   // ~1.5 s by the sender's nameplate and over their side of the board. The opponent's nameplate: Mute emotes, Mute
   // chat (kept per match code, pb-mute-<code>), Report. Settings: Chat and Emotes on/off (snd.chatOn, snd.emotesOn).
-  // PeerJS matches get none of it.
+  // The talk button's badge counts lines that came in while the chat was closed: never your own, which the room
+  // echoes back to you (lineMine). PeerJS matches get none of it.
   // =====================================================================
   var EMOTES = [['bababa', 'BABABABA!'], ['golem', 'Happy Golem'], ['shock', 'Shell-shocked']];
   var talk = { lines: [], can: false, pub: false, spectate: true, team: false, unread: 0, wheel: false, tick: [], tickTimer: 0 };
@@ -17984,6 +18024,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // is this sender on the other side? (1v1: the other side; 2v2: the other team; watchers never)
   var fromFoe = (from) => from >= 0 && (net.duo ? Duo.SEATS[from] && Duo.SEATS[from].side !== me : mode === 'net' && from !== me);
   var fromMe = (from) => mode === 'net' && (net.duo ? net.duoInfo && from === net.duoInfo.seat : from === me);
+  // is this line one this phone sent? (a watcher's line carries no side, only the account name it was sent under)
+  var lineMine = (l) => l.w ? !!(acct && acct.tag && l.tag === acct.tag) : fromMe(l.from);
   function talkReset() { Object.assign(talk, { lines: [], can: false, pub: false, spectate: true, team: false, unread: 0, wheel: false, tick: [] }); clearTimeout(talk.tickTimer); talkSync(); }
   // the messages a match room sends about chat (true: handled)
   function chatRecv(d) {
@@ -18007,11 +18049,13 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   function chatAdd(l) {
     talk.lines.push(l); if (talk.lines.length > 50) talk.lines.shift();
-    if (!(fromFoe(l.from) && muteOf().c) && chatShown()) { tickShow(l); if (!chatSheetOpen()) talk.unread++; }
+    // your own line shows (that's the only place you see it) but never counts as unread: the badge is for messages
+    // that came in, not for the ones you wrote
+    if (!(fromFoe(l.from) && muteOf().c) && chatShown()) { tickShow(l); if (!chatSheetOpen() && !lineMine(l)) talk.unread++; }
     chatSheetDraw(); talkSync();
   }
   var lineHtml = (l) => l.sys ? `<span class="cl sys">${esc(l.sys)}</span>`
-    : `<span class="cl${l.w ? ' w' : ''}${fromMe(l.from) ? ' me' : fromFoe(l.from) ? ' foe' : ''}">${l.team ? '<i class="ct">Team</i>' : ''}${l.w ? '<i class="ct" title="Spectator">👁</i>' : ''}<b>${esc(l.tag)}</b> ${esc(l.text)}</span>`;
+    : `<span class="cl${l.w ? ' w' : ''}${lineMine(l) ? ' me' : fromFoe(l.from) ? ' foe' : ''}">${l.team ? '<i class="ct">Team</i>' : ''}${l.w ? '<i class="ct" title="Spectator">👁</i>' : ''}<b>${esc(l.tag)}</b> ${esc(l.text)}</span>`;
   // a short-lived line under the HUD
   function tickShow(l) {
     talk.tick.push({ l, until: Date.now() + 6000 }); talk.tick = talk.tick.slice(-2);

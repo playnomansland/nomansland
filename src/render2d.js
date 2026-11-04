@@ -6,7 +6,8 @@
 // aim: { id, end } while a melee squad's direction arrow is being set (end: the tile under the finger, or null); see aimFloor.
 // dev (Factions devtest only): { bPlacing, castMode, guideMode, guideId, guide }: the building being placed, the spell being
 // cast, and the arrow being drawn (guide: its points so far, for squad guideId).
-// fx: short-lived battle effects as plain data (shots, flames, bolts, heals, deaths), in board metres.
+// fx: short-lived battle effects as plain data (shots, flames, bolts, heals, deaths, and 'gold': the text over a
+// treasury that fell), in board metres.
 // rangeOf: { side, id } of the squad last tapped, or null (its range ring is drawn by the page, over the board, with the
 // same measure as the ring under the mouse: boardMarks in site-template.html).
 // battleCam: { zoom, x, y } while the battle cam zooms in on the final seconds of a fight (board metres), else null.
@@ -1317,6 +1318,25 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x, y, tw, th);
       ctx.fillStyle = teamCol(sd); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, W / 2, y + th / 2);
     });
+    drawGold();
+  }
+  // Gold over a treasury that was destroyed in this fight (fx kind 'gold'): what the raider takes in gold with a plus,
+  // what the owner loses in red with a minus. It rises from the treasury and fades.
+  function drawGold() {
+    const t = tilePx();
+    for (const e of fx) {
+      if (e.kind !== 'gold') continue;
+      const p = Math.max(0, Math.min(1, e.age / e.life));
+      ctx.globalAlpha = Math.min(1, (1 - p) * 3);
+      ctx.font = `700 ${Math.max(12, Math.round(t * 0.5))}px "IBM Plex Mono", monospace`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const x = PX(e.x), y = PY(e.y) - t * (0.55 + 1.3 * Math.min(1, p * 1.5));
+      ctx.lineWidth = Math.max(2, t * 0.09); ctx.strokeStyle = 'rgba(8,12,14,0.9)';
+      ctx.strokeText(e.text, x, y);
+      ctx.fillStyle = e.mine ? css('--foe') : css('--gold');
+      ctx.fillText(e.text, x, y);
+    }
+    ctx.globalAlpha = 1;
   }
   function draw() {
     pull();
