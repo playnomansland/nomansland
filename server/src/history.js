@@ -5,12 +5,15 @@
 // Durable Object RPC, not awaited by the match). Accounts (step 5) may still go to D1; history can move there later
 // with a one-off copy if it ever needs SQL joins with accounts.
 //
-// What is kept per round (one row): see roundRow below. Gamertags only for tournament matches. The pre-fight
-// snapshot and the fight summary are kept gzipped (a few KB) when they stay under REPLAY_MAX, so replays are
-// possible later. Rows older than KEEP_DAYS are deleted by a daily alarm. No other personal data.
+// What is kept per round (one row): see roundRow below. Usernames of tournament players, ranked players and, since
+// 2026-11-04, any player with an account. The pre-fight snapshot (with the units as they were) and the fight summary
+// are kept gzipped (a few KB) when they stay under REPLAY_MAX: the replays in Match history. Since 2026-11-04 each row
+// also keeps which accounts played it (p0, p1: player ids, never sent out) so a player can list their own matches
+// (mine, called by accounts.js /account/history). Rows older than KEEP_DAYS are deleted by a daily alarm.
 //
 // Reading (src/index.js): GET /history?limit=&before= (newest first, paged by row id) and GET /history/<match id>
 // (one match, oldest round first). A <match id> is "<ROOM CODE>-<seed>"; a bare room code gives that room's newest match.
+// GET /history/<match id>?replay=<round>: that round's replay { pre, summary } (pre carries the units it was played with).
 import { DurableObject } from 'cloudflare:workers';
 import Game from '../../src/game.js';
 import Engine from '../../src/engine.js';
@@ -43,7 +46,7 @@ export function roundRow(pre, sum, m, info) {
   let look = '';
   try { const id = Game.lookOf(pre) || ''; look = (Game.SKINS.find((k) => k.id === id) || {}).name || id; } catch { look = pre.skin || ''; }
   return {
-    room: info.room, tour: info.tour || null, match: info.match || null, matchId: info.matchId,
+    room: info.room, tour: info.tour || null, match: info.match || null, matchId: info.matchId, ranked: !!info.ranked,
     round: sum.round, map: (Game.mapOf(pre) || {}).name || '', look,
     leaders: [leaderName(pre, 0), leaderName(pre, 1)],
     names: info.names || null,
@@ -59,7 +62,7 @@ export function forfeitRow(m, side, info) {
   let leaders = ['', ''];
   try { leaders = [leaderName(m, 0), leaderName(m, 1)]; } catch {}
   return {
-    room: info.room, tour: info.tour || null, match: info.match || null, matchId: info.matchId,
+    room: info.room, tour: info.tour || null, match: info.match || null, matchId: info.matchId, ranked: !!info.ranked,
     round: m.round, map: (Game.mapOf(m) || {}).name || '', look: '', leaders, names: info.names || null,
     armies: [[], []], skills: [[], []], towers: ['', ''], winner: -1, timeout: false, seconds: 0, dmg: [0, 0],
     hp: [m.hp[0], m.hp[1]], over: true, matchWinner: sideOf(m.winner), forfeit: side,
@@ -82,17 +85,23 @@ export class HistoryRoom extends DurableObject {
     this.sql.exec('CREATE INDEX IF NOT EXISTS rounds_match ON rounds (match_id, round)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS rounds_room ON rounds (room, id)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS rounds_time ON rounds (time)');
+    // which accounts played (2026-11-04); older rows have none
+    for (const c of ['p0', 'p1']) { try { this.sql.exec(`ALTER TABLE rounds ADD COLUMN ${c} TEXT`); } catch (e) { if (!/duplicate column/i.test(String(e && e.message))) throw e; } }
+    this.sql.exec('CREATE INDEX IF NOT EXISTS rounds_p0 ON rounds (p0, id)');
+    this.sql.exec('CREATE INDEX IF NOT EXISTS rounds_p1 ON rounds (p1, id)');
   }
 
-  // Saves one round. replay: { pre, summary } or null. Called by the Room without waiting on it.
-  async add(row, replay) {
+  // Saves one round. replay: { pre, summary } or null; pids: [side 0's account id, side 1's] (null = no account).
+  // Called by the Room without waiting on it.
+  async add(row, replay, pids) {
     const fail = (this.env.HISTORY_FAIL_ROOMS || '').split(',').filter(Boolean);
     if (fail.some((p) => String(row.room).startsWith(p))) throw new Error('history store failing (test setting)');
     let blob = null;
     if (replay) { try { const z = await gzip(JSON.stringify(replay)); if (z.byteLength <= REPLAY_MAX) blob = z; } catch { blob = null; } }
     const time = Date.now();
-    this.sql.exec('INSERT INTO rounds (time, match_id, room, tour, round, row, replay) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      time, String(row.matchId), String(row.room), row.tour || null, row.round | 0, JSON.stringify(row), blob);
+    const pid = (k) => (Array.isArray(pids) && typeof pids[k] === 'string' && pids[k] ? pids[k] : null);
+    this.sql.exec('INSERT INTO rounds (time, match_id, room, tour, round, row, replay, p0, p1) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      time, String(row.matchId), String(row.room), row.tour || null, row.round | 0, JSON.stringify(row), blob, pid(0), pid(1));
     if (!(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(time + DAY_MS);
     return true;
   }
@@ -102,6 +111,28 @@ export class HistoryRoom extends DurableObject {
     this.sql.exec('DELETE FROM rounds WHERE time < ?', Date.now() - KEEP_DAYS * DAY_MS);
     const left = this.sql.exec('SELECT COUNT(*) AS n FROM rounds').one().n;
     if (left) await this.ctx.storage.setAlarm(Date.now() + DAY_MS);
+  }
+
+  // A player's own matches, newest first: [{ matchId, side, rounds }], paged by the newest row id of each match.
+  mine(player, before, limit) {
+    if (typeof player !== 'string' || !player) return { matches: [], next: null };
+    limit = Math.max(1, Math.min(30, limit | 0 || 15));
+    const list = (before
+      ? this.sql.exec('SELECT match_id, MAX(id) AS last, MAX(p0 = ?) AS s0 FROM rounds WHERE p0 = ? OR p1 = ? GROUP BY match_id HAVING last < ? ORDER BY last DESC LIMIT ?', player, player, player, before, limit)
+      : this.sql.exec('SELECT match_id, MAX(id) AS last, MAX(p0 = ?) AS s0 FROM rounds WHERE p0 = ? OR p1 = ? GROUP BY match_id ORDER BY last DESC LIMIT ?', player, player, player, limit)).toArray();
+    const matches = list.map((x) => ({
+      matchId: x.match_id, side: x.s0 ? 0 : 1,
+      rounds: this.sql.exec('SELECT id, time, row, replay IS NOT NULL AS has_replay FROM rounds WHERE match_id = ? ORDER BY round, id LIMIT ?', x.match_id, MATCH_MAX).toArray().map(HistoryRoom.out),
+    }));
+    return { matches, next: list.length === limit ? list[list.length - 1].last : null };
+  }
+
+  // one round's replay, unpacked: { pre, summary }, or null
+  async replay(matchId, round) {
+    const r = this.sql.exec('SELECT replay FROM rounds WHERE match_id = ? AND round = ? AND replay IS NOT NULL ORDER BY id DESC LIMIT 1', matchId, round).toArray()[0];
+    if (!r) return null;
+    const stream = new Blob([r.replay]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Response(stream).text();
   }
 
   static out(r) { return { id: r.id, time: new Date(r.time).toISOString(), replay: r.has_replay ? true : false, ...JSON.parse(r.row) }; }
@@ -121,6 +152,13 @@ export class HistoryRoom extends DurableObject {
     if (r.count > READS_PER_MIN) return json({ error: 'too many requests' }, 429, { ...cors, 'retry-after': '60' });
 
     const id = url.searchParams.get('id');
+    if (id != null && url.searchParams.has('replay')) {
+      const round = Number(url.searchParams.get('replay'));
+      if (!ID_RE.test(id) || !id.includes('-') || !Number.isInteger(round) || round < 1 || round > MATCH_MAX) return json({ error: 'bad id' }, 400, cors);
+      const text = await this.replay(id, round);
+      if (!text) return json({ error: 'not found' }, 404, cors);
+      return new Response(text, { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=86400', ...cors } });
+    }
     if (id != null) {
       if (!ID_RE.test(id)) return json({ error: 'bad id' }, 400, cors);
       let matchId = id;

@@ -10,6 +10,7 @@
 //   GET /duo/<CODE>        -> WebSocket into a 2v2 match (DuoRoom; only a developer account can make one)
 //   GET /history?limit=&before= -> saved rounds of server matches, newest first, paged (HistoryRoom, step 4)
 //   GET /history/<MATCH>   -> one match's rounds (<ROOM>-<seed>, or a bare room code for that room's newest match)
+//   GET /history/<MATCH>?replay=<round> -> that round's replay { pre, summary } (Match history's Replay)
 //   GET /leaderboard       -> ranked players with wins, ties and losses, and whether ranked play is on (accounts.js)
 //   POST /account/<route>  -> accounts (step 5; guest, me, google, tag, signout, delete, title, skin, ranked, invite, discord): see accounts.js
 // Cron (wrangler.toml [triggers], hourly): month end, the Legend title for the leaderboard's top 5 (accounts.js awardLegends),
@@ -68,7 +69,7 @@ export default {
       if (!allowedOrigin(request, env)) return json({ error: 'origin' }, 403);
       const q = new URLSearchParams();
       if (h[1]) q.set('id', h[1].toUpperCase().replace(/-(.*)$/, (_, s) => '-' + s.toLowerCase()));
-      for (const k of ['limit', 'before']) if (url.searchParams.has(k)) q.set(k, url.searchParams.get(k).slice(0, 12));
+      for (const k of ['limit', 'before', 'replay']) if (url.searchParams.has(k)) q.set(k, url.searchParams.get(k).slice(0, 12));
       const headers = new Headers({ 'x-origin': request.headers.get('Origin'), 'x-ip': request.headers.get('CF-Connecting-IP') || '' });
       try { return await env.HISTORY.getByName('all').fetch(new Request('https://history/?' + q, { headers })); }
       catch (e) { console.warn('history read', e && e.message); return json({ error: 'history unavailable' }, 503, cors); }

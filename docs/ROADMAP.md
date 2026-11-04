@@ -51,3 +51,12 @@ Open questions:
 - Does every unit deal one type, or can skills/specs change it?
 - How it fits with existing rules: armor floor 15%, ward caps, poison ignoring both.
 - Worth it? It adds a counter layer (good for the game's core), but also a lot to read on a card. Prototype in the counter table first.
+
+## 7. Player profile (planned 2026-11-04)
+
+Tap any username (in a room, a match, match history, the leaderboard or the friends list) to open that player's profile.
+
+- Shows: username and title, worn skins, ranked record and leaderboard place, the last 10 matches (result, opponent, date), most-played units and leaders, and the titles they have.
+- Buttons: **Add friend** / **Message** (from the friends system), **Watch** when they are in a public match, Report.
+- Server: a public read `POST /account/profile { id | tag }` built from what is already stored (players, ranked, the history rows of that account); never ids, emails or anything private. Hidden for deleted accounts.
+- Open: what a guest's profile shows; whether players can hide their match list.

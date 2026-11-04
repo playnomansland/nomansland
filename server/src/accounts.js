@@ -73,6 +73,9 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS discord (subject TEXT PRIMARY KEY, player TEXT NOT NULL UNIQUE, created INTEGER NOT NULL)`,
   // tutorial puzzles (2026-11-03): one row per puzzle a player has solved (k = its index in src/puzzles.json)
   `CREATE TABLE IF NOT EXISTS puzzles (player TEXT NOT NULL, k INTEGER NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (player, k))`,
+  // GG (2026-11-04): one row per GG a player gave after an online match (one per giver and match; see GG below)
+  `CREATE TABLE IF NOT EXISTS ggs (giver TEXT NOT NULL, receiver TEXT NOT NULL, match TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (giver, match))`,
+  `CREATE INDEX IF NOT EXISTS ggs_receiver ON ggs (receiver, giver)`,
 ];
 let schemaReady = null;
 function ensureSchema(db) {
@@ -82,7 +85,8 @@ function ensureSchema(db) {
     // players.legend (2026-11-03): how many months the player ended in the top 5 (counted from 'awards')
     // players.online (2026-11-03): online matches the player finished (countOnline); players.discord: when the Discord check passed
     // players.initiate (2026-11-03): when the last tutorial puzzle was solved (the Initiate title)
-    .then(() => Promise.all(['title TEXT', 'tag_changed INTEGER', 'legend INTEGER', 'online INTEGER', 'discord INTEGER', 'initiate INTEGER'].map((c) => db.prepare('ALTER TABLE players ADD COLUMN ' + c).run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }))))
+    // players.goodsport (2026-11-04): when the player reached GG.need GGs (the Good sport title)
+    .then(() => Promise.all(['title TEXT', 'tag_changed INTEGER', 'legend INTEGER', 'online INTEGER', 'discord INTEGER', 'initiate INTEGER', 'goodsport INTEGER'].map((c) => db.prepare('ALTER TABLE players ADD COLUMN ' + c).run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }))))
     .catch((e) => { schemaReady = null; throw e; });
   return schemaReady;
 }
@@ -94,8 +98,9 @@ function ensureSchema(db) {
 //   legend "Legend" (gold, 2026-11-03): ended a month in the top 5 of the leaderboard (players.legend > 0). Kept for good.
 //   bababa "BABABABA" (orange, 2026-11-03): joined the game's Discord server, checked with Discord (players.discord).
 //   initiate "Initiate" (light blue, 2026-11-03): solved every tutorial puzzle (players.initiate; see PUZZLE below).
+//   goodsport "Good sport" (pale sky blue, 2026-11-04): got GG.need GGs from opponents (players.goodsport; see GG below).
 // The player picks which one shows (players.title); none picked = the first earned one in the order DEV, Legend,
-// BABABABA, Initiate, Day 1.
+// BABABABA, Initiate, Good sport, Day 1.
 // Gamertags: one change a week (TAG_EVERY), any time for developers. Naming a brand-new account (in its first
 // TAG_FRESH, e.g. sign-up's gamertag after Google) doesn't count.
 export const TAG_EVERY = 7 * 24 * 3600e3;
@@ -108,6 +113,7 @@ export function titlesOf(p) {
   if (p && p.legend > 0) out.push('legend');
   if (p && p.discord) out.push('bababa');
   if (p && p.initiate) out.push('initiate');
+  if (p && p.goodsport) out.push('goodsport');
   if (p && p.created < DAY1_END) out.push('day1');
   return out;
 }
@@ -115,6 +121,28 @@ export function titleShown(p) {
   const have = titlesOf(p);
   if (p && p.title === 'none') return '';
   return p && have.includes(p.title) ? p.title : have[0] || '';
+}
+
+// ---------- GG and the Good sport title (2026-11-04) ----------
+// After an online match (a friend's or ranked server match), each player may say GG to the other once (room.js 'gg').
+// It counts towards the other's Good sport title when both players have accounts, they aren't the same player, the
+// match lasted GG.minFights fights and nobody left it. At most GG.perGiver GGs from one player count, so two friends
+// can't hand each other the title. GG.need counted GGs give the title for good.
+export const GG = { title: 'goodsport', need: 10, perGiver: 3, minFights: 3 };
+export async function ggCount(db, id) {
+  const r = await db.prepare('SELECT COALESCE(SUM(MIN(n, ?)), 0) AS n FROM (SELECT COUNT(*) AS n FROM ggs WHERE receiver = ? GROUP BY giver)').bind(GG.perGiver, id).first();
+  return r ? r.n | 0 : 0;
+}
+// one GG; ids are account player ids. Returns true when it was counted.
+export async function recordGG(env, giver, receiver, match, fights) {
+  const db = env.ACCOUNTS;
+  if (!db || !giver || !receiver || giver === receiver || !(fights >= GG.minFights) || typeof match !== 'string') return false;
+  await ensureSchema(db);
+  const now = Date.now();
+  const res = await db.prepare('INSERT OR IGNORE INTO ggs (giver, receiver, match, created) VALUES (?, ?, ?, ?)').bind(giver, receiver, match.slice(0, 40), now).run();
+  if (!(res.meta && res.meta.changes)) return false;
+  if ((await ggCount(db, receiver)) >= GG.need) await db.prepare('UPDATE players SET goodsport = COALESCE(goodsport, ?) WHERE id = ?').bind(now, receiver).run();
+  return true;
 }
 
 // ---------- unit skins (2026-11-03) ----------
@@ -411,7 +439,7 @@ export async function sessionPlayer(env, token) {
   await ensureSchema(db);
   const s = await db.prepare(`SELECT s.player, s.expires, p.tag, p.deleted, p.dev FROM sessions s JOIN players p ON p.id = s.player WHERE s.hash = ?`).bind(await sha256(token)).first();
   if (!s || s.expires < Date.now() || s.deleted) return null;
-  const p = await db.prepare('SELECT created, dev, title, legend, discord, initiate FROM players WHERE id = ?').bind(s.player).first();
+  const p = await db.prepare('SELECT created, dev, title, legend, discord, initiate, goodsport FROM players WHERE id = ?').bind(s.player).first();
   let skins = [];
   try { skins = await wornSkins(db, s.player, !!s.dev); } catch (e) { skins = []; } // a look only: never in the way of playing
   return { id: s.player, tag: s.tag || 'Player', dev: !!s.dev, title: titleShown(p), skins };
@@ -438,7 +466,7 @@ export async function recordSeries(env, ids, winner) {
 // the board (the leader in wins gets the full 75); the win share counts a tie as half a win. Then wins, then fewest
 // losses. score is 0 to 100. Deleted accounts drop off.
 export const BOARD_WEIGHTS = { wins: 0.75, share: 0.25 };
-const BOARD_SQL = `WITH b AS (SELECT p.id, p.tag, p.created, p.dev, p.title, p.legend, p.discord, p.initiate, r.w, r.t, r.l FROM ranked r JOIN players p ON p.id = r.player
+const BOARD_SQL = `WITH b AS (SELECT p.id, p.tag, p.created, p.dev, p.title, p.legend, p.discord, p.initiate, p.goodsport, r.w, r.t, r.l FROM ranked r JOIN players p ON p.id = r.player
     WHERE p.deleted IS NULL AND (r.w + r.t + r.l) > 0), top AS (SELECT MAX(w) AS mw FROM b)
   SELECT b.*, 100.0 * (${BOARD_WEIGHTS.wins} * (CASE WHEN top.mw > 0 THEN b.w * 1.0 / top.mw ELSE 0 END)
     + ${BOARD_WEIGHTS.share} * (b.w + 0.5 * b.t) * 1.0 / (b.w + b.t + b.l)) AS score
@@ -496,9 +524,9 @@ export async function leaderboard(env, cors) {
 }
 
 async function playerOut(db, id) {
-  const p = await db.prepare('SELECT id, tag, created, dev, title, tag_changed, legend, discord, initiate FROM players WHERE id = ?').bind(id).first();
+  const p = await db.prepare('SELECT id, tag, created, dev, title, tag_changed, legend, discord, initiate, goodsport FROM players WHERE id = ?').bind(id).first();
   const logins = await db.prepare('SELECT provider FROM logins WHERE player = ?').bind(id).all();
-  return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google'), dev: !!p.dev, titles: titlesOf(p), title: titleShown(p), tagNext: tagNext(p) > Date.now() ? tagNext(p) : 0, skins: await skinsOf(db, id, !!p.dev), discord: !!p.discord, puzzles: (await db.prepare('SELECT k FROM puzzles WHERE player = ? ORDER BY k').bind(id).all()).results.map((r) => r.k) };
+  return { id: p.id, tag: p.tag, created: p.created, google: logins.results.some((r) => r.provider === 'google'), dev: !!p.dev, titles: titlesOf(p), title: titleShown(p), tagNext: tagNext(p) > Date.now() ? tagNext(p) : 0, skins: await skinsOf(db, id, !!p.dev), discord: !!p.discord, puzzles: (await db.prepare('SELECT k FROM puzzles WHERE player = ? ORDER BY k').bind(id).all()).results.map((r) => r.k), gg: await ggCount(db, id) };
 }
 
 // Developer mode: a Google account whose verified email is in the secret DEV_EMAILS (comma separated; a Cloudflare
@@ -545,7 +573,7 @@ export async function handleAccount(request, env, cors) {
   const db = env.ACCOUNTS;
   if (!db) return json({ error: 'accounts off' }, 503, cors);
   const route = new URL(request.url).pathname.replace(/^\/account\/?/, '').replace(/\/$/, '');
-  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title', 'skin', 'invite', 'discord', 'puzzle', 'bug'].includes(route)) return json({ error: 'not found' }, 404, cors);
+  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title', 'skin', 'invite', 'discord', 'puzzle', 'bug', 'history'].includes(route)) return json({ error: 'not found' }, 404, cors);
   if (request.method !== 'POST') return json({ error: 'method' }, 405, cors);
 
   let body = {};
@@ -611,7 +639,7 @@ export async function handleAccount(request, env, cors) {
 
     if (route === 'title') {
       const t = typeof body.title === 'string' ? body.title : '';
-      const p = await db.prepare('SELECT created, dev, legend, discord, initiate FROM players WHERE id = ?').bind(me.player).first();
+      const p = await db.prepare('SELECT created, dev, legend, discord, initiate, goodsport FROM players WHERE id = ?').bind(me.player).first();
       if (t && !titlesOf(p).includes(t)) return json({ error: 'not your title' }, 400, cors);
       await db.prepare('UPDATE players SET title = ? WHERE id = ?').bind(t || 'none', me.player).run();
       return json({ player: await playerOut(db, me.player) }, 200, cors);
@@ -680,6 +708,13 @@ export async function handleAccount(request, env, cors) {
       }
       await db.prepare('UPDATE players SET seen = ? WHERE id = ?').bind(now, me.player).run();
       return json(out, 200, cors);
+    }
+    if (route === 'history') {
+      // the player's own online matches, newest first (match history, 2026-11-04): HistoryRoom keeps which account
+      // played which side of each round, never shown to anyone else
+      if (!env.HISTORY) return json({ error: 'history off' }, 503, cors);
+      const before = Number.isInteger(body.before) && body.before > 0 ? body.before : null;
+      return json(await env.HISTORY.getByName('all').mine(me.player, before, 15), 200, cors);
     }
     if (route === 'tag') {
       const tag = cleanTag(body.tag);

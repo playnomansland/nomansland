@@ -66,6 +66,14 @@ a { color: var(--you); }
 .hist { display: grid; gap: 6px; max-height: 60vh; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
 .hist li { border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; display: grid; gap: 2px; font: 500 14px var(--font-body); }
 .hist li span { font-size: 12px; color: var(--muted); }
+.hist .hm-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.hist .hm-top b.you { color: var(--you); } .hist .hm-top b.foe { color: var(--foe); }
+.hist .hm-vs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hist details summary { cursor: pointer; font-size: 13px; color: var(--gold); padding: 4px 0; }
+.hist .hist-rounds { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+.hist .hist-rounds li { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 6px 0 0; }
+.hist .hr-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .hist .hr-top .btn { margin-left: auto; }
+.hist .hr-won { color: var(--you); } .hist .hr-lost { color: var(--foe); }
 .acct { display: grid; gap: 10px; }
 .acct-google { min-height: 44px; display: flex; justify-content: center; align-items: center; border-radius: 999px; position: relative; color-scheme: normal; }
 .acct-google:not(.ready)::before { content: 'Loading Google sign-in…'; position: absolute; inset: 0; display: grid; place-items: center; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; background: rgba(32, 33, 36, 0.6); }
@@ -626,6 +634,12 @@ html.pc .corner button span { display: inline; }
 .side .lbl .ptitle i { width: 4px; height: 4px; }
 .side .lbl { align-items: flex-start; }
 
+.rgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 8px; }
+.rgrid .rbtn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; min-height: 56px; }
+.rgrid .rbtn b { font-size: 18px; }
+.rgrid .rbtn span { font-size: 11px; color: var(--muted, #9aa); text-transform: uppercase; letter-spacing: 0.06em; }
+.rgrid .rbtn.won span { color: var(--you); } .rgrid .rbtn.lost span { color: var(--foe); }
+.gg-row { align-items: center; } .gg-got { color: #C6ECFF; font-weight: 700; }
 .series-chip { display: block; margin: 0 auto 2px; width: max-content; padding: 1px 8px; border: 1px solid var(--gold); border-radius: 999px; color: var(--gold); font: 700 11px var(--font-data); letter-spacing: 0.06em; background: rgba(230, 184, 74, 0.1); }
 </style>
 <script>
@@ -856,10 +870,10 @@ html.pc .corner button span { display: inline; }
 
   // ---------- state ----------
   let mode = 'ai';          // ai | claude | tutorial | host | guest
-  const solo = () => mode === 'ai' || mode === 'claude' || mode === 'tutorial'; // playing against the computer on this screen
+  const solo = () => mode === 'ai' || mode === 'claude' || mode === 'tutorial' || mode === 'sandbox'; // playing against the computer on this screen (sandbox: Replay a round)
   // the opponent's account on a server match ({ tag, title }), if their phone has one
   const foePlayer = () => mode === 'net' && net.players && net.players[foe()] || null;
-  const foeName = () => (mode === 'spec' && tour.spec ? tour.spec.foe : '') || tourFoe() || (foePlayer() ? foePlayer().tag : '') || (mode === 'ai' || mode === 'tutorial' ? 'Enemy' : mode === 'claude' ? 'Claude' : 'Opponent'); // a tournament opponent by username
+  const foeName = () => (mode === 'sandbox' && sbx.foe) || (mode === 'spec' && tour.spec ? tour.spec.foe : '') || tourFoe() || (foePlayer() ? foePlayer().tag : '') || (mode === 'ai' || mode === 'tutorial' ? 'Enemy' : mode === 'claude' ? 'Claude' : 'Opponent'); // a tournament opponent by username
   let me = 0;               // which side of the match this screen plays (the guest is side 1)
   const foe = () => 1 - me;
   let m = null;             // match state (on the guest: a copy kept in step by the host)
@@ -1919,6 +1933,7 @@ html.pc .corner button span { display: inline; }
     // a ranked series: the score in games, from this player's side, above the round number
     const rk = mode === 'net' && net.ranked && m ? net.ranked : null, chip = $('series-chip');
     chip.hidden = !rk;
+    if (mode === 'sandbox') { chip.hidden = false; chip.textContent = `Replay · R${sbx.round}`; }
     if (rk && phase !== 'battle') chip.textContent = `Bo${rk.best} · ${rk.wins[me]}–${rk.wins[foe()]}${rk.ties ? ` · ${rk.ties} draw${rk.ties > 1 ? 's' : ''}` : ''}`;
     if ($('foe-name').innerHTML !== fh) $('foe-name').innerHTML = fh;
     if ($('you-name').innerHTML !== yh) $('you-name').innerHTML = yh;
@@ -2471,6 +2486,7 @@ html.pc .corner button span { display: inline; }
     if (m.round === Game.FLANK.round && !choosingPack() && !choosingTower() && !devPicking() && bannerRound !== undoKey()) { bannerRound = undoKey(); setTimeout(() => banner('Flanks are open', 'Deploy on the blue edges of their half'), 150); }
     const undoable = can && undoSnap && undoSnap.key === undoKey() && sideState() !== undoSnap.state;
     const extraBtns = `<span class="xbtns" style="display:flex;gap:6px;flex-wrap:wrap">
+        ${mode === 'sandbox' ? '<button class="btn small" id="sbx-back">Back to results</button>' : ''}
         ${undoable ? '<button class="btn small" id="undo-all">Undo all</button>' : ''}
         ${loanOffer() ? (Game.loanNow(m, me) ? `<button class="btn small" id="loan-undo" ${can && m.gold[me] >= Game.loanTerms(m, me).gold ? '' : 'disabled'}>Pay back loan · −${Game.loanTerms(m, me).gold}</button>` : `<button class="btn small" id="loan" title="${esc(loanText())}" ${can && Game.canTakeLoan(m, me) ? '' : 'disabled'}${Game.investNow(m, me) ? ' title="Not this round: you made the Major investment"' : ''}>Loan · +${Game.loanTerms(m, me).gold}</button>`) : ''}
         ${Game.charOf(m, me) === 'otto' ? `<button class="btn small" id="slot-open" ${can ? '' : 'disabled'}>Slots · ${Game.SLOT.perRound - Game.slotSpins(m, me).length} left</button>` : ''}
@@ -2556,6 +2572,7 @@ html.pc .corner button span { display: inline; }
     });
     if (scrollTo2 != null) { const c = shop.querySelector(`.uc2[data-i="${scrollTo2}"]`); scrollTo2 = null; if (c) c.scrollIntoView({ block: 'nearest', inline: 'center' }); }
     if ($('fight')) $('fight').addEventListener('click', () => capCheck(runFight));
+    if ($('sbx-back')) $('sbx-back').addEventListener('click', sbxExit);
     if ($('ready')) $('ready').addEventListener('click', () => ready[me] ? toggleReady() : capCheck(toggleReady));
     if ($('buy-deploy')) $('buy-deploy').addEventListener('click', () => { if (editable() && Game.buyDeploy(m, me)) changed(); });
     wireMore();
@@ -2591,7 +2608,7 @@ html.pc .corner button span { display: inline; }
   var undoSnap = null;
   const undoKey = () => m ? m.seed + ':' + m.round : '';
   const sideState = () => JSON.stringify(Referee.sideState(m, me));
-  function takeUndoSnap() { if (m && (!undoSnap || undoSnap.key !== undoKey())) undoSnap = { key: undoKey(), state: sideState() }; }
+  function takeUndoSnap() { if (m && (!undoSnap || undoSnap.key !== undoKey())) { undoSnap = { key: undoKey(), state: sideState() }; logRound(m.round, 'start', undoSnap.state); } }
   function undoAll() {
     if (!editable() || !undoSnap || undoSnap.key !== undoKey()) return;
     Referee.restoreSide(m, me, JSON.parse(undoSnap.state));
@@ -2729,8 +2746,9 @@ html.pc .corner button span { display: inline; }
     legend: { name: 'Legend', col: '#FFC83D', glow: 'rgba(255, 200, 61, 0.6)' },
     bababa: { name: 'BABABABA', col: '#FF8A2A', glow: 'rgba(255, 138, 42, 0.6)' },
     initiate: { name: 'Initiate', col: '#7FD3FF', glow: 'rgba(127, 211, 255, 0.6)' },
+    goodsport: { name: 'Good sport', col: '#C6ECFF', glow: 'rgba(198, 236, 255, 0.55)' }, // 2026-11-04: GGs from opponents (a paler blue than Initiate)
   };
-  const TITLE_WHY = { day1: 'Day 1: you were here in the very first week.', dev: 'DEV: you make this game.', legend: 'Legend: you ended a month in the top 5 of the leaderboard.', bababa: 'BABABABA: you joined the No Mans Land Discord.', initiate: 'Initiate: you solved every puzzle.' };
+  const TITLE_WHY = { day1: 'Day 1: you were here in the very first week.', dev: 'DEV: you make this game.', legend: 'Legend: you ended a month in the top 5 of the leaderboard.', bababa: 'BABABABA: you joined the No Mans Land Discord.', initiate: 'Initiate: you solved every puzzle.', goodsport: 'Good sport: opponents said GG to you 10 times.' };
   const titleHtml = (id, big) => TITLES[id] ? `<span class="ptitle${big ? ' big' : ''}" style="--tc:${TITLES[id].col};--tg:${TITLES[id].glow}"><i aria-hidden="true"></i>${esc(TITLES[id].name)}<i aria-hidden="true"></i></span>` : '';
   // a username with its title under it
   const nameplate = (tag, title, cls = '') => `<span class="nameplate ${cls}"><span class="np-tag">${esc(tag)}</span>${titleHtml(title)}</span>`;
@@ -3283,6 +3301,8 @@ html.pc .corner button span { display: inline; }
   function showResult(sum) {
     if (mode === 'tutorial') { tutResult(sum); return; }
     if (mode === 'spec') { specResult(sum); return; }
+    if (mode === 'sandbox') { sbxResult(sum); return; }
+    if (mode === 'replay') { replayDone(sum); return; }
     const iWon = sum.winner === me && !sum.timeout, iLost = sum.winner === foe() && !sum.timeout;
     const head = sum.timeout ? 'Time ran out' : iWon ? `Round ${sum.round} won` : iLost ? `Round ${sum.round} lost` : 'Draw';
     const cls = iWon ? 'you' : iLost ? 'foe' : '';
@@ -3316,6 +3336,7 @@ html.pc .corner button span { display: inline; }
     if (m.over) {
       const inTour = !!tourLive();
       if (inTour && mode !== 'net') tourReport(m.winner); // a server match: the server reports it
+      endShow = null;
       const win = m.winner === me, loss = m.winner === foe(), looking = endLook && phase === 'end'; // still looking at the board: an update (a rematch asked) keeps it so
       phase = 'end'; hud(); netStatus();
       const wait = !solo() && rematch[me];
@@ -3331,12 +3352,13 @@ html.pc .corner button span { display: inline; }
         <h2 class="${win ? 'you' : loss ? 'foe' : ''}">${win ? 'Victory' : loss ? 'Defeat' : 'Draw'}</h2>
         <p class="big">${lines.join(' ')}</p>
         ${asked && !inTour ? `<p>${rk && !rk.done ? 'Your opponent is ready for the next game.' : 'Your opponent wants a rematch.'}</p>` : ''}
+        ${ggRow()}
         <div class="btnrow">
           ${inTour ? '<button class="btn primary" id="again">Back to the tournament</button>'
             : solo() ? '<button class="btn primary" id="again">Play again</button>'
             : inTour ? '<button class="btn primary" id="again">Back to the tournament</button>'
             : `<button class="btn primary" id="again" ${wait ? 'disabled' : ''}>${wait ? 'Waiting for opponent…' : rk && !rk.done ? 'Next game' : rk ? 'New series' : 'Rematch'}</button>`}
-          <button class="btn" id="look">Look at board</button>
+          ${replayBtn()}
           <button class="btn" id="menu">Main menu</button>
         </div>
       </div>`);
@@ -3386,6 +3408,7 @@ html.pc .corner button span { display: inline; }
 
   // ---------- Main menu from the in-match settings: leaving a match that is still on forfeits it ----------
   function askForfeit() {
+    if (mode === 'sandbox') { sbxExit(); return; } // Replay a round: back to the real match's result
     if (!m || phase === 'end' || mode === 'tutorial') { quitToMenu(); return; }
     $('sheet').innerHTML = `
       <div class="bar" data-keep><h3 id="sheet-h">Main menu</h3></div>
@@ -3420,15 +3443,16 @@ html.pc .corner button span { display: inline; }
     leaveNet(); cancelAnimationFrame(raf);
     m.over = true; m.winner = me; phase = 'end'; bt = null; battlePre = null; lastPre = null; deadline = 0; selected = null; resultShownAt = 0;
     closeSheet(true); hud(); setNet(''); $('clock').textContent = ''; render();
-    overlay(`<div class="card">
+    endShow = () => { overlay(`<div class="card">
       <span class="eyebrow">Round ${m.round}</span>
       <h2 class="you">Victory</h2>
       <p class="big">${net.ranked && !inTour ? 'Your opponent left: you win the ranked series.' : 'Your opponent forfeited the match.'}</p>
-      <div class="btnrow"><button class="btn primary" id="menu">${inTour ? 'Back to the tournament' : 'Main menu'}</button><button class="btn" id="look">Look at board</button></div>
+      <div class="btnrow"><button class="btn primary" id="menu">${inTour ? 'Back to the tournament' : 'Main menu'}</button>${replayBtn()}</div>
     </div>`);
     $('panel').innerHTML = '';
     $('menu').addEventListener('click', () => { if (inTour) tour.menu = false; showStart(); });
-    bindLook('Victory · your opponent forfeited.');
+    bindLook('Victory · your opponent forfeited.'); };
+    endShow();
   }
   // the match-over screen: Look at board hides it so the final board can be seen (and turned, on the 3D board, or
   // hovered for ranges); Show result in the panel brings it back. note: the line beside that button.
@@ -3436,6 +3460,8 @@ html.pc .corner button span { display: inline; }
   function bindLook(note) {
     endNote = note; endLook = false;
     if ($('look')) $('look').addEventListener('click', () => lookAtBoard(true));
+    if ($('replay')) $('replay').addEventListener('click', openReplayPick);
+    if ($('gg')) $('gg').addEventListener('click', sendGG);
   }
   function lookAtBoard(on) {
     if (phase !== 'end') return;
@@ -3451,6 +3477,130 @@ html.pc .corner button span { display: inline; }
       const b = $('look'); if (b) b.focus();
     }
     dock(); render();
+  }
+
+  // ---------- Replay a round (2026-11-04) ----------
+  // On the match-over screen (in place of Look at board): pick a round and play it again from its start, as a learning
+  // tool. Your side as it was once that round's picks were done (the Undo all point, takeUndoSnap) and the opponent's
+  // army as it fought that round (the fight's starting board). You deploy differently, Fight, and see how it would have
+  // gone. Played on a copy in mode 'sandbox' (no clock, no AI, nothing saved or sent); Back to results puts the real
+  // match back. Messages from an online opponent that arrive meanwhile wait in sbx.inbox and are handled on the way back.
+  // Each match keeps its own log (roundLog, by m.seed); a reload loses it. Not for 2v2 or spectators (Look at board).
+  var roundLog = { key: '', rounds: {} };
+  function logRound(r, field, v) {
+    if (!m || mode === 'sandbox' || mode === 'replay' || mode === 'spec' || mode === 'tutorial' || (net.duo && mode === 'net')) return;
+    const k = String(m.seed);
+    if (roundLog.key !== k) roundLog = { key: k, rounds: {} };
+    (roundLog.rounds[r] || (roundLog.rounds[r] = {}))[field] = v;
+  }
+  var sbx = { on: false, saved: null, round: 0, foe: '', inbox: [] };
+  var endShow = null; // the match-over card to bring back when there is no summary (the opponent forfeited)
+  function sbxHold(fn, d) { // a message for the real match while replaying: it waits
+    if (!sbx || !sbx.on) return false;
+    if (d && d.t === 'pong') return false;
+    sbx.inbox.push([fn, d]);
+    return true;
+  }
+  const sbxBase = () => (sbx.on ? sbx.saved.m : m);
+  function sbxRounds() {
+    const b = sbxBase();
+    if (!b || roundLog.key !== String(b.seed)) return [];
+    return Object.keys(roundLog.rounds).map(Number).filter(r => roundLog.rounds[r].pre && roundLog.rounds[r].start).sort((a, c) => a - c);
+  }
+  const replayBtn = () => sbxRounds().length && mode !== 'spec' && !(net.duo && mode === 'net')
+    ? '<button class="btn" id="replay">Replay a round</button>' : '<button class="btn" id="look">Look at board</button>';
+  function realRound(r) { const b = sbxBase(); return ((b && b.history) || []).find(h => h.round === r) || null; }
+  const roundWord = (h) => !h ? '' : h.timeout ? 'time' : h.winner === me ? 'won' : h.winner === 1 - me ? 'lost' : 'draw';
+  function openReplayPick() {
+    const rs = sbxRounds();
+    if (!rs.length) return;
+    $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Replay a round</h3><button class="btn small" id="close">Close</button></div>
+      <p class="hint" style="margin:0">Play a round again from its start: your gold and army as they were, and ${esc(sbx.on ? sbx.foe : foeName())}’s army as it fought. Deploy differently and see how the fight would go. The match result doesn’t change.</p>
+      <div class="rgrid">${rs.map(r => { const w = roundWord(realRound(r)); return `<button class="btn rbtn ${w}" data-r="${r}" aria-label="Round ${r}${w ? ', ' + w : ''}"><b class="num">${r}</b><span>${w === 'time' ? 'time' : w}</span></button>`; }).join('')}</div>`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', closeSheet);
+    $('sheet').querySelectorAll('[data-r]').forEach(b => b.addEventListener('click', () => sbxStart(+b.dataset.r)));
+  }
+  function sbxStart(r) {
+    const L = roundLog.rounds[r];
+    if (!L || !L.pre || !L.start) return;
+    if (!sbx.on) {
+      sbx.saved = { m, mode, me, phase, lastSummary, lastPre, nextReady: nextReady.slice(), rematch: rematch.slice(), lastAiLevels, undoSnap, ready: ready.slice(), endShow };
+      sbx.foe = foeName(); sbx.inbox = [];
+    }
+    sbx.on = true; sbx.round = r;
+    cancelAnimationFrame(raf);
+    const s = withUnits(JSON.parse(L.pre));
+    Referee.restoreSide(s, me, JSON.parse(L.start));
+    for (const q of s.armies[1 - me] || []) { if ((q.round | 0) >= r) q.round = r - 1; delete q.from; delete q.movedRound; } // theirs in plain sight
+    s.over = false; s.winner = -1;
+    closeSheet(true); overlay(null);
+    m = s; mode = 'sandbox'; undoSnap = null; lastSummary = null; lastAiLevels = []; endLook = false;
+    nextReady = [false, false]; rematch = [false, false];
+    enterDeploy(0);
+    banner(`Replaying round ${r}`, 'Deploy differently, then Fight. The match result stays as it was.');
+  }
+  function sbxResult(sum) {
+    phase = 'result'; resultShownAt = 0; hud();
+    const r = sbx.round, real = realRound(r), w = roundWord(sum), was = roundWord(real);
+    const head = w === 'time' ? 'Time ran out' : w === 'won' ? 'Round won' : w === 'lost' ? 'Round lost' : 'Draw';
+    const dmg = (x) => [x.dmg[1 - me] ? `${esc(sbx.foe)} takes <b class="num">${x.dmg[1 - me]}</b> damage.` : '', x.dmg[me] ? `You take <b class="num">${x.dmg[me]}</b> damage.` : ''].filter(Boolean).join(' ') || 'Nobody takes damage.';
+    const wasLine = real ? `In the match: ${was === 'time' ? 'time ran out' : was === 'won' ? 'you won it' : was === 'lost' ? 'you lost it' : 'a draw'}${real.dmg[me] ? `, you took ${real.dmg[me]}` : ''}${real.dmg[1 - me] ? `, they took ${real.dmg[1 - me]}` : ''}.` : '';
+    overlay(`<div class="card">
+      <span class="eyebrow">Replay · round ${r}</span>
+      <h2 class="${w === 'won' ? 'you' : w === 'lost' ? 'foe' : ''}">${head}</h2>
+      <p class="big">${dmg(sum)}</p>
+      ${wasLine ? `<p>${wasLine}</p>` : ''}
+      <p class="hint">Only a replay: the match result doesn’t change.</p>
+      <div class="btnrow">
+        <button class="btn primary" id="sbx-again">Try again</button>
+        <button class="btn" id="sbx-pick">Other round</button>
+        <button class="btn" id="sbx-done">Back to results</button>
+      </div>
+    </div>`);
+    $('panel').innerHTML = '';
+    $('sbx-again').addEventListener('click', () => sbxStart(r));
+    $('sbx-pick').addEventListener('click', openReplayPick);
+    $('sbx-done').addEventListener('click', sbxExit);
+  }
+  function sbxExit() {
+    if (!sbx.on) return;
+    cancelAnimationFrame(raf);
+    const S = sbx.saved;
+    sbx.on = false; sbx.saved = null;
+    m = S.m; mode = S.mode; me = S.me; lastSummary = S.lastSummary; lastPre = S.lastPre; nextReady = S.nextReady; rematch = S.rematch;
+    lastAiLevels = S.lastAiLevels; undoSnap = S.undoSnap; ready = S.ready; endShow = S.endShow;
+    phase = 'end'; bt = null; battlePre = null; fx = []; deadline = 0; selected = null; moveMode = false; moving = null;
+    closeSheet(true); coach(null); $('clock').textContent = '';
+    $('series-chip').hidden = true;
+    hud(); render();
+    if (lastSummary) showResult(lastSummary); else if (endShow) endShow();
+    const box = sbx.inbox; sbx.inbox = [];
+    for (const [fn, d] of box) fn(d);
+  }
+
+  // ---------- GG (2026-11-04) ----------
+  // After an online (server) match, each player can say GG once. The other phone shows it; between two accounts the
+  // server counts it towards the other's Good sport title (10 GGs; server accounts.js GG). net.gg = [side 0 said it,
+  // side 1 said it] for the match with seed net.ggSeed.
+  const ggState = () => (net.gg && m && net.ggSeed === m.seed ? net.gg : [false, false]);
+  function ggRow() {
+    if (mode !== 'net' || net.duo || !m || !m.over) return '';
+    const g = ggState(), sent = g[me], got = g[1 - me];
+    return `<div class="btnrow gg-row"><button class="btn" id="gg" ${sent ? 'disabled' : ''}>${sent ? 'GG sent ✓' : 'Say GG'}</button>${got ? `<span class="gg-got">${esc(foeName())} said GG</span>` : ''}</div>`;
+  }
+  function sendGG() {
+    if (mode !== 'net' || !m || !m.over) return;
+    const g = ggState().slice();
+    if (g[me]) return;
+    g[me] = true; net.gg = g; net.ggSeed = m.seed;
+    send({ t: 'gg' });
+    if (lastSummary) showResult(lastSummary); else if (endShow) endShow();
+  }
+  function ggGot(d) {
+    if (Array.isArray(d.gg) && m) { net.gg = d.gg.slice(); net.ggSeed = m.seed; }
+    if (mode === 'spec') { if (d.from === 0 || d.from === 1) banner('GG'); return; }
+    if (phase === 'end' && lastSummary) showResult(lastSummary); else if (phase === 'end' && endShow) endShow();
   }
 
   // ---------- match reports ----------
@@ -3536,26 +3686,100 @@ html.pc .corner button span { display: inline; }
       <span>${esc(histTime(r.time))} · match ${esc(r.code)}${r.map ? ' · ' + esc(r.map) : ''} · damage ${esc(r.dmgHost)}/${esc(r.dmgGuest)}${r.over === true || r.over === 'TRUE' ? ` · match over, ${r.matchWinner === 'draw' ? 'draw' : esc(who(r.matchWinner)) + ' won'}` : ''}</span>
       <span>${esc(r.hostArmy || '–')} vs ${esc(r.guestArmy || '–')}</span></li>`;
   }
-  const hist = { tab: 'server', next: null, busy: false };
-  function openHistorySheet() {
+  // My matches (2026-11-04): this account's own online matches, one card each: the opponent (username, title, an Add
+  // friend button once friends exist), the result and the match's numbers, and every round with its own Replay (the
+  // server keeps each fight's start with the units it was played with: /history/<match>?replay=<round>).
+  const hist = { tab: 'mine', next: null, busy: false };
+  // the friends system fills this in (docs/HANDOFF-FRIENDS.md): an Add friend button for a username, or ''
+  var histFriendBtn = (tag) => '';
+  function openHistorySheet(tab) {
     $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Match history</h3><button class="btn small" id="close">Close</button></div>
-      <div class="btnrow" role="tablist"><button class="btn small" id="hist-srv" role="tab">Online matches</button>${HISTORY_URL ? '<button class="btn small" id="hist-p2p" role="tab">Phone-to-phone</button>' : ''}</div>
+      <div class="btnrow" role="tablist">${acct ? '<button class="btn small" id="hist-mine" role="tab">My matches</button>' : ''}<button class="btn small" id="hist-srv" role="tab">All online</button>${HISTORY_URL ? '<button class="btn small" id="hist-p2p" role="tab">Phone-to-phone</button>' : ''}</div>
       <p class="hint" id="hist-msg" aria-live="polite" style="margin:0">Loading…</p><ul class="hist" id="hist"></ul>
       <button class="btn small" id="hist-more" hidden>Load more</button>`;
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', closeSheet);
+    if ($('hist-mine')) $('hist-mine').addEventListener('click', () => histLoad('mine'));
     $('hist-srv').addEventListener('click', () => histLoad('server'));
     if ($('hist-p2p')) $('hist-p2p').addEventListener('click', () => histLoad('sheet'));
-    $('hist-more').addEventListener('click', () => histLoad('server', true));
-    histLoad('server');
+    $('hist-more').addEventListener('click', () => histLoad(hist.tab, true));
+    $('hist').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-replay]');
+      if (b) { const [id, r, sd] = b.dataset.replay.split('|'); playReplay(id, +r, +sd); }
+    });
+    histLoad(typeof tab === 'string' ? tab : acct ? 'mine' : 'server'); // (a click handler passes its event)
+  }
+  // Watch a saved fight again (Match history's Replay): the round's starting board, played by this phone's engine with
+  // the units it was played with. mode 'replay': nothing to deploy; afterwards back to the history.
+  var replayOf = null; // { id, round, side }
+  async function playReplay(id, round, side) {
+    let data = null;
+    try { const res = await fetch(`${SERVER_URL}/history/${encodeURIComponent(id)}?replay=${round}`); data = res.ok ? await res.json() : null; } catch (e) { data = null; }
+    if (!data || !data.pre || !data.summary) { if ($('hist-msg')) $('hist-msg').textContent = 'Couldn’t load that replay. Try again.'; return; }
+    closeSheet(true);
+    replayOf = { id, round, side };
+    mode = 'replay'; me = side === 1 ? 1 : 0;
+    const pre = data.pre.units && data.pre.matrix ? data.pre : withUnits(data.pre);
+    m = pre; lastSummary = data.summary; nextReady = [false, false]; rematch = [false, false];
+    playBattle(pre);
+  }
+  function replayDone(sum) {
+    phase = 'result'; hud();
+    const w = sum.timeout ? 'Time ran out' : sum.winner === me ? 'Round won' : sum.winner === 1 - me ? 'Round lost' : 'Draw';
+    overlay(`<div class="card">
+      <span class="eyebrow">Replay · round ${esc(replayOf.round)}</span>
+      <h2 class="${sum.winner === me && !sum.timeout ? 'you' : sum.winner === 1 - me && !sum.timeout ? 'foe' : ''}">${w}</h2>
+      <p class="big">${sum.dmg[1 - me] ? `They took <b class="num">${sum.dmg[1 - me]}</b> damage. ` : ''}${sum.dmg[me] ? `You took <b class="num">${sum.dmg[me]}</b> damage.` : ''}${!sum.dmg[0] && !sum.dmg[1] ? 'Nobody took damage.' : ''}</p>
+      <div class="btnrow"><button class="btn primary" id="rp-again">Watch again</button><button class="btn" id="rp-back">Back to match history</button></div>
+    </div>`);
+    $('panel').innerHTML = '';
+    $('rp-again').addEventListener('click', () => { const x = replayOf; playReplay(x.id, x.round, x.side); });
+    $('rp-back').addEventListener('click', () => { replayOf = null; showStart(); openHistorySheet('mine'); });
+  }
+  // one of my matches, as a card
+  function histMatchItem(x) {
+    const rs = x.rounds || [], me0 = x.side === 1 ? 1 : 0, them = 1 - me0, first = rs[0] || {}, last = rs[rs.length - 1] || {};
+    const foeTag = (first.names && first.names[them]) || '', foeLead = (first.leaders && first.leaders[them]) || '';
+    const over = !!last.over, mw = last.matchWinner;
+    const res = !over ? 'Unfinished' : mw === me0 ? 'Victory' : mw === them ? 'Defeat' : 'Draw';
+    const cls = !over ? '' : mw === me0 ? 'you' : mw === them ? 'foe' : '';
+    const fights = rs.filter(q => q.forfeit == null);
+    const dealt = fights.reduce((t, q) => t + ((q.dmg && q.dmg[them]) | 0), 0), took = fights.reduce((t, q) => t + ((q.dmg && q.dmg[me0]) | 0), 0);
+    const kind = first.tour ? 'Tournament' : first.ranked ? 'Ranked' : 'Standard';
+    const forf = rs.find(q => q.forfeit === 0 || q.forfeit === 1);
+    const army = (q, sd) => (q.armies && q.armies[sd] || []).map(a => `${a.unit}${a.level > 1 ? ' L' + a.level : ''}`).join(', ') || '–';
+    const rows = fights.map(q => {
+      const w = q.winner === me0 ? 'won' : q.winner === them ? 'lost' : 'draw';
+      return `<li class="hr"><div class="hr-top"><b>Round ${esc(q.round)}</b> <span class="hr-${w}">${q.timeout ? 'time ran out' : w}</span> <span>you took ${esc(q.dmg[me0])}, they took ${esc(q.dmg[them])}</span>${q.replay ? `<button class="btn small" data-replay="${esc(q.matchId)}|${esc(q.round)}|${me0}">Replay</button>` : ''}</div>
+        <span>You: ${esc(army(q, me0))}</span><span>Them: ${esc(army(q, them))}</span></li>`;
+    }).join('');
+    return `<li class="hm">
+      <div class="hm-top"><b class="${cls}">${res}</b><span>${esc(kind)} · ${esc(histTime(last.time || first.time))}</span></div>
+      <div class="hm-vs">vs ${foeTag ? nameplate(foeTag, '') : `<span class="np-tag">${esc(foeLead ? foeLead + ' (guest)' : 'Guest')}</span>`}${foeTag ? histFriendBtn(foeTag) : ''}</div>
+      <span>${fights.length} round${fights.length === 1 ? '' : 's'}${last.hp ? ` · health ${esc(last.hp[me0])} – ${esc(last.hp[them])}` : ''} · damage dealt ${dealt}, taken ${took}${first.map ? ' · ' + esc(first.map) : ''}${first.leaders ? ` · ${esc(first.leaders[me0] || '?')} vs ${esc(first.leaders[them] || '?')}` : ''}${forf ? ` · ${forf.forfeit === me0 ? 'you left' : 'they left'}` : ''}</span>
+      ${rows ? `<details><summary>Rounds and replays</summary><ul class="hist-rounds">${rows}</ul></details>` : ''}
+    </li>`;
   }
   async function histLoad(tab, more, fallback) {
     if (!$('hist') || (hist.busy && more)) return;
     hist.tab = tab; hist.busy = true;
-    const tabs = { server: $('hist-srv'), sheet: $('hist-p2p') };
+    const tabs = { mine: $('hist-mine'), server: $('hist-srv'), sheet: $('hist-p2p') };
     for (const k in tabs) if (tabs[k]) { tabs[k].classList.toggle('primary', k === tab); tabs[k].setAttribute('aria-selected', k === tab ? 'true' : 'false'); }
     if (!more) { $('hist').innerHTML = ''; $('hist-msg').textContent = 'Loading…'; hist.next = null; }
     $('hist-more').hidden = true;
+    if (tab === 'mine') {
+      let data = null;
+      try { const res = await acctCall('history', more && hist.next ? { before: hist.next } : {}, true); data = res.status === 200 ? res : null; } catch (e) { data = null; }
+      hist.busy = false;
+      if (!$('hist') || hist.tab !== 'mine') return;
+      if (!data || !Array.isArray(data.matches)) { $('hist-msg').textContent = more ? 'Couldn’t load more. Try again.' : 'Couldn’t load your matches. Check your connection and try again.'; if (more) $('hist-more').hidden = false; return; }
+      hist.next = data.next;
+      $('hist').insertAdjacentHTML('beforeend', data.matches.map(histMatchItem).join(''));
+      const n = $('hist').children.length;
+      $('hist-msg').textContent = n ? `Your last ${n === 1 ? 'online match' : n + ' online matches'}. Open one for its rounds and replays.` : 'No online matches yet. Matches you play against a friend or in ranked show up here.';
+      $('hist-more').hidden = !data.next;
+      return;
+    }
     if (tab === 'server') {
       let data = null;
       try {
@@ -3652,7 +3876,7 @@ html.pc .corner button span { display: inline; }
     if (r.discord !== undefined) rw.discord = r.discord && typeof r.discord.clientId === 'string' ? r.discord : null;
     if (!r.player) return;
     acctSave({ id: r.player.id, tag: r.player.tag, google: !!r.player.google, dev: !!r.player.dev, titles: Array.isArray(r.player.titles) ? r.player.titles.filter(t => TITLES[t]) : [], title: TITLES[r.player.title] ? r.player.title : '', tagNext: +r.player.tagNext || 0,
-      skins: Array.isArray(r.player.skins) ? r.player.skins.filter(k => k && Shapes.SKINS[k.id]).map(k => ({ id: k.id, worn: !!k.worn })) : [], discord: !!r.player.discord, puzzles: Array.isArray(r.player.puzzles) ? r.player.puzzles.filter(k => Number.isInteger(k)) : [], session: r.session || acct.session, ts: now() });
+      skins: Array.isArray(r.player.skins) ? r.player.skins.filter(k => k && Shapes.SKINS[k.id]).map(k => ({ id: k.id, worn: !!k.worn })) : [], discord: !!r.player.discord, puzzles: Array.isArray(r.player.puzzles) ? r.player.puzzles.filter(k => Number.isInteger(k)) : [], gg: Math.max(0, r.player.gg | 0), session: r.session || acct.session, ts: now() });
     puzzleSync();
   }
   function acctFail(r) {
@@ -3839,6 +4063,11 @@ html.pc .corner button span { display: inline; }
         ${hasInitiate() ? '<p class="rw-got">Initiate is yours! Pick which title shows in Profile.</p>'
           : !a ? '<p class="hint" style="margin:0">Puzzles you solve count once you have an account (a guest is enough): the game keeps them until then.</p>' : ''}
         <button class="btn ${hasInitiate() ? '' : 'primary'}" id="rw-puz-open">${hasInitiate() ? 'Play the puzzles again' : 'Open the puzzles'}</button>
+      </section>
+      <section class="rw-sec">
+        <div class="rw-head"><div class="rw-chip">${titleHtml('goodsport', true)}</div></div>
+        <p class="hint" style="margin:0">Say GG after online matches. When opponents have said GG to you 10 times, the Good sport title is yours (at most 3 from the same player count, and only finished matches against an account). So far: ${Math.min(10, (a && a.gg) | 0)} of 10.</p>
+        ${a && a.titles && a.titles.includes('goodsport') ? '<p class="rw-got">Good sport is yours! Pick which title shows in Profile.</p>' : ''}
       </section>`;
     $('rw-msg').textContent = rw.msg;
     const on = (id, f) => { if ($(id)) $(id).addEventListener('click', f); };
@@ -4645,8 +4874,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const sim = Game.startBattle(m);
     while (sim.step()) {}
     const summary = Game.resolve(m, sim.result());
-    recordRound(pre, summary);
-    saveHistory(pre, summary);
+    if (mode !== 'sandbox') { recordRound(pre, summary); saveHistory(pre, summary); } // Replay a round changes nothing
     lastSummary = summary; nextReady = [false, false]; rematch = [false, false];
     if (mode === 'host') { send({ t: 'fight', pre, post: snapshot(m), summary }); specSend({ t: 'fight', pre, post: snapshot(m), summary }); saveHost(); }
     playBattle(pre);
@@ -4655,7 +4883,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function playBattle(pre) {
     phase = 'battle'; selected = null; deadline = 0; timeUp = false; watchSq = null;
     sfx('battle');
-    battlePre = withUnits(pre); lastPre = battlePre;
+    battlePre = pre.units && pre.matrix ? pre : withUnits(pre); lastPre = battlePre; // a replay brings the units it was played with
+    logRound(pre.round, 'pre', JSON.stringify({ ...pre, units: null, matrix: null }));
     if (net.duo && net.duoPres && mode === 'net') duoBattle(); // 2v2: both lanes on the wide board
     else bt = Game.startBattle(battlePre);
     fx = []; acc = 0; lastTs = 0;
@@ -4663,7 +4892,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     closeSheet(); overlay(null); hud(); panelBattle(); render();
     cancelAnimationFrame(raf);
     if (reduced) { while (bt.step()) {} finishBattle(); return; }
-    if (!solo()) send({ t: 'speed', s: liveSpeed[me] }); // our pick, so both phones start the fight at the same speed
+    if (!solo() && mode !== 'replay') send({ t: 'speed', s: liveSpeed[me] }); // our pick, so both phones start the fight at the same speed
     if (document.hidden) awayStart(); // (it began while this page is in the background: it waits for it, see awayStart)
     raf = requestAnimationFrame(loop);
   }
@@ -6579,6 +6808,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   const sendStatus = () => send({ t: 'status', ready, nextReady, rematch });
 
   function hostRecv(d) {
+    if (sbxHold(hostRecv, d)) return;
     if (!d || typeof d !== 'object') return;
     if (d.t === 'side') {
       if (!m || phase !== 'deploy' || d.round !== m.round) return;
@@ -6874,6 +7104,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
 
   function guestRecv(d) {
+    if (sbxHold(guestRecv, d)) return;
     if (!d || typeof d !== 'object') return;
     if (d.t === 'draft') {
       const x = d.draft;
@@ -7070,6 +7301,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (me === 0) drawLobby(); else guestWaiting(net.foeHere ? 'Connected. Waiting for your friend to start the match' : 'Connected');
   }
   function srvRecv(d) {
+    if (sbxHold(srvRecv, d)) return;
     if (net.duo && duoRecv(d)) return;
     if ('ranked' in d && d.t !== 'ack') net.ranked = d.ranked || null;
     if ('players' in d && d.t !== 'ack') { net.players = d.players || null; hud(); }
@@ -7104,6 +7336,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       netStatus(); return;
     }
     if (d.t === 'speed') { if (SPEEDS.includes(d.s)) { liveSpeed[foe()] = d.s; showSpeed(); } return; }
+    if (d.t === 'gg') { ggGot(d); return; }
     if (d.t === 'ack') {
       net.pending = net.pending.filter(p => p.seq > d.seq);
       // in step? (the server's fingerprint of this side against this phone's copy; a sync puts it right)
@@ -7137,6 +7370,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     }
     if (d.t === 'sync') {
       if (d.here) net.foeHere = !!d.here[foe()];
+      if (Array.isArray(d.gg) && d.m) { net.gg = d.gg.slice(); net.ggSeed = d.m.seed; }
       if (d.m && !m) { // the first look at this match on this phone: the built-in units
         srvUnits();
         if (net.tourCode) tour.playing = net.code;

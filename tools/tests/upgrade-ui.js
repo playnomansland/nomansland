@@ -102,13 +102,13 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     check((await st(p)).phase === 'Battle' && /again/i.test(await p.textContent('#skip')), `${board}: Skip to result asks first ("${await p.textContent('#skip')}")`);
     await p.click('#skip'); await sleep(400);
     s = await st(p);
-    check(s.phase === 'Match over' && await p.isVisible('#look'), `${board}: the second tap skips; the match is over, with Look at board`);
-    // 4. look at the board, then back
-    await p.click('#look'); await sleep(300);
-    check(await p.isHidden('#overlay') && await p.isVisible('#end-back'), `${board}: Look at board hides the end screen; Show result is in the panel`);
-    await p.screenshot({ path: `upgrade-${board}-look.png` });
-    await p.click('#end-back'); await sleep(200);
-    check(await p.isVisible('#overlay') && await p.isVisible('#look') && /Victory/.test(await p.textContent('#overlay')), `${board}: Show result brings it back`);
+    check(s.phase === 'Match over' && await p.isVisible('#replay'), `${board}: the second tap skips; the match is over, with Replay a round (2026-11-04: in place of Look at board)`);
+    // 4. Replay a round: its sheet lists the rounds played; closing it leaves the end screen
+    await p.click('#replay'); await sleep(300);
+    check(await p.locator('#sheet .rgrid [data-r]').count() >= 1, `${board}: Replay a round lists the rounds`);
+    await p.screenshot({ path: `upgrade-${board}-replay.png` });
+    await p.click('#sheet #close'); await sleep(200);
+    check(await p.isVisible('#overlay') && await p.isVisible('#replay') && /Victory/.test(await p.textContent('#overlay')), `${board}: the end screen is still there`);
     await p.context().close();
   }
 

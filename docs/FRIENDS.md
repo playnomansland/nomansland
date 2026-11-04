@@ -40,6 +40,17 @@ Not to be confused with **Invite a friend** (the referral that gives the Aquamar
 
 ---
 
+## 3b. Watch a friend (added 2026-11-04)
+
+- A friend who is **in a match** (status *In a match · round N*) gets a **Watch** button in the friends list.
+- It opens the match as a spectator: the existing watcher join, `hello { watch: true }` to `/room/CODE`, which already shows the spectator view (nobody's new squads while they deploy). The friend's hub status carries the match code (`status { where: 'match', code, round }`), sent to friends only.
+- Respects the room's spectating setting (lobby work: on by default, the host can turn it off): if watching is off, Watch is greyed with "Watching is off for this match".
+- Tournament matches can be watched as today; 2v2 not yet.
+
+## 3c. Add friend in Match history (added 2026-11-04)
+
+- Match history (Profile → Match history → My matches) already shows each opponent's username (built 2026-11-04). The page has a hook `histFriendBtn(tag)` that returns '' today: make it return an **Add friend** button (or "Friends ✓" / "Request sent") for that username, using the friends endpoints.
+
 ## 4. Private messages
 
 - **Between friends only.** Opened from the friend's row (**Message**) or their nameplate.

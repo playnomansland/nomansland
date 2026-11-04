@@ -137,3 +137,11 @@ Built 2026-11-02 (`server/src/accounts.js`, routes in `server/src/index.js`):
 - The page falls back by itself (copies the report, opens the Discord invite) when the call fails for any reason.
 - To switch on: in Discord, #bug-reports > Edit channel > Integrations > Webhooks > New webhook > Copy webhook URL; on GitHub, add it as the repository secret `DISCORD_BUG_WEBHOOK`; then run the "Server deploy" workflow by hand (a deploy only runs on pushes that touch the server, and secrets are uploaded at deploy time).
 
+## GG, My matches and replays (2026-11-04)
+
+- **GG:** room message `gg` from a player once the match is over, once per side and match (`meta.gg = { seed, sent }`, also in every sync as `gg`). Relayed to everyone in the room as `{ t: 'gg', from, gg }`. When both sides have accounts, they aren't the same player, the match had `GG.minFights` (3) fights and nobody left it, it is saved in D1 table `ggs (giver, receiver, match, created)` (`accounts.js recordGG`). `ggCount` counts at most `GG.perGiver` (3) GGs from one giver; at `GG.need` (10) `players.goodsport` is set and the **Good sport** title (pale sky blue) is earned for good. Player objects carry `gg` (the counted number). Order of titles: DEV, Legend, BABABABA, Initiate, Good sport, Day 1.
+- **Usernames in history:** rows now carry `names` for any side whose phone had an account (before: tournament and ranked only) and `ranked`.
+- **Who played:** history rows keep `p0`, `p1` (account ids of side 0 and 1; tournament matches none). Never sent out.
+- **My matches:** `POST /account/history { before? }` (session) → `HistoryRoom.mine(player, before, 15)` → `{ matches: [{ matchId, side, rounds }], next }`, newest first, paged by the newest row id of each match.
+- **Replays:** each round's replay is now saved with the units it was played with (`Ref.withUnits(pre)`), so it plays back the same after balance changes (an engine change can still change it). `GET /history/<match id>?replay=<round>` → `{ pre, summary }` (404 if not kept; same origin check and per-IP limit as `/history`).
+- Tests: `server/test/gg.test.js` (in npm test, port 8779), `tools/tests/gg.js` (headless counting and title rules), `tools/tests/gg-history-ui.js` (two phones, port 8778).

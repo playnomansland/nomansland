@@ -16,7 +16,7 @@
 //   starts a new series. Leaving a ranked match (forfeit) loses the whole series.
 //
 // Messages in:  hello { create | key | (nothing: join) | tour id + tkey | watch }, start { settings }, act { seq, fn, a }, ready { v },
-//               next { round }, rematch, forfeit, speed { s }, sync, ping
+//               next { round }, rematch, forfeit, speed { s }, sync, ping, gg (after the match: GG to the other player)
 // Messages out: welcome { side, key, seq }, taken, nomatch, lobby { here }, sync { phase, m (view), remaining, held, ready, nextReady,
 //               rematch, summary, ack, here }, ack { seq, ok, h }, status {...}, fight { pre, post, summary },
 //               speed { s }, forfeit { side }, full, denied { why? }, pong. welcome, lobby, sync and fight carry ranked
@@ -28,7 +28,7 @@ import Ref from '../../src/referee.js';
 import { LIMITS, json, readMessage, secret } from './limits.js';
 import { builtin } from './units.js';
 import { roundRow, forfeitRow } from './history.js';
-import { sessionPlayer, rankedOn, recordSeries, countOnline } from './accounts.js';
+import { sessionPlayer, rankedOn, recordSeries, countOnline, recordGG } from './accounts.js';
 import { VERSION } from './version.js';
 
 const KEEP_MS = 24 * 3600 * 1000; // a match nobody touched for a day is deleted
@@ -90,6 +90,7 @@ export class Room extends DurableObject {
       ready: R.ready, nextReady: R.nextReady, rematch: R.rematch, summary: R.summary, fights: R.fights,
       ack: side >= 0 ? R.seq[side] : 0, here: this.here(gone), forfeit: R.forfeit != null ? R.forfeit : null,
       names: this.meta && this.meta.tour ? this.meta.tour.names : null, ranked: this.rankedView(), players: this.playersView(),
+      gg: this.meta && this.meta.gg && this.meta.gg.seed === R.seed ? this.meta.gg.sent : null,
     };
   }
   // each side's account gamertag and title (friends' matches; null = no account)
@@ -150,7 +151,9 @@ export class Room extends DurableObject {
     const t = this.meta && this.meta.tour, R = this.R;
     const room = t ? t.room : (this.code || (this.meta && this.meta.code) || '');
     const rk = this.meta && this.meta.ranked;
-    return { room, tour: t ? t.code : null, match: t ? t.match : null, matchId: `${room}-${((R && R.seed) >>> 0).toString(36)}`, names: t ? t.names : rk ? rk.tags : null };
+    // usernames: a tournament's, a ranked series', or (2026-11-04) any side whose phone has an account
+    const pl = this.meta && this.meta.players, tags = pl && (pl[0] || pl[1]) ? [pl[0] ? pl[0].tag : null, pl[1] ? pl[1].tag : null] : null;
+    return { room, tour: t ? t.code : null, match: t ? t.match : null, matchId: `${room}-${((R && R.seed) >>> 0).toString(36)}`, ranked: !!rk, names: t ? t.names : rk ? rk.tags : tags };
   }
   record(f, forfeitSide) {
     if (!this.env.HISTORY) return;
@@ -162,10 +165,13 @@ export class Room extends DurableObject {
       let row, replay = null;
       if (f) {
         const { units, matrix } = this.units();
-        row = roundRow(Ref.withUnits(f.pre, units, matrix), f.summary, f.post, info);
-        replay = { pre: f.pre, summary: f.summary };
+        const pre = Ref.withUnits(f.pre, units, matrix);
+        row = roundRow(pre, f.summary, f.post, info);
+        replay = { pre, summary: f.summary }; // with the units it was played with, so a replay holds after balance changes
       } else row = forfeitRow(Ref.withUnits(Ref.snapshot(R.m), null, null), forfeitSide, info);
-      await this.env.HISTORY.getByName('all').add(row, replay);
+      // which accounts played (Match history's own list); tournament players have no account in the match
+      const pids = this.meta && !this.meta.tour && this.meta.pids ? this.meta.pids.slice() : null;
+      await this.env.HISTORY.getByName('all').add(row, replay, pids);
     })().catch((e) => console.warn('history not saved', e && e.message));
     try { this.ctx.waitUntil(run); } catch {}
   }
@@ -228,6 +234,24 @@ export class Room extends DurableObject {
         if (again && rk && rk.done) Object.assign(rk, { wins: [0, 0], ties: 0, games: 0, done: false, result: null, forfeit: null, counted: null }); // a new series
         await this.save();
         if (again) this.push({ force: true }); else this.status();
+        return;
+      }
+      case 'gg': {
+        // after a match (2026-11-04): one GG from each player to the other. Shown to everyone in the room; between two
+        // accounts it counts towards the other's Good sport title (accounts.js GG), unless someone left the match.
+        if (!R || !R.m || !R.m.over) return;
+        if (!this.meta) this.meta = { tour: null, keys: ['', ''] };
+        if (!this.meta.gg || this.meta.gg.seed !== R.seed) this.meta.gg = { seed: R.seed, sent: [false, false] };
+        if (this.meta.gg.sent[side]) return;
+        this.meta.gg.sent[side] = true;
+        await this.save();
+        const text = JSON.stringify({ t: 'gg', from: side, gg: this.meta.gg.sent });
+        for (const s of this.sockets()) this.send(s, text);
+        const pids = this.meta.pids || [], left = this.meta.left && this.meta.left.seed === R.seed;
+        if (!this.meta.tour && !left && pids[side] && pids[1 - side]) {
+          const run = recordGG(this.env, pids[side], pids[1 - side], this.historyInfo().matchId, R.fights).catch((e) => console.warn('gg', e && e.message));
+          try { this.ctx.waitUntil(run); } catch {}
+        }
         return;
       }
       case 'forfeit': {

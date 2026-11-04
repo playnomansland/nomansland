@@ -14,7 +14,27 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 - **More balancing.**
 - **Damage types (idea):** physical and magic.
 - **Online lobby (design):** one *Rooms* list of public games (Standard and Ranked together, sortable by name, time, category and mode), Quick play, chat for signed-in players (spectators get their own chat that joins the players' when the match ends), and three cartoon emotes the opponent can mute: Flame Wizard *BABABABA*, a happy Ether Golem and a shell-shocked Sniper. Spectating on by default. Plan in `docs/LOBBY.md`; built after the tournament.
-- **Friends (design):** add friends (they accept), remove them, see who's online (green dot) or offline (grey), **invite a friend** straight into a room, and **private messages**. For signed-in players. Plan in `docs/FRIENDS.md`; built after the tournament, together with the lobby.
+- **Friends (design):** add friends (they accept), remove them, see who's online (green dot) or offline (grey), **invite a friend** straight into a room, **watch a friend's match**, and **private messages**. For signed-in players. Plan in `docs/FRIENDS.md`; built after the tournament, together with the lobby.
+- **Player profile:** tap any username to see their title, skins, ranked record, recent matches and favourite units, with Add friend and Watch.
+
+---
+
+## 4 November 2026 – GG, Replay a round and your match history
+
+### New: Say GG
+- After an online match, the match-over screen has **Say GG**. Your opponent sees "*you* said GG" on theirs.
+- **New title: Good sport** (pale sky blue). When opponents have said GG to you **10 times**, it's yours for good. Only finished online matches between two accounts count, with at least 3 rounds and nobody leaving, and at most 3 GGs from the same player. The **Rewards** sheet shows how many you have.
+
+### New: Replay a round
+- **Look at board** on the match-over screen is now **Replay a round** (2v2 and spectators keep Look at board).
+- Pick a round and play it again from its start: your gold and army as they were, and your opponent's army **as it fought**, all in plain sight. Deploy differently, press **Fight** and see how it would have gone, next to how it went in the match.
+- **Try again**, pick **another round**, or go **Back to results**. It's only a learning tool: the match result never changes, and an online opponent's rematch request waits until you're back.
+
+### Match history: your own matches, with replays
+- **Profile → Match history** now opens on **My matches**: one card per online match with your **opponent's username**, the result, rounds, health, damage dealt and taken, the map and both leaders.
+- Open a match for every round (both armies) and a **Replay** button that plays that fight again.
+- Replays now keep the units the fight was played with, so they play back the same after balance changes.
+- The old lists are still there as **All online** and **Phone-to-phone**.
 
 ---
 

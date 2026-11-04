@@ -55,7 +55,7 @@ const OUT = process.env.SHOTS || '/tmp';
   await p.click('#fight'); await p.waitForFunction(() => window.__pb().phase === 'end', null, { timeout: 120000 }).catch(() => {});
   await sleep(500);
   console.log('phase', (await st()).phase);
-  if (await p.isVisible('#look')) {
+  if (await p.isVisible('#look')) { // (since 2026-11-04 the match-over card has Replay a round instead, except in 2v2 and when watching)
     await p.click('#look'); await sleep(400);
     const v = await p.evaluate(() => document.querySelector('#panel .hint') && document.querySelector('#panel .hint').innerText);
     console.log('look note:', v);
