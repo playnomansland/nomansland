@@ -25,6 +25,8 @@ assert.strictEqual(withSkills('Frost Wizard', ['snowStorm']).storm.radius, 10);
   assert.deepStrictEqual([100, 200, 200, 300], sp.skills.map(id => skill(id).cost));
   assert.deepStrictEqual(skill('poisonousFangs').params, skill('poison').params);
   assert.ok(withSkills('Spiders', ['cavestalkers']).stealth && skill('webShots').master);
+  assert.ok(near(withSkills('Spiders', ['cavestalkers']).hit, unit('Spiders').hit * 1.25)); // 2026-11-05: Cavestalkers +25% hit
+  assert.strictEqual(withSkills('Wisps', ['shadowborn']).hit, unit('Wisps').hit); // other stealth skills: no hit change
 }
 
 // webs: one per body a fight, within 10 m, no damage; each stack 10% slower and 5% less damage, capped at 90%,

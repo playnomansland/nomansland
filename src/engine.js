@@ -242,7 +242,7 @@ const Engine = (() => {
   const SKILL_TYPES = {
     regen:   { label: 'Regeneration', params: [['pct', 'Health regained per second (% of max)', 2, 0.5], ['hp', 'Health (+%)', 20, 5]] },
     poison:  { label: 'Poison shot', params: [['pct', 'Poison damage (% of hit, in total)', 100, 10], ['duration', 'Poison lasts (s)', 4, 0.5], ['slow', 'Longer time between attacks (%)', 30, 5]] },
-    stealth: { label: 'Stealth', params: [] },
+    stealth: { label: 'Stealth', params: [['hit', 'Hit size (+%)', 0, 5]] },
     armorHp: { label: 'Armor and health', params: [['armor', 'Armor (blocked from every hit)', 8, 1], ['hp', 'Health (+%)', 25, 5]] },
     spawn:   { label: 'Spawn goblins', params: [['unit', 'Spawns (unit name)', 'Goblin Swarm', null], ['count', 'Bodies per spawn', 2, 1], ['every', 'Every (s)', 4, 0.5], ['max', 'Most alive at once', 6, 1], ['waves', 'Most waves per fight (0 = no limit)', 0, 1]] },
     rapid:   { label: 'Rapid fire', params: [['aps', 'Attack speed (+%)', 50, 5], ['range', 'Range (−%)', 30, 5]] },
@@ -334,7 +334,7 @@ const Engine = (() => {
     switch (d.type) {
       case 'regen': return +P('hp') ? `+${n('hp')}% health. Regains ${n('pct')}% health a second.` : `Regains ${n('pct')}% health a second.`;
       case 'poison': return `Hits poison: ${n('pct')}% of the hit over ${n('duration')} s, past armor.${+P('slow') ? ` ${n('slow')}% slower attacks.` : ''}`;
-      case 'stealth': return `Hidden until it attacks. Hides again ${STEALTH_BACK} s after it stops attacking.`;
+      case 'stealth': return `${+P('hit') ? `+${n('hit')}% hit. ` : ''}Hidden until it attacks. Hides again ${STEALTH_BACK} s after it stops attacking.`;
       case 'armorHp': return +P('hp') ? `+${n('armor')} armor, +${n('hp')}% health.` : `+${n('armor')} armor.`;
       case 'spawn': return `Spawns ${n('count')} ${String(P('unit'))} every ${n('every')} s (max ${n('max')}${+P('waves') > 0 ? `, ${n('waves')} ${+P('waves') === 1 ? 'wave' : 'waves'}` : ''}).`;
       case 'rapid': return +P('range') ? `+${n('aps')}% attack speed, −${n('range')}% range.` : `+${n('aps')}% attack speed.`;
@@ -436,7 +436,7 @@ const Engine = (() => {
           u.poisonDur = Math.max(u.poisonDur || 0, Math.max(0.5, P('duration')));
           u.aps = u.aps / (1 + Math.max(0, P('slow')) / 100);
           break;
-        case 'stealth': u.stealth = true; break;
+        case 'stealth': u.stealth = true; if (+P('hit')) u.hit = u.hit * (1 + P('hit') / 100); break;
         case 'armorHp': u.bonusArmor = (u.bonusArmor || 0) + Math.max(0, P('armor')); u.hp = u.hp * (1 + P('hp') / 100); break;
         case 'spawn': {
           const name = String(skillParam(d, 'unit'));

@@ -150,8 +150,10 @@
       "type": "stealth",
       "name": "Cavestalkers",
       "cost": 200,
-      "params": {},
-      "text": "Gain stealth."
+      "params": {
+        "hit": 25
+      },
+      "text": "Gain stealth and +25% hit."
     },
     {
       "id": "webShots",
@@ -1803,7 +1805,7 @@
       "name": "War Mammoth",
       "cost": 500,
       "bodies": 1,
-      "hp": 2450,
+      "hp": 2650,
       "hit": 169,
       "aps": 0.5,
       "range": 3,

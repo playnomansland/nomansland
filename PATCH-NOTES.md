@@ -19,6 +19,13 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 5 November 2026 – Balance: Mammoth and Spiders
+
+- **War Mammoth:** 2650 health (was 2450).
+- **Spiders, Cavestalkers:** besides stealth, now also +25% hit.
+
+---
+
 ## 4 November 2026 – Ranked needs a login
 
 - **Ranked is for logged-in players only.** Both players need to be logged in with Google. Guests can still play Standard matches with friends and against the AI.
