@@ -5,3 +5,7 @@ tools/package-lock.json
 lab3d-artifact.html
 game3d-artifact.html
 tools/stat-levers/cache.json
+tools/lab-runs/**/*.json
+!tools/lab-runs/**/*summary*.json
+!tools/lab-runs/**/probe-*.json
+tools/lab-runs/**/*.log
