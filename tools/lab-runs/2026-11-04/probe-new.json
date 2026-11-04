@@ -1,0 +1,3024 @@
+{
+  "generatedAt": "2026-11-04T00:13:36.250Z",
+  "tool": "tools/lab-probe-new.js",
+  "settings": {
+    "distance": 42,
+    "spacing": 3.5,
+    "minDmgPct": 15,
+    "timeCap": 60,
+    "dt": 0.05,
+    "sight": 15,
+    "minSight": 18,
+    "drift": 15,
+    "flameReach": 1.2,
+    "budgets": [
+      1500,
+      3000
+    ],
+    "opponents": 28,
+    "targetingMode": "indexed"
+  },
+  "seconds": 280,
+  "table": [
+    {
+      "variant": "Sniper",
+      "base": "Sniper",
+      "skill": null,
+      "skillPrice": 0,
+      "byBudget": {
+        "1500": {
+          "avg": 0.262,
+          "wins": 17,
+          "of": 28,
+          "worst": [
+            [
+              "Meteor Caller",
+              -1
+            ],
+            [
+              "Goblin Swarm",
+              -0.861
+            ],
+            [
+              "Necromancer",
+              -0.663
+            ],
+            [
+              "Slimeshots",
+              -0.543
+            ]
+          ],
+          "best": [
+            [
+              "Water Mage",
+              1
+            ],
+            [
+              "Ent",
+              1
+            ],
+            [
+              "Leaf Wizard",
+              1
+            ],
+            [
+              "Fire Mage",
+              1
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.861,
+            "Skeleton Archers": -0.542,
+            "Ember Imps": -0.467,
+            "Fire Mage": 1,
+            "Sniper": 0,
+            "Brute": -0.044,
+            "Wisps": 0.498,
+            "Leaf Wizard": 1,
+            "Earth Wizard": -0.152,
+            "Flame Wizard": 0.738,
+            "Steel Wizard": -0.321,
+            "Slime Wizard": 0.067,
+            "Ether Golem": 0.768,
+            "Sun Priest": 0.452,
+            "Meteor Caller": -1,
+            "War Mammoth": 0.546,
+            "Necromancer": -0.663,
+            "Ent": 1,
+            "Slimeshots": -0.543,
+            "Just a horse": 0.867,
+            "Rogue": -0.529,
+            "Spiders": 0.505,
+            "Truespear": 0.867,
+            "Shiv": 0.992,
+            "Water Mage": 1,
+            "Assassin": 0.8,
+            "Frost Wizard": 0.467,
+            "Obelisk": 0.89
+          }
+        },
+        "3000": {
+          "avg": 0.254,
+          "wins": 15,
+          "of": 28,
+          "worst": [
+            [
+              "Meteor Caller",
+              -1
+            ],
+            [
+              "Goblin Swarm",
+              -0.844
+            ],
+            [
+              "Slimeshots",
+              -0.567
+            ],
+            [
+              "Necromancer",
+              -0.527
+            ]
+          ],
+          "best": [
+            [
+              "Water Mage",
+              1
+            ],
+            [
+              "Shiv",
+              1
+            ],
+            [
+              "Leaf Wizard",
+              1
+            ],
+            [
+              "Fire Mage",
+              1
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.844,
+            "Skeleton Archers": -0.433,
+            "Ember Imps": -0.358,
+            "Fire Mage": 1,
+            "Sniper": 0,
+            "Brute": -0.095,
+            "Wisps": 0.633,
+            "Leaf Wizard": 1,
+            "Earth Wizard": -0.49,
+            "Flame Wizard": 0.774,
+            "Steel Wizard": -0.142,
+            "Slime Wizard": -0.131,
+            "Ether Golem": 0.836,
+            "Sun Priest": 0.666,
+            "Meteor Caller": -1,
+            "War Mammoth": -0.181,
+            "Necromancer": -0.527,
+            "Ent": 0.994,
+            "Slimeshots": -0.567,
+            "Just a horse": 0.8,
+            "Rogue": -0.415,
+            "Spiders": 0.548,
+            "Truespear": 0.8,
+            "Shiv": 1,
+            "Water Mage": 1,
+            "Assassin": 0.8,
+            "Frost Wizard": 0.54,
+            "Obelisk": 0.9
+          }
+        }
+      }
+    },
+    {
+      "variant": "Sniper + Hunter, 1 squad awake (paid)",
+      "base": "Sniper",
+      "skill": "Hunter",
+      "skillPrice": 300,
+      "byBudget": {
+        "1500": {
+          "avg": 0.009,
+          "wins": 11,
+          "of": 28,
+          "worst": [
+            [
+              "Goblin Swarm",
+              -0.883
+            ],
+            [
+              "Meteor Caller",
+              -0.825
+            ],
+            [
+              "Necromancer",
+              -0.809
+            ],
+            [
+              "Slimeshots",
+              -0.657
+            ]
+          ],
+          "best": [
+            [
+              "Fire Mage",
+              0.921
+            ],
+            [
+              "Shiv",
+              0.917
+            ],
+            [
+              "Leaf Wizard",
+              0.917
+            ],
+            [
+              "Assassin",
+              0.833
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.883,
+            "Skeleton Archers": -0.65,
+            "Ember Imps": -0.6,
+            "Fire Mage": 0.921,
+            "Sniper": -0.267,
+            "Brute": -0.276,
+            "Wisps": -0.233,
+            "Leaf Wizard": 0.917,
+            "Earth Wizard": -0.387,
+            "Flame Wizard": 0.137,
+            "Steel Wizard": -0.435,
+            "Slime Wizard": -0.132,
+            "Ether Golem": 0.38,
+            "Sun Priest": -0.008,
+            "Meteor Caller": -0.825,
+            "War Mammoth": -0.389,
+            "Necromancer": -0.809,
+            "Ent": 0.783,
+            "Slimeshots": -0.657,
+            "Just a horse": 0.75,
+            "Rogue": -0.332,
+            "Spiders": -0.214,
+            "Truespear": 0.5,
+            "Shiv": 0.917,
+            "Water Mage": 0.833,
+            "Assassin": 0.833,
+            "Frost Wizard": -0.108,
+            "Obelisk": 0.496
+          }
+        },
+        "3000": {
+          "avg": 0.212,
+          "wins": 16,
+          "of": 28,
+          "worst": [
+            [
+              "Meteor Caller",
+              -1
+            ],
+            [
+              "Goblin Swarm",
+              -0.856
+            ],
+            [
+              "Slimeshots",
+              -0.593
+            ],
+            [
+              "Necromancer",
+              -0.522
+            ]
+          ],
+          "best": [
+            [
+              "Ent",
+              0.98
+            ],
+            [
+              "Shiv",
+              0.963
+            ],
+            [
+              "Leaf Wizard",
+              0.963
+            ],
+            [
+              "Water Mage",
+              0.926
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.856,
+            "Skeleton Archers": -0.521,
+            "Ember Imps": -0.417,
+            "Fire Mage": 0.926,
+            "Sniper": -0.2,
+            "Brute": -0.224,
+            "Wisps": 0.407,
+            "Leaf Wizard": 0.963,
+            "Earth Wizard": -0.316,
+            "Flame Wizard": 0.587,
+            "Steel Wizard": -0.242,
+            "Slime Wizard": 0.185,
+            "Ether Golem": 0.761,
+            "Sun Priest": 0.647,
+            "Meteor Caller": -1,
+            "War Mammoth": -0.278,
+            "Necromancer": -0.522,
+            "Ent": 0.98,
+            "Slimeshots": -0.593,
+            "Just a horse": 0.889,
+            "Rogue": -0.166,
+            "Spiders": 0.196,
+            "Truespear": 0.778,
+            "Shiv": 0.963,
+            "Water Mage": 0.926,
+            "Assassin": 0.815,
+            "Frost Wizard": 0.422,
+            "Obelisk": 0.828
+          }
+        }
+      }
+    },
+    {
+      "variant": "Sniper + Hunter, 1 squad awake (free)",
+      "base": "Sniper",
+      "skill": "Hunter",
+      "skillPrice": 0,
+      "byBudget": {
+        "1500": {
+          "avg": 0.325,
+          "wins": 20,
+          "of": 28,
+          "worst": [
+            [
+              "Goblin Swarm",
+              -0.844
+            ],
+            [
+              "Meteor Caller",
+              -0.825
+            ],
+            [
+              "Necromancer",
+              -0.684
+            ],
+            [
+              "Skeleton Archers",
+              -0.55
+            ]
+          ],
+          "best": [
+            [
+              "Ent",
+              1
+            ],
+            [
+              "Fire Mage",
+              0.984
+            ],
+            [
+              "Shiv",
+              0.959
+            ],
+            [
+              "Water Mage",
+              0.933
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.844,
+            "Skeleton Archers": -0.55,
+            "Ember Imps": -0.483,
+            "Fire Mage": 0.984,
+            "Sniper": 0.133,
+            "Brute": 0.333,
+            "Wisps": 0.498,
+            "Leaf Wizard": 0.933,
+            "Earth Wizard": -0.193,
+            "Flame Wizard": 0.745,
+            "Steel Wizard": -0.235,
+            "Slime Wizard": 0.533,
+            "Ether Golem": 0.802,
+            "Sun Priest": 0.6,
+            "Meteor Caller": -0.825,
+            "War Mammoth": 0.2,
+            "Necromancer": -0.684,
+            "Ent": 1,
+            "Slimeshots": -0.5,
+            "Just a horse": 0.933,
+            "Rogue": 0.229,
+            "Spiders": 0.629,
+            "Truespear": 0.667,
+            "Shiv": 0.959,
+            "Water Mage": 0.933,
+            "Assassin": 0.867,
+            "Frost Wizard": 0.557,
+            "Obelisk": 0.867
+          }
+        },
+        "3000": {
+          "avg": 0.335,
+          "wins": 19,
+          "of": 28,
+          "worst": [
+            [
+              "Meteor Caller",
+              -1
+            ],
+            [
+              "Goblin Swarm",
+              -0.836
+            ],
+            [
+              "Slimeshots",
+              -0.527
+            ],
+            [
+              "Necromancer",
+              -0.492
+            ]
+          ],
+          "best": [
+            [
+              "Ent",
+              1
+            ],
+            [
+              "Shiv",
+              0.971
+            ],
+            [
+              "Leaf Wizard",
+              0.967
+            ],
+            [
+              "Water Mage",
+              0.933
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.836,
+            "Skeleton Archers": -0.446,
+            "Ember Imps": -0.308,
+            "Fire Mage": 0.933,
+            "Sniper": -0.1,
+            "Brute": 0.32,
+            "Wisps": 0.615,
+            "Leaf Wizard": 0.967,
+            "Earth Wizard": -0.204,
+            "Flame Wizard": 0.785,
+            "Steel Wizard": -0.132,
+            "Slime Wizard": 0.367,
+            "Ether Golem": 0.851,
+            "Sun Priest": 0.733,
+            "Meteor Caller": -1,
+            "War Mammoth": 0.226,
+            "Necromancer": -0.492,
+            "Ent": 1,
+            "Slimeshots": -0.527,
+            "Just a horse": 0.933,
+            "Rogue": 0.148,
+            "Spiders": 0.6,
+            "Truespear": 0.8,
+            "Shiv": 0.971,
+            "Water Mage": 0.933,
+            "Assassin": 0.833,
+            "Frost Wizard": 0.532,
+            "Obelisk": 0.867
+          }
+        }
+      }
+    },
+    {
+      "variant": "Water Mage",
+      "base": "Water Mage",
+      "skill": null,
+      "skillPrice": 0,
+      "byBudget": {
+        "1500": {
+          "avg": -0.101,
+          "wins": 12,
+          "of": 28,
+          "worst": [
+            [
+              "Sniper",
+              -1
+            ],
+            [
+              "Slime Wizard",
+              -1
+            ],
+            [
+              "Meteor Caller",
+              -1
+            ],
+            [
+              "Sun Priest",
+              -0.833
+            ]
+          ],
+          "best": [
+            [
+              "Spiders",
+              1
+            ],
+            [
+              "Ent",
+              0.933
+            ],
+            [
+              "Goblin Swarm",
+              0.909
+            ],
+            [
+              "Obelisk",
+              0.887
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": 0.909,
+            "Skeleton Archers": 0.649,
+            "Ember Imps": 0.42,
+            "Fire Mage": 0.206,
+            "Sniper": -1,
+            "Brute": -0.426,
+            "Wisps": 0.35,
+            "Leaf Wizard": 0.452,
+            "Earth Wizard": -0.714,
+            "Flame Wizard": -0.523,
+            "Steel Wizard": -0.741,
+            "Slime Wizard": -1,
+            "Ether Golem": -0.617,
+            "Sun Priest": -0.833,
+            "Meteor Caller": -1,
+            "War Mammoth": -0.713,
+            "Necromancer": -0.449,
+            "Ent": 0.933,
+            "Slimeshots": 0.472,
+            "Just a horse": 0.683,
+            "Rogue": -0.677,
+            "Spiders": 1,
+            "Truespear": -0.722,
+            "Shiv": -0.048,
+            "Water Mage": 0,
+            "Assassin": 0.4,
+            "Frost Wizard": -0.714,
+            "Obelisk": 0.887
+          }
+        },
+        "3000": {
+          "avg": 0,
+          "wins": 13,
+          "of": 28,
+          "worst": [
+            [
+              "Sniper",
+              -1
+            ],
+            [
+              "Slime Wizard",
+              -1
+            ],
+            [
+              "Meteor Caller",
+              -1
+            ],
+            [
+              "Earth Wizard",
+              -0.933
+            ]
+          ],
+          "best": [
+            [
+              "Obelisk",
+              1
+            ],
+            [
+              "Spiders",
+              1
+            ],
+            [
+              "Ent",
+              1
+            ],
+            [
+              "Goblin Swarm",
+              1
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": 1,
+            "Skeleton Archers": 0.791,
+            "Ember Imps": 0.513,
+            "Fire Mage": 0.134,
+            "Sniper": -1,
+            "Brute": -0.217,
+            "Wisps": 0.475,
+            "Leaf Wizard": 0.574,
+            "Earth Wizard": -0.933,
+            "Flame Wizard": -0.624,
+            "Steel Wizard": -0.757,
+            "Slime Wizard": -1,
+            "Ether Golem": -0.4,
+            "Sun Priest": -0.664,
+            "Meteor Caller": -1,
+            "War Mammoth": -0.569,
+            "Necromancer": -0.298,
+            "Ent": 1,
+            "Slimeshots": 0.226,
+            "Just a horse": 0.717,
+            "Rogue": -0.292,
+            "Spiders": 1,
+            "Truespear": -0.169,
+            "Shiv": 0.456,
+            "Water Mage": 0,
+            "Assassin": 0.684,
+            "Frost Wizard": -0.642,
+            "Obelisk": 1
+          }
+        }
+      }
+    },
+    {
+      "variant": "Water Mage + Summon water elemental (paid)",
+      "base": "Water Mage",
+      "skill": "Summon water elemental",
+      "skillPrice": 300,
+      "byBudget": {
+        "1500": {
+          "avg": 0.028,
+          "wins": 15,
+          "of": 28,
+          "worst": [
+            [
+              "Sniper",
+              -1
+            ],
+            [
+              "Earth Wizard",
+              -0.956
+            ],
+            [
+              "Slime Wizard",
+              -0.839
+            ],
+            [
+              "Sun Priest",
+              -0.788
+            ]
+          ],
+          "best": [
+            [
+              "Spiders",
+              0.971
+            ],
+            [
+              "Ent",
+              0.943
+            ],
+            [
+              "Goblin Swarm",
+              0.857
+            ],
+            [
+              "Assassin",
+              0.71
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": 0.857,
+            "Skeleton Archers": 0.273,
+            "Ember Imps": 0.662,
+            "Fire Mage": 0.383,
+            "Sniper": -1,
+            "Brute": 0.353,
+            "Wisps": 0.141,
+            "Leaf Wizard": 0.203,
+            "Earth Wizard": -0.956,
+            "Flame Wizard": -0.311,
+            "Steel Wizard": -0.705,
+            "Slime Wizard": -0.839,
+            "Ether Golem": -0.267,
+            "Sun Priest": -0.788,
+            "Meteor Caller": -0.417,
+            "War Mammoth": 0.101,
+            "Necromancer": -0.424,
+            "Ent": 0.943,
+            "Slimeshots": 0.41,
+            "Just a horse": 0.708,
+            "Rogue": -0.09,
+            "Spiders": 0.971,
+            "Truespear": -0.532,
+            "Shiv": -0.071,
+            "Water Mage": 0.354,
+            "Assassin": 0.71,
+            "Frost Wizard": -0.455,
+            "Obelisk": 0.575
+          }
+        },
+        "3000": {
+          "avg": 0.238,
+          "wins": 19,
+          "of": 28,
+          "worst": [
+            [
+              "Sniper",
+              -0.862
+            ],
+            [
+              "Slime Wizard",
+              -0.806
+            ],
+            [
+              "Meteor Caller",
+              -0.75
+            ],
+            [
+              "Earth Wizard",
+              -0.718
+            ]
+          ],
+          "best": [
+            [
+              "Spiders",
+              1
+            ],
+            [
+              "Goblin Swarm",
+              0.986
+            ],
+            [
+              "Ent",
+              0.979
+            ],
+            [
+              "Obelisk",
+              0.937
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": 0.986,
+            "Skeleton Archers": 0.426,
+            "Ember Imps": 0.58,
+            "Fire Mage": 0.198,
+            "Sniper": -0.862,
+            "Brute": 0.713,
+            "Wisps": 0.333,
+            "Leaf Wizard": 0.394,
+            "Earth Wizard": -0.718,
+            "Flame Wizard": -0.141,
+            "Steel Wizard": -0.459,
+            "Slime Wizard": -0.806,
+            "Ether Golem": 0.619,
+            "Sun Priest": -0.312,
+            "Meteor Caller": -0.75,
+            "War Mammoth": 0.593,
+            "Necromancer": -0.094,
+            "Ent": 0.979,
+            "Slimeshots": 0.218,
+            "Just a horse": 0.799,
+            "Rogue": 0.562,
+            "Spiders": 1,
+            "Truespear": 0.001,
+            "Shiv": 0.294,
+            "Water Mage": 0.545,
+            "Assassin": 0.86,
+            "Frost Wizard": -0.242,
+            "Obelisk": 0.937
+          }
+        }
+      }
+    },
+    {
+      "variant": "Water Mage + Summon water elemental (free)",
+      "base": "Water Mage",
+      "skill": "Summon water elemental",
+      "skillPrice": 0,
+      "byBudget": {
+        "1500": {
+          "avg": 0.287,
+          "wins": 21,
+          "of": 28,
+          "worst": [
+            [
+              "Earth Wizard",
+              -0.879
+            ],
+            [
+              "Slime Wizard",
+              -0.806
+            ],
+            [
+              "Steel Wizard",
+              -0.536
+            ],
+            [
+              "Sniper",
+              -0.457
+            ]
+          ],
+          "best": [
+            [
+              "Spiders",
+              1
+            ],
+            [
+              "Goblin Swarm",
+              0.976
+            ],
+            [
+              "Ent",
+              0.975
+            ],
+            [
+              "Obelisk",
+              0.922
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": 0.976,
+            "Skeleton Archers": 0.425,
+            "Ember Imps": 0.643,
+            "Fire Mage": 0.541,
+            "Sniper": -0.457,
+            "Brute": 0.5,
+            "Wisps": 0.325,
+            "Leaf Wizard": 0.405,
+            "Earth Wizard": -0.879,
+            "Flame Wizard": 0.101,
+            "Steel Wizard": -0.536,
+            "Slime Wizard": -0.806,
+            "Ether Golem": 0.185,
+            "Sun Priest": -0.437,
+            "Meteor Caller": 0.099,
+            "War Mammoth": 0.631,
+            "Necromancer": -0.134,
+            "Ent": 0.975,
+            "Slimeshots": 0.551,
+            "Just a horse": 0.767,
+            "Rogue": 0.422,
+            "Spiders": 1,
+            "Truespear": -0.132,
+            "Shiv": 0.3,
+            "Water Mage": 0.555,
+            "Assassin": 0.853,
+            "Frost Wizard": 0.238,
+            "Obelisk": 0.922
+          }
+        },
+        "3000": {
+          "avg": 0.311,
+          "wins": 21,
+          "of": 28,
+          "worst": [
+            [
+              "Slime Wizard",
+              -0.823
+            ],
+            [
+              "Meteor Caller",
+              -0.813
+            ],
+            [
+              "Sniper",
+              -0.767
+            ],
+            [
+              "Earth Wizard",
+              -0.559
+            ]
+          ],
+          "best": [
+            [
+              "Obelisk",
+              1
+            ],
+            [
+              "Spiders",
+              0.996
+            ],
+            [
+              "Goblin Swarm",
+              0.995
+            ],
+            [
+              "Ent",
+              0.988
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": 0.995,
+            "Skeleton Archers": 0.455,
+            "Ember Imps": 0.577,
+            "Fire Mage": 0.257,
+            "Sniper": -0.767,
+            "Brute": 0.742,
+            "Wisps": 0.35,
+            "Leaf Wizard": 0.468,
+            "Earth Wizard": -0.559,
+            "Flame Wizard": -0.051,
+            "Steel Wizard": -0.522,
+            "Slime Wizard": -0.823,
+            "Ether Golem": 0.613,
+            "Sun Priest": -0.018,
+            "Meteor Caller": -0.813,
+            "War Mammoth": 0.689,
+            "Necromancer": 0.071,
+            "Ent": 0.988,
+            "Slimeshots": 0.412,
+            "Just a horse": 0.819,
+            "Rogue": 0.62,
+            "Spiders": 0.996,
+            "Truespear": 0.258,
+            "Shiv": 0.342,
+            "Water Mage": 0.58,
+            "Assassin": 0.882,
+            "Frost Wizard": 0.159,
+            "Obelisk": 1
+          }
+        }
+      }
+    },
+    {
+      "variant": "Spiders",
+      "base": "Spiders",
+      "skill": null,
+      "skillPrice": 0,
+      "byBudget": {
+        "1500": {
+          "avg": -0.375,
+          "wins": 5,
+          "of": 28,
+          "worst": [
+            [
+              "Water Mage",
+              -1
+            ],
+            [
+              "Slime Wizard",
+              -0.903
+            ],
+            [
+              "Flame Wizard",
+              -0.888
+            ],
+            [
+              "War Mammoth",
+              -0.876
+            ]
+          ],
+          "best": [
+            [
+              "Assassin",
+              0.857
+            ],
+            [
+              "Just a horse",
+              0.833
+            ],
+            [
+              "Leaf Wizard",
+              0.451
+            ],
+            [
+              "Truespear",
+              0.312
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.55,
+            "Skeleton Archers": -0.624,
+            "Ember Imps": -0.748,
+            "Fire Mage": -0.594,
+            "Sniper": -0.505,
+            "Brute": -0.693,
+            "Wisps": -0.628,
+            "Leaf Wizard": 0.451,
+            "Earth Wizard": -0.688,
+            "Flame Wizard": -0.888,
+            "Steel Wizard": -0.773,
+            "Slime Wizard": -0.903,
+            "Ether Golem": -0.859,
+            "Sun Priest": -0.355,
+            "Meteor Caller": 0.243,
+            "War Mammoth": -0.876,
+            "Necromancer": -0.296,
+            "Ent": -0.622,
+            "Slimeshots": -0.267,
+            "Just a horse": 0.833,
+            "Rogue": -0.174,
+            "Spiders": 0,
+            "Truespear": 0.312,
+            "Shiv": -0.314,
+            "Water Mage": -1,
+            "Assassin": 0.857,
+            "Frost Wizard": -0.332,
+            "Obelisk": -0.501
+          }
+        },
+        "3000": {
+          "avg": -0.433,
+          "wins": 4,
+          "of": 28,
+          "worst": [
+            [
+              "Water Mage",
+              -1
+            ],
+            [
+              "Flame Wizard",
+              -0.995
+            ],
+            [
+              "Slime Wizard",
+              -0.887
+            ],
+            [
+              "Ether Golem",
+              -0.871
+            ]
+          ],
+          "best": [
+            [
+              "Assassin",
+              0.844
+            ],
+            [
+              "Just a horse",
+              0.833
+            ],
+            [
+              "Truespear",
+              0.354
+            ],
+            [
+              "Leaf Wizard",
+              0.316
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.475,
+            "Skeleton Archers": -0.513,
+            "Ember Imps": -0.789,
+            "Fire Mage": -0.751,
+            "Sniper": -0.548,
+            "Brute": -0.723,
+            "Wisps": -0.624,
+            "Leaf Wizard": 0.316,
+            "Earth Wizard": -0.797,
+            "Flame Wizard": -0.995,
+            "Steel Wizard": -0.817,
+            "Slime Wizard": -0.887,
+            "Ether Golem": -0.871,
+            "Sun Priest": -0.312,
+            "Meteor Caller": -0.612,
+            "War Mammoth": -0.868,
+            "Necromancer": -0.333,
+            "Ent": -0.561,
+            "Slimeshots": -0.57,
+            "Just a horse": 0.833,
+            "Rogue": -0.187,
+            "Spiders": 0,
+            "Truespear": 0.354,
+            "Shiv": -0.289,
+            "Water Mage": -1,
+            "Assassin": 0.844,
+            "Frost Wizard": -0.349,
+            "Obelisk": -0.598
+          }
+        }
+      }
+    },
+    {
+      "variant": "Spiders + Poisonous fangs (paid)",
+      "base": "Spiders",
+      "skill": "Poisonous fangs",
+      "skillPrice": 100,
+      "byBudget": {
+        "1500": {
+          "avg": -0.254,
+          "wins": 8,
+          "of": 28,
+          "worst": [
+            [
+              "Slime Wizard",
+              -0.859
+            ],
+            [
+              "Flame Wizard",
+              -0.829
+            ],
+            [
+              "Water Mage",
+              -0.783
+            ],
+            [
+              "War Mammoth",
+              -0.746
+            ]
+          ],
+          "best": [
+            [
+              "Assassin",
+              0.857
+            ],
+            [
+              "Just a horse",
+              0.833
+            ],
+            [
+              "Leaf Wizard",
+              0.451
+            ],
+            [
+              "Truespear",
+              0.434
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.56,
+            "Skeleton Archers": -0.701,
+            "Ember Imps": -0.708,
+            "Fire Mage": -0.473,
+            "Sniper": -0.363,
+            "Brute": -0.528,
+            "Wisps": -0.568,
+            "Leaf Wizard": 0.451,
+            "Earth Wizard": -0.562,
+            "Flame Wizard": -0.829,
+            "Steel Wizard": -0.607,
+            "Slime Wizard": -0.859,
+            "Ether Golem": -0.74,
+            "Sun Priest": -0.144,
+            "Meteor Caller": 0.243,
+            "War Mammoth": -0.746,
+            "Necromancer": -0.264,
+            "Ent": -0.51,
+            "Slimeshots": -0.319,
+            "Just a horse": 0.833,
+            "Rogue": 0.207,
+            "Spiders": 0.292,
+            "Truespear": 0.434,
+            "Shiv": -0.153,
+            "Water Mage": -0.783,
+            "Assassin": 0.857,
+            "Frost Wizard": 0.105,
+            "Obelisk": -0.105
+          }
+        },
+        "3000": {
+          "avg": -0.334,
+          "wins": 8,
+          "of": 28,
+          "worst": [
+            [
+              "Flame Wizard",
+              -0.997
+            ],
+            [
+              "Slime Wizard",
+              -0.896
+            ],
+            [
+              "Water Mage",
+              -0.893
+            ],
+            [
+              "Ember Imps",
+              -0.797
+            ]
+          ],
+          "best": [
+            [
+              "Assassin",
+              0.857
+            ],
+            [
+              "Just a horse",
+              0.821
+            ],
+            [
+              "Truespear",
+              0.464
+            ],
+            [
+              "Leaf Wizard",
+              0.308
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.522,
+            "Skeleton Archers": -0.642,
+            "Ember Imps": -0.797,
+            "Fire Mage": -0.726,
+            "Sniper": -0.618,
+            "Brute": -0.546,
+            "Wisps": -0.646,
+            "Leaf Wizard": 0.308,
+            "Earth Wizard": -0.673,
+            "Flame Wizard": -0.997,
+            "Steel Wizard": -0.684,
+            "Slime Wizard": -0.896,
+            "Ether Golem": -0.748,
+            "Sun Priest": -0.119,
+            "Meteor Caller": 0.015,
+            "War Mammoth": -0.723,
+            "Necromancer": -0.398,
+            "Ent": -0.478,
+            "Slimeshots": -0.608,
+            "Just a horse": 0.821,
+            "Rogue": 0.119,
+            "Spiders": 0.252,
+            "Truespear": 0.464,
+            "Shiv": -0.277,
+            "Water Mage": -0.893,
+            "Assassin": 0.857,
+            "Frost Wizard": 0.002,
+            "Obelisk": -0.204
+          }
+        }
+      }
+    },
+    {
+      "variant": "Spiders + Poisonous fangs (free)",
+      "base": "Spiders",
+      "skill": "Poisonous fangs",
+      "skillPrice": 0,
+      "byBudget": {
+        "1500": {
+          "avg": -0.254,
+          "wins": 8,
+          "of": 28,
+          "worst": [
+            [
+              "Slime Wizard",
+              -0.859
+            ],
+            [
+              "Flame Wizard",
+              -0.829
+            ],
+            [
+              "Water Mage",
+              -0.783
+            ],
+            [
+              "War Mammoth",
+              -0.746
+            ]
+          ],
+          "best": [
+            [
+              "Assassin",
+              0.857
+            ],
+            [
+              "Just a horse",
+              0.833
+            ],
+            [
+              "Leaf Wizard",
+              0.451
+            ],
+            [
+              "Truespear",
+              0.434
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.56,
+            "Skeleton Archers": -0.701,
+            "Ember Imps": -0.708,
+            "Fire Mage": -0.473,
+            "Sniper": -0.363,
+            "Brute": -0.528,
+            "Wisps": -0.568,
+            "Leaf Wizard": 0.451,
+            "Earth Wizard": -0.562,
+            "Flame Wizard": -0.829,
+            "Steel Wizard": -0.607,
+            "Slime Wizard": -0.859,
+            "Ether Golem": -0.74,
+            "Sun Priest": -0.144,
+            "Meteor Caller": 0.243,
+            "War Mammoth": -0.746,
+            "Necromancer": -0.264,
+            "Ent": -0.51,
+            "Slimeshots": -0.319,
+            "Just a horse": 0.833,
+            "Rogue": 0.207,
+            "Spiders": 0.292,
+            "Truespear": 0.434,
+            "Shiv": -0.153,
+            "Water Mage": -0.783,
+            "Assassin": 0.857,
+            "Frost Wizard": 0.105,
+            "Obelisk": -0.105
+          }
+        },
+        "3000": {
+          "avg": -0.293,
+          "wins": 8,
+          "of": 28,
+          "worst": [
+            [
+              "Flame Wizard",
+              -0.993
+            ],
+            [
+              "Water Mage",
+              -0.868
+            ],
+            [
+              "Slime Wizard",
+              -0.838
+            ],
+            [
+              "Ember Imps",
+              -0.772
+            ]
+          ],
+          "best": [
+            [
+              "Assassin",
+              0.867
+            ],
+            [
+              "Just a horse",
+              0.833
+            ],
+            [
+              "Truespear",
+              0.508
+            ],
+            [
+              "Leaf Wizard",
+              0.36
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.459,
+            "Skeleton Archers": -0.593,
+            "Ember Imps": -0.772,
+            "Fire Mage": -0.665,
+            "Sniper": -0.478,
+            "Brute": -0.51,
+            "Wisps": -0.544,
+            "Leaf Wizard": 0.36,
+            "Earth Wizard": -0.66,
+            "Flame Wizard": -0.993,
+            "Steel Wizard": -0.66,
+            "Slime Wizard": -0.838,
+            "Ether Golem": -0.732,
+            "Sun Priest": 0.08,
+            "Meteor Caller": -0.536,
+            "War Mammoth": -0.676,
+            "Necromancer": -0.359,
+            "Ent": -0.386,
+            "Slimeshots": -0.556,
+            "Just a horse": 0.833,
+            "Rogue": 0.199,
+            "Spiders": 0.324,
+            "Truespear": 0.508,
+            "Shiv": -0.125,
+            "Water Mage": -0.868,
+            "Assassin": 0.867,
+            "Frost Wizard": 0.149,
+            "Obelisk": -0.126
+          }
+        }
+      }
+    },
+    {
+      "variant": "Spiders + Spiderlings (paid)",
+      "base": "Spiders",
+      "skill": "Spiderlings",
+      "skillPrice": 200,
+      "byBudget": {
+        "1500": {
+          "avg": -0.088,
+          "wins": 15,
+          "of": 28,
+          "worst": [
+            [
+              "Water Mage",
+              -1
+            ],
+            [
+              "War Mammoth",
+              -0.864
+            ],
+            [
+              "Ether Golem",
+              -0.834
+            ],
+            [
+              "Flame Wizard",
+              -0.761
+            ]
+          ],
+          "best": [
+            [
+              "Just a horse",
+              0.854
+            ],
+            [
+              "Assassin",
+              0.8
+            ],
+            [
+              "Leaf Wizard",
+              0.519
+            ],
+            [
+              "Sniper",
+              0.482
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.427,
+            "Skeleton Archers": 0.007,
+            "Ember Imps": -0.624,
+            "Fire Mage": -0.022,
+            "Sniper": 0.482,
+            "Brute": -0.554,
+            "Wisps": 0.291,
+            "Leaf Wizard": 0.519,
+            "Earth Wizard": 0.007,
+            "Flame Wizard": -0.761,
+            "Steel Wizard": -0.739,
+            "Slime Wizard": -0.684,
+            "Ether Golem": -0.834,
+            "Sun Priest": 0.019,
+            "Meteor Caller": 0.325,
+            "War Mammoth": -0.864,
+            "Necromancer": -0.105,
+            "Ent": -0.321,
+            "Slimeshots": 0.068,
+            "Just a horse": 0.854,
+            "Rogue": 0.366,
+            "Spiders": 0.306,
+            "Truespear": 0.393,
+            "Shiv": 0.319,
+            "Water Mage": -1,
+            "Assassin": 0.8,
+            "Frost Wizard": 0.103,
+            "Obelisk": -0.382
+          }
+        },
+        "3000": {
+          "avg": -0.04,
+          "wins": 16,
+          "of": 28,
+          "worst": [
+            [
+              "Water Mage",
+              -1
+            ],
+            [
+              "Flame Wizard",
+              -0.89
+            ],
+            [
+              "War Mammoth",
+              -0.835
+            ],
+            [
+              "Ether Golem",
+              -0.815
+            ]
+          ],
+          "best": [
+            [
+              "Just a horse",
+              0.879
+            ],
+            [
+              "Assassin",
+              0.872
+            ],
+            [
+              "Leaf Wizard",
+              0.557
+            ],
+            [
+              "Sniper",
+              0.533
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.136,
+            "Skeleton Archers": 0.188,
+            "Ember Imps": -0.611,
+            "Fire Mage": -0.138,
+            "Sniper": 0.533,
+            "Brute": -0.563,
+            "Wisps": 0.371,
+            "Leaf Wizard": 0.557,
+            "Earth Wizard": -0.261,
+            "Flame Wizard": -0.89,
+            "Steel Wizard": -0.789,
+            "Slime Wizard": -0.653,
+            "Ether Golem": -0.815,
+            "Sun Priest": 0.417,
+            "Meteor Caller": 0.096,
+            "War Mammoth": -0.835,
+            "Necromancer": 0.103,
+            "Ent": 0.045,
+            "Slimeshots": 0.048,
+            "Just a horse": 0.879,
+            "Rogue": 0.41,
+            "Spiders": 0.343,
+            "Truespear": 0.517,
+            "Shiv": 0.332,
+            "Water Mage": -1,
+            "Assassin": 0.872,
+            "Frost Wizard": 0.177,
+            "Obelisk": -0.32
+          }
+        }
+      }
+    },
+    {
+      "variant": "Spiders + Spiderlings (free)",
+      "base": "Spiders",
+      "skill": "Spiderlings",
+      "skillPrice": 0,
+      "byBudget": {
+        "1500": {
+          "avg": 0.005,
+          "wins": 18,
+          "of": 28,
+          "worst": [
+            [
+              "Water Mage",
+              -1
+            ],
+            [
+              "War Mammoth",
+              -0.846
+            ],
+            [
+              "Ether Golem",
+              -0.814
+            ],
+            [
+              "Flame Wizard",
+              -0.769
+            ]
+          ],
+          "best": [
+            [
+              "Just a horse",
+              0.872
+            ],
+            [
+              "Assassin",
+              0.837
+            ],
+            [
+              "Sniper",
+              0.568
+            ],
+            [
+              "Leaf Wizard",
+              0.562
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.256,
+            "Skeleton Archers": 0.176,
+            "Ember Imps": -0.511,
+            "Fire Mage": 0.053,
+            "Sniper": 0.568,
+            "Brute": -0.488,
+            "Wisps": 0.38,
+            "Leaf Wizard": 0.562,
+            "Earth Wizard": 0.066,
+            "Flame Wizard": -0.769,
+            "Steel Wizard": -0.717,
+            "Slime Wizard": -0.632,
+            "Ether Golem": -0.814,
+            "Sun Priest": 0.205,
+            "Meteor Caller": 0.291,
+            "War Mammoth": -0.846,
+            "Necromancer": 0.11,
+            "Ent": 0.114,
+            "Slimeshots": 0.199,
+            "Just a horse": 0.872,
+            "Rogue": 0.393,
+            "Spiders": 0.458,
+            "Truespear": 0.443,
+            "Shiv": 0.397,
+            "Water Mage": -1,
+            "Assassin": 0.837,
+            "Frost Wizard": 0.172,
+            "Obelisk": -0.111
+          }
+        },
+        "3000": {
+          "avg": 0.005,
+          "wins": 17,
+          "of": 28,
+          "worst": [
+            [
+              "Water Mage",
+              -1
+            ],
+            [
+              "Flame Wizard",
+              -0.87
+            ],
+            [
+              "War Mammoth",
+              -0.831
+            ],
+            [
+              "Ether Golem",
+              -0.795
+            ]
+          ],
+          "best": [
+            [
+              "Assassin",
+              0.889
+            ],
+            [
+              "Just a horse",
+              0.887
+            ],
+            [
+              "Leaf Wizard",
+              0.589
+            ],
+            [
+              "Sniper",
+              0.564
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": 0.045,
+            "Skeleton Archers": 0.241,
+            "Ember Imps": -0.556,
+            "Fire Mage": -0.084,
+            "Sniper": 0.564,
+            "Brute": -0.514,
+            "Wisps": 0.412,
+            "Leaf Wizard": 0.589,
+            "Earth Wizard": -0.206,
+            "Flame Wizard": -0.87,
+            "Steel Wizard": -0.783,
+            "Slime Wizard": -0.64,
+            "Ether Golem": -0.795,
+            "Sun Priest": 0.444,
+            "Meteor Caller": 0.067,
+            "War Mammoth": -0.831,
+            "Necromancer": 0.142,
+            "Ent": 0.112,
+            "Slimeshots": 0.09,
+            "Just a horse": 0.887,
+            "Rogue": 0.434,
+            "Spiders": 0.41,
+            "Truespear": 0.528,
+            "Shiv": 0.381,
+            "Water Mage": -1,
+            "Assassin": 0.889,
+            "Frost Wizard": 0.279,
+            "Obelisk": -0.097
+          }
+        }
+      }
+    },
+    {
+      "variant": "Spiders + Cavestalkers (paid)",
+      "base": "Spiders",
+      "skill": "Cavestalkers",
+      "skillPrice": 200,
+      "byBudget": {
+        "1500": {
+          "avg": -0.294,
+          "wins": 6,
+          "of": 28,
+          "worst": [
+            [
+              "Water Mage",
+              -0.987
+            ],
+            [
+              "War Mammoth",
+              -0.89
+            ],
+            [
+              "Ether Golem",
+              -0.88
+            ],
+            [
+              "Flame Wizard",
+              -0.786
+            ]
+          ],
+          "best": [
+            [
+              "Meteor Caller",
+              1
+            ],
+            [
+              "Just a horse",
+              0.806
+            ],
+            [
+              "Leaf Wizard",
+              0.692
+            ],
+            [
+              "Sniper",
+              0.361
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.636,
+            "Skeleton Archers": -0.472,
+            "Ember Imps": -0.769,
+            "Fire Mage": -0.346,
+            "Sniper": 0.361,
+            "Brute": -0.744,
+            "Wisps": 0.155,
+            "Leaf Wizard": 0.692,
+            "Earth Wizard": -0.477,
+            "Flame Wizard": -0.786,
+            "Steel Wizard": -0.755,
+            "Slime Wizard": -0.671,
+            "Ether Golem": -0.88,
+            "Sun Priest": -0.381,
+            "Meteor Caller": 1,
+            "War Mammoth": -0.89,
+            "Necromancer": -0.389,
+            "Ent": -0.711,
+            "Slimeshots": -0.245,
+            "Just a horse": 0.806,
+            "Rogue": 0,
+            "Spiders": -0.364,
+            "Truespear": 0.306,
+            "Shiv": -0.086,
+            "Water Mage": -0.987,
+            "Assassin": 0,
+            "Frost Wizard": -0.292,
+            "Obelisk": -0.668
+          }
+        },
+        "3000": {
+          "avg": -0.257,
+          "wins": 7,
+          "of": 28,
+          "worst": [
+            [
+              "Water Mage",
+              -1
+            ],
+            [
+              "Flame Wizard",
+              -0.91
+            ],
+            [
+              "War Mammoth",
+              -0.872
+            ],
+            [
+              "Ether Golem",
+              -0.866
+            ]
+          ],
+          "best": [
+            [
+              "Meteor Caller",
+              1
+            ],
+            [
+              "Just a horse",
+              0.821
+            ],
+            [
+              "Leaf Wizard",
+              0.653
+            ],
+            [
+              "Sniper",
+              0.44
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.515,
+            "Skeleton Archers": -0.4,
+            "Ember Imps": -0.785,
+            "Fire Mage": -0.408,
+            "Sniper": 0.44,
+            "Brute": -0.737,
+            "Wisps": 0.249,
+            "Leaf Wizard": 0.653,
+            "Earth Wizard": -0.326,
+            "Flame Wizard": -0.91,
+            "Steel Wizard": -0.763,
+            "Slime Wizard": -0.587,
+            "Ether Golem": -0.866,
+            "Sun Priest": -0.302,
+            "Meteor Caller": 1,
+            "War Mammoth": -0.872,
+            "Necromancer": -0.306,
+            "Ent": -0.613,
+            "Slimeshots": -0.51,
+            "Just a horse": 0.821,
+            "Rogue": 0,
+            "Spiders": -0.189,
+            "Truespear": 0.428,
+            "Shiv": 0.133,
+            "Water Mage": -1,
+            "Assassin": 0,
+            "Frost Wizard": -0.165,
+            "Obelisk": -0.673
+          }
+        }
+      }
+    },
+    {
+      "variant": "Spiders + Cavestalkers (free)",
+      "base": "Spiders",
+      "skill": "Cavestalkers",
+      "skillPrice": 0,
+      "byBudget": {
+        "1500": {
+          "avg": -0.178,
+          "wins": 8,
+          "of": 28,
+          "worst": [
+            [
+              "Water Mage",
+              -1
+            ],
+            [
+              "War Mammoth",
+              -0.855
+            ],
+            [
+              "Ether Golem",
+              -0.838
+            ],
+            [
+              "Flame Wizard",
+              -0.809
+            ]
+          ],
+          "best": [
+            [
+              "Meteor Caller",
+              1
+            ],
+            [
+              "Just a horse",
+              0.833
+            ],
+            [
+              "Leaf Wizard",
+              0.748
+            ],
+            [
+              "Sniper",
+              0.5
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.569,
+            "Skeleton Archers": -0.325,
+            "Ember Imps": -0.706,
+            "Fire Mage": -0.168,
+            "Sniper": 0.5,
+            "Brute": -0.7,
+            "Wisps": 0.304,
+            "Leaf Wizard": 0.748,
+            "Earth Wizard": -0.062,
+            "Flame Wizard": -0.809,
+            "Steel Wizard": -0.719,
+            "Slime Wizard": -0.568,
+            "Ether Golem": -0.838,
+            "Sun Priest": -0.281,
+            "Meteor Caller": 1,
+            "War Mammoth": -0.855,
+            "Necromancer": -0.253,
+            "Ent": -0.615,
+            "Slimeshots": 0.049,
+            "Just a horse": 0.833,
+            "Rogue": 0,
+            "Spiders": 0,
+            "Truespear": 0.346,
+            "Shiv": 0.361,
+            "Water Mage": -1,
+            "Assassin": 0,
+            "Frost Wizard": -0.099,
+            "Obelisk": -0.567
+          }
+        },
+        "3000": {
+          "avg": -0.214,
+          "wins": 7,
+          "of": 28,
+          "worst": [
+            [
+              "Water Mage",
+              -1
+            ],
+            [
+              "Flame Wizard",
+              -0.906
+            ],
+            [
+              "War Mammoth",
+              -0.864
+            ],
+            [
+              "Ether Golem",
+              -0.861
+            ]
+          ],
+          "best": [
+            [
+              "Meteor Caller",
+              1
+            ],
+            [
+              "Just a horse",
+              0.833
+            ],
+            [
+              "Leaf Wizard",
+              0.693
+            ],
+            [
+              "Sniper",
+              0.5
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.478,
+            "Skeleton Archers": -0.357,
+            "Ember Imps": -0.772,
+            "Fire Mage": -0.323,
+            "Sniper": 0.5,
+            "Brute": -0.721,
+            "Wisps": 0.283,
+            "Leaf Wizard": 0.693,
+            "Earth Wizard": -0.284,
+            "Flame Wizard": -0.906,
+            "Steel Wizard": -0.764,
+            "Slime Wizard": -0.529,
+            "Ether Golem": -0.861,
+            "Sun Priest": -0.194,
+            "Meteor Caller": 1,
+            "War Mammoth": -0.864,
+            "Necromancer": -0.269,
+            "Ent": -0.56,
+            "Slimeshots": -0.459,
+            "Just a horse": 0.833,
+            "Rogue": 0,
+            "Spiders": 0,
+            "Truespear": 0.473,
+            "Shiv": 0.236,
+            "Water Mage": -1,
+            "Assassin": 0,
+            "Frost Wizard": -0.066,
+            "Obelisk": -0.606
+          }
+        }
+      }
+    },
+    {
+      "variant": "Spiders + Web-shots (paid)",
+      "base": "Spiders",
+      "skill": "Web-shots",
+      "skillPrice": 300,
+      "byBudget": {
+        "1500": {
+          "avg": -0.423,
+          "wins": 5,
+          "of": 28,
+          "worst": [
+            [
+              "Water Mage",
+              -1
+            ],
+            [
+              "Slime Wizard",
+              -0.923
+            ],
+            [
+              "Flame Wizard",
+              -0.867
+            ],
+            [
+              "War Mammoth",
+              -0.817
+            ]
+          ],
+          "best": [
+            [
+              "Just a horse",
+              0.878
+            ],
+            [
+              "Assassin",
+              0.768
+            ],
+            [
+              "Leaf Wizard",
+              0.432
+            ],
+            [
+              "Truespear",
+              0.425
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.635,
+            "Skeleton Archers": -0.729,
+            "Ember Imps": -0.806,
+            "Fire Mage": -0.716,
+            "Sniper": -0.59,
+            "Brute": -0.611,
+            "Wisps": -0.769,
+            "Leaf Wizard": 0.432,
+            "Earth Wizard": -0.767,
+            "Flame Wizard": -0.867,
+            "Steel Wizard": -0.758,
+            "Slime Wizard": -0.923,
+            "Ether Golem": -0.736,
+            "Sun Priest": -0.317,
+            "Meteor Caller": 0.104,
+            "War Mammoth": -0.817,
+            "Necromancer": -0.449,
+            "Ent": -0.698,
+            "Slimeshots": -0.505,
+            "Just a horse": 0.878,
+            "Rogue": -0.394,
+            "Spiders": -0.381,
+            "Truespear": 0.425,
+            "Shiv": -0.524,
+            "Water Mage": -1,
+            "Assassin": 0.768,
+            "Frost Wizard": -0.256,
+            "Obelisk": -0.196
+          }
+        },
+        "3000": {
+          "avg": -0.449,
+          "wins": 5,
+          "of": 28,
+          "worst": [
+            [
+              "Water Mage",
+              -1
+            ],
+            [
+              "Flame Wizard",
+              -0.966
+            ],
+            [
+              "Slime Wizard",
+              -0.929
+            ],
+            [
+              "War Mammoth",
+              -0.855
+            ]
+          ],
+          "best": [
+            [
+              "Just a horse",
+              0.897
+            ],
+            [
+              "Assassin",
+              0.831
+            ],
+            [
+              "Truespear",
+              0.364
+            ],
+            [
+              "Leaf Wizard",
+              0.296
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.57,
+            "Skeleton Archers": -0.633,
+            "Ember Imps": -0.816,
+            "Fire Mage": -0.766,
+            "Sniper": -0.629,
+            "Brute": -0.673,
+            "Wisps": -0.778,
+            "Leaf Wizard": 0.296,
+            "Earth Wizard": -0.84,
+            "Flame Wizard": -0.966,
+            "Steel Wizard": -0.801,
+            "Slime Wizard": -0.929,
+            "Ether Golem": -0.808,
+            "Sun Priest": -0.307,
+            "Meteor Caller": 0.054,
+            "War Mammoth": -0.855,
+            "Necromancer": -0.507,
+            "Ent": -0.626,
+            "Slimeshots": -0.669,
+            "Just a horse": 0.897,
+            "Rogue": -0.281,
+            "Spiders": -0.341,
+            "Truespear": 0.364,
+            "Shiv": -0.524,
+            "Water Mage": -1,
+            "Assassin": 0.831,
+            "Frost Wizard": -0.293,
+            "Obelisk": -0.397
+          }
+        }
+      }
+    },
+    {
+      "variant": "Spiders + Web-shots (free)",
+      "base": "Spiders",
+      "skill": "Web-shots",
+      "skillPrice": 0,
+      "byBudget": {
+        "1500": {
+          "avg": -0.245,
+          "wins": 9,
+          "of": 28,
+          "worst": [
+            [
+              "Water Mage",
+              -1
+            ],
+            [
+              "Slime Wizard",
+              -0.903
+            ],
+            [
+              "Flame Wizard",
+              -0.759
+            ],
+            [
+              "Ember Imps",
+              -0.748
+            ]
+          ],
+          "best": [
+            [
+              "Just a horse",
+              0.883
+            ],
+            [
+              "Assassin",
+              0.857
+            ],
+            [
+              "Truespear",
+              0.608
+            ],
+            [
+              "Leaf Wizard",
+              0.521
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.55,
+            "Skeleton Archers": -0.624,
+            "Ember Imps": -0.748,
+            "Fire Mage": -0.501,
+            "Sniper": 0.024,
+            "Brute": -0.51,
+            "Wisps": -0.628,
+            "Leaf Wizard": 0.521,
+            "Earth Wizard": -0.688,
+            "Flame Wizard": -0.759,
+            "Steel Wizard": -0.71,
+            "Slime Wizard": -0.903,
+            "Ether Golem": -0.639,
+            "Sun Priest": -0.019,
+            "Meteor Caller": 0.259,
+            "War Mammoth": -0.735,
+            "Necromancer": -0.311,
+            "Ent": -0.611,
+            "Slimeshots": -0.267,
+            "Just a horse": 0.883,
+            "Rogue": 0.127,
+            "Spiders": 0,
+            "Truespear": 0.608,
+            "Shiv": -0.252,
+            "Water Mage": -1,
+            "Assassin": 0.857,
+            "Frost Wizard": 0.127,
+            "Obelisk": 0.196
+          }
+        },
+        "3000": {
+          "avg": -0.331,
+          "wins": 6,
+          "of": 28,
+          "worst": [
+            [
+              "Water Mage",
+              -1
+            ],
+            [
+              "Flame Wizard",
+              -0.959
+            ],
+            [
+              "Slime Wizard",
+              -0.871
+            ],
+            [
+              "War Mammoth",
+              -0.824
+            ]
+          ],
+          "best": [
+            [
+              "Just a horse",
+              0.906
+            ],
+            [
+              "Assassin",
+              0.853
+            ],
+            [
+              "Truespear",
+              0.507
+            ],
+            [
+              "Leaf Wizard",
+              0.447
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.475,
+            "Skeleton Archers": -0.513,
+            "Ember Imps": -0.789,
+            "Fire Mage": -0.673,
+            "Sniper": -0.257,
+            "Brute": -0.612,
+            "Wisps": -0.624,
+            "Leaf Wizard": 0.447,
+            "Earth Wizard": -0.805,
+            "Flame Wizard": -0.959,
+            "Steel Wizard": -0.753,
+            "Slime Wizard": -0.871,
+            "Ether Golem": -0.772,
+            "Sun Priest": -0.099,
+            "Meteor Caller": 0.026,
+            "War Mammoth": -0.824,
+            "Necromancer": -0.281,
+            "Ent": -0.541,
+            "Slimeshots": -0.57,
+            "Just a horse": 0.906,
+            "Rogue": 0.061,
+            "Spiders": 0,
+            "Truespear": 0.507,
+            "Shiv": -0.269,
+            "Water Mage": -1,
+            "Assassin": 0.853,
+            "Frost Wizard": -0.085,
+            "Obelisk": -0.286
+          }
+        }
+      }
+    },
+    {
+      "variant": "Sun Priest",
+      "base": "Sun Priest",
+      "skill": null,
+      "skillPrice": 0,
+      "byBudget": {
+        "1500": {
+          "avg": 0.155,
+          "wins": 19,
+          "of": 28,
+          "worst": [
+            [
+              "Goblin Swarm",
+              -0.869
+            ],
+            [
+              "Skeleton Archers",
+              -0.751
+            ],
+            [
+              "Ember Imps",
+              -0.689
+            ],
+            [
+              "Necromancer",
+              -0.644
+            ]
+          ],
+          "best": [
+            [
+              "Ether Golem",
+              0.951
+            ],
+            [
+              "Obelisk",
+              0.882
+            ],
+            [
+              "Water Mage",
+              0.833
+            ],
+            [
+              "Just a horse",
+              0.833
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.869,
+            "Skeleton Archers": -0.751,
+            "Ember Imps": -0.689,
+            "Fire Mage": 0.356,
+            "Sniper": -0.452,
+            "Brute": 0.673,
+            "Wisps": -0.6,
+            "Leaf Wizard": 0.615,
+            "Earth Wizard": 0.195,
+            "Flame Wizard": 0.745,
+            "Steel Wizard": 0.536,
+            "Slime Wizard": 0.048,
+            "Ether Golem": 0.951,
+            "Sun Priest": 0,
+            "Meteor Caller": 0.35,
+            "War Mammoth": 0.223,
+            "Necromancer": -0.644,
+            "Ent": 0.095,
+            "Slimeshots": -0.536,
+            "Just a horse": 0.833,
+            "Rogue": 0.01,
+            "Spiders": 0.355,
+            "Truespear": 0.332,
+            "Shiv": -0.568,
+            "Water Mage": 0.833,
+            "Assassin": 0.804,
+            "Frost Wizard": 0.615,
+            "Obelisk": 0.882
+          }
+        },
+        "3000": {
+          "avg": -0.023,
+          "wins": 14,
+          "of": 28,
+          "worst": [
+            [
+              "Goblin Swarm",
+              -0.867
+            ],
+            [
+              "Necromancer",
+              -0.799
+            ],
+            [
+              "Ember Imps",
+              -0.774
+            ],
+            [
+              "Slime Wizard",
+              -0.767
+            ]
+          ],
+          "best": [
+            [
+              "Ether Golem",
+              0.893
+            ],
+            [
+              "Obelisk",
+              0.855
+            ],
+            [
+              "Just a horse",
+              0.845
+            ],
+            [
+              "Assassin",
+              0.683
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.867,
+            "Skeleton Archers": -0.75,
+            "Ember Imps": -0.774,
+            "Fire Mage": 0.21,
+            "Sniper": -0.666,
+            "Brute": 0.416,
+            "Wisps": -0.642,
+            "Leaf Wizard": 0.556,
+            "Earth Wizard": -0.666,
+            "Flame Wizard": 0.598,
+            "Steel Wizard": 0.384,
+            "Slime Wizard": -0.767,
+            "Ether Golem": 0.893,
+            "Sun Priest": 0,
+            "Meteor Caller": -0.315,
+            "War Mammoth": 0.658,
+            "Necromancer": -0.799,
+            "Ent": -0.238,
+            "Slimeshots": -0.736,
+            "Just a horse": 0.845,
+            "Rogue": -0.618,
+            "Spiders": 0.312,
+            "Truespear": 0.132,
+            "Shiv": -0.589,
+            "Water Mage": 0.664,
+            "Assassin": 0.683,
+            "Frost Wizard": 0.564,
+            "Obelisk": 0.855
+          }
+        }
+      }
+    },
+    {
+      "variant": "Sun Priest + Split beam (paid)",
+      "base": "Sun Priest",
+      "skill": "Split beam",
+      "skillPrice": 100,
+      "byBudget": {
+        "1500": {
+          "avg": -0.105,
+          "wins": 13,
+          "of": 28,
+          "worst": [
+            [
+              "Sniper",
+              -0.972
+            ],
+            [
+              "Slime Wizard",
+              -0.932
+            ],
+            [
+              "Necromancer",
+              -0.871
+            ],
+            [
+              "Shiv",
+              -0.806
+            ]
+          ],
+          "best": [
+            [
+              "Ether Golem",
+              0.926
+            ],
+            [
+              "Obelisk",
+              0.871
+            ],
+            [
+              "Just a horse",
+              0.75
+            ],
+            [
+              "Assassin",
+              0.639
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.69,
+            "Skeleton Archers": -0.723,
+            "Ember Imps": -0.458,
+            "Fire Mage": 0.281,
+            "Sniper": -0.972,
+            "Brute": 0.492,
+            "Wisps": -0.792,
+            "Leaf Wizard": -0.286,
+            "Earth Wizard": -0.485,
+            "Flame Wizard": 0.532,
+            "Steel Wizard": -0.283,
+            "Slime Wizard": -0.932,
+            "Ether Golem": 0.926,
+            "Sun Priest": -0.797,
+            "Meteor Caller": 0.212,
+            "War Mammoth": 0.547,
+            "Necromancer": -0.871,
+            "Ent": 0.317,
+            "Slimeshots": -0.671,
+            "Just a horse": 0.75,
+            "Rogue": -0.275,
+            "Spiders": 0.593,
+            "Truespear": -0.789,
+            "Shiv": -0.806,
+            "Water Mage": 0.634,
+            "Assassin": 0.639,
+            "Frost Wizard": 0.106,
+            "Obelisk": 0.871
+          }
+        },
+        "3000": {
+          "avg": -0.038,
+          "wins": 12,
+          "of": 28,
+          "worst": [
+            [
+              "Slime Wizard",
+              -0.958
+            ],
+            [
+              "Sniper",
+              -0.831
+            ],
+            [
+              "Earth Wizard",
+              -0.733
+            ],
+            [
+              "Wisps",
+              -0.674
+            ]
+          ],
+          "best": [
+            [
+              "Ether Golem",
+              0.916
+            ],
+            [
+              "Obelisk",
+              0.904
+            ],
+            [
+              "Just a horse",
+              0.8
+            ],
+            [
+              "Assassin",
+              0.708
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.547,
+            "Skeleton Archers": -0.584,
+            "Ember Imps": -0.474,
+            "Fire Mage": -0.188,
+            "Sniper": -0.831,
+            "Brute": 0.615,
+            "Wisps": -0.674,
+            "Leaf Wizard": 0.2,
+            "Earth Wizard": -0.733,
+            "Flame Wizard": 0.544,
+            "Steel Wizard": -0.243,
+            "Slime Wizard": -0.958,
+            "Ether Golem": 0.916,
+            "Sun Priest": -0.492,
+            "Meteor Caller": -0.566,
+            "War Mammoth": 0.662,
+            "Necromancer": -0.441,
+            "Ent": 0.504,
+            "Slimeshots": -0.538,
+            "Just a horse": 0.8,
+            "Rogue": -0.126,
+            "Spiders": 0.636,
+            "Truespear": -0.493,
+            "Shiv": -0.667,
+            "Water Mage": 0.632,
+            "Assassin": 0.708,
+            "Frost Wizard": 0.374,
+            "Obelisk": 0.904
+          }
+        }
+      }
+    },
+    {
+      "variant": "Sun Priest + Split beam (free)",
+      "base": "Sun Priest",
+      "skill": "Split beam",
+      "skillPrice": 0,
+      "byBudget": {
+        "1500": {
+          "avg": 0.215,
+          "wins": 20,
+          "of": 28,
+          "worst": [
+            [
+              "Wisps",
+              -0.726
+            ],
+            [
+              "Shiv",
+              -0.685
+            ],
+            [
+              "Sniper",
+              -0.667
+            ],
+            [
+              "Slime Wizard",
+              -0.606
+            ]
+          ],
+          "best": [
+            [
+              "Ether Golem",
+              0.975
+            ],
+            [
+              "Obelisk",
+              0.925
+            ],
+            [
+              "Just a horse",
+              0.881
+            ],
+            [
+              "Assassin",
+              0.813
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.426,
+            "Skeleton Archers": -0.551,
+            "Ember Imps": 0.29,
+            "Fire Mage": 0.301,
+            "Sniper": -0.667,
+            "Brute": 0.778,
+            "Wisps": -0.726,
+            "Leaf Wizard": 0.514,
+            "Earth Wizard": 0.143,
+            "Flame Wizard": 0.694,
+            "Steel Wizard": 0.256,
+            "Slime Wizard": -0.606,
+            "Ether Golem": 0.975,
+            "Sun Priest": -0.444,
+            "Meteor Caller": 0.362,
+            "War Mammoth": 0.232,
+            "Necromancer": 0.018,
+            "Ent": 0.774,
+            "Slimeshots": -0.486,
+            "Just a horse": 0.881,
+            "Rogue": 0.4,
+            "Spiders": 0.769,
+            "Truespear": 0.199,
+            "Shiv": -0.685,
+            "Water Mage": 0.78,
+            "Assassin": 0.813,
+            "Frost Wizard": 0.505,
+            "Obelisk": 0.925
+          }
+        },
+        "3000": {
+          "avg": 0.084,
+          "wins": 15,
+          "of": 28,
+          "worst": [
+            [
+              "Slime Wizard",
+              -0.946
+            ],
+            [
+              "Sniper",
+              -0.769
+            ],
+            [
+              "Earth Wizard",
+              -0.642
+            ],
+            [
+              "Wisps",
+              -0.618
+            ]
+          ],
+          "best": [
+            [
+              "Ether Golem",
+              0.938
+            ],
+            [
+              "Obelisk",
+              0.914
+            ],
+            [
+              "Just a horse",
+              0.857
+            ],
+            [
+              "Assassin",
+              0.757
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.41,
+            "Skeleton Archers": -0.492,
+            "Ember Imps": -0.493,
+            "Fire Mage": 0.233,
+            "Sniper": -0.769,
+            "Brute": 0.679,
+            "Wisps": -0.618,
+            "Leaf Wizard": 0.474,
+            "Earth Wizard": -0.642,
+            "Flame Wizard": 0.506,
+            "Steel Wizard": 0.333,
+            "Slime Wizard": -0.946,
+            "Ether Golem": 0.938,
+            "Sun Priest": -0.402,
+            "Meteor Caller": -0.578,
+            "War Mammoth": 0.683,
+            "Necromancer": -0.092,
+            "Ent": 0.612,
+            "Slimeshots": -0.476,
+            "Just a horse": 0.857,
+            "Rogue": 0.257,
+            "Spiders": 0.721,
+            "Truespear": -0.333,
+            "Shiv": -0.611,
+            "Water Mage": 0.708,
+            "Assassin": 0.757,
+            "Frost Wizard": 0.537,
+            "Obelisk": 0.914
+          }
+        }
+      }
+    },
+    {
+      "variant": "Sun Priest + Shortsight (paid)",
+      "base": "Sun Priest",
+      "skill": "Shortsight",
+      "skillPrice": 100,
+      "byBudget": {
+        "1500": {
+          "avg": -0.141,
+          "wins": 13,
+          "of": 28,
+          "worst": [
+            [
+              "Necromancer",
+              -0.936
+            ],
+            [
+              "Goblin Swarm",
+              -0.919
+            ],
+            [
+              "Sniper",
+              -0.86
+            ],
+            [
+              "Skeleton Archers",
+              -0.833
+            ]
+          ],
+          "best": [
+            [
+              "Ether Golem",
+              0.914
+            ],
+            [
+              "Obelisk",
+              0.775
+            ],
+            [
+              "Flame Wizard",
+              0.756
+            ],
+            [
+              "Just a horse",
+              0.75
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.919,
+            "Skeleton Archers": -0.833,
+            "Ember Imps": -0.8,
+            "Fire Mage": 0.411,
+            "Sniper": -0.86,
+            "Brute": 0.098,
+            "Wisps": -0.745,
+            "Leaf Wizard": 0.287,
+            "Earth Wizard": -0.492,
+            "Flame Wizard": 0.756,
+            "Steel Wizard": 0.25,
+            "Slime Wizard": -0.6,
+            "Ether Golem": 0.914,
+            "Sun Priest": -0.486,
+            "Meteor Caller": 0.1,
+            "War Mammoth": 0.517,
+            "Necromancer": -0.936,
+            "Ent": -0.521,
+            "Slimeshots": -0.767,
+            "Just a horse": 0.75,
+            "Rogue": -0.786,
+            "Spiders": -0.097,
+            "Truespear": -0.53,
+            "Shiv": -0.728,
+            "Water Mage": 0.705,
+            "Assassin": 0.304,
+            "Frost Wizard": 0.291,
+            "Obelisk": 0.775
+          }
+        },
+        "3000": {
+          "avg": -0.099,
+          "wins": 13,
+          "of": 28,
+          "worst": [
+            [
+              "Goblin Swarm",
+              -0.893
+            ],
+            [
+              "Slime Wizard",
+              -0.858
+            ],
+            [
+              "Skeleton Archers",
+              -0.802
+            ],
+            [
+              "Ember Imps",
+              -0.799
+            ]
+          ],
+          "best": [
+            [
+              "Ether Golem",
+              0.892
+            ],
+            [
+              "Obelisk",
+              0.846
+            ],
+            [
+              "Just a horse",
+              0.8
+            ],
+            [
+              "Flame Wizard",
+              0.771
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.893,
+            "Skeleton Archers": -0.802,
+            "Ember Imps": -0.799,
+            "Fire Mage": -0.182,
+            "Sniper": -0.733,
+            "Brute": 0.323,
+            "Wisps": -0.717,
+            "Leaf Wizard": 0.4,
+            "Earth Wizard": -0.668,
+            "Flame Wizard": 0.771,
+            "Steel Wizard": 0.396,
+            "Slime Wizard": -0.858,
+            "Ether Golem": 0.892,
+            "Sun Priest": 0.016,
+            "Meteor Caller": -0.327,
+            "War Mammoth": 0.493,
+            "Necromancer": -0.795,
+            "Ent": -0.333,
+            "Slimeshots": -0.773,
+            "Just a horse": 0.8,
+            "Rogue": -0.736,
+            "Spiders": 0.101,
+            "Truespear": -0.189,
+            "Shiv": -0.684,
+            "Water Mage": 0.618,
+            "Assassin": 0.618,
+            "Frost Wizard": 0.445,
+            "Obelisk": 0.846
+          }
+        }
+      }
+    },
+    {
+      "variant": "Sun Priest + Shortsight (free)",
+      "base": "Sun Priest",
+      "skill": "Shortsight",
+      "skillPrice": 0,
+      "byBudget": {
+        "1500": {
+          "avg": 0.171,
+          "wins": 19,
+          "of": 28,
+          "worst": [
+            [
+              "Necromancer",
+              -0.9
+            ],
+            [
+              "Goblin Swarm",
+              -0.875
+            ],
+            [
+              "Skeleton Archers",
+              -0.738
+            ],
+            [
+              "Ember Imps",
+              -0.686
+            ]
+          ],
+          "best": [
+            [
+              "Ether Golem",
+              0.975
+            ],
+            [
+              "Flame Wizard",
+              0.927
+            ],
+            [
+              "Obelisk",
+              0.925
+            ],
+            [
+              "Water Mage",
+              0.851
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.875,
+            "Skeleton Archers": -0.738,
+            "Ember Imps": -0.686,
+            "Fire Mage": 0.348,
+            "Sniper": -0.452,
+            "Brute": 0.767,
+            "Wisps": -0.6,
+            "Leaf Wizard": 0.627,
+            "Earth Wizard": 0.248,
+            "Flame Wizard": 0.927,
+            "Steel Wizard": 0.75,
+            "Slime Wizard": 0.048,
+            "Ether Golem": 0.975,
+            "Sun Priest": 0.067,
+            "Meteor Caller": 0.35,
+            "War Mammoth": 0.268,
+            "Necromancer": -0.9,
+            "Ent": 0.14,
+            "Slimeshots": -0.551,
+            "Just a horse": 0.833,
+            "Rogue": -0.059,
+            "Spiders": 0.367,
+            "Truespear": 0.332,
+            "Shiv": -0.599,
+            "Water Mage": 0.851,
+            "Assassin": 0.804,
+            "Frost Wizard": 0.615,
+            "Obelisk": 0.925
+          }
+        },
+        "3000": {
+          "avg": 0.007,
+          "wins": 15,
+          "of": 28,
+          "worst": [
+            [
+              "Goblin Swarm",
+              -0.869
+            ],
+            [
+              "Ember Imps",
+              -0.78
+            ],
+            [
+              "Slime Wizard",
+              -0.767
+            ],
+            [
+              "Skeleton Archers",
+              -0.765
+            ]
+          ],
+          "best": [
+            [
+              "Ether Golem",
+              0.93
+            ],
+            [
+              "Obelisk",
+              0.887
+            ],
+            [
+              "Just a horse",
+              0.845
+            ],
+            [
+              "Flame Wizard",
+              0.814
+            ]
+          ],
+          "scores": {
+            "Goblin Swarm": -0.869,
+            "Skeleton Archers": -0.765,
+            "Ember Imps": -0.78,
+            "Fire Mage": 0.128,
+            "Sniper": -0.666,
+            "Brute": 0.556,
+            "Wisps": -0.672,
+            "Leaf Wizard": 0.545,
+            "Earth Wizard": -0.666,
+            "Flame Wizard": 0.814,
+            "Steel Wizard": 0.488,
+            "Slime Wizard": -0.767,
+            "Ether Golem": 0.93,
+            "Sun Priest": 0.328,
+            "Meteor Caller": -0.315,
+            "War Mammoth": 0.588,
+            "Necromancer": -0.652,
+            "Ent": -0.166,
+            "Slimeshots": -0.734,
+            "Just a horse": 0.845,
+            "Rogue": -0.63,
+            "Spiders": 0.345,
+            "Truespear": 0.122,
+            "Shiv": -0.604,
+            "Water Mage": 0.658,
+            "Assassin": 0.683,
+            "Frost Wizard": 0.564,
+            "Obelisk": 0.887
+          }
+        }
+      }
+    }
+  ]
+}
