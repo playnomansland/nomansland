@@ -926,7 +926,15 @@ html.pc .corner button span { display: inline; }
     sirski: { title: 'SIRSKI', file: 'audio/sirski.mp3' },
     knarkkungn: { title: 'Knarkkungn', file: 'audio/knarkkungn.mp3' },
     habbyourmam: { title: 'Habbyourmam', file: 'audio/habbyourmam.mp3' },
+    evening: { title: 'Evening', file: 'audio/evening.mp3' },
+    s4knandet: { title: 'S4knandet', file: 'audio/s4knandet.mp3' },
+    eyesInTheFront2: { title: 'Eyes in the front 2', file: 'audio/eyes-in-the-front-2.mp3' }, // the whole song (menu)
+    // the same song as battle music: plays from start to end (seconds), then loops back to start
+    eyesInTheFront2Battle: { title: 'Eyes in the front 2', file: 'audio/eyes-in-the-front-2.mp3', start: 22.15, end: 88.61 },
   };
+  // deployment / battle music not given to a look yet: kept out of the menu playlist and played nowhere until it goes
+  // in PLAYLISTS or MUSIC_COMBOS (and then out of this list)
+  const UNASSIGNED = ['evening', 's4knandet', 'eyesInTheFront2Battle'];
   const ARTIST = 'Snetänd'; // unless a song names its own
   const songName = (id) => `“${SONGS[id].title}” - ${SONGS[id].artist || ARTIST}`;
   const PLAYLISTS = { deploy: ['bulgaria'], battle: ['habbyourmam'] };
@@ -940,7 +948,7 @@ html.pc .corner button span { display: inline; }
   };
   const LOOK_MUSIC = { frost: 'cavern', autumn: 'autumn', cavern: 'cavern', snow: 'icy' }; // frost = Darkwoods
   // the menu playlist: every song that isn't deployment or battle music (a new song shows up in it by itself)
-  const phaseSongs = new Set([...PLAYLISTS.deploy, ...PLAYLISTS.battle, ...Object.values(MUSIC_COMBOS).flatMap(o => Object.values(o).flat())]);
+  const phaseSongs = new Set([...UNASSIGNED, ...PLAYLISTS.deploy, ...PLAYLISTS.battle, ...Object.values(MUSIC_COMBOS).flatMap(o => Object.values(o).flat())]);
   PLAYLISTS.menu = Object.keys(SONGS).filter(id => !phaseSongs.has(id));
   const FADE_IN = 1, FADE_OUT = 1; // seconds
   const DEFAULT_VOL = 10;
@@ -958,23 +966,39 @@ html.pc .corner button span { display: inline; }
   // phase lasts; a paused playlist picks up where it stopped. pl.shuffle: the next song is a random other one (the
   // deploy and battle playlists always shuffle); otherwise the next in the list, wrapping round, so a song picked
   // from the list (pl.play) is followed by the one after it. pl.repeat: the song plays again and again.
+  // A song with start / end (seconds) plays only that part: it starts at start, and at end it goes back to start
+  // (alone in its playlist or on Repeat) or on to the next song.
   function playlist(tracks, shuffle = true) {
     const pickNext = (cur) => { if (tracks.length < 2) return 0; if (!pl.shuffle) return (cur + 1) % tracks.length; let t = Math.floor(Math.random() * (tracks.length - 1)); return t >= cur ? t + 1 : t; };
-    let track = Math.floor(Math.random() * tracks.length), gain = null, stopT = 0;
+    let track = Math.floor(Math.random() * tracks.length), gain = null, stopT = 0, segT = 0;
     const el = new Audio(SONGS[tracks[track]].file);
     el.preload = 'none';
     const pl = { el, playing: false, onChange: null, shuffle, repeat: false }, past = []; // past: the songs played before, for Back
+    const cur = () => SONGS[tracks[track]];
+    const head = () => cur().start || 0;
+    const rewind = () => { try { el.currentTime = head(); } catch (e) {} };
     const load = (t) => { track = t; el.src = SONGS[tracks[track]].file; if (pl.playing) el.play().catch(() => {}); if (pl.onChange) pl.onChange(); };
-    el.addEventListener('ended', () => pl.next());
+    el.addEventListener('loadedmetadata', () => { if (el.currentTime < head()) rewind(); });
+    const atEnd = () => { // past the song's end: loop back to its start, or go on to the next one
+      const s = cur();
+      if (s.end == null || el.currentTime < s.end) return;
+      if (tracks.length < 2 || pl.repeat) rewind(); else pl.next();
+    };
+    el.addEventListener('timeupdate', atEnd);
+    // timeupdate only comes about 4 times a second: check more often so the loop point lands on time
+    el.addEventListener('playing', () => { clearInterval(segT); if (cur().end != null) segT = setInterval(atEnd, 20); });
+    el.addEventListener('pause', () => clearInterval(segT));
+    el.addEventListener('emptied', () => clearInterval(segT));
+    el.addEventListener('ended', () => { if (cur().end != null && (tracks.length < 2 || pl.repeat)) { rewind(); el.play().catch(() => {}); } else pl.next(); });
     pl.song = () => tracks[track];
     pl.list = () => tracks.slice();
-    pl.play = (id) => { const t = tracks.indexOf(id); if (t < 0) return; if (t !== track) { past.push(tracks[track]); if (past.length > 20) past.shift(); load(t); } else { try { el.currentTime = 0; } catch (e) {} } };
+    pl.play = (id) => { const t = tracks.indexOf(id); if (t < 0) return; if (t !== track) { past.push(tracks[track]); if (past.length > 20) past.shift(); load(t); } else rewind(); };
     pl.setRepeat = (on) => { pl.repeat = !!on; el.loop = pl.repeat; };
     pl.next = () => { past.push(tracks[track]); if (past.length > 20) past.shift(); load(pickNext(track)); };
     // Back: to the start of this song, or (in its first 3 seconds) to the one before
     pl.back = () => {
       const prev = past.length && tracks.indexOf(past[past.length - 1]);
-      if (el.currentTime > 3 || !past.length || prev < 0) { past.length = 0; try { el.currentTime = 0; } catch (e) {} return; }
+      if (el.currentTime > head() + 3 || !past.length || prev < 0) { past.length = 0; rewind(); return; }
       past.pop(); load(prev);
     };
     pl.tracks = (list) => { // switch to another list of songs, from the start of a random one

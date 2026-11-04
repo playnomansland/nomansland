@@ -16,6 +16,14 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 4 November 2026 – New music
+
+- **Eyes in the front 2** is in the menu playlist (the whole song).
+- Three new deployment and battle songs are in the game but not on any map yet: **Evening**, **S4knandet** and a battle cut of **Eyes in the front 2** that loops its middle part. They don't play in the menu.
+- The new songs are levelled to the same loudness as the rest of the music.
+
+---
+
 ## 4 November 2026 – Report a bug
 
 ### New: Report a bug from inside the game
