@@ -33,7 +33,7 @@ Builds on the server described in `docs/SERVER.md` (Room, DuoRoom, TourRoom, acc
 - **Top:** **Quick play**, **Create room**, the join-by-code box, and a **Sort** button.
 - **One list, "Rooms":** every public room, Standard and Ranked together (2v2 too, for developers only).
 - **Sort** (a small sheet): *Name* (A–Z), *Date/time* (newest first; the default), *Category* (Standard / Ranked), *Mode* (1v1 / 2v2). Picking the active option again flips the order. Within a group, newest first. The choice is remembered on the phone (`pb-lobby-sort`).
-- **Room cards:** host's nameplate (gamertag + title), room name (auto: "Vilhelm's room"; no free text, nothing to moderate), tags, map, players (1/2, or 3/4 for 2v2), round if in progress, a 👁 count of watchers, and **Join** / **Watch**.
+- **Room cards:** host's nameplate (username + title), room name (auto: "Vilhelm's room"; no free text, nothing to moderate), tags, map, players (1/2, or 3/4 for 2v2), round if in progress, a 👁 count of watchers, and **Join** / **Watch**.
 - Private rooms are never listed. They work as today: code or `?play=CODE` link.
 - **Quick play:** joins the oldest open public Standard room; if there is none, creates one and waits in it.
 - **Ranked rooms:** created with Mode *Ranked* (account needed, fixed RANKED settings, best of 3, as today). Joining one needs an account too; the card shows the host's leaderboard score.
@@ -121,7 +121,7 @@ Messages (WebSocket `/lobby`):
 ### Muting and reporting (on the phone)
 - Opponent's nameplate → **Mute emotes** / **Mute chat**, separately. Muted messages still arrive but aren't shown. Remembered for that match code (localStorage), so a reload keeps it.
 - Settings sheet: **Chat** on/off and **Emotes** on/off for every match (hides everyone's).
-- **Report** (on a chat line or the nameplate) posts the last 20 lines plus both gamertags and the match id to a Discord channel, through the same webhook path as bug reports (`accounts.js` BUG) with its own channel and limit.
+- **Report** (on a chat line or the nameplate) posts the last 20 lines plus both usernames and the match id to a Discord channel, through the same webhook path as bug reports (`accounts.js` BUG) with its own channel and limit.
 - **Text chat is for signed-in players only** (the room checks the account session from hello). Guests see chat, can send emotes, and get a "Sign in to chat" line in place of the text box.
 - *Later:* **Block player** (account-level, D1 `blocks` table): hides their chat and emotes in every future match.
 
@@ -152,7 +152,7 @@ Messages (WebSocket `/lobby`):
 
 1. **Lobby list:** LobbyRoom, rooms register when public (Standard and Ranked), the lobby screen, Join / Watch, Quick play, spectate toggle.
 2. **Chat and emotes:** messages in Room, the chat panel and emote wheel, muting, reporting, the three emote pictures.
-3. **Friends, game invites and private messages:** see `docs/FRIENDS.md`.
+3. **Friends, game invites and private messages:** see `docs/FRIENDS.md`; built in parallel by a separate agent (`docs/HANDOFF-FRIENDS.md`).
 4. **2v2 listings** (developer only), Team / All chat.
 5. Later, once there are players: the ranked queue (rating, queue, paired rooms).
 6. Later: block list, lobby-wide chat channel (not planned; moderation load).

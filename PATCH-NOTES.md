@@ -14,7 +14,7 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 - **More balancing.**
 - **Damage types (idea):** physical and magic.
 - **Online lobby (design):** one *Rooms* list of public games (Standard and Ranked together, sortable by name, time, category and mode), Quick play, chat for signed-in players (spectators get their own chat that joins the players' when the match ends), and three cartoon emotes the opponent can mute: Flame Wizard *BABABABA*, a happy Ether Golem and a shell-shocked Sniper. Spectating on by default. Plan in `docs/LOBBY.md`; built after the tournament.
-- **Friends (design):** add friends (they accept), remove them, see who's online or in a match, **invite a friend** straight into a room, and **private messages**. For signed-in players. Plan in `docs/FRIENDS.md`; built after the tournament, together with the lobby.
+- **Friends (design):** add friends (they accept), remove them, see who's online (green dot) or offline (grey), **invite a friend** straight into a room, and **private messages**. For signed-in players. Plan in `docs/FRIENDS.md`; built after the tournament, together with the lobby.
 
 ---
 
@@ -43,7 +43,7 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ### New: Report a bug from inside the game
 - **Settings** (the cog in a match, or Settings on the main menu) has a **Report a bug** button.
-- Write what happened; the **game version, match id and round** (plus map, 2D/3D board, device and your gamertag) are **filled in for you**.
+- Write what happened; the **game version, match id and round** (plus map, 2D/3D board, device and your username) are **filled in for you**.
 - **Post the report** makes a new post in **#bug-reports** on our Discord, titled by your first line, and gives you a link to it so you can add screenshots or a video.
 - If the game can't post it, the whole report is **copied** and **Open Discord** takes you there to paste it.
 
@@ -253,7 +253,7 @@ The first version of **2v2** (developer accounts only): two Standard boards side
 ## 2 November 2026 – Balance and fixes
 
 ### Usernames
-- **Gamertags are now called usernames** everywhere in the game: sign-up, Profile, tournaments and match screens.
+- **Usernames are now called usernames** everywhere in the game: sign-up, Profile, tournaments and match screens.
 
 ### Unit sheets
 - A unit's **stats** (bodies, health, hit, attacks per second, range, speed) now sit at the **top of its sheet**, right under its name, instead of at the bottom.
@@ -307,12 +307,12 @@ The first version of **2v2** (developer accounts only): two Standard boards side
 
 ## 2 November 2026 – Titles
 
-- **Titles** now show under your gamertag with a little glow: on the main menu, in your Profile, on the Leaderboard and in ranked matches.
+- **Titles** now show under your username with a little glow: on the main menu, in your Profile, on the Leaderboard and in ranked matches.
 - **Day 1** (purple): everyone who makes an account in this first week, up to and including Sunday 8 November. Accounts made earlier today get it too.
 - **DEV** (pink): the developer's account.
 - Pick which title shows (or none) under **Profile**.
-- In a match, **You** and **Opponent** at the top are now your **gamertags with your titles**. Against a friend online you see their name and title (if they have an account); against the AI it still says Enemy.
-- **Gamertags** can be changed **once a week** (Profile shows when you can change it next). The developer can change theirs any time. Naming a brand-new account when you sign up doesn't count.
+- In a match, **You** and **Opponent** at the top are now your **usernames with your titles**. Against a friend online you see their name and title (if they have an account); against the AI it still says Enemy.
+- **Usernames** can be changed **once a week** (Profile shows when you can change it next). The developer can change theirs any time. Naming a brand-new account when you sign up doesn't count.
 - When you get a new title, the main menu greets you with a **"You have received a new Title!"** pop-up. Players who already had an account see it the next time they open the main menu.
 - **Fix:** on wide computer screens the welcome screen's title and buttons sat off to the right. They're centred now.
 - **Sign in with Google** looks better: Google's own button in its dark style, as wide as the box, with a short note that the sign-in is handled by Google. It no longer jumps around while it loads.
@@ -323,12 +323,12 @@ The first version of **2v2** (developer accounts only): two Standard boards side
 
 ### A new way in
 - **Welcome screen:** the big No Mans Land title over an autumn battlefield, with **Log in**, **Play as guest** and **Sign up**.
-- **Sign up** has its own screen: pick a gamertag, then sign up with Google (keeps your account on any device) or as a guest on this one. **Log in** is Google sign-in.
+- **Sign up** has its own screen: pick a username, then sign up with Google (keeps your account on any device) or as a guest on this one. **Log in** is Google sign-in.
 - **Stay logged in?** is asked right after you make an account or log in, so the game can open straight on the menu next time. Change it any time in **Settings**. Off means you're logged out when you close the browser.
 
 ### The main menu
 - One big **PLAY** button. It opens **Play vs Friend** and **Play vs AI**, with the match settings and the box for a match or tournament code.
-- **Profile** and **Settings** sit in the top right corner (round icons on phones, labelled buttons on computers). Profile has your gamertag, Google sign-in, **Match history** and **Log out**.
+- **Profile** and **Settings** sit in the top right corner (round icons on phones, labelled buttons on computers). Profile has your username, Google sign-in, **Match history** and **Log out**.
 - **Tutorial**, **How to play**, **Encyclopedia** and the new **Leaderboard** are along the bottom, with the music player under them.
 - The game has a new app icon: the wizard.
 
@@ -349,18 +349,18 @@ The first version of **2v2** (developer accounts only): two Standard boards side
 
 ## 2 November 2026 – Accounts
 
-- **Account** on the start screen. Tap **Play as a guest** to get your own gamertag on this phone, no sign-up needed. You can change the gamertag any time.
-- **Sign in with Google** to keep your player if you change or reset your phone: sign in on another phone and you're the same player. A guest who signs in keeps their gamertag.
-- **Sign out** on one phone leaves your other phones signed in. **Delete account** (tap twice) removes your gamertag and sign-in for good; past match results stay, without your name.
+- **Account** on the start screen. Tap **Play as a guest** to get your own username on this phone, no sign-up needed. You can change the username any time.
+- **Sign in with Google** to keep your player if you change or reset your phone: sign in on another phone and you're the same player. A guest who signs in keeps their username.
+- **Sign out** on one phone leaves your other phones signed in. **Delete account** (tap twice) removes your username and sign-in for good; past match results stay, without your name.
 - We never store passwords, and nothing from your Google account except an id Google gives us for it: not your email, not your name.
-- For now the account only holds your gamertag. Matches and tournaments still work exactly as before; linking them to your account comes after Sunday's tournament.
+- For now the account only holds your username. Matches and tournaments still work exactly as before; linking them to your account comes after Sunday's tournament.
 - **Developer mode** for the game's developer: a Google account on the server's private developer list gets every feature, now and in anything added later. The Account sheet shows when it's on.
 
 ---
 
 ## 2 November 2026 – Match history on the server
 
-- **Every online match is saved by the server.** Each round of every match on the game server (friends' matches and tournament matches) is saved by the server itself: map, look, leaders, both armies with levels and tiles, skills, towers, who won, damage and health. Tournament matches also keep the gamertags.
+- **Every online match is saved by the server.** Each round of every match on the game server (friends' matches and tournament matches) is saved by the server itself: map, look, leaders, both armies with levels and tiles, skills, towers, who won, damage and health. Tournament matches also keep the usernames.
 - **Match history** on the start screen now reads from the server, newest first, with **Load more** for older battles. The **Phone-to-phone** tab shows the old list for phone-to-phone matches, and it is also shown if the server can't be reached.
 - Saving never gets in the way of a match: it happens after the fight is sent, and if it fails the match just goes on.
 - Rounds are kept for a year. The old Google Sheet is kept as an archive.
@@ -423,11 +423,11 @@ Goblin Swarm and Ember Imps already had theirs. Sunken Deep's units are still pl
 ## 31 October 2026 – Tournaments
 
 ### Host a tournament
-- New on the start screen: **Host a tournament**. Send the invite link (or the 4-letter code) to your friends. They open it, pick a **gamertag**, and wait in the lobby. Works for any number of players; 6 to 12 is the sweet spot.
+- New on the start screen: **Host a tournament**. Send the invite link (or the 4-letter code) to your friends. They open it, pick a **username**, and wait in the lobby. Works for any number of players; 6 to 12 is the sweet spot.
 - Formats: **Swiss + playoffs** (everyone plays every round against someone on the same score, then the top 4 play semifinals and a final) or **Knockout**.
 - Each round, your match shows on the tournament screen: tap **Start match** (if you host) or **Join match**. The match starts by itself when you are both in, and the result is sent by itself when it ends.
 - **Standings**, **Matches** and a **Bracket** for the playoffs, live on every phone. The organizer can also share a **big-screen link** for a TV or laptop.
-- Your opponent's gamertag shows at the top of the screen during the match.
+- Your opponent's username shows at the top of the screen during the match.
 
 ### Organizer tools
 - **Settings:** format, Swiss rounds, playoff size, map (fixed, or a random one each round that everyone plays), look, Standard pack or All units, which leaders and units are in, **how many leaders to choose from (2 to 5)**, deploy timers (round 1 and later rounds) and the results screen timer.

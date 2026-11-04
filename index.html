@@ -10791,7 +10791,7 @@ Floors.floor = (() => {
   // ----- Report a bug (2026-11-04): a new post in the Discord forum #bug-reports with the game version and match id
   // filled in. The server posts it through a webhook (/account/bug, accounts.js BUG); when that's off or fails, the report
   // is copied and the Discord server opens, so it can be pasted there by hand.
-  const GAME_VERSION = '4 Nov 2026 · ba20f3c'; // src/build.js: the newest patch notes date and a hash of this page
+  const GAME_VERSION = '4 Nov 2026 · 9ed06f0'; // src/build.js: the newest patch notes date and a hash of this page
   const DISCORD_FALLBACK = 'https://discord.gg/TBpDKSBWsY';
   const bug = { draft: '', busy: false };
   // the id the server's match history uses (room.js historyInfo: <room>-<seed>), or one made the same way for other matches
@@ -10827,7 +10827,7 @@ Floors.floor = (() => {
       <p class="hint" style="margin:0">What happened, and what did you expect? The first line becomes the post’s title in <b>#bug-reports</b> on our Discord.</p>
       <textarea id="bug-text" maxlength="1500" rows="6" placeholder="The Brute walked through the wall in round 4…" aria-label="What happened"
         style="min-height:120px;font:14px var(--font-body);background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:8px;width:100%;resize:vertical"></textarea>
-      <p class="hint" style="margin:0">Filled in for you: version <span class="num">${esc(GAME_VERSION)}</span>${id ? `, match <span class="num">${esc(id)}</span>${info.round ? ` (round ${esc(info.round)})` : ''}` : ''}, your device${acct ? ' and gamertag' : ''}.</p>
+      <p class="hint" style="margin:0">Filled in for you: version <span class="num">${esc(GAME_VERSION)}</span>${id ? `, match <span class="num">${esc(id)}</span>${info.round ? ` (round ${esc(info.round)})` : ''}` : ''}, your device${acct ? ' and username' : ''}.</p>
       <div class="bar"><span></span><button class="btn primary" id="bug-send">Post the report</button></div>
       <p class="hint" id="bug-msg" style="margin:0" aria-live="polite"></p>
       <div class="bar" id="bug-after" hidden><span></span><a class="btn" id="bug-link" href="${esc(invite)}" target="_blank" rel="noopener">Open Discord</a></div>`;
