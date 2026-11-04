@@ -12,18 +12,24 @@
 //
 // Messages in:  hello { create, session } | { key } | {}, seat { a, b } (host, lobby: swap two seats), kick { seat } (host,
 //               lobby), start { settings } (host), act { seq, fn, a }, ready { v }, next { round }, rematch, forfeit,
-//               mark { kind, col, row } (a ping; 'ping' is the keep-alive), emote { id } (both to the team only), sync
+//               mark { kind, col, row } (a ping; 'ping' is the keep-alive), emote { id } (both to the team only), sync,
+//               chat { text, team? } (Google-signed-in phones only; team: the teammate only), emote { id } with id one of
+//               bababa, golem, shock (the lobby's emotes: to everyone)
+// The online lobby (2026-11-04, docs/LOBBY.md): hello { create, public: true } lists the 2v2 room in the lobby
+// (kind 'duo', dev while config 'lobby_duo' is 'dev'); when it is 'all', anyone may make a 2v2 room.
 // Messages out: welcome { side, key, seq, seat, lane, host }, duolobby { seats, host, seat }, full, denied { why },
-//               mark { from, kind, col, row }, emote { from, id }, team { team } (only the other lane changed: m.team),
+//               mark { from, kind, col, row }, emote { from, id }, chat { from, tag, text, at, team? }, chatLog { lines },
+//               roomset { pub, spectate: false, chat }, team { team } (only the other lane changed: m.team),
 //               sync / status / fight as in a 1v1 room (server/src/room.js) for the seat's own lane (sync's m carries
 //               m.team, the other lane as this seat may see it), plus duo ({ seat, lane, names, here, bots, hp, ready,
 //               nextReady, vote }) and, in fight, duo.pres (both lanes before the fight, for the playback).
 import { DurableObject } from 'cloudflare:workers';
 import Ref from '../../src/referee.js';
 import Duo from '../../src/duo.js';
-import { LIMITS, json, readMessage, secret } from './limits.js';
+import { LIMITS, LOBBY, CHAT, json, readMessage, secret, ipHash } from './limits.js';
+import { Chat } from './chat.js';
 import { builtin } from './units.js';
-import { sessionPlayer } from './accounts.js';
+import { sessionPlayer, lobbyDuo } from './accounts.js';
 
 const KEEP_MS = 24 * 3600 * 1000;
 
@@ -34,7 +40,10 @@ export class DuoRoom extends DurableObject {
     this.rate = new Map();
     this.sent = new Map();
     this.teamSent = new Map(); // socket -> fingerprint of the m.team it last got
+    this.chat = new Chat(ctx.storage);
+    this.listed = null;
     ctx.blockConcurrencyWhile(async () => {
+      await this.chat.load();
       const { units, matrix } = builtin();
       this.meta = (await ctx.storage.get('meta')) || null; // { code, seats: [{ key, tag, title } | null x4], host: seat }
       this.D = Duo.load(await ctx.storage.get('D'), units, matrix);
@@ -45,7 +54,7 @@ export class DuoRoom extends DurableObject {
     if (this.ctx.getWebSockets().length >= LIMITS.maxSockets) return json({ error: 'room full' }, 429);
     const [client, server] = Object.values(new WebSocketPair());
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ code: request.headers.get('x-code') || '' });
+    server.serializeAttachment({ code: request.headers.get('x-code') || '', ip: await ipHash(request.headers.get('CF-Connecting-IP') || '') });
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -59,7 +68,43 @@ export class DuoRoom extends DurableObject {
   async save() {
     await this.ctx.storage.put({ meta: this.meta, D: this.D ? Duo.save(this.D) : null, active: Date.now() });
     const due = this.D && this.D.lanes[0] ? Duo.due(this.D, Date.now()) : 0;
-    await this.ctx.storage.setAlarm(due || Date.now() + KEEP_MS);
+    let at = due || Date.now() + KEEP_MS;
+    if (this.listing()) at = Math.min(at, Date.now() + this.hbMs()); // a listed room's heartbeat
+    await this.ctx.storage.setAlarm(at);
+  }
+  hbMs() { return +this.env.LOBBY_HEARTBEAT_MS || LOBBY.heartbeatMs; } // LOBBY_HEARTBEAT_MS: tests only
+  // ----- the online lobby (docs/LOBBY.md): this room's card, sent to LobbyRoom like a 1v1 room's (room.js report) -----
+  listing(gone) {
+    const M = this.meta, D = this.D, now = Date.now();
+    if (!M || !M.pub) return null;
+    const playing = !!(D && D.lanes[0] && D.phase !== 'lobby'), here = this.here(gone);
+    if (playing && D.phase === 'end') return null;
+    if (!playing && (!here[M.host] || now - (M.waitAt || 0) > (+this.env.LOBBY_IDLE_MS || LOBBY.waitIdleMs))) return null;
+    const h = M.seats[M.host];
+    return { code: M.code, kind: 'duo', mode: '2v2', host: { tag: h ? h.tag : 'Player', title: h ? h.title || '' : '' }, map: '2v2', look: '',
+      players: playing ? 4 : M.seats.filter((p, k) => p && here[k]).length, phase: playing ? 'playing' : 'waiting',
+      round: playing ? D.lanes[0].m.round : 0, watchers: 0, spectate: false, at: M.made || now };
+  }
+  report(opts = {}) {
+    if (!this.env.LOBBY || !this.meta) return;
+    const l = this.listing(opts.gone), key = l ? JSON.stringify(l) : '';
+    if (!l && !this.meta.listed) return;
+    if (!opts.force && this.listed === key) return;
+    this.listed = key; this.meta.listed = !!l;
+    const lobby = this.env.LOBBY.getByName('all');
+    const run = (l ? lobby.upsert(l, this.meta.owner || '') : lobby.drop(this.meta.code)).catch((e) => console.warn('lobby report', e && e.message));
+    try { this.ctx.waitUntil(run); } catch {}
+  }
+  roomset(seat) { const p = this.meta && this.meta.seats[seat]; return { t: 'roomset', pub: !!(this.meta && this.meta.pub), spectate: false, chat: !!(p && p.chat) }; }
+  async chatIn(ws, seat, d) {
+    const p = this.meta.seats[seat];
+    if (!p || !p.chat) return this.send(ws, { t: 'denied', why: 'sign in' });
+    const team = d.team === true;
+    const res = await this.chat.add('s' + seat, seat, p.tag, d.text, team ? { team: true, side: Duo.SEATS[seat].side } : {});
+    if (res.why === 'slow down') return this.send(ws, { t: 'denied', why: 'slow down' });
+    if (!res.line) return;
+    if (team) this.team(seat, Chat.out(res.line));
+    else { const text = JSON.stringify(Chat.out(res.line)); for (const s of this.sockets()) if (this.att(s).role === 'p') this.send(s, text); }
   }
   names() { return (this.meta ? this.meta.seats : [null, null, null, null]).map((p, k) => p ? p.tag : this.D && this.D.bots[k] ? 'AI' : ''); }
   lobbyMsg(ws, gone) {
@@ -141,7 +186,15 @@ export class DuoRoom extends DurableObject {
         this.team(seat, { t: 'mark', from: seat, kind: d.kind, col, row });
         return;
       }
-      case 'emote': { // a quick line for the team
+      case 'chat': return this.chatIn(ws, seat, d);
+      case 'emote': { // a quick line for the team, or one of the lobby's emotes (to everyone)
+        if (CHAT.emotes.includes(d.id)) {
+          const res = this.chat.emote('s' + seat, d.id);
+          if (res.why === 'slow down') return this.send(ws, { t: 'denied', why: 'slow down' });
+          const text = JSON.stringify({ t: 'emote', from: seat, id: d.id });
+          for (const s of this.sockets()) if (this.att(s).role === 'p') this.send(s, text);
+          return;
+        }
         if (inLobby || !Duo.EMOTES.includes(d.id)) return;
         this.team(seat, { t: 'emote', from: seat, id: d.id });
         return;
@@ -162,6 +215,7 @@ export class DuoRoom extends DurableObject {
         this.D = Duo.create(d.settings, units);
         Duo.start(this.D, units, matrix, now, this.seed(), this.meta.seats.map((p) => !p));
         await this.save(); this.push({ force: true });
+        this.report();
         return;
       }
       case 'act': {
@@ -178,6 +232,7 @@ export class DuoRoom extends DurableObject {
         const f = Duo.setReady(D, seat, !!d.v, now);
         await this.save();
         if (f) this.broadcastFight(f); else this.status();
+        if (f) this.report();
         return;
       }
       case 'next': {
@@ -185,6 +240,7 @@ export class DuoRoom extends DurableObject {
         const began = Duo.next(D, seat, d.round | 0, now);
         await this.save();
         if (began) this.push({ force: true }); else this.status();
+        if (began) this.report();
         return;
       }
       case 'rematch': {
@@ -192,12 +248,14 @@ export class DuoRoom extends DurableObject {
         const again = Duo.rematch(D, seat, units, matrix, now, this.seed());
         await this.save();
         if (again) this.push({ force: true }); else this.status();
+        if (again) this.report();
         return;
       }
       case 'forfeit': {
         if (inLobby || !Duo.forfeit(D, seat)) return;
         await this.save();
         for (const s of this.sockets()) { const b = this.att(s); if (b.role === 'p') this.send(s, { t: 'forfeit', side: Duo.SEATS[seat].side, seat, duo: this.duoInfo(b.seat, this.here()) }); }
+        this.report();
         return;
       }
     }
@@ -234,8 +292,15 @@ export class DuoRoom extends DurableObject {
     if (seat < 0) {
       if (d.create) {
         if (this.meta && this.meta.seats.some(Boolean)) { this.send(ws, { t: 'taken' }); return; }
-        if (!(who && who.dev) && this.env.DUO_ANYONE !== '1') { this.send(ws, { t: 'denied', why: 'dev' }); return; } // developers only (DUO_ANYONE: local tests)
-        this.meta = { code: a.code, seats: [null, null, null, null], host: 0 };
+        let open = this.env.DUO_ANYONE === '1'; // developers only (DUO_ANYONE: local tests), or everyone once config lobby_duo is 'all'
+        if (!(who && who.dev) && !open) { try { open = (await lobbyDuo(this.env)) === 'all'; } catch (e) { open = false; } }
+        if (!(who && who.dev) && !open) { this.send(ws, { t: 'denied', why: 'dev' }); return; }
+        if (d.public === true && this.env.LOBBY) {
+          let ok = true;
+          try { ok = await this.env.LOBBY.getByName('all').claim(a.ip); } catch (e) { ok = true; }
+          if (!ok) { this.send(ws, { t: 'denied', why: 'slow down' }); return; }
+        }
+        this.meta = { code: a.code, seats: [null, null, null, null], host: 0, pub: d.public === true, made: now, waitAt: now, owner: who ? 'p:' + who.id : 'g:' + a.ip };
         seat = 0;
       } else {
         if (!this.meta || !this.meta.seats.some(Boolean)) { this.send(ws, { t: 'nomatch' }); return; }
@@ -243,8 +308,9 @@ export class DuoRoom extends DurableObject {
         seat = started ? -1 : this.meta.seats.findIndex((p) => !p);
         if (seat < 0) { this.send(ws, { t: 'full' }); return; }
       }
-      this.meta.seats[seat] = { key: secret(), tag: who ? who.tag : 'Player ' + (seat + 1), title: who ? who.title || '' : '' };
-    } else if (who) { this.meta.seats[seat].tag = who.tag; this.meta.seats[seat].title = who.title || ''; }
+      this.meta.seats[seat] = { key: secret(), tag: who ? who.tag : 'Player ' + (seat + 1), title: who ? who.title || '' : '', chat: !!(who && who.google) };
+    } else if (who) { this.meta.seats[seat].tag = who.tag; this.meta.seats[seat].title = who.title || ''; this.meta.seats[seat].chat = !!who.google; }
+    if (this.meta.pub) this.meta.waitAt = now;
     for (const s of this.atSeat(seat)) if (s !== ws) { this.setAtt(s, { role: 'x' }); try { s.close(1000, 'replaced'); } catch {} }
     this.setAtt(ws, { role: 'p', seat });
     this.sent.delete(ws);
@@ -252,6 +318,10 @@ export class DuoRoom extends DurableObject {
     if (this.D && this.D.lanes[0]) Duo.setAway(this.D, seat, false, now);
     await this.save();
     this.push({ force: true });
+    this.send(ws, this.roomset(seat));
+    const lines = this.chat.lines.filter((l) => !l.team || l.side === Duo.SEATS[seat].side);
+    if (lines.length) this.send(ws, { t: 'chatLog', lines: lines.map(Chat.out) });
+    this.report();
   }
 
   async left(ws) {
@@ -264,20 +334,30 @@ export class DuoRoom extends DurableObject {
       await this.save();
       if (began) this.push({ gone: ws, force: true }); else this.status(ws);
     } else this.push({ gone: ws, force: true });
+    if (this.meta && this.meta.pub) this.meta.waitAt = Date.now();
+    this.report({ gone: ws });
   }
   webSocketClose(ws) { return this.left(ws); }
   webSocketError(ws) { return this.left(ws); }
 
   async alarm() {
     const D = this.D, now = Date.now();
+    const dueAt = D && D.lanes[0] ? Duo.due(D, now) : 0;
+    if (dueAt && dueAt > now + 20 && this.meta && this.meta.pub) { // the listing's heartbeat only (room.js alarm)
+      this.report({ force: true });
+      await this.ctx.storage.setAlarm(this.listing() ? Math.min(dueAt, now + this.hbMs()) : dueAt);
+      return;
+    }
     if (D && D.lanes[0] && Duo.due(D, now)) {
       const f = Duo.tick(D, now);
       await this.save();
       if (f) this.broadcastFight(f); else this.push({ force: true });
+      if (f) this.report();
       return;
     }
     const active = (await this.ctx.storage.get('active')) || 0;
-    if (now - active >= KEEP_MS && !this.sockets().length) { await this.ctx.storage.deleteAlarm(); await this.ctx.storage.deleteAll(); this.D = null; this.meta = null; return; }
-    await this.ctx.storage.setAlarm(now + KEEP_MS);
+    if (now - active >= KEEP_MS && !this.sockets().length) { await this.ctx.storage.deleteAlarm(); await this.ctx.storage.deleteAll(); this.D = null; this.meta = null; this.chat.lines = []; return; }
+    if (this.meta && this.meta.pub) this.report({ force: true });
+    await this.ctx.storage.setAlarm(this.listing() ? now + this.hbMs() : now + KEEP_MS);
   }
 }
