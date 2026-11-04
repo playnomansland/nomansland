@@ -26,6 +26,8 @@
 //   /account/discord { code, redirect } (auth) -> { player }  (Discord check for the BABABABA title; see DISCORD below)
 //   /account/puzzle  { k, army } (auth)  -> { player, won, solved }  (a tutorial puzzle's fight, replayed here; see PUZZLE below)
 //   /account/bug     { text, version, match, info } (auth optional) -> { ok, url }  (a post in #bug-reports; see BUG below)
+//   /account/friends, /account/friend/{add,accept,decline,cancel,remove,mute}, /account/dm/{list,read,report} (auth, Google
+//                    accounts): friends and private messages; see FRIENDS below and hub.js (the live part)
 // guest, google and me also take { invite: CODE }: a new account made through a friend's invite link (INVITE).
 //
 // Month end (2026-11-03): the Worker's hourly cron (wrangler.toml [triggers], index.js scheduled) calls awardLegends,
@@ -48,7 +50,7 @@ export const ACCOUNT = {
   MAX_SESSIONS: 10,        // per player; the oldest go first
   BODY_BYTES: 8 * 1024,    // a Google ID token is about 1.2 KB
   // per IP: [count, window ms]. A tournament on one wifi shares an IP, so these leave room for a full room of friends.
-  RATE: { guest: [20, 3600e3], google: [30, 600e3], other: [120, 60e3], bug: [5, 600e3] },
+  RATE: { guest: [20, 3600e3], google: [30, 600e3], other: [120, 60e3], bug: [5, 600e3], report: [5, 600e3] },
 };
 const DAY = 24 * 3600e3;
 
@@ -76,13 +78,13 @@ const SCHEMA = [
 ];
 let schemaReady = null;
 function ensureSchema(db) {
-  if (!schemaReady) schemaReady = db.batch(SCHEMA.map((s) => db.prepare(s)))
+  if (!schemaReady) schemaReady = db.batch([...SCHEMA, ...FRIEND_SCHEMA].map((s) => db.prepare(s)))
     // players.title (2026-11-02): the title picked to show; added to a table that may already exist
     // players.tag_changed (2026-11-02): when the gamertag was last changed (one change a week; developers any time)
     // players.legend (2026-11-03): how many months the player ended in the top 5 (counted from 'awards')
     // players.online (2026-11-03): online matches the player finished (countOnline); players.discord: when the Discord check passed
     // players.initiate (2026-11-03): when the last tutorial puzzle was solved (the Initiate title)
-    .then(() => Promise.all(['title TEXT', 'tag_changed INTEGER', 'legend INTEGER', 'online INTEGER', 'discord INTEGER', 'initiate INTEGER'].map((c) => db.prepare('ALTER TABLE players ADD COLUMN ' + c).run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }))))
+    .then(() => Promise.all(['title TEXT', 'tag_changed INTEGER', 'legend INTEGER', 'online INTEGER', 'discord INTEGER', 'initiate INTEGER', ...FRIEND_COLUMNS].map((c) => db.prepare('ALTER TABLE players ADD COLUMN ' + c).run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }))))
     .catch((e) => { schemaReady = null; throw e; });
   return schemaReady;
 }
@@ -540,12 +542,288 @@ export function puzzleWon(k, army) {
   return f.summary.winner === 0 && !f.summary.timeout;
 }
 
+// ---------- friends, game invites and private messages (2026-11-04; docs/FRIENDS.md) ----------
+// Signed-in players only (a Google login, not a bare guest). Friends are stored by player id, so a username change
+// keeps them. A request waits until the other player accepts (FRIENDS.requestMs); if both ask, they are friends at
+// once. Declining, cancelling and removing are silent: the other side's list just updates (hub event 'removed').
+// Removing a friend deletes the pair's private messages. The live part (online dots, invites, messages arriving) is
+// the PlayerHub (hub.js), one per player; these routes tell the hubs about changes (event()).
+//   /account/friends           (auth)              -> { friends: [{ id, tag, title, online, status, seen, unread, muted }], incoming, outgoing }
+//   /account/friend/add        { tag | id } (auth) -> { ok, sent | friends } or { several: [{ id, tag, title }] } (a username several players have)
+//   /account/friend/accept     { id }              -> { ok }       /account/friend/decline { id } -> { ok }
+//   /account/friend/cancel     { id }              -> { ok }       /account/friend/remove  { id } -> { ok }
+//   /account/friend/mute       { id, on }          -> { ok, muted } (their messages are kept but not shown live or counted unread)
+//   /account/dm/list           { id, before? }     -> { lines: [{ k, from, text, at }], more } (oldest first, pages of FRIENDS.dmPage)
+//   /account/dm/read           { id }              -> { ok }       (the thread was opened: its messages are no longer unread)
+//   /account/dm/report         { id }              -> { ok }       (the thread's last 20 lines to the reports channel)
+// /account/me carries friends: { requests, unread } (the Friends button's badge). /account/delete wipes all of it.
+export const FRIENDS = {
+  max: 100, outMax: 20, perDay: 20, lookups: [30, 600e3], requestMs: 30 * DAY,
+  dmMax: 300, dmKeep: 100, dmPage: 30, dmBurst: [5, 10e3], dmHour: 60, reportLines: 20,
+  onlineMs: 5 * 60e3,   // a hub refreshes players.hub_at at least every 2 minutes while a socket is open
+  inviteMs: 5 * 60e3, invitesPerMin: 10,
+};
+const FRIEND_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS friends (a TEXT NOT NULL, b TEXT NOT NULL, since INTEGER NOT NULL, PRIMARY KEY (a, b))`,
+  `CREATE INDEX IF NOT EXISTS friends_b ON friends (b)`,
+  `CREATE TABLE IF NOT EXISTS friend_requests (sender TEXT NOT NULL, target TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (sender, target))`,
+  `CREATE INDEX IF NOT EXISTS friend_requests_target ON friend_requests (target)`,
+  `CREATE TABLE IF NOT EXISTS dms (pair TEXT NOT NULL, sender TEXT NOT NULL, text TEXT NOT NULL, created INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS dms_pair ON dms (pair, created)`,
+  `CREATE TABLE IF NOT EXISTS dm_read (player TEXT NOT NULL, pair TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (player, pair))`,
+  `CREATE TABLE IF NOT EXISTS friend_mutes (player TEXT NOT NULL, muted TEXT NOT NULL, PRIMARY KEY (player, muted))`,
+];
+// players.hub: the player's status as JSON while a hub socket is open ({ where, round?, code? }), else NULL;
+// players.hub_at: when the hub last wrote it (older than FRIENDS.onlineMs = offline, in case a hub was stopped)
+const FRIEND_COLUMNS = ['hub TEXT', 'hub_at INTEGER'];
+const FRIEND_ROUTES = ['friends', 'friend/add', 'friend/accept', 'friend/decline', 'friend/cancel', 'friend/remove', 'friend/mute', 'dm/list', 'dm/read', 'dm/report'];
+const ID_RE = /^p[0-9a-f]{16}$/;
+export const pairOf = (x, y) => (x < y ? [x, y] : [y, x]);
+export const pairKey = (x, y) => pairOf(x, y).join(':');
+const PUB = 'p.id, p.tag, p.created, p.dev, p.title, p.legend, p.discord, p.initiate';
+const pubOut = (r) => ({ id: r.id, tag: r.tag || 'Player', title: titleShown(r) });
+// what friends see of a status: where and the round, never a room's code
+export function statusOut(r, now = Date.now()) {
+  let st = null;
+  if (r && r.hub && r.hub_at > now - FRIENDS.onlineMs) { try { st = JSON.parse(r.hub); } catch (e) { st = null; } }
+  return st ? { online: true, status: { where: st.where, ...(st.where === 'match' && st.round ? { round: st.round } : {}) } } : { online: false, status: null };
+}
+// a per-player counter in 'hits' (lookups, requests a day); true while under max
+async function hitPlayer(db, k, max, win, now = Date.now()) {
+  const row = await db.prepare(`INSERT INTO hits (k, start, n) VALUES (?1, ?2, 1)
+     ON CONFLICT (k) DO UPDATE SET n = CASE WHEN start < ?3 THEN 1 ELSE n + 1 END, start = CASE WHEN start < ?3 THEN ?2 ELSE start END
+     RETURNING n`).bind(k, now, now - win).first();
+  return row.n <= max;
+}
+async function friendable(db, id) {
+  return db.prepare(`SELECT ${PUB} FROM players p WHERE p.id = ? AND p.deleted IS NULL AND EXISTS (SELECT 1 FROM logins l WHERE l.player = p.id AND l.provider = 'google')`).bind(id).first();
+}
+export async function areFriends(db, x, y) {
+  if (!x || !y || x === y) return false;
+  const [a, b] = pairOf(x, y);
+  return !!(await db.prepare('SELECT 1 FROM friends WHERE a = ? AND b = ?').bind(a, b).first());
+}
+export async function friendIds(env, id) {
+  const db = env.ACCOUNTS;
+  if (!db) return [];
+  await ensureSchema(db);
+  const rows = (await db.prepare(`SELECT CASE WHEN a = ?1 THEN b ELSE a END AS id FROM friends WHERE a = ?1 OR b = ?1`).bind(id).all()).results;
+  return rows.map((r) => r.id);
+}
+const friendCount = async (db, id) => (await db.prepare('SELECT COUNT(*) AS n FROM friends WHERE a = ?1 OR b = ?1').bind(id).first()).n;
+export async function friendCounts(db, id, now = Date.now()) {
+  if (!(await hasGoogle(db, id))) return null;
+  const req = await db.prepare(`SELECT COUNT(*) AS n FROM friend_requests r JOIN players p ON p.id = r.sender WHERE r.target = ? AND r.created > ? AND p.deleted IS NULL`).bind(id, now - FRIENDS.requestMs).first();
+  const un = await db.prepare(`SELECT COUNT(*) AS n FROM dms d JOIN friends f ON d.pair = f.a || ':' || f.b
+      LEFT JOIN dm_read r ON r.player = ?1 AND r.pair = d.pair
+      WHERE (f.a = ?1 OR f.b = ?1) AND d.sender != ?1 AND d.created > COALESCE(r.at, 0)
+        AND NOT EXISTS (SELECT 1 FROM friend_mutes m WHERE m.player = ?1 AND m.muted = d.sender)`).bind(id).first();
+  return { requests: req.n, unread: un.n };
+}
+// the statements that remove a player's friends data (account delete)
+function friendsWipe(db, id) {
+  return [
+    db.prepare('DELETE FROM friends WHERE a = ?1 OR b = ?1').bind(id),
+    db.prepare('DELETE FROM friend_requests WHERE sender = ?1 OR target = ?1').bind(id),
+    db.prepare(`DELETE FROM dms WHERE pair LIKE ?1 || ':%' OR pair LIKE '%:' || ?1`).bind(id),
+    db.prepare(`DELETE FROM dm_read WHERE player = ?1 OR pair LIKE ?1 || ':%' OR pair LIKE '%:' || ?1`).bind(id),
+    db.prepare('DELETE FROM friend_mutes WHERE player = ?1 OR muted = ?1').bind(id),
+  ];
+}
+// tells a player's hub (hub.js) about a change; never in the way of the answer
+async function hubEvent(env, id, msg) {
+  if (!env.HUB) return;
+  try { await env.HUB.getByName(id).event(msg); } catch (e) { console.warn('hub event', e && e.message); }
+}
+// ----- used by the PlayerHub (hub.js) -----
+// the signed-in player behind a hub's hello { session }, or null; google: false for a bare guest
+export async function hubPlayer(env, token) {
+  const p = await sessionPlayer(env, token);
+  if (!p) return null;
+  return { id: p.id, tag: p.tag, title: p.title, google: await hasGoogle(env.ACCOUNTS, p.id) };
+}
+// the player's live status (null = no hub socket open: offline, and last seen = now)
+export async function setPresence(env, id, st, now = Date.now()) {
+  const db = env.ACCOUNTS;
+  if (!db) return;
+  await ensureSchema(db);
+  if (st) await db.prepare('UPDATE players SET hub = ?, hub_at = ? WHERE id = ?').bind(JSON.stringify(st), now, id).run();
+  else await db.prepare('UPDATE players SET hub = NULL, hub_at = NULL, seen = ? WHERE id = ?').bind(now, id).run();
+}
+export async function presenceOf(env, id, now = Date.now()) {
+  const db = env.ACCOUNTS;
+  await ensureSchema(db);
+  const r = await db.prepare('SELECT hub, hub_at, seen FROM players WHERE id = ? AND deleted IS NULL').bind(id).first();
+  return r ? { ...statusOut(r, now), seen: r.seen } : { online: false, status: null, seen: 0 };
+}
+// a private message from -> to, saved (the pair's last FRIENDS.dmKeep kept). null when they aren't friends or it's
+// over the hourly limit; muted: the receiver muted the sender (saved, not delivered live)
+export async function saveDm(env, from, to, text, now = Date.now(), hourMax = FRIENDS.dmHour) {
+  const db = env.ACCOUNTS;
+  await ensureSchema(db);
+  if (!(await areFriends(db, from, to))) return { error: 'not friends' };
+  // the hourly limit counts in 'hits' (the pair's trimming to the last 100 must not give room for more)
+  if (!(await hitPlayer(db, 'dmh:' + from, hourMax, 3600e3, now))) return { error: 'slow down' };
+  const pair = pairKey(from, to);
+  const [ins] = await db.batch([
+    db.prepare('INSERT INTO dms (pair, sender, text, created) VALUES (?, ?, ?, ?) RETURNING rowid AS k').bind(pair, from, text, now),
+    db.prepare('DELETE FROM dms WHERE pair = ?1 AND rowid NOT IN (SELECT rowid FROM dms WHERE pair = ?1 ORDER BY created DESC, rowid DESC LIMIT ?2)').bind(pair, FRIENDS.dmKeep),
+    db.prepare('INSERT INTO dm_read (player, pair, at) VALUES (?, ?, ?) ON CONFLICT (player, pair) DO UPDATE SET at = excluded.at').bind(from, pair, now), // your own message: the thread is read
+  ]);
+  const muted = !!(await db.prepare('SELECT 1 FROM friend_mutes WHERE player = ? AND muted = ?').bind(to, from).first());
+  return { k: ins.results[0].k, at: now, muted };
+}
+export const friendPub = async (env, id) => { const db = env.ACCOUNTS; await ensureSchema(db); const r = await db.prepare(`SELECT ${PUB} FROM players p WHERE p.id = ?`).bind(id).first(); return r ? pubOut(r) : null; };
+
+// ----- the routes -----
+async function handleFriends(db, env, route, body, me, now, cors, ip) {
+  const fail = (error, status = 400, more = {}) => json({ error, ...more }, status, cors);
+  if (!(await hasGoogle(db, me.player))) return fail('google needed', 403);
+  const id = typeof body.id === 'string' && ID_RE.test(body.id) ? body.id : '';
+  const meP = await friendPub(env, me.player);
+  const live = `r.created > ${now - FRIENDS.requestMs}`;
+
+  if (route === 'friends') {
+    const rows = (await db.prepare(`SELECT ${PUB}, p.hub, p.hub_at, p.seen, f.since FROM friends f JOIN players p ON p.id = CASE WHEN f.a = ?1 THEN f.b ELSE f.a END
+      WHERE (f.a = ?1 OR f.b = ?1) AND p.deleted IS NULL`).bind(me.player).all()).results;
+    const unread = new Map((await db.prepare(`SELECT d.sender, COUNT(*) AS n FROM dms d JOIN friends f ON d.pair = f.a || ':' || f.b
+      LEFT JOIN dm_read r ON r.player = ?1 AND r.pair = d.pair
+      WHERE (f.a = ?1 OR f.b = ?1) AND d.sender != ?1 AND d.created > COALESCE(r.at, 0) GROUP BY d.sender`).bind(me.player).all()).results.map((r) => [r.sender, r.n]));
+    const muted = new Set((await db.prepare('SELECT muted FROM friend_mutes WHERE player = ?').bind(me.player).all()).results.map((r) => r.muted));
+    const friends = rows.map((r) => ({ ...pubOut(r), ...statusOut(r, now), seen: r.seen, since: r.since, unread: muted.has(r.id) ? 0 : unread.get(r.id) || 0, muted: muted.has(r.id) }))
+      .sort((x, y) => (y.online - x.online) || (y.seen - x.seen));
+    const reqs = async (sql) => (await db.prepare(sql).bind(me.player).all()).results.map((r) => ({ ...pubOut(r), created: r.created_at }));
+    const incoming = await reqs(`SELECT ${PUB}, r.created AS created_at FROM friend_requests r JOIN players p ON p.id = r.sender WHERE r.target = ? AND ${live} AND p.deleted IS NULL ORDER BY r.created DESC`);
+    const outgoing = await reqs(`SELECT ${PUB}, r.created AS created_at FROM friend_requests r JOIN players p ON p.id = r.target WHERE r.sender = ? AND ${live} AND p.deleted IS NULL ORDER BY r.created DESC`);
+    return json({ friends, incoming, outgoing, max: FRIENDS.max }, 200, cors);
+  }
+
+  if (route === 'friend/add') {
+    let target = id;
+    if (!target) {
+      const tag = cleanTag(body.tag);
+      if (!tag) return fail('bad tag');
+      if (!(await hitPlayer(db, 'flook:' + me.player, FRIENDS.lookups[0], FRIENDS.lookups[1], now))) return fail('slow down', 429);
+      const found = (await db.prepare(`SELECT ${PUB} FROM players p WHERE p.deleted IS NULL AND lower(p.tag) = lower(?) AND p.id != ?
+        AND EXISTS (SELECT 1 FROM logins l WHERE l.player = p.id AND l.provider = 'google') ORDER BY p.seen DESC LIMIT 5`).bind(tag, me.player).all()).results;
+      if (!found.length) return fail('not found', 404);
+      if (found.length > 1) return json({ several: found.map(pubOut) }, 200, cors);
+      target = found[0].id;
+    }
+    if (target === me.player) return fail('self');
+    const t = await friendable(db, target);
+    if (!t) return fail('not found', 404);
+    if (await areFriends(db, me.player, target)) return json({ ok: true, friends: true, player: pubOut(t) }, 200, cors);
+    const [a, b] = pairOf(me.player, target);
+    const back = await db.prepare(`SELECT 1 FROM friend_requests r WHERE r.sender = ? AND r.target = ? AND ${live}`).bind(target, me.player).first();
+    if (back) { // both asked: friends at once
+      if ((await friendCount(db, me.player)) >= FRIENDS.max) return fail('too many friends', 409);
+      if ((await friendCount(db, target)) >= FRIENDS.max) return fail('their list is full', 409);
+      await db.batch([
+        db.prepare('INSERT OR IGNORE INTO friends (a, b, since) VALUES (?, ?, ?)').bind(a, b, now),
+        db.prepare('DELETE FROM friend_requests WHERE (sender = ?1 AND target = ?2) OR (sender = ?2 AND target = ?1)').bind(me.player, target),
+      ]);
+      await hubEvent(env, target, { t: 'accepted', by: meP });
+      await hubEvent(env, me.player, { t: 'accepted', by: pubOut(t) });
+      return json({ ok: true, friends: true, player: pubOut(t) }, 200, cors);
+    }
+    const mine = await db.prepare(`SELECT 1 FROM friend_requests r WHERE r.sender = ? AND r.target = ? AND ${live}`).bind(me.player, target).first();
+    if (mine) return json({ ok: true, sent: true, player: pubOut(t) }, 200, cors);
+    if ((await friendCount(db, me.player)) >= FRIENDS.max) return fail('too many friends', 409);
+    const out = await db.prepare(`SELECT COUNT(*) AS n FROM friend_requests r WHERE r.sender = ? AND ${live}`).bind(me.player).first();
+    if (out.n >= FRIENDS.outMax) return fail('too many requests', 409);
+    if (!(await hitPlayer(db, 'freq:' + me.player, FRIENDS.perDay, DAY, now))) return fail('slow down', 429);
+    await db.batch([
+      db.prepare('DELETE FROM friend_requests WHERE created <= ?').bind(now - FRIENDS.requestMs), // old ones
+      db.prepare('INSERT OR REPLACE INTO friend_requests (sender, target, created) VALUES (?, ?, ?)').bind(me.player, target, now),
+    ]);
+    await hubEvent(env, target, { t: 'request', from: meP });
+    return json({ ok: true, sent: true, player: pubOut(t) }, 200, cors);
+  }
+
+  if (!id) return fail('bad id');
+  if (route === 'friend/accept') {
+    const r = await db.prepare(`SELECT 1 FROM friend_requests r WHERE r.sender = ? AND r.target = ? AND ${live}`).bind(id, me.player).first();
+    const t = r && (await friendable(db, id));
+    if (!t) return fail('no request', 404);
+    if ((await friendCount(db, me.player)) >= FRIENDS.max) return fail('too many friends', 409);
+    if ((await friendCount(db, id)) >= FRIENDS.max) return fail('their list is full', 409);
+    const [a, b] = pairOf(me.player, id);
+    await db.batch([
+      db.prepare('INSERT OR IGNORE INTO friends (a, b, since) VALUES (?, ?, ?)').bind(a, b, now),
+      db.prepare('DELETE FROM friend_requests WHERE (sender = ?1 AND target = ?2) OR (sender = ?2 AND target = ?1)').bind(me.player, id),
+    ]);
+    await hubEvent(env, id, { t: 'accepted', by: meP });
+    await hubEvent(env, me.player, { t: 'accepted', by: pubOut(t) });
+    return json({ ok: true }, 200, cors);
+  }
+  if (route === 'friend/decline' || route === 'friend/cancel') {
+    const [sender, target] = route === 'friend/decline' ? [id, me.player] : [me.player, id];
+    await db.prepare('DELETE FROM friend_requests WHERE sender = ? AND target = ?').bind(sender, target).run();
+    await hubEvent(env, id, { t: 'removed', by: me.player }); // silent: their list just updates
+    return json({ ok: true }, 200, cors);
+  }
+  if (route === 'friend/remove') {
+    const [a, b] = pairOf(me.player, id), pair = a + ':' + b;
+    await db.batch([
+      db.prepare('DELETE FROM friends WHERE a = ? AND b = ?').bind(a, b),
+      db.prepare('DELETE FROM dms WHERE pair = ?').bind(pair),
+      db.prepare('DELETE FROM dm_read WHERE pair = ?').bind(pair),
+      db.prepare('DELETE FROM friend_mutes WHERE (player = ?1 AND muted = ?2) OR (player = ?2 AND muted = ?1)').bind(me.player, id),
+    ]);
+    await hubEvent(env, id, { t: 'removed', by: me.player });
+    await hubEvent(env, me.player, { t: 'removed', by: id });
+    return json({ ok: true }, 200, cors);
+  }
+  if (route === 'friend/mute') {
+    if (!(await areFriends(db, me.player, id))) return fail('not friends', 403);
+    if (body.on) await db.prepare('INSERT OR IGNORE INTO friend_mutes (player, muted) VALUES (?, ?)').bind(me.player, id).run();
+    else await db.prepare('DELETE FROM friend_mutes WHERE player = ? AND muted = ?').bind(me.player, id).run();
+    return json({ ok: true, muted: !!body.on }, 200, cors);
+  }
+  // private messages: friends only
+  if (!(await areFriends(db, me.player, id))) return fail('not friends', 403);
+  const pair = pairKey(me.player, id);
+  if (route === 'dm/list') {
+    const before = Number.isInteger(body.before) && body.before > 0 ? body.before : Number.MAX_SAFE_INTEGER;
+    const rows = (await db.prepare('SELECT rowid AS k, sender, text, created FROM dms WHERE pair = ? AND rowid < ? ORDER BY rowid DESC LIMIT ?').bind(pair, before, FRIENDS.dmPage + 1).all()).results;
+    const more = rows.length > FRIENDS.dmPage;
+    return json({ lines: rows.slice(0, FRIENDS.dmPage).reverse().map((r) => ({ k: r.k, from: r.sender, text: r.text, at: r.created })), more }, 200, cors);
+  }
+  if (route === 'dm/read') {
+    await db.prepare('INSERT INTO dm_read (player, pair, at) VALUES (?, ?, ?) ON CONFLICT (player, pair) DO UPDATE SET at = excluded.at').bind(me.player, pair, now).run();
+    return json({ ok: true }, 200, cors);
+  }
+  if (route === 'dm/report') {
+    const hook = reportHook(env);
+    if (!hook) return fail('reports off', 503);
+    if (!(await hit(db, 'report', ip, env)) || !(await hitPlayer(db, 'freport:' + me.player, 5, 600e3, now))) return fail('slow down', 429);
+    const them = await friendPub(env, id);
+    const rows = (await db.prepare('SELECT sender, text, created FROM dms WHERE pair = ? ORDER BY rowid DESC LIMIT ?').bind(pair, FRIENDS.reportLines).all()).results.reverse();
+    const name = (pid) => (pid === me.player ? meP.tag : them ? them.tag : 'Player');
+    const lines = rows.map((r) => `[${new Date(r.created).toISOString().slice(0, 16).replace('T', ' ')}] ${bugField(name(r.sender), 40)}: ${bugField(r.text, FRIENDS.dmMax)}`);
+    const content = (`Private messages reported by ${bugField(meP.tag, 40)} (${me.player}) about ${bugField(them ? them.tag : 'Player', 40)} (${id}), ${new Date(now).toISOString()}\n\`\`\`\n${lines.join('\n').replace(/`/g, "'")}\n\`\`\``).slice(0, 2000);
+    const msg = { content, username: 'Message report', allowed_mentions: { parse: [] } };
+    const own = hook === env.REPORT_WEBHOOK;
+    if (!own) { msg.thread_name = `Messages: ${bugField(meP.tag, 30)} about ${bugField(them ? them.tag : 'Player', 30)}`; if (/^\d{5,25}$/.test(env.BUG_TAG || '')) msg.applied_tags = [env.BUG_TAG]; } // the bug forum needs a post title
+    let res;
+    try { res = await fetch(hook + (own ? '' : '?wait=true'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(msg) }); }
+    catch (e) { return fail('discord unavailable', 502); }
+    if (!res.ok) return fail('discord', 502, { code: res.status });
+    return json({ ok: true }, 200, cors);
+  }
+  return fail('not found', 404);
+}
+// Reports have their own channel: REPORT_WEBHOOK (a Cloudflare secret; the deploy workflow copies the GitHub secret
+// DISCORD_REPORT_WEBHOOK). Until it is set they go to the bug-report forum (BUG_WEBHOOK) as their own posts.
+const reportHook = (env) => [env.REPORT_WEBHOOK, env.BUG_WEBHOOK].find((h) => BUG_HOOK.test(h || '') || BUG_HOOK_TEST.test(h || '')) || '';
+
 // ---------- the route handler ----------
 export async function handleAccount(request, env, cors) {
   const db = env.ACCOUNTS;
   if (!db) return json({ error: 'accounts off' }, 503, cors);
   const route = new URL(request.url).pathname.replace(/^\/account\/?/, '').replace(/\/$/, '');
-  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title', 'skin', 'invite', 'discord', 'puzzle', 'bug'].includes(route)) return json({ error: 'not found' }, 404, cors);
+  if (!['guest', 'me', 'google', 'tag', 'signout', 'delete', 'ranked', 'title', 'skin', 'invite', 'discord', 'puzzle', 'bug', ...FRIEND_ROUTES].includes(route)) return json({ error: 'not found' }, 404, cors);
   if (request.method !== 'POST') return json({ error: 'method' }, 405, cors);
 
   let body = {};
@@ -608,6 +886,7 @@ export async function handleAccount(request, env, cors) {
 
     const me = await auth(db, request);
     if (!me) return json({ error: 'signed out' }, 401, cors);
+    if (FRIEND_ROUTES.includes(route)) return await handleFriends(db, env, route, body, me, now, cors, ip); // friends (FRIENDS below)
 
     if (route === 'title') {
       const t = typeof body.title === 'string' ? body.title : '';
@@ -673,6 +952,7 @@ export async function handleAccount(request, env, cors) {
       try { await grantSkins(env, now); } catch (e) { console.warn('skins', e && e.message); }
       if (body.invite) { try { await claimInvite(db, me.player, body.invite, now); } catch (e) { console.warn('invite', e && e.message); } }
       const out = { player: await playerOut(db, me.player), rankedOn: await rankedOn(env), discord: discordInfo(env) };
+      try { out.friends = await friendCounts(db, me.player, now); } catch (e) { console.warn('friends', e && e.message); } // the Friends button's badge
       const lastRotation = me.expires - ACCOUNT.SESSION_DAYS * DAY;
       if (now - lastRotation > (+env.ACCOUNT_ROTATE_MS || ACCOUNT.ROTATE_MS)) {   // the setting is for tests
         out.session = await newSession(db, me.player);
@@ -703,6 +983,7 @@ export async function handleAccount(request, env, cors) {
         db.prepare('DELETE FROM logins WHERE player = ?').bind(me.player),
         db.prepare('DELETE FROM sessions WHERE player = ?').bind(me.player),
         db.prepare('UPDATE players SET tag = NULL, deleted = ? WHERE id = ?').bind(now, me.player),
+        ...friendsWipe(db, me.player), // friendships, requests, private messages, mutes
       ]);
       return json({ ok: true }, 200, cors);
     }

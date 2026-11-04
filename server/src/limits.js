@@ -8,6 +8,9 @@ export const LIMITS = {
   matchRatePerWindow: 150,      // ... (in a match: every tap that buys, places or moves is a message)
   rateWindowMs: 10_000,         // ... per 10 seconds; more and it's disconnected
   selftestEveryMs: 10_000,      // the self test runs at most once per 10 s
+  // friends (2026-11-04): a player's hub (hub.js)
+  maxHubSockets: 8,             // one player's phones and tabs at once
+  hubRatePerWindow: 40,         // messages per 10 s on one hub socket (status, invites, private messages)
 };
 
 export const json = (body, status = 200, extra = {}) => new Response(JSON.stringify(body), {
