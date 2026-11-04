@@ -5,6 +5,7 @@
 # Optional: DEV_EMAILS - comma-separated Google emails that get developer mode (put into a Cloudflare secret).
 #           DISCORD_CLIENT_SECRET - the Discord app's client secret, for the BABABABA title (also a Cloudflare secret).
 #           DISCORD_BUG_WEBHOOK - a webhook URL on the #bug-reports forum channel, for in-game bug reports (Cloudflare secret BUG_WEBHOOK).
+#           DISCORD_REPORT_WEBHOOK - a webhook URL on the channel for reported private messages (Cloudflare secret REPORT_WEBHOOK).
 # Without them the tests still run and the deploy step is skipped.
 name: Server deploy
 
@@ -55,6 +56,7 @@ jobs:
           DEV_EMAILS: ${{ secrets.DEV_EMAILS }}
           DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
           DISCORD_BUG_WEBHOOK: ${{ secrets.DISCORD_BUG_WEBHOOK }}
+          DISCORD_REPORT_WEBHOOK: ${{ secrets.DISCORD_REPORT_WEBHOOK }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "Cloudflare secrets not set yet: skipping deploy."
@@ -65,3 +67,4 @@ jobs:
           if [ -n "$DEV_EMAILS" ]; then printf '%s' "$DEV_EMAILS" | npx wrangler secret put DEV_EMAILS; fi
           if [ -n "$DISCORD_CLIENT_SECRET" ]; then printf '%s' "$DISCORD_CLIENT_SECRET" | npx wrangler secret put DISCORD_CLIENT_SECRET; fi
           if [ -n "$DISCORD_BUG_WEBHOOK" ]; then printf '%s' "$DISCORD_BUG_WEBHOOK" | npx wrangler secret put BUG_WEBHOOK; fi
+          if [ -n "$DISCORD_REPORT_WEBHOOK" ]; then printf '%s' "$DISCORD_REPORT_WEBHOOK" | npx wrangler secret put REPORT_WEBHOOK; fi
