@@ -163,9 +163,67 @@ Questions
 (pending: 1000 matches on run 1's seeds; one side's AI never sees Hunter)
 
 
-## Run 3: carry cap and hoarding
+## Run 3: carry cap and hoarding (300 matches per setup, seeds 810000-810299, mirrored offers)
+
+Tool: tools/lab-hoard.js. No change to src/: the hoarder is the game's own AI shown less than it has, and its moves
+still go through the referee one by one.
+- Rounds 1-3: its view shows only the gold above "keep", for deploying and for level-ups. Pure: keep everything
+  (it fields only free package squads). Keep 500: spend what is above 500, so the carry stays at the cap.
+- From round 4: one pass where its view leaves out every tier 1-2 unit (so it buys tier 3-4), then a normal pass
+  for whatever is left.
+- Cap off: after each fight the lab gives back what CARRY_CAP took, the same as no cap for these matches.
+- The hoarder plays side 0 on even seeds and side 1 on odd seeds. The opponent is the normal AI. The same seeds are
+  used in every setup.
+
+    Setup                       hoarder wins   win%   95% CI    z      capLost per match
+    Pure hoarder, cap on        152 / 300      50.7   45-56     0.23   453 (in all 300 matches)
+    Pure hoarder, cap off       233 / 300      77.7   73-82     9.58   0 (the cap would have taken 503)
+    Keep-500 hoarder, cap on    191 / 300      63.7   58-69     4.73   73 (in 296 matches)
+
+capLost for the normal AI: 0 in every setup.
+
+When the hoarder spikes (pure hoarder; round-win % for the hoarder, gold at round start H / N, army value H / N)
+
+    Round   cap on: win%  gold        army         cap off: win%  gold        army
+    1        4            250/250     300/478      4              250/250     300/478
+    2        0            550/313     300/663      0              550/313     300/663
+    3        0            900/430     307/866      0              950/430     307/866
+    4       34           1031/544     971/1108     69            1483/544    1321/1108
+    5       54            746/666    1502/1420     82             802/682    1869/1422
+    6       59            797/823    2068/1885     77             778/830    2433/1905
+    7       65            886/897    2742/2397     74             869/899    3109/2471
+    8       65            976/998    3452/3009     71             967/990    3809/3105
+
+(Army value: squad prices on the board, each level +50%.) In rounds 1-3 the hoarder takes 9 + 16 + 22 = about 47
+damage while the bot takes almost none. It spikes in round 4. With the cap off it arrives with about 1480 gold, wins
+69% of round 4 and 82% of round 5, and its army stays bigger for the rest of the match. With the cap on it loses about
+450 gold at the end of round 3 (and 50 at the end of round 2). It arrives with about 1030 and only draws level.
+
+Clear signals
+- The cap does what it is meant to against pure hoarding. Without it, banking 3 rounds is worth +27 points of match
+  win rate against the normal AI (77.7% vs 50.7%, the same seeds). With it, pure hoarding is break-even.
+- Keep-500 hoarding (spend what is above the cap, never lose gold to it) still wins 63.7% (z 4.7) with the cap on.
+  The cap does not stop "float 500 and spike in round 4".
+- Part of every hoarder's edge may be the tier 3-4 dump itself rather than the saving. See the control below.
+
+Noise and limits
+- 4-5 of 300 matches per setup had a desync, and one had a refused move. All of them involve the hoarder playing Otto.
+  His slot-machine goblin picks a tier 1 unit not left out of the match, and the hoarder's view leaves tier 1-2 out.
+  So that one move went differently on the referee than the AI expected. It's a lab artefact, at most 1.7% of matches.
+- The opponent is the AI, which does not react to a hoarder (it sees the hoarder's empty board and spends as usual).
+  A human seeing an empty board in round 2 might punish it or save too.
+
+Control: the same tier 3-4 preference with no hoarding (--hoard-rounds 0, cap on)
 
 (pending)
+
+Questions
+1. Keep-500 hoarding beats the normal AI 64% with the cap on. Is "save 500, spike in round 4" a strategy you want
+   to exist? If not, is the lever the cap's size, or the income curve?
+2. Pure hoarding takes about 47 damage in 3 rounds, nearly half a player's health, and still breaks even. Is the
+   35-per-round damage cap (MAX_ROUND_DMG) making early losses too cheap?
+3. Does the normal AI under-buy tier 3-4 units? (The control answers this; if it does, the AI's drafting rather than
+   the economy is part of what this run measures.)
 
 
 ## Run 4: maps (--map random, --no-mirror)
