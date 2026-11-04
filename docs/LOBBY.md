@@ -1,6 +1,6 @@
 # Online lobby, chat and emotes (design, 2026-11-04)
 
-Status: **design only, nothing built.** Decisions are Vilhelm's (2026-11-04) unless marked *proposal* or *open*.
+Status: **design only, nothing built.** Build handoff: `docs/HANDOFF-LOBBY.md`. Decisions are Vilhelm's (2026-11-04) unless marked *proposal* or *open*.
 Builds on the server described in `docs/SERVER.md` (Room, DuoRoom, TourRoom, accounts).
 
 ---
@@ -9,11 +9,11 @@ Builds on the server described in `docs/SERVER.md` (Room, DuoRoom, TourRoom, acc
 
 | Topic | Decision |
 |---|---|
-| Room list | A global list of open rooms, tagged Standard / Ranked / 2v2, public / private. |
+| Room list | **One list, "Rooms"**, holding every public room (Standard, Ranked, and 2v2 for developers). No filter chips; a **Sort** button instead (name, date/time, category, mode). Private rooms aren't listed. |
 | Ranked | **In the list** for the test season (no real player base yet). A queue replaces or joins it once there are enough players (§5). |
 | 2v2 | Built into the lobby architecture now, but **developer only** until 2v2 works as intended. |
-| Chat | Text chat, in the lobby rooms and in matches. |
-| Emotes | Three emotes the opponent sees, mutable by the opponent: **Flame Wizard "BABABABA"**, **Happy Ether Golem**, **Shell-shocked Sniper**. In the lobby and in matches. |
+| Chat | Text chat in waiting rooms and matches, **for signed-in players only** (guests read and use emotes). Spectators chat in **their own room**, which **merges with the players' chat when the match ends**. |
+| Emotes | Three emotes the opponent sees, mutable by the opponent: **Flame Wizard "BABABABA"**, **Happy Ether Golem**, **Shell-shocked Sniper**. In waiting rooms and in matches. Based on the 3D models, **drawn in a cartoonish 2D style. No sounds for now.** |
 | Spectating | **On by default**; the host can turn it off. |
 
 ---
@@ -30,7 +30,9 @@ Builds on the server described in `docs/SERVER.md` (Room, DuoRoom, TourRoom, acc
 ## 3. What players see
 
 ### Lobby screen (PLAY → Online)
-- **Top:** filter chips: *Standard*, *Ranked*, *2v2* (developers only), *Open only*. Then **Quick play**, **Create room**, and the join-by-code box.
+- **Top:** **Quick play**, **Create room**, the join-by-code box, and a **Sort** button.
+- **One list, "Rooms":** every public room, Standard and Ranked together (2v2 too, for developers only).
+- **Sort** (a small sheet): *Name* (A–Z), *Date/time* (newest first; the default), *Category* (Standard / Ranked), *Mode* (1v1 / 2v2). Picking the active option again flips the order. Within a group, newest first. The choice is remembered on the phone (`pb-lobby-sort`).
 - **Room cards:** host's nameplate (gamertag + title), room name (auto: "Vilhelm's room"; no free text, nothing to moderate), tags, map, players (1/2, or 3/4 for 2v2), round if in progress, a 👁 count of watchers, and **Join** / **Watch**.
 - Private rooms are never listed. They work as today: code or `?play=CODE` link.
 - **Quick play:** joins the oldest open public Standard room; if there is none, creates one and waits in it.
@@ -44,7 +46,7 @@ Both nameplates, ready check, the host's settings (host can change them until bo
 
 ### In a match
 - An **emote button** (small speech bubble) in the tray row opens a wheel: the 3 emotes plus a chat line.
-- Emotes play as a ~1.5 s sticker by the sender's nameplate (and over their tower on the board), with a sound.
+- Emotes play as a ~1.5 s sticker by the sender's nameplate (and over their tower on the board). No sound.
 - Chat shows as a short-lived line under the HUD, and in full in a chat sheet.
 - Tapping the opponent's nameplate: **Mute emotes**, **Mute chat** (separately), **Report**.
 - After the match **Rematch** keeps the room (and the chat).
@@ -110,33 +112,36 @@ Messages (WebSocket `/lobby`):
 - Server checks: text trimmed, control characters removed, at most 120 characters; word filter (a short list, matches replaced by `***`); rate 3 lines per 5 s and 20 per minute; emotes 1 per 3 s. Over the limit: dropped, the sender gets `denied { why: 'slow down' }`.
 - Who gets what:
   - players' chat and emotes → both players and the watchers;
-  - watchers' chat → other watchers only (players never see it, so nobody can pass hidden information to a player);
+  - watchers' chat → other watchers only while the match runs (players never see it, so nobody can pass hidden information to a player);
+  - **when the match ends** (the result is in, or a forfeit), the two chats **merge**: everyone in the room (players and watchers) gets the watchers' lines from that match, interleaved by time, and from then on every line goes to everyone. A rematch starting splits them again. Message: `chatMerge { lines }` to players, then normal `chat` to all;
   - 2v2: a *Team* / *All* switch. Team goes to the teammate only (as the current quick lines); All to everyone in the room.
 - The room keeps the last 50 lines in memory (for a reconnecting phone and for reports). Chat is **not** saved in match history.
 - PeerJS matches (the fallback) get no chat or emotes.
 
 ### Muting and reporting (on the phone)
-- Opponent's nameplate → **Mute emotes** / **Mute chat**, separately. Muted messages still arrive but aren't shown or played. Remembered for that match code (localStorage), so a reload keeps it.
+- Opponent's nameplate → **Mute emotes** / **Mute chat**, separately. Muted messages still arrive but aren't shown. Remembered for that match code (localStorage), so a reload keeps it.
 - Settings sheet: **Chat** on/off and **Emotes** on/off for every match (hides everyone's).
 - **Report** (on a chat line or the nameplate) posts the last 20 lines plus both gamertags and the match id to a Discord channel, through the same webhook path as bug reports (`accounts.js` BUG) with its own channel and limit.
-- *Proposal:* text chat for signed-in players only; guests can still send emotes and read chat. Guests are free and anonymous, which is where abuse usually comes from.
+- **Text chat is for signed-in players only** (the room checks the account session from hello). Guests see chat, can send emotes, and get a "Sign in to chat" line in place of the text box.
 - *Later:* **Block player** (account-level, D1 `blocks` table): hides their chat and emotes in every future match.
 
 ### The three emotes
-| id | Look | Sound |
-|---|---|---|
-| `bababa` | Flame Wizard shouting, comic speech burst "BABABABA!" (same style as the Animation Lab's "AAARGH!"), staff shaking. Matches the Discord title. | short shouted "ba-ba-ba" |
-| `golem` | Happy Ether Golem: bounces, glowing smile, a few sparkles. | soft happy hum / chime |
-| `shock` | Shell-shocked Sniper: wide eyes, smoke wisps, a little twitch, tinnitus ring lines. | high ringing tone fading out |
+| id | Look |
+|---|---|
+| `bababa` | Flame Wizard shouting, mouth wide, staff shaking, a comic speech burst "BABABABA!" (same style as the Animation Lab's "AAARGH!"). Matches the Discord title. |
+| `golem` | Happy Ether Golem: big closed-eye smile, bouncing, a few sparkles. |
+| `shock` | Shell-shocked Sniper: huge round eyes, soot on the face, smoke wisps, a twitch, ring lines around the head. |
 
-- v1 art: a still picture of each, rendered from the game's own 3D models with the expression parts added (like the skin pictures in `img/skins/`), animated with CSS (pop in, shake/bounce, fade out). Files `img/emotes/*.png`. Sounds are placeholders until Vilhelm has real ones.
+- **Style:** cartoonish 2D, drawn by hand as SVG: thick dark outlines, flat colours with one shade, exaggerated faces and proportions (big head). Each keeps the silhouette, colours and props of the unit's 3D model in `src/models3d.js` (Flame Wizard: wizard:fire's hat, robe and staff with the fire orb; Ether Golem: its stone body and glow; Sniper: its headgear, rifle and scope), so players recognise the unit. Render the model once for reference (as for the skin pictures) and draw from it.
+- Files `img/emotes/bababa.svg`, `golem.svg`, `shock.svg`. Animated with CSS (pop in, shake / bounce / twitch, fade out after ~1.5 s).
+- **No sounds for now.**
 - Emotes carry no game information, so they need no hiding rules.
 
 ---
 
 ## 7. Page
 
-- New screen `#lobby` under the home layer (home screens in `site-template.html`): filters, room cards, Quick play / Find ranked / Create room, join box. Opened from PLAY → *Online*.
+- New screen `#lobby` under the home layer (home screens in `site-template.html`): the Rooms list with Sort, room cards, Quick play / Find ranked / Create room, join box. Opened from PLAY → *Online*.
 - `lobbyOpen / lobbyRecv / lobbyDraw` (one socket while the screen is open; closed when a match starts).
 - Chat and emote UI shared by the waiting room and the match: `chatPanel`, `emoteWheel`, `emoteShow(from, id)`, mute state `pb-mute-<code>`.
 - Settings: `snd`-style keys `chatOn`, `emotesOn`.
@@ -151,7 +156,7 @@ Messages (WebSocket `/lobby`):
 4. Later, once there are players: the ranked queue (rating, queue, paired rooms).
 5. Later: block list, lobby-wide chat channel (not planned; moderation load).
 
-Tests to add: `server/test/lobby.test.js` (listings appear and vanish, dev filter, ranked rooms need an account, heartbeat expiry, limits), chat checks in `match.test.js` (limits, filter, watcher isolation), `tools/tests/lobby-ui.js`.
+Tests to add: `server/test/lobby.test.js` (listings appear and vanish, dev filter, ranked rooms need an account, heartbeat expiry, limits), chat checks in `match.test.js` (signed-in only, limits, filter, watchers isolated during the match, merge at the end, split on rematch), `tools/tests/lobby-ui.js`.
 
 Timing: all of this changes how online matches start and adds messages to match rooms, so it goes in **after the tournament on Sunday 2026-11-08** (match-play freeze from Saturday).
 
@@ -160,6 +165,4 @@ Timing: all of this changes how online matches start and adds messages to match 
 ## 9. Open questions
 
 1. Rating for the later queue: Elo or today's leaderboard score?
-2. Chat for guests too, or signed-in players only (proposal)?
-3. Should watchers be able to chat at all, or only read?
-4. Real sounds for the emotes, or placeholders for now?
+(Settled 2026-11-04: one Rooms list with Sort; chat signed-in only; watchers chat in their own room, merged at the end; emotes drawn 2D, no sounds.)

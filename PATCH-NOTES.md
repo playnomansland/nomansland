@@ -13,7 +13,7 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 - **More lore** for the world, factions and units.
 - **More balancing.**
 - **Damage types (idea):** physical and magic.
-- **Online lobby (design):** a global list of open rooms (Standard, Ranked, 2v2 for developers), Quick play, ranked rooms in the list for the test season (a queue later), chat and three emotes (Flame Wizard *BABABABA*, happy Ether Golem, shell-shocked Sniper) that the opponent can mute, and spectating on by default. Plan in `docs/LOBBY.md`; built after the tournament.
+- **Online lobby (design):** one *Rooms* list of public games (Standard and Ranked together, sortable by name, time, category and mode), Quick play, chat for signed-in players (spectators get their own chat that joins the players' when the match ends), and three cartoon emotes the opponent can mute: Flame Wizard *BABABABA*, a happy Ether Golem and a shell-shocked Sniper. Spectating on by default. Plan in `docs/LOBBY.md`; built after the tournament.
 
 ---
 
