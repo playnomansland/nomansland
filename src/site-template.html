@@ -8924,6 +8924,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const h = Mpb.voteHead(m, me);
     if (!h) return '';
     const K = Mpb.kindOf(h.kind), L = duoMyLane(), mine = h.votes[L], theirs = h.votes[1 - L], part = h.part && ((K.place.parts || []).find(p => p.id === h.part) || {}).name;
+    if (h.lane != null) return `<div class="mpb-box"><div><b>${h.lane === L ? `Place your ${esc(K.single || K.name)}` : `Your teammate places their ${esc(K.single || K.name)}`}</b>${h.lane === L ? ' · tap a glowing tile (it goes there at once).' : '.'} <span class="num" id="mpb-vote-s">${mpbClockAt.vote ? mpbLeft('vote') + ' s' : ''}</span></div></div>`; // one player places it alone (Mpb.queue's lane)
     return `<div class="mpb-box"><div><b>Place ${part ? `the ${esc(K.name.replace(/^The /, ''))}’s ${esc(part)}` : `your team’s ${esc(K.name.replace(/^The /, ''))}`}</b> · tap a glowing tile. ${mine ? '<span style="color:' + duoRing(duoMySeat()).col + '">Your vote is in.</span> ' : ''}${theirs ? `<span style="color:${duoRing(Duo.mateOf(duoMySeat())).col}">Your teammate voted.</span>` : 'Waiting for your teammate.'} The same tile places it at once; two tiles: one of them when the time runs out. <span class="num" id="mpb-vote-s">${mpbClockAt.vote ? mpbLeft('vote') + ' s' : ''}</span></div></div>`;
   }
   function mpbPanel() { return mpbOn() ? mpbDraftHtml() + mpbVoteHtml() : ''; }
@@ -8942,8 +8943,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // the tiles the team may vote for now (cached: the 3D board redraws the marks every frame)
   function mpbVoteTiles() {
     const h = Mpb.voteHead(m, me);
-    if (!h) return [];
-    const key = [m.round, h.kind, h.part, Mpb.recs(m, me).length, m.armies[me].length, Game.teamArmy(m, me).length].join('|');
+    if (!h || (h.lane != null && h.lane !== duoMyLane())) return []; // (the teammate's own to place)
+    const key =[m.round, h.kind, h.part, Mpb.recs(m, me).length, m.armies[me].length, Game.teamArmy(m, me).length].join('|');
     if (mpbSpotCache.key !== key || now() - mpbSpotCache.at > 400) mpbSpotCache = { key, at: now(), tiles: Mpb.spots(m, me, h.kind, h.part) };
     return mpbSpotCache.tiles;
   }
@@ -8962,7 +8963,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function mpbTap(t) {
     if (!mpbOn() || !t) return false;
     const h = phase === 'deploy' && Mpb.voteHead(m, me);
-    if (h && Mpb.spotOk(m, me, h.kind, h.part, t.col, t.row)) { if (editable() && Game.mpbVote(m, me, t.col, t.row)) changed(); return true; }
+    if (h && (h.lane == null || h.lane === duoMyLane()) && Mpb.spotOk(m, me, h.kind, h.part, t.col, t.row)) { if (editable() && Game.mpbVote(m, me, t.col, t.row)) changed(); return true; }
     const x = Mpb.recAt(m, t.col, t.row);
     if (x) { openMpbSheet(x.side, x.rec.key); return true; }
     return false;
@@ -8997,9 +8998,35 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       },
     },
     // ===== treeKojja (page) =====
+    // who it stands for this round, the squad in its Nest (yours: a button to its sheet), how to use Nest and Grow
+    treeKojja: {
+      html(side, rec, live) {
+        const mine = side === me, K = Mpb.kindOf('treeKojja'), nest = Mpb.skillN(rec, 'nest') > 0;
+        const sq = m.armies[side].concat(Game.teamArmy(m, side)).find(q => q.col === rec.col && q.row === rec.row && !Game.isRider(q));
+        const own = sq && m.armies[side].includes(sq) && side === me;
+        const lines = [];
+        if (rec.data.ghost) lines.push(mine ? 'Their kojja, destroyed in the last fight: it stands for your team this round only (Nest works for you here, on their board).' : 'Your kojja, destroyed in the last fight: it stands for them this round, then it is yours again.');
+        if (nest) lines.push(sq ? `In it: <b>${esc((m.units[sq.unit] || {}).name || 'a squad')}</b>${own ? ' (yours)' : ''}. It shoots from 1 body, +${Mpb.KOJJA.nestRange} m range.` : mine && phase === 'deploy' ? `Nest: put a ranged squad (more than ${Mpb.KOJJA.ranged} m range) on this kojja: place one here or move one in.` : 'Nest: room for 1 ranged squad.');
+        if (mine && phase === 'deploy' && !rec.data.ghost && Mpb.voteQueue(m, me).some(e => e.kind === 'treeKojja' && e.lane != null)) lines.push('Grow: the new kojja is being placed (within ' + Mpb.KOJJA.grow + ' tiles of one of yours).');
+        return lines.map(l => `<p style="margin:0">${l}</p>`).join('') + (own ? '<button class="btn small" id="mpb-tk-sq">Its sheet</button>' : '');
+      },
+      wire(root, side, rec) {
+        const b = root.querySelector('#mpb-tk-sq'); if (!b) return;
+        b.addEventListener('click', () => { const sq = m.armies[me].find(q => q.col === rec.col && q.row === rec.row && !Game.isRider(q)); if (sq) openSheet(sq.unit, sq, me); });
+      },
+    },
     // ===== fieldHospital (page) =====
     // ===== coalMine (page) =====
     // ===== scorch (page) =====
+    // whose turret it is, what it fights with now, and that it sits out the round after it falls
+    scorch: {
+      html(side, rec) {
+        const u = Mpb.scorchUnit(m, rec), whose = side !== me ? 'Their turret' : rec.data.lane === duoMyLane() ? 'Your turret' : 'Your teammate’s turret';
+        const out = rec.data.out === m.round ? ' · <span style="color:var(--foe)">destroyed in the last fight: it sits out this round</span>' : '';
+        return `<p style="margin:0"><b>${whose}</b>${out}</p><p class="hint" style="margin:0">${Math.round(u.range)} m range · ${Math.round(u.hit)} hit · ${u.aps.toFixed(2)} attacks/s · splash ${u.splash} m · burn ${u.burn || 0}% · ${u.structure ? 'not a unit (not needed to win)' : 'walks: a unit, it must be destroyed to win'}</p>`;
+      },
+      wire() {},
+    },
     // ===== oak (page) =====
     // ===== factory (page) =====
     // ===== magicLake (page) =====

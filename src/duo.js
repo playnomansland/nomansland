@@ -182,6 +182,7 @@
     }
     // the team's buildings (src/mpb.js): lane 0 builds them, once for the team
     for (const sd of [0, 1]) for (const b of M.bodies(lanes[0], sd)) { b.lane = 0; (sd === 0 ? A : B).push(b); }
+    M.link(lanes[0], A, B); // a building that ties bodies to its own (hooks.link: the squad in a Tree kojja)
     G.useGrid(MAP);
     const ch = charm.map(c => Object.keys(c).length ? c : null);
     // portal: where a team's tower falls, a portal to the other team's tower opens (Engine opts.portal; 2v2 only)
@@ -358,6 +359,7 @@
         if (!head) continue;
         for (const L of [0, 1]) {
           if (!D.bots[seatOf(L, sd)]) continue;
+          if (head.lane != null && head.lane !== L) continue; // a building one player places alone (Mpb.queue's lane)
           const mate = head.votes[1 - L], human = mate && !D.bots[seatOf(1 - L, sd)] && M.spotOk(lanes[L], sd, head.kind, head.part, mate.col, mate.row) ? mate : null;
           const mine = head.votes[L] && M.spotOk(lanes[L], sd, head.kind, head.part, head.votes[L].col, head.votes[L].row) ? head.votes[L] : null;
           const want = human || mine || M.autoSpot(lanes[L], sd, head.kind, head.part);
@@ -462,6 +464,7 @@
     setTeam(ms(D), own.lane);
     if (G.needsPack(m, sd)) G.choosePack(m, sd, Math.floor(Math.random() * m.packages[sd].length));
     if (G.needsTowerPick(m, sd)) { const ch = G.towerChoices(m, sd); G.setTowerType(m, sd, ch[Math.floor(Math.random() * ch.length)].id); }
+    M.botTurn(m, sd, M.rng((D.seed + m.round * 9173 + seat * 31337) >>> 0)); // the team's buildings' skills (hooks.bot), seeded
     G.aiDeploy(m, sd);
     // the Vault: gold the carry cap would take next round goes in instead (a put round only)
     const spare = Math.min(m.gold[sd] - G.CARRY_CAP, M.vaultRoom(m, sd, 'put'));

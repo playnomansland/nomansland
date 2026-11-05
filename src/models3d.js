@@ -702,9 +702,44 @@ const Models3D = (THREE) => {
   BUILD['mpb:golem:silver'] = golem('#C9CED6', '#8A929A');
   BUILD['mpb:golem:gold'] = golem(GOLD, '#9A7418');
   // ===== treeKojja (3D) =====
+  // The Tree kojja: a stubby, gnarled tree whose lopsided crown hugs a plank lookout hut (a watchtower that grew rather
+  // than was built): roots splayed on the ground, a rope ladder up the trunk, the hut's lookout slit facing its enemy
+  // (-z), a pointed roof in the team colour and a small bird on the ridge, the one thing awake up there
+  BUILD['mpb:treeKojja'] = () => [
+    ...[0, 1, 2, 3, 4].map(k => { const a = k * 1.26 + 0.3; return P(cone(0.35, 1.6, 5), '#5A3E26', [Math.cos(a) * 0.75, 0.2, Math.sin(a) * 0.75], [Math.sin(a) * 1.2, 0, -Math.cos(a) * 1.2]); }), // roots
+    P(cyl(0.55, 0.85, 3.2, 7), '#6B4A2B', [0, 1.6, 0], [0.05, 0, -0.06]),
+    P(cyl(0.18, 0.25, 1.4, 5), '#6B4A2B', [0.75, 2.6, 0.3], [0.2, 0, -0.9]), // a crooked branch
+    ...[-1, 1].map(sd => P(box(0.06, 2.7, 0.06), '#C9B48A', [sd * 0.22, 1.5, -0.86])), // the rope ladder
+    ...[0, 1, 2, 3, 4].map(k => P(box(0.5, 0.06, 0.08), '#A88E6E', [0, 0.45 + k * 0.5, -0.86])),
+    ...[[0, 3.6, 0.2, 1.7, '#6B8E3D'], [-1.3, 3.2, 0.4, 1.2, '#56763A'], [1.3, 3.4, -0.2, 1.25, '#5F8040'], [0.3, 4.4, 0.9, 1.1, '#7C9C4A'], [-0.6, 4.1, -0.9, 1.0, '#86A657'], [1.0, 2.9, 1.0, 0.9, '#56763A']]
+      .map(([x, y, z, r, col]) => P(ball(r), col, [x, y, z])), // the crown: leaf clumps
+    P(box(2.1, 1.25, 1.9), '#9C7A54', [0, 3.75, -0.55]), // the hut, wedged in the crown
+    ...[0, 1, 2].map(k => P(box(2.14, 0.06, 1.94), '#5B3F24', [0, 3.3 + k * 0.4, -0.55])), // plank seams
+    P(box(1.3, 0.28, 0.08), DARK, [0, 3.85, -1.52]), // the lookout slit
+    P(box(2.5, 0.16, 2.3), '#5B3F24', [0, 3.08, -0.55]), // its floor
+    P(cone(1.75, 1.2, 4), 'team', [0, 4.98, -0.55], [0, Math.PI / 4, 0]),
+    P(ball(0.17), '#3A3026', [0.15, 5.65, -0.55]), P(cone(0.06, 0.18, 4), '#E8A04A', [0.15, 5.66, -0.78], [-Math.PI / 2, 0, 0])]; // the bird
   // ===== fieldHospital (3D) =====
   // ===== coalMine (3D) =====
   // ===== scorch (3D) =====
+  // A Scorch turret: a squat stone brazier with a band in the team colour, iron feet and glowing coals, with a grumpy
+  // Ember Imp sitting in it up to its chest (horns, a scowl, little glowing eyes) and soft amber flames round the rim.
+  // 'mpb:scorch:mobile' (Legs): the same brazier, smaller (a walker of radius 1), on four stubby iron legs.
+  const brazier = (k, y0) => lifted([
+    P(cyl(1.15 * k, 0.8 * k, 1.0 * k, 8), '#7A746C', [0, 0.5 * k, 0]),
+    P(cyl(1.2 * k, 1.2 * k, 0.2 * k, 8), '#4E4A45', [0, 1.02 * k, 0]),
+    P(cyl(1.18 * k, 1.0 * k, 0.22 * k, 8), 'team', [0, 0.62 * k, 0]),
+    P(cyl(1.0 * k, 1.0 * k, 0.12 * k, 8), '#FFC98A', [0, 1.1 * k, 0]), // the coals
+    P(cyl(0.42 * k, 0.5 * k, 0.6 * k, 7), '#E8834A', [0, 1.35 * k, 0]), // the imp: chest, head, horns, scowl
+    P(ball(0.45 * k), '#E8834A', [0, 1.95 * k, 0]),
+    ...[-1, 1].flatMap(sd => [P(cone(0.12 * k, 0.5 * k, 4), '#B5552A', [sd * 0.3 * k, 2.4 * k, 0.05 * k], [0, 0, -sd * 0.5]),
+      P(ball(0.07 * k), GLOW, [sd * 0.16 * k, 2.0 * k, -0.4 * k]),
+      P(box(0.22 * k, 0.05 * k, 0.05 * k), '#3A2018', [sd * 0.15 * k, 2.12 * k, -0.42 * k], [0, 0, sd * 0.4]),
+      P(cyl(0.1 * k, 0.12 * k, 0.5 * k, 5), '#E8834A', [sd * 0.55 * k, 1.3 * k, -0.1 * k], [0, 0, sd * 0.9])]), // arms on the rim
+    ...[0, 1, 2, 3, 4, 5].map(j => { const a = j * Math.PI / 3 + 0.4; return P(cone(0.16 * k, (0.55 + (j % 2) * 0.3) * k, 4), j % 2 ? EMBER : '#FFB36B', [Math.cos(a) * 0.85 * k, 1.35 * k, Math.sin(a) * 0.85 * k]); })], y0);
+  BUILD['mpb:scorch'] = () => [P(cyl(1.5, 1.6, 0.3, 8), STONE, [0, 0.15, 0]), ...[0, 1, 2].map(j => { const a = j * 2.09; return P(box(0.3, 0.4, 0.3), IRON, [Math.cos(a) * 0.9, 0.45, Math.sin(a) * 0.9]); }), ...brazier(1, 0.5)];
+  BUILD['mpb:scorch:mobile'] = () => [...[[-1, -1], [1, -1], [-1, 1], [1, 1]].flatMap(([x, z]) => [P(box(0.16, 0.6, 0.16), IRON, [x * 0.38, 0.3, z * 0.3]), P(box(0.26, 0.08, 0.3), DARK, [x * 0.38, 0.04, z * 0.3 - 0.05])]),
+    ...brazier(0.55, 0.55)];
   // ===== oak (3D) =====
   // ===== factory (3D) =====
   // ===== magicLake (3D) =====
