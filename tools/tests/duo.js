@@ -347,7 +347,7 @@ check('the tower portal: never in 1v1', () => {
 check('the 2v2 units: built-in plus Rollers, Cog Builder, Mechite Guards; no Altar of Build', () => {
   const names = units.map(u => u.name);
   assert.deepStrictEqual(names.slice(0, demo.units.length), demo.units.map(u => u.name), 'the built-in units first, as they are');
-  assert.deepStrictEqual(names.slice(demo.units.length), ['Rollers', 'Cog Builder', 'Mechite Guards']);
+  assert.deepStrictEqual(names.slice(demo.units.length), ['Rollers', 'Cog Builder', 'Mechite Guards', 'Shadowhands']); // (Shadowhands: the Shadow Den's, src/mpb.js; only a team with a Den has it)
   assert.ok(!names.includes('Altar of Build'));
   assert.ok(units.every(u => !u.faction), 'no faction (no faction trait)');
   assert.strictEqual(matrix.length, units.length); assert.ok(matrix.every(r => r.length === units.length));

@@ -171,9 +171,49 @@
     text: 'Restoration: all healing and regen of the team +25%.', downside: 'The round after it was destroyed, a level 3 Ent with all its skills fights for the opponents.', skills: [], hooks: {} });
 
   // ===== factory =====
-  def({ id: 'factory', name: 'Factory', short: 'fa', kind: 'economic', hp: 1000, armor: 0, color: '#B07A3C',
-    text: 'The Cog Builder’s Factory as a team building: built at once, either player buys its unit of the round.',
-    downside: 'As the Cog Builder’s Factory.', skills: [], hooks: {} });
+  // The Cog Builder's Factory (Game BUILDINGS 'factory', src/faction-units.json) as a team building: standing at once
+  // (no builder, no site), not levelled. Each round either player may buy one of its units for the team (one a round
+  // for this factory): the buyer pays, and the unit comes out in front of the factory FAC.skills' time into the fight,
+  // marked as the buyer's (its lane), made by the very code that makes the Cog Builder's (Game.buildingMakes, with
+  // the buyer's lane's match: Duo.battle's ctx.lanes; no builder skills, no blessing). Destroyed in a fight: like the
+  // Cog Builder's it must be rebuilt, so it makes nothing the next round. A Cog Builder's own Factory in a lane works
+  // beside it as before.
+  const FAC = { hp: 1000, armor: 0, building: 'factory', noBuff: { aps: 0, shield: 0, armor: 0, faster: 0 } };
+  const facResting = (m, rec) => !!rec && rec.fell > 0 && rec.fell === m.round - 1;
+  // this round's buy: { id (the building's skill), lane (who paid) } or null
+  const facNow = (m, rec) => { for (const id of ['fighter', 'gunner', 'cogmech']) { const log = thisRound(m, rec.skills[id]); if (log.length) return { id, lane: log[0].lane }; } return null; };
+  def({ id: 'factory', name: 'Factory', short: 'fa', kind: 'economic', hp: FAC.hp, armor: FAC.armor, color: '#B07A3C',
+    text: 'The Cog Builder’s Factory as a team building, built at once. Each round either of you can buy one of its units for the team; whoever buys pays, and it fights for your team.',
+    downside: 'Destroyed in a fight: it is rebuilt, so it makes nothing the next round.',
+    // the prices are the Cog Builder's Factory's (tools/tests/mpb-b5.js checks them against the building's data)
+    skills: [
+      { id: 'fighter', name: 'Cogbot Fighter', cost: 100, per: 'round', text: 'A tough melee bot (1500 health, 4 armor, a 2-hit shield) walks out 2 s into the fight.' },
+      { id: 'gunner', name: 'Cogbot Machinegunner', cost: 100, per: 'round', text: 'A long-range gunner that spins up its fire walks out 2 s into the fight.' },
+      { id: 'cogmech', name: 'CogMech', cost: 300, per: 'round', text: 'A walking mech with two turrets (2000 health, 4 armor, splash) walks out 4 s into the fight.' },
+    ],
+    hooks: {
+      // one unit a round for the team (a take-back frees it), none the round after it was destroyed
+      canBuy: (m, side, rec, sk) => !facResting(m, rec) && !facNow(m, rec) && !!G.buildingSkillInfo(FAC.building, sk.id),
+      bodies(m, side, rec, ctx) {
+        const out = ctx.main(), b = out[0], now = facNow(m, rec), info = G.buildingInfo(FAC.building);
+        if (b && now && info) {
+          const pr = G.buildingMakes((ctx.lanes && ctx.lanes[now.lane]) || m, side, info, G.buildingSkillInfo(FAC.building, now.id), 0, FAC.noBuff, null);
+          if (pr) b.produce = { ...pr, lane: now.lane }; // (Engine: lane marks whose it is)
+        }
+        return out;
+      },
+      info(m, side, rec) {
+        const now = facNow(m, rec);
+        return [facResting(m, rec) ? 'Being rebuilt this round: it makes nothing.' : now ? `This round: ${(skillOf('factory', now.id) || {}).name}` : 'Nothing bought this round', 'One unit a round for your team.'];
+      },
+      // a bot buys one of its units most rounds when it has gold to spare
+      bot(m, side, rec, r) {
+        if (r() >= 0.6) return;
+        const ok = KINDS.factory.skills.filter(sk => m.gold[side] - skillCost(m, side, rec.key, sk.id) >= 150 && canBuy(m, side, rec.key, sk.id));
+        if (ok.length) mpbBuy(m, side, rec.key, ok[Math.floor(r() * ok.length)].id);
+      },
+    },
+  });
 
   // ===== magicLake =====
   def({ id: 'magicLake', name: 'Magic lake', short: 'ml', kind: 'technical', hp: 0, armor: 0, color: '#3E8FC4',
@@ -189,8 +229,177 @@
     downside: 'Destroyed: the bodies that destroyed it get half a level of XP; the squad inside loses what it gained inside.', skills: [], hooks: {} });
 
   // ===== shadowDen =====
-  def({ id: 'shadowDen', name: 'Shadow Den', short: 'sd', kind: 'technical', hp: 800, armor: 2, color: '#3B3350',
-    text: 'Rogues, Assassins and Shadowhands: no flank delay.', downside: 'Destroyed: your Shadowhands are lost, no Den skills next round.', skills: [], hooks: {} });
+  // Technical. While a team has its Den:
+  //  - Rogues, Assassins and Shadowhands (DEN.units) placed this round on a flank tile (an Assassin also in the enemy's
+  //    zone) don't stand still the flank delay in their first fight (squadBodies);
+  //  - Shadowhands: a unit of the 2v2 set (extraUnits, added by Duo.unitSet; u.mpbUnit) only a team with a Den has in
+  //    its shop (Game.isOff -> unitOff): the Rogue at half health and hit, 1 body, tier 1 (100 gold), no unlock, the
+  //    Rogue's Stealth and Forward planting built in (it may go in no man's land), its own look (mpb 'shadowDen', skin 'hand');
+  //  - each player has DEN.tokens Shadow deployment a round on top of their own, only for those three units
+  //    (Game.deploysLeft -> shadowBonus).
+  // Skills: Impersonate (per player): an enemy tier 1-2 squad the buyer can see; DEN.impAt s into the fight one of its
+  //   bodies leaves and a Shadowhand of the buyer's team stands in its place (Engine opts.mpb.shadowImpersonate).
+  //   Sabotage (team): an enemy unit type they can't deploy next round (Game.place -> sabotaged; their shop shows a red X).
+  //   Insider information (team): next round this team sees the opponents' squads live (Game.foeSeen / teamSeen ->
+  //   watching, so Referee.hide shows them where they stand; their gold, buys and levels stay hidden) and the opponents'
+  //   deploy clock is DEN.cut ms shorter (Duo.cutFor: at most down to 5 s); they see "You are being watched". Bought in
+  //   a round whose fight destroys the Den: the opponents get it, free, instead.
+  // Downside: destroyed: the team's Shadowhands squads are removed (nothing back) and no Den skills the next round.
+  // rec.data: imp [{ round, lane (buyer), tl (target's lane), id (its id there), u (its unit type) }], sab [{ round
+  //   (bought in), ui, lane }] (this round's buy and the one in force, kept apart), insider { round, lane },
+  //   watch { round (the round it works in), by (the side that watches), free }
+  const DEN = { hp: 800, armor: 2, units: ['Rogue', 'Assassin', 'Shadowhands'], hands: 'Shadowhands', from: 'Rogue', half: 0.5, cost: 1, tokens: 1,
+    impersonate: 200, impAt: 5, impTier: 2, sabotage: 100, insider: 350, cut: 15000, color: '#8E7CC3' };
+  const LANE_OFF = 1000000; // = Duo.OFF: lane 1's squad ids in a fight (and the other lane's in m.team) are moved by this
+  const denOf = (m, side) => recs(m, side).find(r => r.kind === 'shadowDen') || null;
+  const denUnit = (m, ui) => !!(m && m.units && m.units[ui] && DEN.units.includes(m.units[ui].name));
+  const handsIdx = (m) => (m && m.units ? m.units.findIndex(u => u && u.mpbUnit === 'shadowDen') : -1);
+  const isHands = (m, ui) => !!(m && m.units && m.units[ui] && m.units[ui].mpbUnit === 'shadowDen');
+  // no Den skills the round after it was destroyed
+  const denResting = (m, rec) => !!rec && rec.fell > 0 && rec.fell === m.round - 1;
+  // Game.deploysLeft: the Shadow deployment. ui: a Den unit about to be placed may use it; any other placement may use
+  // only what Den units already took (so the player's own deployments are never more than before)
+  function shadowBonus(m, side, ui) {
+    if (!on(m) || !denOf(m, side)) return 0;
+    const used = m.armies[side].filter(s => s.round === m.round && !s.free && !s.gift && denUnit(m, s.unit)).length;
+    return ui != null && denUnit(m, ui) ? DEN.tokens : Math.min(used, DEN.tokens);
+  }
+  // Game.mpbLocked: side may not deploy unit type ui this round (the other team sabotaged it last round)
+  const sabList = (rec) => (rec && Array.isArray(rec.data.sab) ? rec.data.sab : []);
+  const sabNow = (m, rec) => sabList(rec).find(x => x.round === m.round) || null;      // bought this round (works next round)
+  const sabLive = (m, rec) => sabList(rec).find(x => x.round === m.round - 1) || null; // bought last round: in force now
+  const sabotaged = (m, side, ui) => on(m) && recs(m, 1 - side).some(r => r.kind === 'shadowDen' && (sabLive(m, r) || {}).ui === ui);
+  // side sees the other team's deployment live this round (Insider information; either Den may hold it)
+  const watching = (m, side) => on(m) && [0, 1].some(sd => recs(m, sd).some(r => r.kind === 'shadowDen' && r.data.watch && r.data.watch.round === m.round && r.data.watch.by === side));
+  const deployCut = (m, side) => watching(m, 1 - side) ? DEN.cut : 0; // ms off side's deploy clock (Duo)
+  // the enemy squads a player of side may impersonate: tier 1-2 squads they can see, in their own lane (who 0) or the
+  // other one (who 1, m.team; id: that lane's own id). As foeSeen, a squad sold this round still shows (m.team.sold,
+  // Duo.teamOf: the server's other lane has it there, the page's hidden view in its armies), unless they are watched live
+  const teamSold = (m, side) => (watching(m, 1 - side) ? [] : ((m.team && m.team.sold && m.team.sold[side]) || []).filter(q => q.soldRound === m.round && q.round < m.round && !G.hiddenFromFoe(m, q)));
+  const impTier = (m, ui) => !!(m.units[ui] && !m.units[ui].building && G.tierOf(m.units, ui) <= DEN.impTier);
+  function impTargets(m, side) {
+    const ok = (q) => !G.isRider(q) && impTier(m, q.unit);
+    return G.foeSeen(m, 1 - side).filter(ok).map(q => ({ who: 0, id: q.id, sq: q }))
+      .concat(G.teamSeen(m, 1 - side).concat(teamSold(m, 1 - side)).filter(ok).map(q => ({ who: 1, id: q.id >= LANE_OFF ? q.id - LANE_OFF : q.id, sq: q })));
+  }
+  // the target's squad wherever it stands (also sold or riding): its unit type is kept with the buy, so a squad id
+  // used again after their Undo all (a live target while watching) is no target
+  function impFind(m, side, who, id) {
+    const f = 1 - side, mine = who === 0, tid = mine ? id : id + LANE_OFF;
+    const list = mine ? m.armies[f].concat(G.soldNow(m, f)) : ((m.team && m.team.armies && m.team.armies[f]) || []).concat((m.team && m.team.sold && m.team.sold[f]) || []);
+    return list.find(q => q.id === tid) || null;
+  }
+  const impNow = (m, rec) => (rec.data.imp || []).filter(x => x.round === m.round);
+  const sabOk = (m, ui) => Number.isInteger(ui) && ui >= 0 && ui < m.units.length && !m.units[ui].building && !(Array.isArray(m.off) && m.off.includes(ui));
+  def({ id: 'shadowDen', name: 'Shadow Den', short: 'sd', kind: 'technical', hp: DEN.hp, armor: DEN.armor, color: '#3B3350',
+    text: `Rogues, Assassins and Shadowhands: no flank delay, and ${DEN.tokens} extra Shadow deployment a round for each of you, only for them. Recruit Shadowhands in the shop (tier 1, ${DEN.cost * 100} gold): a Rogue at half strength, 1 body, may go in no man’s land.`,
+    downside: 'Destroyed: your Shadowhands are lost, and no Den skills the next round.',
+    skills: [
+      { id: 'impersonate', name: 'Impersonate', cost: DEN.impersonate, per: 'roundPlayer', text: `Pick an enemy tier 1 or 2 squad you can see: ${DEN.impAt} s into the fight one of its bodies becomes a Shadowhand of yours.` },
+      { id: 'sabotage', name: 'Sabotage', cost: DEN.sabotage, per: 'round', text: 'Pick a unit type: the other team can’t deploy it next round (a big red X on their card).' },
+      { id: 'insider', name: 'Insider information', cost: DEN.insider, per: 'round', text: `Next round your team sees their deployment live and their deploy clock is ${DEN.cut / 1000} s shorter; they see “You are being watched”. If your Den is destroyed in this round’s fight, they get it for free instead.` },
+    ],
+    // the Shadowhands unit, made from the set's Rogue (Duo.unitSet)
+    extraUnits(units) {
+      const r = units.find(u => u && u.name === DEN.from);
+      if (!r) return [];
+      const sk = Array.isArray(r.skills) ? r.skills : [], mods = Array.isArray(r.skillMods) ? r.skillMods : [];
+      return [{ ...r, name: DEN.hands, cost: DEN.cost, unlock: 0, bodies: 1, hp: r.hp * DEN.half, hit: r.hit * DEN.half, shape: 'knife', color: DEN.color,
+        skills: ['stealth', 'forward', sk[2] || null], skillsInnate: [true, true, false], skillMods: [null, null, mods[2] || null],
+        mpbUnit: 'shadowDen', mpb: 'shadowDen', mpbSkin: 'hand', noPack: true }]; // (noPack: never in a starting package)
+    },
+    hooks: {
+      canBuy(m, side, rec, sk, args) {
+        if (denResting(m, rec)) return false;
+        if (sk.id === 'impersonate') {
+          const [who, id] = args;
+          if (!((who === 0 || who === 1) && Number.isInteger(id) && handsIdx(m) >= 0)) return false;
+          // Duo.rebuildTeam replays the teammate's buy (m.mpbReplay): it was checked when bought, and the target may
+          // have been sold or taken back since (the buy stands, as their gold stays paid)
+          return !!m.mpbReplay || impTargets(m, side).some(t => t.who === who && t.id === id);
+        }
+        if (sk.id === 'sabotage') return sabOk(m, args[0]);
+        return true;
+      },
+      bought(m, side, rec, sk, args, lane) {
+        if (sk.id === 'impersonate') { const q = impFind(m, side, args[0], args[1]); rec.data.imp = impNow(m, rec).concat({ round: m.round, lane, tl: args[0] === 0 ? lane : 1 - lane, id: args[1], u: q ? q.unit : null }); }
+        if (sk.id === 'sabotage') rec.data.sab = sabList(rec).filter(x => x.round !== m.round).concat({ round: m.round, ui: args[0], lane }); // (last round's, in force now, stays)
+        if (sk.id === 'insider') rec.data.insider = { round: m.round, lane };
+      },
+      unbuy(m, side, rec, sk, lane) {
+        if (sk.id === 'impersonate') rec.data.imp = impNow(m, rec).filter(x => x.lane !== lane);
+        if (sk.id === 'sabotage') rec.data.sab = sabList(rec).filter(x => x.round !== m.round);
+        if (sk.id === 'insider' && rec.data.insider && rec.data.insider.round === m.round) delete rec.data.insider;
+      },
+      // no flank delay for its units (an Assassin in the enemy's zone neither), as Game.bodiesFor sets it
+      squadBodies(m, side, rec, sq, list) {
+        if (!denUnit(m, sq.unit) || !(sq.round === m.round || sq.movedRound === m.round)) return;
+        if (G.isFlank(side, sq.col, sq.row) || (G.anywhere(m, sq.unit) && (G.inZone(1 - side, sq.row) || G.isFlank(1 - side, sq.col, sq.row)))) for (const b of list) b.delay = 0;
+      },
+      // Impersonate: what the Engine needs for this round's targets (fight ids: lane 1's moved by LANE_OFF). lanes (Duo.battle):
+      // the target must still be that squad (its unit type, tier 1-2) in its lane; the Shadowhand is the buyer's own
+      // (their lane's Shadowhands skills)
+      battleOpts(m, side, rec, opts, lanes) {
+        const list = impNow(m, rec), hi = handsIdx(m), k = recs(m, side).indexOf(rec);
+        if (!list.length || hi < 0) return;
+        const ls = lanes || [m];
+        const out = list.map((x, j) => {
+          const L = ls[x.tl], q = L && L.armies[1 - side].find(s => s.id === x.id);
+          if (L && !(q && q.unit === x.u && impTier(L, q.unit))) return null;
+          return { side, squad: x.tl === 0 ? x.id : x.id + LANE_OFF, at: DEN.impAt, unit: E.leveled(G.unitFor(ls[x.lane] || m, side, hi), 0), sq: extraOf(k, j), lane: x.lane };
+        }).filter(Boolean);
+        if (out.length) opts.mpb.shadowImpersonate = (opts.mpb.shadowImpersonate || []).concat(out);
+      },
+      afterFight(lanes, side, rec, res, sums, round) {
+        const m = lanes[0], fell = rec.fell === round, k = recs(m, side).indexOf(rec); // (m.round is the next round already)
+        const made = (rec.data.imp || []).filter(x => x.round === round).filter((x, j) => res.squads && res.squads[side + ':' + extraOf(k, j)]).length;
+        if (made) news(sums, side, { kind: 'shadowDen', imp: made, text: `${side === 0 ? 'Team A' : 'Team B'}’s Shadow Den: ${made} enemy bod${made > 1 ? 'ies' : 'y'} turned into Shadowhands.` });
+        const ins = rec.data.insider;
+        if (ins && ins.round === round) {
+          rec.data.watch = { round: round + 1, by: fell ? 1 - side : side, free: fell };
+          delete rec.data.insider;
+          if (fell) news(sums, side, { kind: 'shadowDen', flip: true, text: `${side === 0 ? 'Team A' : 'Team B'}’s Shadow Den fell while its Insider information was on: the other team gets it for free next round.` });
+        }
+        if (!fell) return;
+        let lost = 0;
+        for (const L of lanes) { const before = L.armies[side].length; L.armies[side] = L.armies[side].filter(q => !isHands(L, q.unit)); lost += before - L.armies[side].length; }
+        news(sums, side, { kind: 'shadowDen', lost, text: `${side === 0 ? 'Team A' : 'Team B'}’s Shadow Den was destroyed: ${lost ? `${lost} Shadowhands squad${lost > 1 ? 's' : ''} lost, ` : ''}no Den skills next round.` });
+      },
+      // old buys are done with: a lock only lasts the round after it was bought, a watch only its own round
+      roundStart(lanes, side, rec) {
+        const m = lanes[0], d = rec.data;
+        if (d.imp) d.imp = d.imp.filter(x => x.round === m.round);
+        if (d.sab) d.sab = sabList(rec).filter(x => x.round >= m.round - 1);
+        if (d.insider && d.insider.round < m.round) delete d.insider;
+        if (d.watch && d.watch.round < m.round) delete d.watch;
+      },
+      // the opponents don't see this round's targets, sabotage or Insider information until the fight
+      hide(s, h, rec) {
+        const d = rec.data;
+        if (d.imp) d.imp = d.imp.filter(x => x.round !== s.round);
+        if (d.sab) d.sab = sabList(rec).filter(x => x.round !== s.round); // (the one in force since the round began shows)
+        if (d.insider && d.insider.round === s.round) delete d.insider;
+      },
+      // viewer: the side reading the sheet (the owners by default)
+      info(m, side, rec, viewer = side) {
+        const out = [], ours = viewer === side, live = sabLive(m, rec);
+        if (denResting(m, rec)) out.push(ours ? 'Destroyed last round: no Den skills this round.' : 'Destroyed last round: no Den skills for them this round.');
+        if (live) out.push(`Sabotage: ${ours ? 'their' : 'your'} ${(m.units[live.ui] || {}).name || 'unit'} can’t be deployed this round.`);
+        for (const sd of [side, 1 - side]) if (watching(m, sd)) out.push(sd === viewer ? 'Insider information: you see their deployment live.' : 'Insider information: they see your deployment live.');
+        return out;
+      },
+      // a bot now and then: impersonates a squad, sabotages a unit type they field, buys Insider information
+      bot(m, side, rec, r) {
+        const spare = (c) => m.gold[side] - c >= 150;
+        if (r() < 0.3 && spare(DEN.impersonate)) { const t = impTargets(m, side); if (t.length) { const x = t[Math.floor(r() * t.length)]; mpbBuy(m, side, rec.key, 'impersonate', x.who, x.id); } }
+        if (r() < 0.25 && spare(DEN.sabotage)) {
+          const types = [...new Set(G.foeSeen(m, 1 - side).concat(G.teamSeen(m, 1 - side)).map(q => q.unit))].filter(ui => sabOk(m, ui)).sort((a, b) => a - b);
+          if (types.length) mpbBuy(m, side, rec.key, 'sabotage', types[Math.floor(r() * types.length)]); // (the lock in force from last round's stays)
+        }
+        if (r() < 0.15 && spare(DEN.insider + 50)) mpbBuy(m, side, rec.key, 'insider');
+      },
+    },
+  });
 
   // =====================================================================
   // Records
@@ -413,8 +622,9 @@
   // which building of a side a fight squad id is (k), or -1
   const indexOf = (sq) => sq <= SQ && sq > XSQ ? SQ - sq : sq <= XSQ && sq > XSQ - 1000 ? Math.floor((XSQ - sq) / 10) : -1;
   const isSquad = (sq) => typeof sq === 'number' && sq <= SQ && sq > XSQ - 1000;
-  // lane 0's MPB bodies for side (Duo.battle builds them once for the team)
-  function bodies(m, side, idx0 = 5000) {
+  // lane 0's MPB bodies for side (Duo.battle builds them once for the team). lanes (optional): both lanes' matches, as
+  // ctx.lanes (a kind that makes a unit for one player: the Factory's buyer)
+  function bodies(m, side, idx0 = 5000, lanes = null) {
     if (!on(m)) return [];
     grid(m);
     const out = [];
@@ -422,17 +632,18 @@
       const K = kindOf(rec.kind);
       if (!K) return;
       const idx = idx0 + k * 20;
-      const ctx = { k, squad: squadOf(k), xsq: (j) => extraOf(k, j), idx,
+      const ctx = { k, squad: squadOf(k), xsq: (j) => extraOf(k, j), idx, lanes,
         main: () => { if (!(K.hp > 0)) return []; const w = G.tileToWorld(rec.col, rec.row); return E.buildSquad(unitOf(m, side, rec), side, w.x, w.y, squadOf(k), G.TILE, idx); } };
       out.push(...(K.hooks.bodies ? K.hooks.bodies(m, side, rec, ctx) : ctx.main()));
     });
     return out;
   }
-  // the Engine options the buildings add (opts.mpb: fields the kinds fill; opts as a whole for tiles and the like)
-  function battleOpts(m, opts) {
+  // the Engine options the buildings add (opts.mpb: fields the kinds fill; opts as a whole for tiles and the like).
+  // lanes (optional): both lanes' matches, the hook's 5th argument
+  function battleOpts(m, opts, lanes = null) {
     if (!on(m)) return opts;
     if (!opts.mpb) opts.mpb = {};
-    for (const side of [0, 1]) for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.battleOpts) K.hooks.battleOpts(m, side, rec, opts); }
+    for (const side of [0, 1]) for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.battleOpts) K.hooks.battleOpts(m, side, rec, opts, lanes); }
     return opts;
   }
   // Game.bodiesFor: a squad's fight unit (before its bodies are made) and its bodies (after)
@@ -443,6 +654,12 @@
   function squadBodies(m, side, sq, list, u) {
     for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.squadBodies) K.hooks.squadBodies(m, side, rec, sq, list, u); }
   }
+  // units a kind brings into the 2v2 set (kind field extraUnits(units) -> [unit]; Duo.unitSet appends them). Game.isOff
+  // asks unitOff: such a unit (u.mpbUnit = the kind) is off for a team without a building of that kind (group B5)
+  const extraUnits = (units) => Object.values(KINDS).flatMap(K => (K.extraUnits ? K.extraUnits(units) : []));
+  const unitOff = (m, side, ui) => { const u = m && m.units && m.units[ui]; return !!(u && u.mpbUnit) && !(side != null && recs(m, side).some(r => r.kind === u.mpbUnit)); };
+  // the bots' turn (Duo.botTurn, before its squads): each building's hooks.bot(m, side, rec, r), r a seeded 0..1 source
+  function bots(m, side, r) { if (!on(m)) return; for (const rec of recs(m, side).slice()) { const K = kindOf(rec.kind); if (K && K.hooks.bot) K.hooks.bot(m, side, rec, r); } }
   // a line for the results screen: summaries[L].mpbNews[side] gets { kind, ... } (the page words it)
   function news(sums, side, item) { for (const s of sums) { if (!s.mpbNews) s.mpbNews = [[], []]; s.mpbNews[side].push(item); } }
   // After the fight (Duo.fight, both lanes resolved): fell, the kinds' afterFight, the artifacts' winners and gold.
@@ -593,6 +810,9 @@
     hide, unitOf, squadOf, extraOf, indexOf, isSquad, bodies, battleOpts, squadMods, squadBodies, news, afterFight, roundStart,
     cardPool, cardName, cardText, rollArtifacts, artifactsFor,
     dealDraft, draftOpen, draftTurn, giveCard, applyDraft, draftPick, botPick, rng, laneOf, on,
+    extraUnits, unitOff, bots,
+    // the Factory and the Shadow Den (group B5)
+    FAC, facNow, facResting, DEN, LANE_OFF, denOf, denUnit, handsIdx, isHands, denResting, shadowBonus, sabotaged, sabNow, sabLive, watching, deployCut, impTargets, impFind, impNow,
   };
   // the player actions (Referee.ACTIONS lists them) and the hooks Game calls (occupied, bodiesFor, Referee.hide)
   Object.assign(G, { mpbBuy, mpbUndo, mpbAct, mpbVote, vaultPut, vaultTake, draftPick });

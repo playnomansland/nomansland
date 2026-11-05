@@ -707,10 +707,52 @@ const Models3D = (THREE) => {
   // ===== scorch (3D) =====
   // ===== oak (3D) =====
   // ===== factory (3D) =====
+  // The 2v2 team Factory: the Cog Builder's brick workshop (factory() above, in the kind's colour) with a band in the team
+  // colour round the eaves and a tall flagpole at its left front corner flying a big swallow-tailed team banner with a
+  // brass cog on it, so it reads as the team's and not one player's
+  BUILD['mpb:factory'] = () => [...factory(),
+    P(box(4.15, 0.22, 3.35), 'team', [0, 2.45, 0]),
+    P(cyl(0.09, 0.11, 5.6, 6), DARK, [-2.35, 2.8, -1.85]), P(ball(0.17), BRASS, [-2.35, 5.65, -1.85]),
+    P(box(1.5, 1.6, 0.08), 'team', [-1.55, 4.7, -1.85]), // the banner, facing its own side (-z)
+    P(box(0.6, 0.8, 0.08), 'team', [-0.62, 5.1, -1.85], [0, 0, -0.55]), P(box(0.6, 0.8, 0.08), 'team', [-0.62, 4.3, -1.85], [0, 0, 0.55]), // its swallow tail
+    P(cyl(0.42, 0.42, 0.1, 10), BRASS, [-1.65, 4.7, -1.92], [Math.PI / 2, 0, 0]), P(cyl(0.17, 0.17, 0.12, 8), DARK, [-1.65, 4.7, -1.95], [Math.PI / 2, 0, 0])];
   // ===== magicLake (3D) =====
   // ===== jail (3D) =====
   // ===== school (3D) =====
   // ===== shadowDen (3D) =====
+  // The Shadow Den: a crooked hideout of dark violet stone (the kind's colour, 'tint') on a rough plinth, a steep slate
+  // roof with a band in the team colour under its eaves, a pale mask with glowing violet eyes on the gable over a black
+  // arched doorway (-z, toward its own side), two crossed daggers on the wall, a violet lantern on a post, a cloth in the
+  // team colour hung from the side, crates in the shadows
+  const VIOLET = '#B79CFF', SLATE = '#231E2E';
+  BUILD['mpb:shadowDen'] = () => [
+    P(box(4.0, 0.35, 3.6), ROCK, [0, 0.17, 0]),
+    P(box(3.3, 2.3, 2.9), 'tint', [0, 1.5, 0], [0, 0.05, 0.03]),
+    P(box(3.5, 0.3, 3.1), 'team', [0, 2.62, 0], [0, 0.05, 0.03]),
+    P(cone(2.75, 2.5, 4), SLATE, [0.1, 3.95, 0], [0, Math.PI / 4 + 0.05, 0.05], [1, 1, 0.9]),
+    P(box(0.12, 0.9, 0.12), SLATE, [0.25, 5.3, 0.1], [0, 0, 0.3]), // a bent chimney
+    P(box(1.0, 1.4, 0.15), '#0B0910', [0, 0.95, -1.47]), P(cyl(0.5, 0.5, 0.15, 8), '#0B0910', [0, 1.65, -1.47], [Math.PI / 2, 0, 0]), // the doorway
+    // the mask on the gable, its eyes glowing
+    P(ball(0.52), BONE, [0, 3.3, -1.45], [0, 0, 0], [1, 1.15, 0.4]),
+    ...[-1, 1].map(sd => P(box(0.26, 0.1, 0.06), VIOLET, [sd * 0.2, 3.38, -1.67], [0, 0, sd * 0.35])),
+    // crossed daggers on the wall, left of the door
+    ...[-1, 1].flatMap(sd => [P(box(0.08, 1.0, 0.05), METAL, [-1.0, 1.55, -1.5], [0, 0, sd * 0.7]), P(box(0.25, 0.08, 0.08), WOOD, [-1.0 + sd * 0.27, 1.27, -1.52], [0, 0, sd * 0.7])]),
+    // a lantern on a post at the right front corner
+    P(cyl(0.06, 0.07, 2.2, 5), WOOD, [1.9, 1.1, -1.7]), P(box(0.5, 0.06, 0.06), WOOD, [1.7, 2.15, -1.7]),
+    P(box(0.36, 0.46, 0.36), DARK, [1.5, 1.85, -1.7]), P(box(0.28, 0.34, 0.38), VIOLET, [1.5, 1.85, -1.7]),
+    // a cloth in the team colour hung from the right wall, crates at the left back
+    P(box(0.06, 1.3, 0.9), 'team', [1.7, 1.55, 0.3]),
+    P(box(0.7, 0.6, 0.7), WOOD, [-1.95, 0.65, 1.1], [0, 0.4, 0]), P(box(0.5, 0.45, 0.5), '#5B4A3A', [-1.85, 1.18, 1.05], [0, 0.9, 0])];
+  // a Shadowhand (the Den's walker, u.mpb 'shadowDen', u.mpbSkin 'hand'): a slight hooded figure, cloak and hood in the
+  // unit's violet, a pale mask with violet eyes, a sash in the team colour, a long dagger held low; for a body of radius 1
+  BUILD['mpb:shadowDen:hand'] = () => [...legs(0.7, 0.15, 0.17),
+    P(cyl(0.22, 0.3, 0.72, 6), 'tint', [0, 1.05, 0]),
+    P(cone(0.52, 1.4, 6), 'tint', [0, 0.92, 0.1], [-0.12, 0, 0], [1, 1, 0.6]),
+    P(box(0.1, 0.8, 0.07), 'team', [0, 1.08, -0.27], [0, 0, -0.7]),
+    P(ball(0.21), BONE, [0, 1.62, -0.02], [0, 0, 0], [1, 1.1, 0.9]),
+    ...[-1, 1].map(sd => P(box(0.1, 0.04, 0.04), VIOLET, [sd * 0.08, 1.66, -0.2])),
+    P(cone(0.3, 0.68, 6), 'tint', [0, 1.86, 0.06], [0.28, 0, 0]),
+    P(box(0.09, 0.09, 0.15), DARK, [0.38, 0.95, -0.15]), P(cone(0.05, 0.7, 4), METAL, [0.4, 0.98, -0.58], [-1.4, 0, 0.1])];
 
   // the Leafblade suit (an awakened Leaf Wizard): a leaf-green mech on thick legs, a glowing visor, missile pods on its
   // shoulders and two long leaf blades held out from its arms
