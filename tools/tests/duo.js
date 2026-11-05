@@ -33,7 +33,7 @@ function setup(lanes) { lanes.forEach((m, L) => { Duo.setTeam(lanes, L); for (co
 // no two squads of one side on a tile, across both lanes
 function clashes(lanes) {
   const seen = new Set(); let n = 0;
-  for (const m of lanes) for (const sd of [0, 1]) for (const q of m.armies[sd]) { if (q.in != null) continue; const k = sd + ':' + q.col + ',' + q.row; if (seen.has(k)) n++; seen.add(k); }
+  for (const m of lanes) for (const sd of [0, 1]) for (const q of m.armies[sd]) { if (q.in != null || Game.mpbHeld(q)) continue; const k = sd + ':' + q.col + ',' + q.row; if (seen.has(k)) n++; seen.add(k); }
   return n;
 }
 const freeTile = (m, sd, unit) => { for (const row of Game.zoneRows(sd)) for (let c = 0; c < Game.COLS; c++) if (Game.canPlaceAt(m, sd, c, row, unit) && Game.spotFree(m, sd, c, row, unit)) return [c, row]; return null; };
