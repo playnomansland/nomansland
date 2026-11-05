@@ -985,6 +985,9 @@ const Game = (() => {
   // other opponent's squads you can see (teamSeen) hold theirs. Their ids are moved (Duo.OFF) so they never clash.
   // half: which half of the board this player's own squads go to by default (0: the low columns).
   const teamArmy = (m, side) => (m && m.team && m.team.armies && m.team.armies[side]) || [];
+  // the teammate's buildings from skills (the Cog Builder's Factory) in a 2v2 lane: their tiles are taken here too
+  const teamBuildings = (m, side) => (m && m.team && m.team.buildings && m.team.buildings[side]) || [];
+  const teamBuildingAt = (m, side, col, row) => teamBuildings(m, side).some(b => b.col === col && b.row === row);
   const teamSeen = (m, side) => teamArmy(m, side).filter(s => s.round < m.round && !hiddenFromFoe(m, s));
   const enemyHolds = (m, side, col, row) => !!m && (foeSeen(m, 1 - side).some(s => { const p = seenAt(m, s); return p.col === col && p.row === row; }) ||
     teamSeen(m, 1 - side).some(s => { const p = seenAt(m, s); return p.col === col && p.row === row; }) ||
@@ -1785,7 +1788,7 @@ const Game = (() => {
   }
 
   const towerAt = (m, side, col, row) => !!(m.towers && m.towers[side] && m.towers[side].col === col && m.towers[side].row === row);
-  const occupied = (m, side, col, row) => towerAt(m, side, col, row) || treasuryAt(m, side, col, row) || elfOwnAt(m, side, col, row) || !!buildingAt(m, side, col, row) || m.armies[side].some(s => covers(m, s, col, row)) || teamArmy(m, side).some(s => covers(m, s, col, row)) || devOccupied(m, side, col, row);
+  const occupied = (m, side, col, row) => towerAt(m, side, col, row) || treasuryAt(m, side, col, row) || elfOwnAt(m, side, col, row) || !!buildingAt(m, side, col, row) || teamBuildingAt(m, side, col, row) || m.armies[side].some(s => covers(m, s, col, row)) || teamArmy(m, side).some(s => covers(m, s, col, row)) || devOccupied(m, side, col, row);
   const needsTower = (m, side) => !!(m.towers && !m.towers[side]);
   // the tower can be placed (or moved) during round 1 only
   function placeTower(m, side, col, row) {
@@ -3276,7 +3279,7 @@ const Game = (() => {
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,
-    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, AIM, canAim, setAim, clearAim, aimEnd, aimTo, resolve, aiDeploy, occupied,
+    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, teamBuildings, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, AIM, canAim, setAim, clearAim, aimEnd, aimTo, resolve, aiDeploy, occupied,
     GRID, useGrid,
     DEV, CAT_NAMES, LESSER_SQ, WALL_SQ, setDevData, devBuilding, devPower, devSpell, isDev, towerUp, pickCat, devOffer, pickNow, needsDevPick, devPick, undoDevPick, devShown,
     lessersOf, placedLessers, unplacedLesser, lesserAt, lesserSpotOk, placeLesser, lesserUnit, auraFor, modUnit, powersOf, devGold, devDeploys,

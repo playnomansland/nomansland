@@ -50,8 +50,11 @@
 
   // ----- the other lane on this lane's board (m.team) -----
   const moved = (q) => { const o = { ...q, id: move(q.id) }; if (q.in != null) o.in = move(q.in); if (q.from && q.from.in != null) o.from = { ...q.from, in: move(q.from.in) }; return o; };
-  // the squads of match o (the other lane) as m.team carries them; half: the half of the board this lane's players use
-  const teamOf = (o, half) => ({ half, armies: [0, 1].map(sd => (o.armies[sd] || []).map(moved)) });
+  // the squads of match o (the other lane) as m.team carries them; half: the half of the board this lane's players use.
+  // buildings: the other lane's buildings from skills (the Cog Builder's Factory: { id, col, row, round, built }), so
+  // their tiles are taken in this lane too (Game.occupied) and the board can draw them
+  const teamOf = (o, half) => ({ half, armies: [0, 1].map(sd => (o.armies[sd] || []).map(moved)),
+    buildings: [0, 1].map(sd => ((o.buildings && o.buildings[sd]) || []).map(b => ({ id: b.id, col: b.col, row: b.row, round: b.round, built: !!b.built }))) });
   // the server's copy: each lane gets the other lane's squads as they really stand (the rules check against them)
   function setTeam(lanes, L) { lanes[L].team = teamOf(lanes[1 - L], L); }
   function setTeams(lanes) { setTeam(lanes, 0); setTeam(lanes, 1); }
