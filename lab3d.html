@@ -1183,6 +1183,26 @@ const Engine = (() => {
 
   // A steppable battle between two lists of bodies (side 0 and side 1)
   function createBattle(A, B, g, opts = {}) {
+    // 2v2 Coal mine (src/mpb.js coalMine; only a 2v2 fight's bodies carry mineTo, so off by default): a squad deployed
+    // round a mine's entrance has mineTo = { x, y (the middle of its tile at the exit), dx, dy (from its own tile to
+    // there), h (half a tile), t (travel s), rise (s it then stands, as a flank squad), boost: { speed %, armor, secs }
+    // | null }. A squad whose exit tile an enemy squad's body starts on doesn't go in. The others go down as the fight
+    // starts: they stand at the exit already, but can't be seen, hit or pushed for t s (mineT: see sheltered), then
+    // stand still rise s more (delay), then fight; with a boost they are faster and tougher for secs s from coming out.
+    const mineOn = A.some(b => b.mineTo) || B.some(b => b.mineTo), mineFx = [];
+    if (mineOn) {
+      const held = (side, mt) => (side === 0 ? B : A).some(f => f.squad >= 0 && !f.u.structure && Math.abs(f.x - mt.x) <= mt.h && Math.abs(f.y - mt.y) <= mt.h);
+      const stay = new Set();
+      for (const b of A.concat(B)) if (b.mineTo && (b.inside || b.boarded || held(b.side, b.mineTo))) stay.add(b.side + ':' + b.squad);
+      for (const b of A.concat(B)) {
+        if (!b.mineTo) continue;
+        if (stay.has(b.side + ':' + b.squad)) { b.mineTo = null; continue; }
+        b.x += b.mineTo.dx; b.y += b.mineTo.dy; b.mineT = b.mineTo.t;
+        b.delay = Math.max(b.delay || 0, b.mineTo.t + b.mineTo.rise);
+        if (b.spreadTo) { b.spreadTo.x += b.mineTo.dx; b.spreadTo.y += b.mineTo.dy; }
+        if (b.guide) b.guide = b.guide.map(p => ({ ...p, x: p.x + b.mineTo.dx, y: p.y + b.mineTo.dy })); // its direction arrow, from the exit
+      }
+    }
     // linked squads and squads with a healbot: their bodies, in squads of u.bodies (a Counter Lab army puts all its
     // squads under one id; a game squad has exactly u.bodies of them)
     const groups = [];
@@ -1203,6 +1223,7 @@ const Engine = (() => {
       if (!e) continue;
       const hb = newBody(leveled(e.unit, lead.level), lead.side, lead.x, lead.y - (lead.side === 0 ? 1 : -1) * 2.5, escortIdx++, -1);
       hb.follow = grp; hb.healPct = e.pct; hb.credit = lead;
+      if (lead.mineT > 0) { hb.mineT = lead.mineT; hb.delay = lead.delay; hb.mineBoost = lead.mineTo && lead.mineTo.boost; } // (2v2 Coal mine: it comes through with its squad, Fresh air too)
       (lead.side === 0 ? A : B).push(hb);
     }
     // a portal in front of each squad that summons (Ember Imps' Hellfiend): the squad holds still (channel) for the
@@ -1230,11 +1251,43 @@ const Engine = (() => {
       const e = newBody(leveled({ ...el.unit, speed: b.u.speed }, b.level), b.side, x, y, i, -1);
       e.credit = b;
       if (b.delay) e.delay = b.delay;
+      if (b.mineT > 0) { e.mineT = b.mineT; e.mineBoost = b.mineTo && b.mineTo.boost; } // (2v2 Coal mine: it comes through with its summoner, Fresh air too)
       if (b.march) e.march = b.march.slice();
       list.push(e);
     }
+    // 2v2 Field hospital (src/mpb.js; only Duo.battle sets opts.mpb.fieldHospital = { dress: [[r, ...], [...]], pct }):
+    // Field dressing: each number r of a side gives one of its squads (its fighting squads, ids >= 0, by id; the
+    // r-th share of them) +pct % health for this fight. Second wind: bodies marked fhRevive = { x, y } (one squad)
+    // come back whole there, once, the first time all of them are down (see the end of step)
+    const fhOpt = opts.mpb && opts.mpb.fieldHospital;
+    if (fhOpt) for (const sd of [0, 1]) {
+      const list = sd === 0 ? A : B, ids = [...new Set(list.filter(b => b.squad >= 0 && !b.u.structure && !b.u.noCount && !b.u.aloft && !b.u.construct).map(b => b.squad))].sort((a, b) => a - b);
+      const add = {};
+      for (const r of (fhOpt.dress && fhOpt.dress[sd]) || []) if (ids.length) { const q = ids[Math.min(ids.length - 1, Math.floor(r * ids.length))]; add[q] = (add[q] || 0) + fhOpt.pct; }
+      const made = new Map();
+      for (const b of list) {
+        if (!(add[b.squad] > 0) || b.u.structure) continue;
+        if (!made.has(b.u)) made.set(b.u, { ...b.u, hp: b.u.hp * (1 + add[b.squad] / 100) });
+        const k = b.hp / b.u.hp; b.u = made.get(b.u); b.hp = b.u.hp * k;
+      }
+    }
+    const FH_KEEP = ['band', 'sniperMark', 'marked', 'prey', 'zoe', 'shroom', 'aura', 'glutN', 'mask'];
+    const fhRevives = [];
+    if (fhOpt) for (const list of [A, B]) for (const b of list) if (b.fhRevive) {
+      let grp = fhRevives.find(x => x.side === b.side && x.squad === b.squad);
+      if (!grp) fhRevives.push(grp = { side: b.side, squad: b.squad, x: b.fhRevive.x, y: b.fhRevive.y, list: [], done: false });
+      grp.list.push(b); b.fhU = b.u;
+      // what Game.bodiesFor put on the body (Home ground, Mark Bounty, Hunter's prey, Zoe, Glut...), as the fight starts
+      b.fhKeep = {};
+      for (const k of FH_KEEP) if (b[k] !== undefined) b.fhKeep[k] = b[k] && typeof b[k] === 'object' && !Array.isArray(b[k]) ? { ...b[k] } : b[k];
+    }
     const all = A.concat(B);
     const sides = [A, B];
+    // 2v2 Oak (src/mpb.js; only Duo.battle sets opts.mpb.oak): while a body with oakRestore (an Oak) stands, every heal
+    // on its side is that many times as strong
+    const oakOn = !!(opts.mpb && opts.mpb.oak), oaks = oakOn ? all.filter(b => b.oakRestore > 0) : [];
+    const oakK = (sd) => { let k = 1; for (const b of oaks) if (b.side === sd && b.alive && b.oakRestore > k) k = b.oakRestore; return k; };
+    const oakNow = oakOn ? [oakK(0), oakK(1)] : [1, 1]; // fixed at the start of each tick (step), so who acts first on the tick an Oak falls doesn't matter
     const counts = (b) => !(b.u.structure || b.u.aloft || b.u.noCount); // what makes up a side's army (towers, drones and constructs don't)
     const stats = [
       { dealt: 0, wasted: 0, blocked: 0, missed: 0, windLost: 0, winds: 0, totalHp: A.reduce((s, b) => s + (counts(b) ? b.u.hp : 0), 0) },
@@ -1289,8 +1342,8 @@ const Engine = (() => {
         if (opts.record) shots.push([v.x, v.y, v.x, v.y, v.side, v.u.blastR, 1, 0, 0]);
         for (const f of sides[1 - v.side]) if (f.alive && f !== v.rammed && hyp(f.x - v.x, f.y - v.y) <= v.u.blastR) hurt(v, f, dmg, v.x, v.y);
       }
-      // a carrier is gone: whoever rode inside jumps out where it fell
-      if (v.u.carrier) {
+      // a carrier is gone: whoever rode inside jumps out where it fell (a Tree kojja's one body too: b.nest)
+      if (v.u.carrier || v.nest) {
         let k = 0;
         for (const r of sides[v.side]) {
           if (r.carrier !== v || !r.boarded) continue;
@@ -1318,6 +1371,10 @@ const Engine = (() => {
     const charmUsed = [{}, {}]; // Gentleman squads that already won a body over this fight
     const charmGained = [{}, {}], charmGave = [{}, {}]; // squads that already gained / gave a stack this fight
     const turning = [];          // bodies won over this tick: they switch sides at the end of it
+    // 2v2 Shadow Den's Impersonate (opts.mpb.shadowImpersonate = [{ side, squad, at, unit, sq, lane }], set only by
+    // src/mpb.js through Duo.battle): `at` s into the fight one body of enemy squad `squad` leaves the fight and a
+    // Shadowhand (unit, squad id sq) of `side` takes its place. Absent: nothing changes.
+    const shImp = opts.mpb && Array.isArray(opts.mpb.shadowImpersonate) && opts.mpb.shadowImpersonate.length ? opts.mpb.shadowImpersonate.map(x => ({ ...x, done: false })) : null;
     // owner is about to kill v: count the kill for charisma, or win v over instead (returns true; v lives on)
     function finishing(owner, v) {
       const c = charm[owner.side];
@@ -1349,6 +1406,7 @@ const Engine = (() => {
     // to full health or saves a body just because of who went first; a body that fell meanwhile gets none
     let healLater = null;
     function heal(v, amt) {
+      if (oakOn) amt *= oakNow[v.side]; // the Oak's Restoration (2v2)
       if (healLater) { if (amt > 0) healLater.push(v, amt * healK(v)); return; }
       if (amt > 0 && v.hp < v.u.hp) v.hp = Math.min(v.u.hp, v.hp + amt * healK(v));
     }
@@ -1420,7 +1478,12 @@ const Engine = (() => {
     // the cell a board point is in (-1 off the grid)
     const cellOf = (x, y) => { const c = Math.floor((x - ter.x0) / TC), r = Math.floor((ter.y1 - y) / TC); return c < 0 || r < 0 || c >= ter.cols || r >= ter.rows ? -1 : r * ter.cols + c; };
     const cellX = (i) => ter.x0 + (i % ter.cols + 0.5) * TC, cellY = (i) => ter.y1 - (Math.floor(i / ter.cols) + 0.5) * TC;
-    const blocked = (i) => i >= 0 && ter.block[i] === 1;
+    // 2v2 Magic lake (src/mpb.js magicLake; opts.mpb.lakeWalk = [[cell, ...] side 0 may walk on, [...] side 1], set
+    // only by a 2v2 fight: off by default): those water cells are open ground for that side's bodies (Waterspirits).
+    // walkSide is the side of the body being steered or kept out of the water (steer, keepOut, artSpot set it).
+    const lakeWalk = ter && opts.mpb && opts.mpb.lakeWalk ? opts.mpb.lakeWalk.map(l => new Set(l || [])) : null;
+    let walkSide = 0;
+    const blocked = lakeWalk ? (i) => i >= 0 && ter.block[i] === 1 && !lakeWalk[walkSide].has(i) : (i) => i >= 0 && ter.block[i] === 1;
     // Height: a body on higher ground than its target gets HEIGHT.range m more range and HEIGHT.dmg % more damage per
     // level of difference (from +2 down to -2: 4 levels, 4x); shooting uphill takes as much off (range never below 1 m,
     // or its own range if shorter).
@@ -1469,8 +1532,9 @@ const Engine = (() => {
       return j;
     }
     // how far every cell is from a goal cell on foot (Dijkstra; whole numbers, so the same on every device), kept per goal
-    function flowTo(goal) {
-      let f = terCache.flows.get(goal);
+    function flowTo(goal0) {
+      const goal = goal0, fk = lakeWalk ? goal0 * 2 + walkSide : goal0; // (a 2v2 Magic lake: each side walks its own ways)
+      let f = terCache.flows.get(fk);
       if (f) return f;
       if (terCache.flows.size >= NAV.keep) terCache.flows.clear();
       f = new Int32Array(ter.cols * ter.rows).fill(NAV_INF);
@@ -1498,7 +1562,7 @@ const Engine = (() => {
         if (d > f[i]) continue;
         for (const s of STEPS) { const j = stepTo(i, s); if (j >= 0 && d + s[2] < f[j]) { f[j] = d + s[2]; push([f[j], j]); } }
       }
-      terCache.flows.set(goal, f);
+      terCache.flows.set(fk, f);
       return f;
     }
     // Which way a body walking toward (gx, gy) goes, given the way it wants to go (wx, wy): straight on while nothing
@@ -1507,6 +1571,7 @@ const Engine = (() => {
     // opening instead of walking into the wall. The way is worked out again every NAV.every s, or when the goal moves on.
     function steer(b, gx, gy, wx, wy) {
       if (!terBlock || b.u.aloft) return [wx, wy];
+      if (lakeWalk) walkSide = b.side;
       const look = Math.min(NAV.look, hyp(gx - b.x, gy - b.y));
       if (clearWalk(b.x, b.y, b.x + wx * look, b.y + wy * look)) { b.nav = null; return [wx, wy]; }
       const goal = walkCell(gx, gy), start = cellOf(b.x, b.y);
@@ -1532,6 +1597,7 @@ const Engine = (() => {
     }
     // a body standing in a blocked cell (pushed there, or walked round a corner) is put back out at the nearest open edge
     function keepOut(b) {
+      if (lakeWalk) walkSide = b.side;
       const i = cellOf(b.x, b.y);
       if (i < 0) return;
       const c0 = i % ter.cols, r0 = Math.floor(i / ter.cols);
@@ -1596,6 +1662,14 @@ const Engine = (() => {
       obj.lead = lead;
       if (obj.won < 0 && lead >= 0 && obj.hold >= obj.secs - 1e-9) obj.won = lead;
     }
+    // ----- 2v2 Jail and School (opts.mpb, src/mpb.js; set only by src/duo.js, off by default) -----
+    // opts.mpb.discover = [{ x, y, r, side, squad }] (the Jail's Skywatch): while a living body of fight squad `squad`
+    // of `side` stands (no squad: always), a stealthed body of the other side standing in the square |dx|, |dy| <= r
+    // round (x, y) is seen (not hidden) while it is there. opts.mpb.watchKills (the School): a
+    // body with watchKill notes who cut it down (b.killedBy = { side, squad }), and result().killedBy lists them.
+    const discover = opts.mpb && Array.isArray(opts.mpb.discover) && opts.mpb.discover.length ? opts.mpb.discover : null;
+    const discovered = (b, lit) => lit.some(d => d.side !== b.side && Math.abs(b.x - d.x) <= d.r && Math.abs(b.y - d.y) <= d.r);
+    const watchKills = !!(opts.mpb && opts.mpb.watchKills);
     // ----- 2v2 artifacts (opts.artifacts = [{ x, y, r, cap }] in board metres, r and cap default ARTIFACT; set only by
     // src/duo.js, off by default: without it nothing here runs) -----
     // Points: at the end of every tick each squad of a side with a living, fighting body inside an unlocked artifact's
@@ -1607,7 +1681,7 @@ const Engine = (() => {
     // and the points freeze. A fight that ends first: more points wins (equal: -1), see result().
     // Bodies soft-prioritise an unlocked artifact within their awareness (artifactMove, in the movement below).
     const arts = opts.artifacts && opts.artifacts.length ? opts.artifacts.map(a => ({ x: +a.x, y: +a.y, r: a.r > 0 ? +a.r : ARTIFACT.r, cap: a.cap > 0 ? +a.cap : ARTIFACT.cap, pts: [0, 0], rate: [0, 0], locked: false, won: -1 })) : null;
-    const holds = (b) => b.alive && !b.boarded && !b.turning && !(b.inside && b.inside.alive) && !b.u.structure && !b.u.building && !(b.u.barrier > 0) && b.u.kind !== 'watchtower' && !b.u.aloft && !b.u.noCount;
+    const holds = (b) => b.alive && !b.boarded && !b.turning && !(b.inside && b.inside.alive) && !(b.mineT > 0) && !b.u.structure && !b.u.building && !(b.u.barrier > 0) && b.u.kind !== 'watchtower' && !b.u.aloft && !b.u.noCount;
     const holdKey = (b) => b.credit ? 'c' + b.credit.side + ':' + b.credit.squad : 's' + b.squad;
     const holdTier = (b) => !b.credit && b.tier >= 1 ? Math.min(4, Math.floor(b.tier)) : 1;
     function artifactStep() {
@@ -1629,6 +1703,7 @@ const Engine = (() => {
     function artSpot(b, a) {
       if (b.artSpot && b.artSpot.a === a) return b.artSpot;
       if (b.artK == null) b.artK = sides[b.side].indexOf(b);
+      if (lakeWalk) walkSide = b.side;
       const fwd = b.side === 1 ? -1 : 1;
       let at = { a, x: a.x, y: a.y };
       for (let j = 0; j < 12; j++) {
@@ -1678,7 +1753,9 @@ const Engine = (() => {
     // move speed: a pool's speed boost adds to it while it lasts
     // ...and kill stacks (Rampager, the Assassin) add to it
     // ...and Berserkers' roars speed it up by a share
-    const spd = (b) => ((b.poolFastT > 0 ? b.u.speed + b.poolFast : b.u.speed) + (b.kills > 0 ? b.kills * b.u.killStack.speed : 0)) * (b.roarSpd > 0 ? 1 + b.roarSpd / 100 : 1);
+    const spd0 = (b) => ((b.poolFastT > 0 ? b.u.speed + b.poolFast : b.u.speed) + (b.kills > 0 ? b.kills * b.u.killStack.speed : 0)) * (b.roarSpd > 0 ? 1 + b.roarSpd / 100 : 1);
+    // ...and a 2v2 Coal mine's boost, for a while after coming out (mineFast s left; see mineOn)
+    const spd = (b) => b.mineFast > 0 ? spd0(b) * (1 + b.mineBoost.speed / 100) : spd0(b);
     // How far an attack reaches. Flame cones can reach further than where the unit stops (g.flameReach x range),
     // so a flamer keeps burning the enemies behind the first one without walking up to each.
     const reachOf = (b) => b.u.flame > 0 && g.flameReach > 1 ? R(b) * g.flameReach : R(b);
@@ -1711,6 +1788,7 @@ const Engine = (() => {
     function kill(owner, v) {
       for (const x of v.link ? v.link.filter(x => x.alive) : [v]) {
         x.hp = 0; x.alive = false; x.diedTick = tick;
+        if (watchKills && owner && x.watchKill) { const o = owner.credit ? owner.credit.convert || owner.credit : owner; x.killedBy = { side: o.side, squad: o.squad }; } // 2v2 School: its destroyers
         if (owner) owner.xp += x.u.hp * x.level;
         fell(x);
         if (owner) killed(owner, x);
@@ -1752,7 +1830,7 @@ const Engine = (() => {
       if (opts.record) shots.push([x.x, x.y, b.x, b.y, b.side, 0, 0, 0, 0, 1, 0, 0, 0, 3]); // [13] 3: eaten
     }
     // Overwatch: a body sitting in a structure that still stands can't be hit or targeted
-    const sheltered = (f) => !!(f.inside && f.inside.alive);
+    const sheltered = (f) => !!(f.inside && f.inside.alive) || f.mineT > 0; // (or down a 2v2 Coal mine, see mineOn)
     // Shadow hunter: an enemy body that shares its spot with no other body of its side (not a structure)
     function isLone(f) {
       if (f.u.structure || f.u.aloft) return false;
@@ -1762,6 +1840,12 @@ const Engine = (() => {
     // Overwatch: a body sitting in a building counts the seconds it sees no enemy it could pick within its sight (range
     // + sight, at least the minimum sight); after WATCH_IDLE s in a row it leaves (true), and a watchtower it leaves
     // empty is taken down (not destroyed: no one gets anything for it and its side isn't crippled)
+    // an enemy b could pick within its awareness (range + sight, at least the minimum sight) that it can see
+    function seesFoe(b) {
+      const aware = Math.max(R(b) + sight, minSight);
+      for (const f of sides[1 - b.side]) if (pickable(b, f) && gap(f, b) <= aware && inSight(b, f)) return true;
+      return false;
+    }
     function watchIdle(b) {
       const aware = Math.max(R(b) + sight, minSight);
       let sees = false;
@@ -1774,6 +1858,23 @@ const Engine = (() => {
         host.alive = false; host.hp = 0; host.removed = true; host.diedTick = tick;
       }
       return true;
+    }
+    // 2v2 Tree kojja (src/mpb.js treeKojja; its link hook sets b.nest = { range, sight } on the one body of a squad
+    // sitting in the kojja, the squad's other bodies ride in that body: boarded, carrier = it): the body leaves the
+    // kojja (it saw no enemy for WATCH_IDLE s, or the kojja fell): it loses the kojja's extra range and sight, and the
+    // rest of its squad steps out round it
+    function unnest(b) {
+      const n = b.nest;
+      b.nest = null;
+      b.u = { ...b.u, range: b.u.range - n.range, trueSight: n.sight };
+      let k = 0;
+      for (const r of sides[b.side]) {
+        if (r.carrier !== b || !r.boarded) continue;
+        const [ox, oy] = SPAWN_SPOTS[k++ % SPAWN_SPOTS.length], fwd = b.side === 0 ? 1 : -1;
+        r.boarded = false; r.alive = true; r.carrier = null;
+        r.x = b.x + ox * g.spacing * 0.5; r.y = b.y + oy * fwd * g.spacing * 0.5;
+      }
+      invalidateTargetIndex();
     }
     // the side's tower (not a lesser structure: treasury, watchtower, wall, building)
     const isTower = (f) => !!f.u.structure && !f.u.lesser;
@@ -1795,7 +1896,8 @@ const Engine = (() => {
     // seesHidden: b can pick f although f is stealthed: Overwatch (u.trueSight) within b's range, or a Sniper
     // (b.sniperMark, set by the game) looking for the squad its side's Sniper tower marked (f.marked), or a Hunter (b.u.hunter)
     // looking for a squad its side's Hunters marked (f.prey, set by the game)
-    const seesHidden = (b, f) => f.u.stealth && !f.u.aloft && ((f.marked && b.sniperMark > 0) || (f.prey && b.u.hunter) || (b.u.trueSight && gap(f, b) <= b.u.range + 1e-9));
+    // (2v2 Scorch turrets, src/mpb.js scorch: u.scorchSight sees stealthed units at any distance)
+    const seesHidden = (b, f) => f.u.stealth && !f.u.aloft && ((f.marked && b.sniperMark > 0) || (f.prey && b.u.hunter) || (b.u.trueSight && gap(f, b) <= b.u.range + 1e-9) || !!b.u.scorchSight);
     const pickable = (b, f) => f.alive && (!f.hidden || seesHidden(b, f)) && !sheltered(f) && !(b.hunt && !isLone(f)) && !ignores(b, f);
     // damage that skips armor and ward (poison)
     function direct(owner, v, amount) {
@@ -1864,6 +1966,7 @@ const Engine = (() => {
       // burn hurts the caster's enemies, mend heals the caster's units, mud slows the caster's enemies
       if (tl.type === 'burn') { if (b.side !== tl.side) neutralDamage(b, tl.dps * dt); return; }
       if (tl.type === 'mend') { if (b.side === tl.side) heal(b, tl.dps * healMul * dt); return; }
+      if (tl.type === 'mpbLake') { if (b.side === tl.side) heal(b, b.u.hp * tl.pct / 100 * healMul * dt); return; } // 2v2 Magic lake: Waterspirits' regen (tl.pct % of max health a second)
       if (tl.type === 'mud') {
         if (b.side === tl.side || b.u.unstoppable) return;
         if (!(b.slowT > 0)) { b.slowMove = 0; b.slowAtk = 0; }
@@ -2837,21 +2940,38 @@ const Engine = (() => {
       shots = [];
       tick++;
       for (let k = 0; k < 4; k++) if (cripple[k] > 0) cripple[k] = Math.max(0, cripple[k] - dt);
+      if (oakOn) { oakNow[0] = oakK(0); oakNow[1] = oakK(1); } // 2v2 Oak: Restoration as the tick starts
       // map tiles under the units (checked before moving, so the tile a unit starts on always counts)
       if (tiles.length) for (const b of all) {
         if (!b.alive || b.u.structure || b.u.aloft) continue;
         for (const tl of tiles) if (b.alive && b.x >= tl.x0 && b.x < tl.x1 && b.y >= tl.y0 && b.y < tl.y1) onTile(b, tl);
       }
       // stealth: hidden until it attacks, and again after STEALTH_BACK s without attacking (roster rules can turn either off)
+      const lit = discover ? discover.filter(d => d.squad == null || all.some(a => a.alive && a.side === d.side && a.squad === d.squad)) : null; // 2v2 Jail: the Skywatches still standing
       for (const b of all) {
         if (!b.alive || !b.u.stealth) continue;
         if (!stealthOn) b.hidden = false;
         // "without attacking" counts from when it could have attacked again: a slow shooter (a Sniper reloads for 4 s or
         // more) no longer hides between its own shots, which made it impossible to hit (fixed 2026-11-03)
         else if (!b.hidden && stealthBack && t - b.lastAtk >= Math.max(STEALTH_BACK, 1 / Math.max(0.01, apsOf(b) * atkMul(b)) + STEALTH_GRACE) - 1e-9) b.hidden = true;
+        if (lit && lit.length && b.hidden && !b.u.aloft && discovered(b, lit)) b.hidden = false; // 2v2 Jail: Skywatch sees it while it stands in its light
       }
       // a body with a start delay (deployed on a flank) can't move or attack until it runs out
       for (const b of all) if (b.delay > 0) b.delay = Math.max(0, b.delay - dt);
+      // 2v2 Coal mine (mineOn): bodies down the mine come out when their travel time is up (mineFx: { x, y, side, t }
+      // for the boards); with the boost, faster and tougher for its secs
+      if (mineOn) for (const b of all) {
+        if (b.mineT > 0) {
+          b.mineT = Math.max(0, b.mineT - dt);
+          if (b.mineT > 0) continue;
+          if (b.mineTo && !mineFx.some(e => e.squad === b.squad && e.side === b.side)) mineFx.push({ x: b.x, y: b.y, side: b.side, squad: b.squad, t });
+          const bo = b.mineBoost || (b.mineTo && b.mineTo.boost); // (mineBoost: a body that came with its squad: a healbot, an elemental)
+          if (bo && b.alive) { b.mineBoost = bo; b.mineFast = bo.secs; b.u = { ...b.u, bonusArmor: (b.u.bonusArmor || 0) + bo.armor }; }
+        } else if (b.mineFast > 0) {
+          b.mineFast = Math.max(0, b.mineFast - dt);
+          if (!(b.mineFast > 0)) b.u = { ...b.u, bonusArmor: (b.u.bonusArmor || 0) - b.mineBoost.armor };
+        }
+      }
       // home ground (band = { y0, y1, armor, hpPct, on }): extra armor and health while the body stands between
       // y0 and y1 (its own zone); it loses both when it walks out, and gets them back if it returns
       for (const b of all) {
@@ -2894,6 +3014,7 @@ const Engine = (() => {
         if (b.inside) { // Overwatch: it stays in its building while that stands, and while it sees enemies now and then
           if (b.inside.alive && !watchIdle(b)) { b.x = b.inside.x; b.y = b.inside.y; continue; }
           b.inside = null;
+          if (b.nest) unnest(b); // 2v2 Tree kojja: the rest of its squad steps out with it
         }
         if (b.stunT > 0) { b.stunT = Math.max(0, b.stunT - dt); continue; } // stunned: can't move (or attack, below)
         if (b.channel) continue; // summoning through its portal: it holds still (and doesn't attack, below)
@@ -2912,6 +3033,7 @@ const Engine = (() => {
         // shoot one enemy while it walks to another. Kept through a stun, roots and a charge's run-through.
         const was = b.intent;
         b.intent = null;
+        if (b.holdT > 0 && b.holdSee && seesFoe(b)) b.holdT = 0; // 2v2 Jail guards (b.holdSee): they hold until an enemy is in their awareness
         if (b.holdT > 0) { b.holdT -= dt; continue; } // holding its ground (it still shoots)
         const foes = sides[1 - b.side];
         if (b.trampleLeft > 0) {
@@ -3280,6 +3402,7 @@ const Engine = (() => {
               if (g.bounds) x = Math.max(g.bounds.x0, Math.min(g.bounds.x1, x));
               const kid = newBody(pu, b.side, x, y, spawnNo[b.side]++, -1);
               kid.credit = b;
+              if (b.produce.lane === 0 || b.produce.lane === 1) kid.lane = b.produce.lane; // 2v2 MPB Factory: the player who bought it (src/mpb.js)
               pendingKids.push(kid);
             });
           }
@@ -3569,6 +3692,35 @@ const Engine = (() => {
         for (const x of live) { x.hp = 0; x.alive = false; x.diedTick = tick; x.sacrificed = true; }
         pendingKids.push(pt.hf);
       }
+      if (shImp) for (const x of shImp) { // the Shadow Den's Impersonate (see shImp): the body is gone, a Shadowhand stands there
+        if (x.done || t < x.at - 1e-9) continue;
+        x.done = true;
+        const v = sides[1 - x.side].find(b => b.alive && b.squad === x.squad && !b.boarded && !b.turning && !b.u.structure);
+        if (!v) continue; // the squad is gone (or never came): nothing happens
+        v.hp = 0; v.alive = false; v.diedTick = tick; v.sacrificed = true; v.impTaken = true;
+        const kid = newBody(x.unit, x.side, v.x, v.y, spawnNo[x.side]++, x.sq);
+        kid.tier = 1; kid.impersonated = true;
+        if (x.lane === 0 || x.lane === 1) kid.lane = x.lane;
+        pendingKids.push(kid);
+      }
+      // 2v2 Field hospital's Second wind: a marked squad all down (fallen, or won over) comes back whole, once. A squad
+      // its own portal sacrificed (Summon hellfiend) wasn't wiped out: the revive is spent and nothing comes back (a body
+      // the Shadow Den's Impersonate took is just gone: the rest of the squad may still be wiped out and come back)
+      for (const fr of fhRevives) {
+        if (!fr.done && fr.list.some(b => b.sacrificed && !b.impTaken)) { fr.done = true; continue; }
+        if (fr.done || !fr.list.every(b => (!b.alive && !b.boarded) || b.side !== fr.side)) continue;
+        fr.done = true;
+        const kids = fr.list.map((b, k) => {
+          const [ox, oy] = SPAWN_SPOTS[k % SPAWN_SPOTS.length], fwd = fr.side === 0 ? 1 : -1;
+          const kid = newBody(b.fhU, fr.side, fr.x + ox * g.spacing * 0.6, fr.y + oy * fwd * g.spacing * 0.6, spawnNo[fr.side]++, fr.squad);
+          kid.tier = b.tier; kid.lane = b.lane; kid.level = b.level; kid.fhBack = true; b.fhGone = true;
+          for (const k in b.fhKeep) { const v = b.fhKeep[k]; kid[k] = v && typeof v === 'object' && !Array.isArray(v) ? { ...v } : v; }
+          return kid;
+        });
+        if (kids[0] && kids[0].u.link) { for (const kid of kids) kid.link = kids; groups.push(kids); }
+        if (opts.record) shots.push([fr.x, fr.y, fr.x, fr.y, fr.side, 0, 0, 1]);
+        pendingKids.push(...kids);
+      }
       // bodies spawned by deaths this tick join the fight
       for (const kid of pendingKids) { all.push(kid); sides[kid.side].push(kid); if (counts(kid)) stats[kid.side].totalHp += kid.u.hp; if (terBlock && !kid.u.aloft) keepOut(kid); } // not in the water
       pendingKids.length = 0;
@@ -3621,7 +3773,7 @@ const Engine = (() => {
         }
         const k = b.side + ':' + b.squad;
         const s = squads[k] || (squads[k] = { side: b.side, squad: b.squad, total: 0, alive: 0, xp: 0, dealt: 0 });
-        s.total++; if (b.alive || inside(b)) s.alive++;
+        if (!b.fhGone) { s.total++; if (b.alive || inside(b)) s.alive++; } // (a squad Second wind brought back counts its new bodies only)
         s.xp += b.xp; s.dealt += b.dealt || 0;
         if (b.glutGain > 0) s.glut = Math.max(s.glut || 0, b.glutGain); // Glut stacks eaten this fight (see u.glut)
       }
@@ -3631,6 +3783,7 @@ const Engine = (() => {
         survivors: [aliveA, aliveB], counts: [A.length, B.length],
         stats, squads, markKill: markKill.slice(), objective: obj ? obj.won : -1,
         ...(arts ? { artifacts: artifactsNow(true) } : {}), // 2v2 artifacts: [{ x, y, r, cap, pts, rate, locked, won }] (only with opts.artifacts)
+        ...(watchKills ? { killedBy: all.filter(b => b.watchKill).map(b => ({ side: b.side, squad: b.squad, by: b.killedBy || null })) } : {}), // 2v2 School (opts.mpb.watchKills)
         charm, // charisma stacks after the fight, by side and squad id (null for a side without)
         converted: [0, 1].map(k => all.filter(b => b.convert && b.side === k).length), // bodies each side won over
         // each building: still standing, seconds of building done at the end (null when it was already built), whether any was done this fight
@@ -3638,7 +3791,7 @@ const Engine = (() => {
       };
     }
 
-    return { step, frame, result, bodies: all, neutrals, mines: () => mines, pools: () => pools, portals: () => portals.filter(p => t >= p.t0 && t < p.t0 + p.secs), drops: () => drops.filter(d => !d.done).map(d => ({ side: d.side, t: d.t, r: d.r, spots: d.spots, left: Math.max(0, d.t - t) })), isOver: () => over, time: () => t, lastShots: () => shots, projectiles: () => projectiles, crippled: (side, lane) => cripple[side + 2 * (lane | 0)], gates: () => gates.filter(Boolean), gateFx: () => gateFx, charm: (side, squad) => (charm[side] && charm[side][squad]) || 0,
+    return { step, frame, result, bodies: all, neutrals, mines: () => mines, pools: () => pools, portals: () => portals.filter(p => t >= p.t0 && t < p.t0 + p.secs), drops: () => drops.filter(d => !d.done).map(d => ({ side: d.side, t: d.t, r: d.r, spots: d.spots, left: Math.max(0, d.t - t) })), isOver: () => over, time: () => t, lastShots: () => shots, projectiles: () => projectiles, crippled: (side, lane) => cripple[side + 2 * (lane | 0)], gates: () => gates.filter(Boolean), gateFx: () => gateFx, mineFx: () => mineFx, charm: (side, squad) => (charm[side] && charm[side][squad]) || 0,
       objective: () => obj && { n: obj.n.slice(), lead: obj.lead, hold: obj.hold, secs: obj.secs, won: obj.won },
       artifacts: () => artifactsNow(false) }; // 2v2 artifacts as they stand ([] without opts.artifacts)
   }
@@ -3720,7 +3873,9 @@ const Game = (() => {
     ? (m.round === 1 ? CONFIG.firstRoundDeploys : CONFIG.deploysPerRound) + m.extraDeploys[side] + devDeploys(m, side) + (musterOn(m, side) ? 1 : 0) + (shoePerk(m, side, 'deploy') ? 1 : 0)
     : Infinity;
   const deployedThisRound = (m, side) => m.armies[side].filter(s => s.round === m.round && !s.free && !s.gift).length; // package squads and slot machine goblins don't count
-  const deploysLeft = (m, side) => deploysAllowed(m, side) - deployedThisRound(m, side);
+  // ui (optional): the unit about to be placed. 2v2 Shadow Den (src/mpb.js shadowBonus): +1 deployment a round only
+  // for its units (Rogue, Assassin, Shadowhands); nothing without m.mpb
+  const deploysLeft = (m, side, ui) => deploysAllowed(m, side) - deployedThisRound(m, side) + (MPB && m && m.mpb ? MPB.shadowBonus(m, side, ui) : 0);
   // A unit's `cost` is in lab units: 1 = one standard squad (SQUAD_COST gold)
   const unitCostOf = (unit) => Math.max(10, Math.round((unit.cost || 1) * SQUAD_COST / 10) * 10);
   // Upgrades cost half the unit's price at the default setting (50 for a 100-gold squad)
@@ -4327,7 +4482,8 @@ const Game = (() => {
     return { ch: t.tiles[row][col], shape: (t.shape && t.shape[row][col]) || '.', h: CHH[t.height[row][col]] || 0 };
   }
   // nothing can be placed on a wall or water tile (an edge wall leaves its tile free)
-  const terrainBlocks = (m, col, row) => { const t = terrainTile(m, col, row); return (t.ch === '#' || t.ch === '~') && !EDGE_FORMS.includes(t.shape); };
+  // (2v2: a Magic lake's water too, src/mpb.js Mpb.terrainAt)
+  const terrainBlocks = (m, col, row) => { const t = terrainTile(m, col, row); return ((t.ch === '#' || t.ch === '~') && !EDGE_FORMS.includes(t.shape)) || (!!MPB && !!m && !!m.mpb && MPB.terrainAt(m, col, row)); };
   // The map objective (a map's `objective` = { secs, gold }: the Bridge): its zone is the raised ground (every walkable
   // tile above level 0). In a fight, the side with more units standing on it for secs s in a row wins it (Engine's
   // objective), once a fight, and gets gold more in the next round (resolve).
@@ -4726,7 +4882,11 @@ const Game = (() => {
   // the teammate's buildings from skills (the Cog Builder's Factory) in a 2v2 lane: their tiles are taken here too
   const teamBuildings = (m, side) => (m && m.team && m.team.buildings && m.team.buildings[side]) || [];
   const teamBuildingAt = (m, side, col, row) => teamBuildings(m, side).some(b => b.col === col && b.row === row);
-  const teamSeen = (m, side) => teamArmy(m, side).filter(s => s.round < m.round && !hiddenFromFoe(m, s));
+  const teamSeen = (m, side) => watchedLive(m, side) ? liveSeen(teamArmy(m, side)) : teamArmy(m, side).filter(s => s.round < m.round && !hiddenFromFoe(m, s));
+  // 2v2 Shadow Den's Insider information (src/mpb.js watching): the other team sees side's squads live this round,
+  // where they stand now (riders stay hidden); nothing without m.mpb
+  const watchedLive = (m, side) => !!(MPB && m && m.mpb && MPB.watching(m, 1 - side));
+  const liveSeen = (list) => list.filter(s => !isRider(s)).map(s => { const { from, movedRound, luckMove, outRound, ...q } = s; return q; });
   const enemyHolds = (m, side, col, row) => !!m && (foeSeen(m, 1 - side).some(s => { const p = seenAt(m, s); return p.col === col && p.row === row; }) ||
     teamSeen(m, 1 - side).some(s => { const p = seenAt(m, s); return p.col === col && p.row === row; }) ||
     (m.round > 1 && m.towers && m.towers[1 - side] && m.towers[1 - side].col === col && m.towers[1 - side].row === row));
@@ -4767,7 +4927,7 @@ const Game = (() => {
     }
     const el = elfSpot(m); // the map's elf tower stands between the two middle rows
     if (el && el.col === col && (row === ROWS / 2 - 1 || row === ROWS / 2)) return true;
-    return !!api.mpbAt(m, col, row);
+    return !!(MPB && m && m.mpb) && MPB.at(m, col, row, true); // (building tiles only: not the tiles round a Coal mine's exit)
   }
   const nearBldg = (m, side, col, row) => { for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (bldgSeen(m, side, col + dc, row + dr)) return true; return false; };
   // ui (optional): the unit being placed, for unit-specific tiles (all of a footprint's tiles must be allowed)
@@ -4783,10 +4943,12 @@ const Game = (() => {
   // A squad of a unit with Overwatch can stand in one of its player's buildings: the tower, the treasury (once it is
   // up) or a building (the Factory). One squad per building. In a fight it sits inside, safe until the
   // building falls (Engine: b.inside); a squad of it anywhere else fights from a small watchtower of its own.
+  // (2v2: also a team building that holds a squad, src/mpb.js hooks.holds: the Tree kojja's Nest; mpbHolds below)
   const garrisonAt = (m, side, col, row) => !!m && ((towerAt(m, side, col, row) && towerUp(m, side)) || (treasuryAt(m, side, col, row) && treasuryUp(m)) ||
-    !!buildingAt(m, side, col, row));
-  // a building tile with room for a squad of ui
-  const garrisonFree = (m, side, col, row, ui) => ui != null && !!m && !!m.units[ui] && !m.units[ui].building && hasSkillType(m, side, ui, 'overwatch') && garrisonAt(m, side, col, row) &&
+    !!buildingAt(m, side, col, row) || mpbHolds(m, side, col, row, null));
+  // a building tile with room for a squad of ui (a 2v2 building that holds squads: any unit it takes, Overwatch or not)
+  const garrisonFree = (m, side, col, row, ui) => ui != null && !!m && !!m.units[ui] && !m.units[ui].building &&
+    (mpbHolds(m, side, col, row, null) ? mpbHolds(m, side, col, row, ui) : hasSkillType(m, side, ui, 'overwatch') && garrisonAt(m, side, col, row)) &&
     !m.armies[side].some(s => covers(m, s, col, row)) && !teamArmy(m, side).some(s => covers(m, s, col, row));
   const inBuilding = (m, side, sq) => !!sq && !isRider(sq) && garrisonAt(m, side, sq.col, sq.row);
   const WATCH_SQ = -500; // watchtowers in a fight: squad ids -500, -501, ...
@@ -4796,6 +4958,11 @@ const Game = (() => {
   // army (it levels, sells and counts like any other) with `in` = the carrier's squad id, on the carrier's tile.
   // The opponent never sees it on the board; in a fight it stays inside until the carrier dies (see Engine).
   const isRider = (sq) => !!sq && sq.in != null;
+  // 2v2 Jail and School (src/mpb.js): a squad held in a building (sq.jailed: in the enemy's Jail; sq.school: in its own
+  // team's School) stands on that building's tile, can't move, be taken back or carry anyone, and doesn't fight (a
+  // squad in a School can't be sold either). Only a 2v2 lane ever sets these.
+  const mpbHeld = (sq) => !!sq && !!(sq.jailed || sq.school);
+  const schoolLock = (m, side, ui) => !!m && m.armies[side].some(s => s.school && s.unit === ui); // no new squad of a unit type sitting in a School
   // 2v2: a squad can ride in its teammate's carrier too (the teammate's lane is another match: m.team). Its `in` is
   // then the carrier's id as m.team carries it (moved by TEAM_ID, as Duo.OFF), and in m.team a teammate's rider in one
   // of your carriers has `in` = your carrier's own id (Duo.teamOf flips the link back), so the lookups below find the
@@ -4814,7 +4981,7 @@ const Game = (() => {
     m.sold[side] = soldNow(m, side).filter(q => q.id !== sq.id).concat({ ...sq, soldRound: m.round });
   }
   // the squads of side as the other side sees them while deploying: those from earlier rounds, those sold this round too
-  const foeSeen = (m, side) => m.armies[side].filter(s => s.round < m.round && !hiddenFromFoe(m, s)).concat(soldNow(m, side).filter(s => !hiddenFromFoe(m, s)));
+  const foeSeen = (m, side) => watchedLive(m, side) ? liveSeen(m.armies[side]) : m.armies[side].filter(s => s.round < m.round && !hiddenFromFoe(m, s)).concat(soldNow(m, side).filter(s => !hiddenFromFoe(m, s)));
   const isCarrier = (m, ui) => !!(m && m.units[ui] && m.units[ui].carrier);
   // the rider in carrier sq (yours or, in 2v2, your teammate's: either may sit in either's carrier)
   const riderOf = (m, side, sq) => sq ? m.armies[side].find(s => s.in === sq.id) || teamArmy(m, side).find(s => s.in === sq.id) || null : null;
@@ -4826,7 +4993,7 @@ const Game = (() => {
   // the carrier on a tile that has room for a squad of unit ui: your own, or (2v2) your teammate's
   function boardable(m, side, col, row, ui) {
     const c = squadAt(m, side, col, row) || mateAt(m, side, col, row);
-    return c && isCarrier(m, c.unit) && !isCarrier(m, ui) && !(m.units[ui] && m.units[ui].building) && !riderOf(m, side, c) ? c : null;
+    return c && isCarrier(m, c.unit) && !isCarrier(m, ui) && !(m.units[ui] && m.units[ui].building) && !riderOf(m, side, c) && !mpbHeld(c) ? c : null;
   }
   // riders follow their carrier's tile. A carrier that is gone leaves its rider standing on the tile; in 2v2 a
   // teammate's carrier sold or taken back (it is no longer in m.team) does too, and the opponents go on thinking it
@@ -5016,7 +5183,8 @@ const Game = (() => {
 
   // a unit left out of this match (match settings on the menu). side (optional): also a unit of a faction that
   // player didn't draft (Factions mode)
-  const isOff = (m, ui, side) => !!(m && ((Array.isArray(m.off) && m.off.includes(ui)) || (side != null && !ownsUnit(m, side, ui))));
+  // 2v2: a unit a building brings (the Shadow Den's Shadowhands, u.mpbUnit) is off for a team without that building
+  const isOff = (m, ui, side) => !!(m && ((Array.isArray(m.off) && m.off.includes(ui)) || (side != null && !ownsUnit(m, side, ui)) || (MPB && m.units && m.units[ui] && m.units[ui].mpbUnit && MPB.unitOff(m, side, ui))));
 
   // ---------- skills (bought per unit type, for all squads of that type) ----------
   // m.units[i].skillDefs = [def or null, ...], one per skill slot (Engine.SKILL_SLOTS)
@@ -5148,6 +5316,10 @@ const Game = (() => {
   // ...and make skills either-or: skillOr = [[1, 2], ...] = a player can own only one skill of each group
   const skillOr = (m, ui, k) => { const g = m.units[ui] && Array.isArray(m.units[ui].skillOr) ? m.units[ui].skillOr : []; return [...new Set(g.filter(x => Array.isArray(x) && x.includes(k)).flat())].filter(j => j !== k && skillDef(m, ui, j)); };
   const skillOrTaken = (m, side, ui, k) => skillOr(m, ui, k).filter(j => hasSkill(m, side, ui, j));
+  // 2v2 School (src/mpb.js): the skill slots of unit ui this player's squad is learning in their team's School (only a
+  // 2v2 lane has m.mpb); the other skill of an either-or pair can't be bought meanwhile
+  const schoolLearning = (m, side, ui) => !m.mpb ? [] : (m.mpb[side] || []).map(r => r.kind === 'school' && r.data && r.data.pupil)
+    .filter(p => p && p.learn && p.ui === ui && p.lane === (m.duoLane === 1 ? 1 : 0)).map(p => p.learn.k);
   function canBuySkill(m, side, ui, k) {
     const d = skillDef(m, ui, k);
     if (!d || hasSkill(m, side, ui, k)) return false;
@@ -5157,6 +5329,7 @@ const Game = (() => {
     if (!m.armies[side].some(s => s.unit === ui)) return false; // needs a squad of that type on the board
     if (skillNeedsMissing(m, side, ui, k).length) return false;
     if (skillOrTaken(m, side, ui, k).length) return false; // either-or: it has the other one
+    if (m.mpb && schoolLearning(m, side, ui).some(j => skillOr(m, ui, k).includes(j))) return false; // ...or learns it (2v2 School)
     return m.gold[side] >= skillCost(m, ui, k, side);
   }
   function buySkill(m, side, ui, k) {
@@ -5447,17 +5620,24 @@ const Game = (() => {
       const [b] = E.buildSquad(bu, side, w.x, w.y, r.squad, TILE, idx + k, lv);
       if (!built) b.site = { work: (r.rec.progress || 0) * info.buildSecs, need: info.buildSecs, self: info.selfBuild || 0 };
       const sk = built ? buildingSkillInfo(r.id, bskillOf(m, side, r.key)) : null;
-      const makes = !sk ? [] : sk.unit ? [[sk.unit, 1]] : (sk.make || []).map(([bid, sid, n]) => [(buildingSkillInfo(bid, sid) || {}).unit, n]);
-      const units = [];
-      for (const [u0, n] of makes) if (u0) for (let j = 0; j < n; j++) {
-        let pu = E.withTraits({ ...u0, level: 0, construct: true });
-        pu = blessed({ ...pu, aps: pu.aps * (1 + cb.aps / 100), shield: (pu.shield || 0) + cb.shield, bonusArmor: (pu.bonusArmor || 0) + cb.armor }, bl);
-        units.push(E.leveled(withCharacter(m, side, withFactionTrait(pu, info.faction)), lv));
-      }
-      if (units.length) b.produce = { units, time: (sk.time || 0) * (1 - cb.faster / 100) / (bl ? 1 + bl.build / 100 : 1) };
+      const pr = buildingMakes(m, side, info, sk, lv, cb, bl);
+      if (pr) b.produce = pr;
       out.push(b);
     });
     return out;
+  }
+  // what skill sk of a building of kind info makes in a fight: { units, time } (Engine b.produce), or null. lv: the
+  // building's level, cb: the builder skills' buff (constructBuff), bl: Blessing of the Cycle (or null). The 2v2 MPB
+  // Factory (src/mpb.js) makes its units with it too.
+  function buildingMakes(m, side, info, sk, lv, cb, bl) {
+    const makes = !sk ? [] : sk.unit ? [[sk.unit, 1]] : (sk.make || []).map(([bid, sid, n]) => [(buildingSkillInfo(bid, sid) || {}).unit, n]);
+    const units = [];
+    for (const [u0, n] of makes) if (u0) for (let j = 0; j < n; j++) {
+      let pu = E.withTraits({ ...u0, level: 0, construct: true });
+      pu = blessed({ ...pu, aps: pu.aps * (1 + cb.aps / 100), shield: (pu.shield || 0) + cb.shield, bonusArmor: (pu.bonusArmor || 0) + cb.armor }, bl);
+      units.push(E.leveled(withCharacter(m, side, withFactionTrait(pu, info.faction)), lv));
+    }
+    return units.length ? { units, time: (sk.time || 0) * (1 - cb.faster / 100) / (bl ? 1 + bl.build / 100 : 1) } : null;
   }
   // after a fight: sites built (or the work they kept), buildings destroyed, XP from what they made (a bought
   // building gets its XP as a squad). Returns what happened, per side: [{ id, built: true } | { id, lost: true } | { id, progress }]
@@ -5485,7 +5665,7 @@ const Game = (() => {
   const sellValue = (m, sq) => { const ak = sq.awaken > 0 ? awakenCost(m, sq.unit) : 0, now = sq.awaken === m.round;
     return Math.floor((unitCostOf(m.units[sq.unit]) + (sq.level || 0) * levelCost(m.units[sq.unit]) + (now ? 0 : ak)) / 2 / 5) * 5 + (now ? ak : 0); };
   function sell(m, side, sqId) {
-    const i = m.armies[side].findIndex(s => s.id === sqId && s.round < m.round);
+    const i = m.armies[side].findIndex(s => s.id === sqId && s.round < m.round && !s.school); // (2v2: not while it sits in a School)
     if (i < 0) return 0;
     const [sq] = m.armies[side].splice(i, 1);
     for (const r of m.armies[side]) if (r.in === sq.id) r.outRound = m.round; // the opponent doesn't see it step out
@@ -5527,7 +5707,7 @@ const Game = (() => {
   // (it can go on moving, or get back in, for free); the opponent still sees nothing until the fight
   const freeOut = (m, side, sq) => !!sq && sq.round !== m.round && movedId(m, side) !== sq.id
     && (isRider(sq) || (!!sq.from && sq.movedRound === m.round && sq.from.in != null));
-  const canMove = (m, side, sq) => !!sq && !(m.units[sq.unit] && m.units[sq.unit].building) && (sq.round === m.round || freeMover(m, side, sq) || freeOut(m, side, sq) || // a building stays put
+  const canMove = (m, side, sq) => !!sq && !(m.units[sq.unit] && m.units[sq.unit].building) && !mpbHeld(sq) && (sq.round === m.round || freeMover(m, side, sq) || freeOut(m, side, sq) || // a building stays put
     sq.luckMove === m.round || (movedId(m, side) !== sq.id && freeMovesLeft(m, side) > 0) || // a free move (Bastion's March order, Otto's horseshoe)
     (movedId(m, side) == null ? m.gold[side] >= CONFIG.moveCost : movedId(m, side) === sq.id));
   // Each carrier lets one squad out and one squad in per round (2026-11-05; before, a rider could hop in and out
@@ -5613,6 +5793,10 @@ const Game = (() => {
   const setMpb = (x) => { MPB = x || null; return true; };
   const mpbApi = () => MPB;
   const mpbAt = (m, col, row) => !!(MPB && m && m.mpb) && MPB.at(m, col, row);
+  // a unit type side may not deploy this round (the other team's Shadow Den: Sabotage)
+  const mpbLocked = (m, side, ui) => !!(MPB && m && m.mpb) && MPB.sabotaged(m, side, ui);
+  // a 2v2 building of side's on the tile that holds a squad of unit ui (ui null: any squad at all) (Mpb.holds)
+  const mpbHolds = (m, side, col, row, ui) => !!(MPB && m && m.mpb && MPB.holds) && MPB.holds(m, side, col, row, ui);
   const occupied = (m, side, col, row) => towerAt(m, side, col, row) || treasuryAt(m, side, col, row) || elfOwnAt(m, side, col, row) || !!buildingAt(m, side, col, row) || teamBuildingAt(m, side, col, row) || m.armies[side].some(s => covers(m, s, col, row)) || teamArmy(m, side).some(s => covers(m, s, col, row)) || devOccupied(m, side, col, row) || mpbAt(m, col, row);
   const needsTower = (m, side) => !!(m.towers && !m.towers[side]);
   // the tower can be placed (or moved) during round 1 only
@@ -5640,6 +5824,8 @@ const Game = (() => {
     if (needsTower(m, side)) return null; // the tower goes down first
     if (!isUnlocked(m, side, unitIdx)) return null;
     if (capFull(m, side, unitIdx)) return null; // DEVTESTLATEGAME: at most LATE.cap squads of a tier 3+ unit type
+    if (mpbLocked(m, side, unitIdx)) return null; // 2v2: a unit type the other team's Shadow Den sabotaged this round
+    if (schoolLock(m, side, unitIdx)) return null; // 2v2 School: none of the unit type sitting in it
     const into = boardable(m, side, col, row, unitIdx); // a carrier with room: the new squad rides inside
     if (!spotFree(m, side, col, row, unitIdx) && !into) return null;
     const ride = into ? { in: into.id } : {};
@@ -5650,7 +5836,7 @@ const Game = (() => {
     }
     const cost = shopCost(m, side, unitIdx), level = startLevel(m, side);
     if (m.gold[side] < cost) return null;
-    if (deploysLeft(m, side) <= 0) return null;
+    if (deploysLeft(m, side, unitIdx) <= 0) return null;
     // a squad that starts leveled up starts with the XP of that level, so the next one is as far off as usual
     const sq = { id: m.nextId[side]++, unit: unitIdx, col, row, round: m.round, xp: level ? xpNeeded(m.units[unitIdx], level - 1) : 0, level, cost, ...ride };
     m.armies[side].push(sq);
@@ -5665,7 +5851,7 @@ const Game = (() => {
     return !!sq && unplaceSquad(m, side, sq.id);
   }
   function unplaceSquad(m, side, id) {
-    const i = m.armies[side].findIndex(s => s.id === id && s.round === m.round && !s.gift); // a slot machine goblin is kept
+    const i = m.armies[side].findIndex(s => s.id === id && s.round === m.round && !s.gift && !mpbHeld(s)); // a slot machine goblin is kept (and one in a 2v2 School)
     if (i < 0) return false;
     const [sq] = m.armies[side].splice(i, 1);
     m.gold[side] += sq.cost + (sq.awaken > 0 ? awakenCost(m, sq.unit) : 0); // its awakening too
@@ -7024,15 +7210,18 @@ const Game = (() => {
     aiHunt(m, side); // Hunters mark the priciest enemy squad they may
     let guard = 0;
     while (m.gold[side] - reserve >= minCost && guard++ < 60) {
+      let shadowOnly = false; // 2v2 Shadow Den: only its Shadow deployment is left (src/mpb.js shadowBonus): one of its units, no buy
       if (deploysLeft(m, side) <= 0) {
+        shadowOnly = !!(MPB && m.mpb) && m.units.some((u, i) => !isOff(m, i, side) && !mpbLocked(m, side, i) && deploysLeft(m, side, i) > 0 && shopCost(m, side, i) + (isUnlocked(m, side, i) ? 0 : unlockCost(m, i, side)) <= m.gold[side] - reserve);
         // out of deployments: buy one more only if a squad is still affordable after it
-        if (m.extraDeploys[side] >= AI.maxExtraDeploys || m.gold[side] - reserve < minCost + deployCost(m, side)) break;
-        if (!aiCall('buyDeploy', m, side)) break;
+        if (!shadowOnly && (m.extraDeploys[side] >= AI.maxExtraDeploys || m.gold[side] - reserve < minCost + deployCost(m, side))) break;
+        if (!shadowOnly && !aiCall('buyDeploy', m, side)) break;
       }
       const budget = m.gold[side] - reserve;
       let best = -1, bs = -Infinity;
       m.units.forEach((u, i) => {
-        if (isOff(m, i, side) || capFull(m, side, i)) return;
+        if (isOff(m, i, side) || capFull(m, side, i) || mpbLocked(m, side, i) || schoolLock(m, side, i)) return;
+        if (shadowOnly && deploysLeft(m, side, i) <= 0) return;
         if (u.building && ((own[i] || 0) >= 1 || m.round < 3)) return; // a building (Altar of Build): one, from round 3
         const extra = isUnlocked(m, side, i) ? 0 : unlockCost(m, i, side); // a locked unit costs its unlock on top
         if (shopCost(m, side, i) + extra > budget) return;
@@ -7110,7 +7299,7 @@ const Game = (() => {
     setBuildings, BUILDINGS: () => BUILDINGS, buildingInfo, BUILDING_SQUAD, isBuildingSkill, buildingIdOf, buildingsOf, buildingOf, buildingAt, buildingShown, buildingSpotOk,
     canBuyBuilding, buyBuilding, buildingSkills, buildingSkillInfo, bskillOf, bskillCost, canBuyBuildingSkill, buyBuildingSkill, undoBuildingSkill,
     buildingXpNeeded, buildingLevelCost, buildingReady, levelBuilding, undoLevelBuilding, constructBuff, buildingBodies, canBuySkill, buySkill, undoSkill, sellValue, sell,
-    isRider, TEAM_ID, mateRide, mateAt, syncRiders, freeOut, horseUse, horseOk, horseLeft, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
+    isRider, mpbHeld, schoolLock, TEAM_ID, mateRide, mateAt, syncRiders, freeOut, horseUse, horseOk, horseLeft, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
     TOWER, TOWER_TYPES, OUTPOST, TOWER_PICK_ROUND, towerType, towerChoices, needsTowerPick, setTowerType, settleTowerPicks, TOWER_SKILL, towerSkillOf, towerSkillVisible, towerPicked, canBuyTowerSkill, buyTowerSkill, undoTowerSkill, towerSkillCost, towerSkill2Of, towerSkill2Visible, towerSkill2Cost, canBuyTowerSkill2, buyTowerSkill2, undoTowerSkill2, towerSkill2On, PARA, paraDropOf, MOAT, BWALL, BWALL_SQ, EDGES, bwallsOf, bwallOn, edgeOf, bwallWorld, bwallsLeft, bwallShown, bwallSpotOk, placeBwall, unplaceBwall, ensureBwalls, bwallUnit, INVEST, MAGE_GENERALS, mageGenPrice, MAGE, mageGenInfo, mageGenOf, mageTpOf, mageTpRound, mageTpNew, isExtraGen, mageGenCost, canBuyMageGen, buyMageGen, undoMageGen, mageTowerUnit, generalUnit, LOAN, loanNow, investNow, bankBusy, investNow, bankBusy, canTakeLoan, takeLoan, undoLoan, towerRounds, troundInfo, troundOn, troundCost, canBuyTround, buyTround, undoTround, SLIME_UNITS, slimeTowerUnit, slimeSkillDefs, TOWER_MID, towerColOk, towerAt, needsTower, placeTower, ensureTower,
     FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, anywhere, mpbAt, bldgSeen, nearBldg, isOff, enemyHolds, inNoMans, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
     STANDARD_PACK, ICE, ALTAR, GOLEM, isIce, hailRound, altarRound, stormShift, stormRows, hailTiles, altarCost, altarRefund, altarCount, pushRoom, altarBought, addAltar, buyAltar, undoAltar, snowgres, snowgreUnit,
@@ -7119,6 +7308,7 @@ const Game = (() => {
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,
+    mpbLocked, buildingMakes,
     zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, teamBuildings, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, AIM, canAim, setAim, clearAim, aimEnd, aimTo, resolve, aiDeploy, occupied, setMpb, mpbApi,
     GRID, useGrid,
     DEV, CAT_NAMES, LESSER_SQ, WALL_SQ, setDevData, devBuilding, devPower, devSpell, isDev, towerUp, pickCat, devOffer, pickNow, needsDevPick, devPick, undoDevPick, devShown,
@@ -7801,6 +7991,7 @@ const Render2D = (cv, view, opts = {}) => {
       }
     }
     if (v && v.dev) devFloor(v, plain);
+    if (v && v.mpb) drawMpbFloor(v); // 2v2 buildings on the floor (the Oak's moss)
     if (v && !plain && phase === 'deploy') aimFloor(v);
     if (plain) return;
     if (v && v.buff) for (const side of [0, 1]) { // Zoe's buff tiles: a gold tile with a star
@@ -8270,15 +8461,253 @@ const Render2D = (cv, view, opts = {}) => {
       for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.ellipse(x + w * 0.33, y0 + h * (0.82 - k * 0.12), s * 0.09, s * 0.035, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } // coins
     },
     // ===== treeKojja (2D) =====
+    // a lopsided leafy crown on a short trunk with a little plank hut wedged in it: a roof in the team colour, a dark
+    // lookout slit, a rope ladder down the trunk and a bird sitting on the roof's tip
+    treeKojja(x, y, t, side, o) {
+      const s = t * 0.82, c = teamCol(side), sway = Math.sin((o.time || 0) * 1.3 + x * 0.05) * s * 0.012;
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y + s * 0.4, s * 0.42, s * 0.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#6B4A2B'; ctx.fillRect(x - s * 0.07, y + s * 0.02, s * 0.14, s * 0.38); // trunk
+      ctx.strokeStyle = '#C9B48A'; ctx.lineWidth = Math.max(1, s * 0.02); // rope ladder
+      for (const dx of [-0.03, 0.03]) { ctx.beginPath(); ctx.moveTo(x + s * (0.1 + dx), y + s * 0.02); ctx.lineTo(x + s * (0.1 + dx), y + s * 0.36); ctx.stroke(); }
+      for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(x + s * 0.07, y + s * (0.08 + k * 0.08)); ctx.lineTo(x + s * 0.13, y + s * (0.08 + k * 0.08)); ctx.stroke(); }
+      for (const [dx, dy, r, col] of [[-0.24, -0.02, 0.2, '#56763A'], [0.22, 0.0, 0.19, '#5F8040'], [0.0, -0.2, 0.24, '#6B8E3D'], [-0.12, 0.08, 0.16, '#7C9C4A'], [0.14, -0.08, 0.17, '#86A657']]) {
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x + s * dx + sway, y + s * dy, s * r, 0, Math.PI * 2); ctx.fill(); } // the crown, leaf clumps
+      const hx = x + sway, hy = y - s * 0.12, hw = s * 0.34, hh = s * 0.2; // the hut
+      ctx.fillStyle = '#9C7A54'; ctx.strokeStyle = '#5B3F24'; ctx.lineWidth = Math.max(1, s * 0.02);
+      ctx.beginPath(); ctx.rect(hx - hw / 2, hy - hh / 2, hw, hh); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); for (let k = 1; k < 3; k++) { ctx.moveTo(hx - hw / 2, hy - hh / 2 + hh * k / 3); ctx.lineTo(hx + hw / 2, hy - hh / 2 + hh * k / 3); } ctx.stroke(); // planks
+      ctx.fillStyle = '#2B2F33'; ctx.fillRect(hx - hw * 0.28, hy - hh * 0.12, hw * 0.56, hh * 0.22); // the lookout slit
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(hx - hw * 0.62, hy - hh / 2); ctx.lineTo(hx + hw * 0.62, hy - hh / 2); ctx.lineTo(hx, hy - hh * 1.55); ctx.closePath(); ctx.fill(); // roof
+      ctx.fillStyle = '#3A3026'; ctx.beginPath(); ctx.arc(hx + s * 0.02, hy - hh * 1.62, Math.max(1.2, s * 0.035), 0, Math.PI * 2); ctx.fill(); // the bird on top
+      ctx.fillStyle = '#E8A04A'; ctx.beginPath(); ctx.moveTo(hx + s * 0.05, hy - hh * 1.64); ctx.lineTo(hx + s * 0.085, hy - hh * 1.6); ctx.lineTo(hx + s * 0.05, hy - hh * 1.56); ctx.fill();
+    },
     // ===== fieldHospital (2D) =====
+    // a canvas ridge tent seen from the front: a pale gable with its flaps tied open (a dark doorway), the roof's long
+    // side behind it, a white disc with a soft green cross over the door, a pennant in the team colour on the ridge
+    // pole, and its world detail: a line of bandages hung out to dry beside it
+    fieldHospital(x, y, t, side, o) {
+      const s = t * 0.82, c = teamCol(side), dx = s * 0.16, dy = -s * 0.14, by = y + s * 0.3, ay = y - s * 0.36, hw = s * 0.42;
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x + dx * 0.5, by + s * 0.04, s * 0.56, s * 0.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.lineJoin = 'round'; ctx.strokeStyle = '#8E8670'; ctx.lineWidth = Math.max(1, s * 0.03);
+      ctx.fillStyle = '#C9C0A6'; ctx.beginPath(); ctx.moveTo(x, ay); ctx.lineTo(x + dx, ay + dy); ctx.lineTo(x + hw + dx, by + dy); ctx.lineTo(x + hw, by); ctx.closePath(); ctx.fill(); ctx.stroke(); // the roof's long side
+      ctx.fillStyle = '#EDE7D6'; ctx.beginPath(); ctx.moveTo(x, ay); ctx.lineTo(x + hw, by); ctx.lineTo(x - hw, by); ctx.closePath(); ctx.fill(); ctx.stroke(); // the front gable
+      ctx.fillStyle = '#4A4236'; ctx.beginPath(); ctx.moveTo(x, y - s * 0.02); ctx.lineTo(x + s * 0.17, by); ctx.lineTo(x - s * 0.17, by); ctx.closePath(); ctx.fill(); // the doorway
+      ctx.fillStyle = '#DCD3BC'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x, y - s * 0.02); ctx.lineTo(x + sd * s * 0.25, by - s * 0.02); ctx.lineTo(x + sd * s * 0.12, by); ctx.closePath(); ctx.fill(); } // its flaps, tied back
+      const cx = x, cy = y - s * 0.16, cr = s * 0.11;
+      ctx.fillStyle = '#FAF7EE'; ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6FB07E'; ctx.fillRect(cx - cr * 0.22, cy - cr * 0.7, cr * 0.44, cr * 1.4); ctx.fillRect(cx - cr * 0.7, cy - cr * 0.22, cr * 1.4, cr * 0.44); // a soft green cross
+      ctx.fillStyle = c; ctx.fillRect(x - hw, by - s * 0.05, hw * 2, s * 0.05); // the team's hem
+      ctx.strokeStyle = '#6B5A44'; ctx.lineWidth = Math.max(1, s * 0.025); ctx.beginPath(); ctx.moveTo(x + dx, ay + dy); ctx.lineTo(x + dx, ay + dy - s * 0.2); ctx.stroke(); // the ridge pole
+      const wave = Math.sin((o.time || 0) * 3 + x * 0.1) * s * 0.02;
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x + dx, ay + dy - s * 0.2); ctx.lineTo(x + dx + s * 0.18, ay + dy - s * 0.16 + wave); ctx.lineTo(x + dx, ay + dy - s * 0.11); ctx.closePath(); ctx.fill();
+      // the bandages drying on a line to the left
+      const lx0 = x - hw - s * 0.06, lx1 = x - s * 0.2, ly = y - s * 0.02;
+      ctx.strokeStyle = '#8E8670'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(lx0, by); ctx.lineTo(lx0, ly - s * 0.04); ctx.moveTo(lx0, ly - s * 0.03); ctx.quadraticCurveTo((lx0 + lx1) / 2, ly + s * 0.04, lx1, ly - s * 0.08); ctx.stroke();
+      ctx.fillStyle = '#FAF7EE'; for (const k of [0.3, 0.62]) { const bx = lx0 + (lx1 - lx0) * k; ctx.fillRect(bx - s * 0.025, ly, s * 0.05, s * 0.13); }
+    },
     // ===== coalMine (2D) =====
+    // the entrance: a rocky mound with a timber-framed adit (a black arch under a lintel in the team colour), rails
+    // running out of it and a little cart heaped with coal; a lantern hangs by the door
+    coalMine(x, y, t, side, o) {
+      const s = t * 0.8, c = teamCol(side);
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y + s * 0.36, s * 0.52, s * 0.11, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#6B625A'; ctx.strokeStyle = '#3A342F'; ctx.lineWidth = Math.max(1, s * 0.03); // the mound
+      ctx.beginPath(); ctx.moveTo(x - s * 0.5, y + s * 0.34); ctx.quadraticCurveTo(x - s * 0.46, y - s * 0.4, x, y - s * 0.44); ctx.quadraticCurveTo(x + s * 0.46, y - s * 0.4, x + s * 0.5, y + s * 0.34); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#857A6E'; for (const [fx, fy, fr] of [[-0.3, -0.12, 0.07], [0.28, -0.2, 0.06], [0.34, 0.1, 0.05], [-0.36, 0.14, 0.05]]) { ctx.beginPath(); ctx.arc(x + s * fx, y + s * fy, s * fr, 0, Math.PI * 2); ctx.fill(); } // stones
+      ctx.fillStyle = '#121212'; ctx.beginPath(); ctx.moveTo(x - s * 0.2, y + s * 0.3); ctx.lineTo(x - s * 0.2, y - s * 0.08); ctx.quadraticCurveTo(x, y - s * 0.26, x + s * 0.2, y - s * 0.08); ctx.lineTo(x + s * 0.2, y + s * 0.3); ctx.closePath(); ctx.fill(); // the dark adit
+      ctx.fillStyle = '#8A5A32'; ctx.fillRect(x - s * 0.26, y - s * 0.14, s * 0.07, s * 0.46); ctx.fillRect(x + s * 0.19, y - s * 0.14, s * 0.07, s * 0.46); // timber posts
+      ctx.fillStyle = c; ctx.fillRect(x - s * 0.3, y - s * 0.22, s * 0.6, s * 0.09); // the lintel, in the team colour
+      ctx.strokeStyle = '#9AA1A8'; ctx.lineWidth = Math.max(1, s * 0.025); // rails
+      for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + sd * s * 0.08, y + s * 0.3); ctx.lineTo(x + sd * s * 0.14, y + s * 0.5); ctx.stroke(); }
+      ctx.fillStyle = '#55595E'; ctx.fillRect(x + s * 0.02, y + s * 0.24, s * 0.26, s * 0.13); // the cart
+      ctx.fillStyle = '#1E1C1B'; for (const [fx, fy] of [[0.08, 0.23], [0.15, 0.21], [0.22, 0.23], [0.12, 0.18]]) { ctx.beginPath(); ctx.arc(x + s * fx, y + s * fy, s * 0.045, 0, Math.PI * 2); ctx.fill(); } // its coal
+      ctx.fillStyle = '#2B2F33'; for (const fx of [0.07, 0.23]) { ctx.beginPath(); ctx.arc(x + s * fx, y + s * 0.38, s * 0.03, 0, Math.PI * 2); ctx.fill(); }
+      const glow = 0.75 + 0.25 * Math.sin((o.time || 0) * 3 + x); // the lantern
+      ctx.fillStyle = '#FFD27A'; ctx.globalAlpha = 0.35 * glow; ctx.beginPath(); ctx.arc(x - s * 0.32, y - s * 0.02, s * 0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(x - s * 0.32, y - s * 0.02, s * 0.035, 0, Math.PI * 2); ctx.fill();
+    },
+    // the exit: a round shaft ringed with planks under a small winch frame with a pennant in the team colour; while
+    // deploying, a dashed square round the 8 tiles nobody may deploy on (where the squads come up)
+    'coalMine:exit'(x, y, t, side, o) {
+      const s = t * 0.95, c = teamCol(side);
+      if (!o.fight) { ctx.strokeStyle = c; ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]); ctx.strokeRect(x - t * 1.5 + 2, y - t * 1.5 + 2, t * 3 - 4, t * 3 - 4); ctx.setLineDash([]); ctx.globalAlpha = 1; }
+      ctx.fillStyle = '#8A5A32'; ctx.strokeStyle = '#4E3218'; ctx.lineWidth = Math.max(1, s * 0.03);
+      ctx.beginPath(); ctx.ellipse(x, y + s * 0.08, s * 0.36, s * 0.28, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); // the plank rim
+      ctx.strokeStyle = '#6B4A2A'; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * s * 0.24, y + s * 0.08 + Math.sin(a) * s * 0.19); ctx.lineTo(x + Math.cos(a) * s * 0.36, y + s * 0.08 + Math.sin(a) * s * 0.28); ctx.stroke(); }
+      ctx.fillStyle = '#0E0D0C'; ctx.beginPath(); ctx.ellipse(x, y + s * 0.08, s * 0.24, s * 0.18, 0, 0, Math.PI * 2); ctx.fill(); // the shaft
+      ctx.strokeStyle = '#6B4A2A'; ctx.lineWidth = Math.max(1.5, s * 0.05); // the winch frame
+      ctx.beginPath(); ctx.moveTo(x - s * 0.3, y + s * 0.14); ctx.lineTo(x, y - s * 0.38); ctx.lineTo(x + s * 0.3, y + s * 0.14); ctx.stroke();
+      ctx.strokeStyle = '#C8B89A'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y - s * 0.36); ctx.lineTo(x, y + s * 0.04); ctx.stroke(); // the rope
+      ctx.fillStyle = '#55595E'; ctx.beginPath(); ctx.arc(x, y - s * 0.36, s * 0.06, 0, Math.PI * 2); ctx.fill(); // its wheel
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x, y - s * 0.38); ctx.lineTo(x + s * 0.24, y - s * 0.32); ctx.lineTo(x, y - s * 0.24); ctx.closePath(); ctx.fill(); // the pennant
+    },
     // ===== scorch (2D) =====
+    // a squat stone brazier with a team-coloured band; a grumpy Ember Imp sits in its glowing coals, horns and
+    // scowl showing over the rim, licked by soft amber flames
+    scorch(x, y, t, side, o) { scorchShape(x, y, t * 0.78, side, o.time || 0, false); },
     // ===== oak (2D) =====
+    // an old broad oak: a gnarled trunk on spreading roots with a calm sleeping face in its bark (eyes shut, a small
+    // smile), a ribbon in the team colour round it, a wide lumpy crown of three dusty greens with acorns, its world
+    // detail (a rope swing from a low branch) and, in a fight, pale motes of Restoration drifting up
+    oak(x, y, t, side, o) {
+      const s = t * 0.92, c = teamCol(side), ty = y + s * 0.36;
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, ty, s * 0.5, s * 0.12, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#5E4329'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + sd * s * 0.08, y + s * 0.16); ctx.quadraticCurveTo(x + sd * s * 0.2, ty - s * 0.02, x + sd * s * 0.32, ty + s * 0.02); ctx.lineTo(x + sd * s * 0.1, ty); ctx.closePath(); ctx.fill(); } // roots
+      ctx.fillStyle = '#7A5A36'; ctx.strokeStyle = '#4B3420'; ctx.lineWidth = Math.max(1, s * 0.025);
+      ctx.beginPath(); ctx.moveTo(x - s * 0.13, ty); ctx.quadraticCurveTo(x - s * 0.09, y + s * 0.05, x - s * 0.12, y - s * 0.08); ctx.lineTo(x + s * 0.12, y - s * 0.08); ctx.quadraticCurveTo(x + s * 0.09, y + s * 0.05, x + s * 0.13, ty); ctx.closePath(); ctx.fill(); ctx.stroke(); // the trunk
+      // the swing: two ropes from the left branch and a plank (drawn before the crown, which hides the knots)
+      ctx.strokeStyle = '#B79A6E'; ctx.lineWidth = 1; const sx = x - s * 0.3, sw = Math.sin((o.time || 0) * 1.4 + x) * s * 0.02;
+      ctx.beginPath(); ctx.moveTo(sx - s * 0.05, y - s * 0.12); ctx.lineTo(sx - s * 0.05 + sw, y + s * 0.18); ctx.moveTo(sx + s * 0.05, y - s * 0.12); ctx.lineTo(sx + s * 0.05 + sw, y + s * 0.18); ctx.stroke();
+      ctx.fillStyle = '#8A5A32'; ctx.fillRect(sx - s * 0.08 + sw, y + s * 0.17, s * 0.16, s * 0.035);
+      for (const [fx, fy, r, col] of [[-0.24, -0.2, 0.25, '#5C7A42'], [0.24, -0.22, 0.24, '#5C7A42'], [0, -0.36, 0.28, '#6E8B4E'], [-0.12, -0.18, 0.22, '#87A35E'], [0.13, -0.3, 0.2, '#87A35E']]) {
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x + fx * s, y + fy * s, r * s, 0, Math.PI * 2); ctx.fill(); // the crown
+      }
+      ctx.fillStyle = '#8C6239'; for (const [fx, fy] of [[-0.3, -0.12], [0.2, -0.1], [0.05, -0.44], [0.32, -0.3]]) { ctx.beginPath(); ctx.ellipse(x + fx * s, y + fy * s, s * 0.025, s * 0.032, 0, 0, Math.PI * 2); ctx.fill(); } // acorns
+      ctx.fillStyle = c; ctx.fillRect(x - s * 0.125, y + s * 0.16, s * 0.25, s * 0.05); // the team's ribbon
+      if (t >= 22) { // its face: eyes shut, a small smile
+        ctx.strokeStyle = '#3A2616'; ctx.lineWidth = Math.max(1, s * 0.02);
+        for (const sd of [-1, 1]) { ctx.beginPath(); ctx.arc(x + sd * s * 0.045, y + s * 0.01, s * 0.028, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke(); }
+        ctx.beginPath(); ctx.arc(x, y + s * 0.07, s * 0.035, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+      }
+      if (o.hpr != null && o.hpr > 0) { // Restoration at work: motes drifting up
+        ctx.fillStyle = '#CFEAB8';
+        for (let k = 0; k < 4; k++) { const p = (((o.time || 0) * 0.45 + k / 4) % 1 + 1) % 1; ctx.globalAlpha = 0.7 * (1 - p); ctx.beginPath(); ctx.arc(x + Math.sin(k * 2.1 + p * 4) * s * 0.35, y - s * 0.1 - p * s * 0.55, Math.max(1, s * 0.03), 0, Math.PI * 2); ctx.fill(); }
+        ctx.globalAlpha = 1;
+      }
+    },
     // ===== factory (2D) =====
+    // the Cog Builder's Factory as drawn for a Cog Builder (always built, its cog turning), under the team's tall
+    // swallow-tailed banner on a pole at its side with a white cog on it: the team's, not one player's
+    factory(x, y, t, side, o) {
+      const s = t * 0.92, c = teamCol(side);
+      drawFactory(x + s * 0.06, y, s, side, '#B07A3C', { built: true, time: o.time, level: 0 });
+      const px = x - s * 0.38, top = y - s * 0.56, bh = s * 0.36, bw = s * 0.34;
+      ctx.strokeStyle = '#2B2F33'; ctx.lineWidth = Math.max(1.5, s * 0.035);
+      ctx.beginPath(); ctx.moveTo(px, y + s * 0.22); ctx.lineTo(px, top - s * 0.05); ctx.stroke(); // the pole
+      const wave = Math.sin((o.time || 0) * 3 + x * 0.1) * s * 0.015;
+      ctx.fillStyle = c; ctx.strokeStyle = '#1D1A18'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px + bw, top + wave); ctx.lineTo(px + bw * 0.72, top + bh * 0.5); ctx.lineTo(px + bw, top + bh + wave); ctx.lineTo(px, top + bh); ctx.closePath(); ctx.fill(); ctx.stroke();
+      const cx = px + bw * 0.38, cy = top + bh * 0.5, cr = bh * 0.2; // a small white cog on it
+      ctx.fillStyle = '#F4EFE3'; ctx.beginPath(); for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6, r = k % 2 ? cr : cr * 1.35; ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } ctx.closePath(); ctx.fill();
+      ctx.fillStyle = c; ctx.beginPath(); ctx.arc(cx, cy, cr * 0.45, 0, Math.PI * 2); ctx.fill();
+    },
     // ===== magicLake (2D) =====
+    // a pond filling its tile: soft blue water with a pale shimmer, slow ripples, a lily pad and reeds at its edge, a
+    // thin bank in the team colour. Waterspirits: two small pale spirits bob on it; Water elemental: a swirl in its middle
+    magicLake(x, y, t, side, o) {
+      const s = t * 0.96, c = teamCol(side), tm = o.time || 0, rec = o.rec, sk = (id) => !!(rec && rec.skills && rec.skills[id] && rec.skills[id].n > 0);
+      const r = s * 0.14;
+      ctx.fillStyle = '#2F6F99'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - s / 2, y - s / 2, s, s, r) : ctx.rect(x - s / 2, y - s / 2, s, s); ctx.fill();
+      const g = ctx.createRadialGradient(x - s * 0.15, y - s * 0.18, s * 0.05, x, y, s * 0.6); g.addColorStop(0, 'rgba(170,220,240,0.55)'); g.addColorStop(1, 'rgba(62,143,196,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - s / 2, y - s / 2, s, s, r) : ctx.rect(x - s / 2, y - s / 2, s, s); ctx.fill();
+      ctx.strokeStyle = '#D6EEF7'; ctx.lineWidth = 1;
+      for (let k = 0; k < 2; k++) { const p = ((tm * 0.35 + k * 0.5) % 1); ctx.globalAlpha = 0.45 * (1 - p); ctx.beginPath(); ctx.ellipse(x + s * 0.08, y + s * 0.06, s * (0.08 + p * 0.26), s * (0.05 + p * 0.17), 0, 0, Math.PI * 2); ctx.stroke(); } // ripples
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#6E9E5A'; ctx.beginPath(); ctx.arc(x - s * 0.24, y + s * 0.22, s * 0.1, 0.5, Math.PI * 2 + 0.1); ctx.lineTo(x - s * 0.24, y + s * 0.22); ctx.fill(); // a lily pad
+      ctx.fillStyle = '#F2C6D6'; ctx.beginPath(); ctx.arc(x - s * 0.22, y + s * 0.2, s * 0.03, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#7A8F4A'; ctx.lineWidth = Math.max(1, s * 0.025); for (const fx of [0.3, 0.36, 0.41]) { ctx.beginPath(); ctx.moveTo(x + s * fx, y - s * 0.4); ctx.lineTo(x + s * (fx - 0.03), y - s * 0.18); ctx.stroke(); } // reeds
+      ctx.strokeStyle = c; ctx.globalAlpha = 0.7; ctx.lineWidth = Math.max(1, t * 0.04); ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - s / 2 + 1, y - s / 2 + 1, s - 2, s - 2, r) : ctx.rect(x - s / 2 + 1, y - s / 2 + 1, s - 2, s - 2); ctx.stroke(); ctx.globalAlpha = 1;
+      if (sk('spirits')) for (let k = 0; k < 2; k++) { // two little water spirits
+        const sx = x + s * (k ? 0.18 : -0.12), sy = y + s * (k ? -0.12 : -0.02) + Math.sin(tm * 2 + k * 2) * s * 0.03;
+        ctx.fillStyle = '#E8F7FC'; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.arc(sx, sy, s * 0.07, Math.PI, 0); ctx.lineTo(sx + s * 0.07, sy + s * 0.07); ctx.lineTo(sx - s * 0.07, sy + s * 0.07); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#2F6F99'; ctx.globalAlpha = 1; for (const e of [-1, 1]) { ctx.beginPath(); ctx.arc(sx + e * s * 0.025, sy, Math.max(0.8, s * 0.012), 0, Math.PI * 2); ctx.fill(); }
+      }
+      if (sk('elemental')) { // a swirl: the elemental waiting under it
+        ctx.strokeStyle = '#BFE6F2'; ctx.lineWidth = Math.max(1.2, s * 0.03); ctx.globalAlpha = 0.85;
+        ctx.beginPath(); for (let k = 0; k <= 24; k++) { const a = tm * 1.5 + k * 0.45, d = s * 0.02 + k * s * 0.009; const px = x + Math.cos(a) * d, py = y + Math.sin(a) * d * 0.8; k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke(); ctx.globalAlpha = 1;
+      }
+    },
     // ===== jail (2D) =====
+    // a stern grey stone lock-up: a heavy plinth, a barred window with the jailed squads' shapes peering out between the
+    // bars, a team band, a squat lamp turret on top (Skywatch) with its amber lantern, and a ring of keys by the door.
+    // In a fight its light lies soft on every tile it watches (deploying: drawMpbs' lit tiles)
+    jail(x, y, t, side, o) {
+      const s = t * 0.8, c = teamCol(side), w = s * 0.84, h = s * 0.6, x0 = x - w / 2, y0 = y - h * 0.4, lw = Math.max(1, s * 0.03);
+      const rec = mpbRecAt('jail', side, x, y, t), up = !rec || Mpb.litTiles(m, side, rec).length > 0;
+      if (o.hpr != null && rec && up) { // the Skywatch light in a fight
+        const L = Mpb.JAIL.light, g = ctx.createRadialGradient(x, y, t * 0.5, x, y, t * (L + 0.6));
+        g.addColorStop(0, 'rgba(255,226,160,0.20)'); g.addColorStop(1, 'rgba(255,226,160,0.05)');
+        ctx.fillStyle = g; ctx.fillRect(x - t * (L + 0.5), y - t * (L + 0.5), t * (2 * L + 1), t * (2 * L + 1));
+      }
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y + h * 0.66, w * 0.62, s * 0.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#4E4A45'; ctx.fillRect(x0 - s * 0.05, y0 + h * 0.9, w + s * 0.1, h * 0.18); // plinth
+      ctx.fillStyle = '#7C7F86'; ctx.strokeStyle = '#3A3C41'; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.rect(x0, y0, w, h * 0.92); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#686B72'; ctx.lineWidth = 1; // stone courses
+      for (const fy of [0.3, 0.56]) { ctx.beginPath(); ctx.moveTo(x0, y0 + h * fy); ctx.lineTo(x0 + w, y0 + h * fy); ctx.stroke(); }
+      ctx.fillStyle = c; ctx.fillRect(x0, y0 - h * 0.02, w, h * 0.1); // the team's band along the roof edge
+      for (let k = 0; k < 4; k++) { ctx.fillStyle = '#6A6D74'; ctx.fillRect(x0 + k * w / 3.5, y0 - h * 0.16, w / 7, h * 0.14); } // crenels
+      const wx0 = x - w * 0.36, wy0 = y0 + h * 0.2, ww = w * 0.5, wh = h * 0.5; // the barred window
+      ctx.fillStyle = '#1F2023'; ctx.fillRect(wx0, wy0, ww, wh);
+      const cells = rec ? ((rec.data && rec.data.cells) || []) : [];
+      cells.slice(0, 2).forEach((cl, k) => { const u = units[cl.ui]; if (!u) return; ctx.fillStyle = u.color; Shapes.draw(ctx, u.shape, wx0 + ww * (0.28 + k * 0.44), wy0 + wh * 0.55, Math.min(ww * 0.2, wh * 0.36), 1); });
+      ctx.strokeStyle = '#B8BCC2'; ctx.lineWidth = Math.max(1, s * 0.035);
+      for (let k = 1; k < 5; k++) { ctx.beginPath(); ctx.moveTo(wx0 + ww * k / 5, wy0); ctx.lineTo(wx0 + ww * k / 5, wy0 + wh); ctx.stroke(); }
+      ctx.strokeRect(wx0, wy0, ww, wh);
+      ctx.fillStyle = '#3A3C41'; ctx.fillRect(x + w * 0.2, y0 + h * 0.36, w * 0.22, h * 0.56); // the iron door
+      ctx.strokeStyle = '#C9A24A'; ctx.lineWidth = Math.max(1, s * 0.025); // keys on a ring by the door
+      ctx.beginPath(); ctx.arc(x + w * 0.31, y0 + h * 0.24, s * 0.05, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + w * 0.31, y0 + h * 0.3); ctx.lineTo(x + w * 0.3, y0 + h * 0.44); ctx.stroke();
+      ctx.fillStyle = '#5A5D63'; ctx.fillRect(x - s * 0.09, y0 - h * 0.46, s * 0.18, h * 0.32); // the lamp turret
+      ctx.fillStyle = up ? '#FFE2A0' : '#6E6A64'; ctx.beginPath(); ctx.arc(x, y0 - h * 0.5, s * 0.1, 0, Math.PI * 2); ctx.fill(); // its lantern (dark the round after it fell)
+      if (up) { ctx.globalAlpha = 0.35; ctx.fillStyle = '#FFE2A0'; ctx.beginPath(); ctx.arc(x, y0 - h * 0.5, s * 0.2, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
+    },
     // ===== school (2D) =====
+    // a little brick-red schoolhouse: a pitched slate roof, a bell turret with its brass bell, a team band under the eaves,
+    // a chalkboard door and a round window where the squad inside looks out; an apple on the step
+    school(x, y, t, side, o) {
+      const s = t * 0.8, c = teamCol(side), w = s * 0.78, h = s * 0.5, x0 = x - w / 2, y0 = y - h * 0.18, lw = Math.max(1, s * 0.03);
+      const rec = mpbRecAt('school', side, x, y, t), p = rec && rec.data ? rec.data.pupil : null;
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y + h * 0.9, w * 0.62, s * 0.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#A8443A'; ctx.strokeStyle = '#5E241E'; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#8E3830'; ctx.lineWidth = 1; // brick courses
+      for (const fy of [0.33, 0.66]) { ctx.beginPath(); ctx.moveTo(x0, y0 + h * fy); ctx.lineTo(x0 + w, y0 + h * fy); ctx.stroke(); }
+      ctx.fillStyle = c; ctx.fillRect(x0 - s * 0.02, y0 - h * 0.08, w + s * 0.04, h * 0.12); // the team's band under the eaves
+      ctx.fillStyle = '#56606A'; ctx.strokeStyle = '#2E3439'; ctx.lineWidth = lw; // the slate roof
+      ctx.beginPath(); ctx.moveTo(x0 - s * 0.08, y0 - h * 0.06); ctx.lineTo(x, y0 - h * 0.86); ctx.lineTo(x0 + w + s * 0.08, y0 - h * 0.06); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#EDE3CC'; ctx.fillRect(x - s * 0.07, y0 - h * 1.12, s * 0.14, h * 0.32); // the bell turret
+      ctx.fillStyle = '#56606A'; ctx.beginPath(); ctx.moveTo(x - s * 0.1, y0 - h * 1.1); ctx.lineTo(x, y0 - h * 1.36); ctx.lineTo(x + s * 0.1, y0 - h * 1.1); ctx.closePath(); ctx.fill();
+      const sw = Math.sin((o.time || 0) * 2.2) * s * 0.012; // the bell swings a little
+      ctx.fillStyle = '#C9A24A'; ctx.beginPath(); ctx.arc(x + sw, y0 - h * 0.92, s * 0.045, Math.PI, 0); ctx.lineTo(x + sw + s * 0.055, y0 - h * 0.86); ctx.lineTo(x + sw - s * 0.055, y0 - h * 0.86); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#2F4A3A'; ctx.strokeStyle = '#7A5A36'; ctx.lineWidth = Math.max(1, s * 0.025); // the chalkboard door
+      ctx.fillRect(x + w * 0.08, y0 + h * 0.36, w * 0.28, h * 0.64); ctx.strokeRect(x + w * 0.08, y0 + h * 0.36, w * 0.28, h * 0.64);
+      ctx.strokeStyle = '#EDE3CC'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w * 0.13, y0 + h * 0.55); ctx.lineTo(x + w * 0.3, y0 + h * 0.5); ctx.stroke(); // a chalk line
+      const rx = x - w * 0.22, ry = y0 + h * 0.48, rr = Math.min(w * 0.17, h * 0.32); // the round window
+      ctx.fillStyle = p ? '#FFE9A8' : '#2B2F33'; ctx.strokeStyle = '#EDE3CC'; ctx.lineWidth = Math.max(1, s * 0.03);
+      ctx.beginPath(); ctx.arc(rx, ry, rr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      const u = p && units[p.ui];
+      if (u) { ctx.fillStyle = u.color; Shapes.draw(ctx, u.shape, rx, ry, rr * 0.62, 1); }
+      if (p && p.learn) { ctx.fillStyle = '#FFE9A8'; ctx.font = `600 ${Math.max(7, Math.round(t * 0.2))}px "IBM Plex Mono", monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✎', x + w * 0.22, y0 + h * 0.18); } // learning a skill
+      ctx.fillStyle = '#C4473A'; ctx.beginPath(); ctx.arc(x + w * 0.45, y0 + h * 0.98, s * 0.045, 0, Math.PI * 2); ctx.fill(); // an apple on the step
+      ctx.fillStyle = '#5E8C3A'; ctx.fillRect(x + w * 0.45, y0 + h * 0.98 - s * 0.075, s * 0.015, s * 0.035);
+    },
     // ===== shadowDen (2D) =====
+    // a crooked hideout of dark violet stone under a steep slate roof with a band in the team colour, a pale mask with
+    // glowing violet eyes over its black doorway, two crossed daggers on the wall and a violet lantern
+    shadowDen(x, y, t, side, o) {
+      const s = t * 0.8, c = teamCol(side), w = s * 0.8, h = s * 0.46, x0 = x - w / 2, y0 = y - h * 0.1;
+      const glow = 0.65 + 0.35 * Math.sin((o.time || 0) * 2.4 + x * 0.05);
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y0 + h + s * 0.03, w * 0.6, s * 0.08, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#3B3350'; ctx.strokeStyle = '#7C6BAA'; ctx.lineWidth = Math.max(1, s * 0.03); // (a pale violet edge: it reads on dark boards)
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + w, y0 - h * 0.06); ctx.lineTo(x0 + w * 0.98, y0 + h); ctx.lineTo(x0 + w * 0.02, y0 + h); ctx.closePath(); ctx.fill(); ctx.stroke(); // the walls, a little askew
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x0 - s * 0.04, y0 + h * 0.02); ctx.lineTo(x0 + w + s * 0.04, y0 - h * 0.05); ctx.lineTo(x0 + w + s * 0.04, y0 + h * 0.14); ctx.lineTo(x0 - s * 0.04, y0 + h * 0.2); ctx.closePath(); ctx.fill(); // the team's band
+      ctx.fillStyle = '#231E2E'; ctx.beginPath(); ctx.moveTo(x0 - s * 0.08, y0 + h * 0.04); ctx.lineTo(x + w * 0.06, y0 - h * 1.05); ctx.lineTo(x0 + w + s * 0.08, y0 - h * 0.04); ctx.closePath(); ctx.fill(); ctx.stroke(); // the roof
+      ctx.fillStyle = '#0B0910'; ctx.beginPath(); ctx.moveTo(x - w * 0.13, y0 + h); ctx.lineTo(x - w * 0.13, y0 + h * 0.5); ctx.quadraticCurveTo(x, y0 + h * 0.28, x + w * 0.13, y0 + h * 0.5); ctx.lineTo(x + w * 0.13, y0 + h); ctx.closePath(); ctx.fill(); // the doorway
+      const mx = x, my = y0 - h * 0.38, mr = s * 0.11; // the mask on the gable
+      ctx.fillStyle = '#E9E3CF'; ctx.beginPath(); ctx.moveTo(mx - mr, my - mr * 0.5); ctx.quadraticCurveTo(mx, my - mr * 1.1, mx + mr, my - mr * 0.5); ctx.quadraticCurveTo(mx + mr * 0.8, my + mr * 0.9, mx, my + mr * 1.05); ctx.quadraticCurveTo(mx - mr * 0.8, my + mr * 0.9, mx - mr, my - mr * 0.5); ctx.fill();
+      ctx.fillStyle = '#B79CFF'; ctx.globalAlpha = glow;
+      for (const sd of [-1, 1]) { ctx.beginPath(); ctx.ellipse(mx + sd * mr * 0.42, my - mr * 0.05, mr * 0.26, mr * 0.12, sd * 0.35, 0, Math.PI * 2); ctx.fill(); } // its eyes
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#C9CED6'; ctx.lineWidth = Math.max(1.2, s * 0.035); // crossed daggers
+      const dx = x0 + w * 0.24, dy = y0 + h * 0.6, dl = s * 0.13;
+      ctx.beginPath(); ctx.moveTo(dx - dl, dy - dl); ctx.lineTo(dx + dl, dy + dl); ctx.moveTo(dx + dl, dy - dl); ctx.lineTo(dx - dl, dy + dl); ctx.stroke();
+      ctx.fillStyle = '#5B4A3A'; for (const sd of [-1, 1]) ctx.fillRect(dx + sd * dl * 0.75 - s * 0.025, dy + dl * 0.6, s * 0.05, s * 0.05);
+      const lx = x0 + w * 0.84, ly = y0 + h * 0.55; // a lantern with a violet flame
+      ctx.fillStyle = '#B79CFF'; ctx.globalAlpha = 0.25 * glow; ctx.beginPath(); ctx.arc(lx, ly, s * 0.13, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = '#2B2F33'; ctx.fillRect(lx - s * 0.04, ly - s * 0.06, s * 0.08, s * 0.11);
+      ctx.fillStyle = '#B79CFF'; ctx.globalAlpha = glow; ctx.fillRect(lx - s * 0.025, ly - s * 0.04, s * 0.05, s * 0.07); ctx.globalAlpha = 1;
+    },
   };
   const MPB_BODY = {
     // ===== golem (2D) =====
@@ -8295,7 +8724,56 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.strokeStyle = c; ctx.lineWidth = Math.max(1.5, r * 0.12); ctx.beginPath(); ctx.arc(x, y, r * 1.08, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     },
+    // ===== shadowDen: Shadowhands (2D) =====
+    // a Shadowhand (u.mpb 'shadowDen'): a hooded cloak in violet with a pale mask, two glowing eyes and a dagger,
+    // pointing the way its side faces; ringed in its team's colour
+    shadowDen(x, y, r, side, u, o) {
+      const c = teamCol(side), up = -upOf(side), col = u.color || '#8E7CC3'; // (up: the hood's point toward where its side faces)
+      ctx.globalAlpha = o.alpha == null ? 1 : o.alpha;
+      ctx.fillStyle = col; ctx.strokeStyle = '#17131F'; ctx.lineWidth = Math.max(1, r * 0.08);
+      ctx.beginPath(); ctx.moveTo(x, y + up * r * 0.95); ctx.quadraticCurveTo(x + r * 0.95, y + up * r * 0.1, x + r * 0.7, y - up * r * 0.8); ctx.lineTo(x - r * 0.7, y - up * r * 0.8); ctx.quadraticCurveTo(x - r * 0.95, y + up * r * 0.1, x, y + up * r * 0.95); ctx.fill(); ctx.stroke(); // the hooded cloak
+      ctx.fillStyle = '#E9E3CF'; ctx.beginPath(); ctx.ellipse(x, y + up * r * 0.25, r * 0.36, r * 0.3, 0, 0, Math.PI * 2); ctx.fill(); // the mask
+      ctx.fillStyle = '#5A2D91'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.ellipse(x + sd * r * 0.15, y + up * r * 0.27, r * 0.09, r * 0.05, 0, 0, Math.PI * 2); ctx.fill(); }
+      ctx.strokeStyle = '#C9CED6'; ctx.lineWidth = Math.max(1, r * 0.12); ctx.beginPath(); ctx.moveTo(x + r * 0.55, y - up * r * 0.2); ctx.lineTo(x + r * 0.95, y + up * r * 0.55); ctx.stroke(); // the dagger
+      ctx.strokeStyle = c; ctx.lineWidth = Math.max(1.5, r * 0.12); ctx.beginPath(); ctx.arc(x, y, r * 1.08, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    },
+    // ===== magicLake (2D walker) =====
+    // the Water Elemental a lake tile becomes: a tall drop of water with a curling crest, calm eyes, a ripple at its foot
+    magicLake(x, y, r, side, u, o) {
+      const c = teamCol(side), tm = o.time || 0;
+      ctx.globalAlpha = o.alpha == null ? 1 : o.alpha;
+      ctx.strokeStyle = '#D6EEF7'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x, y + r * 0.75, r * (0.8 + 0.1 * Math.sin(tm * 3)), r * 0.25, 0, 0, Math.PI * 2); ctx.stroke(); // the ripple
+      ctx.fillStyle = '#5FA8D3'; ctx.strokeStyle = '#2F6F99'; ctx.lineWidth = Math.max(1, r * 0.1);
+      ctx.beginPath(); ctx.moveTo(x, y - r * 1.05); ctx.bezierCurveTo(x + r * 0.95, y - r * 0.1, x + r * 0.8, y + r * 0.8, x, y + r * 0.8); ctx.bezierCurveTo(x - r * 0.8, y + r * 0.8, x - r * 0.95, y - r * 0.1, x, y - r * 1.05); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#E8F7FC'; ctx.lineWidth = Math.max(1, r * 0.12); ctx.beginPath(); ctx.arc(x - r * 0.25, y - r * 0.55, r * 0.28, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); // its crest
+      ctx.fillStyle = '#16384F'; for (const e of [-1, 1]) { ctx.beginPath(); ctx.ellipse(x + e * r * 0.25, y + r * 0.05, r * 0.08, r * 0.05, 0, 0, Math.PI * 2); ctx.fill(); } // calm half-shut eyes
+      ctx.strokeStyle = c; ctx.lineWidth = Math.max(1.5, r * 0.12); ctx.beginPath(); ctx.arc(x, y, r * 1.12, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    },
+    // ===== scorch (2D walker) =====
+    // a Scorch turret with Legs: the brazier on two stubby iron legs
+    scorch(x, y, r, side, u, o) { ctx.globalAlpha = o.alpha == null ? 1 : o.alpha; scorchShape(x, y, r * 2.4, side, o.time || 0, true); ctx.globalAlpha = 1; },
   };
+  // ===== scorch (2D, shared) =====
+  // the Scorch turret: s = its size in px; legs: the walking one (Legs) on two stubby iron legs
+  function scorchShape(x, y, s, side, time, legs) {
+    const c = teamCol(side), fl = Math.sin(time * 9 + x * 0.3) * 0.5 + 0.5;
+    ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y + s * 0.42, s * 0.4, s * 0.09, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+    if (legs) { ctx.fillStyle = '#3B3F44'; for (const sd of [-1, 1]) { ctx.fillRect(x + sd * s * 0.2 - s * 0.06, y + s * 0.18, s * 0.12, s * 0.24); ctx.fillRect(x + sd * s * 0.2 - s * 0.1, y + s * 0.38, s * 0.2, s * 0.06); } }
+    ctx.fillStyle = '#7A746C'; ctx.strokeStyle = '#4E4A45'; ctx.lineWidth = Math.max(1, s * 0.03);
+    ctx.beginPath(); ctx.moveTo(x - s * 0.36, y - s * 0.02); ctx.lineTo(x + s * 0.36, y - s * 0.02); ctx.lineTo(x + s * 0.26, y + s * 0.3); ctx.lineTo(x - s * 0.26, y + s * 0.3); ctx.closePath(); ctx.fill(); ctx.stroke(); // the bowl
+    ctx.fillStyle = c; ctx.fillRect(x - s * 0.33, y + s * 0.06, s * 0.66, s * 0.07); // the team's band
+    ctx.globalAlpha = 0.55 + 0.3 * fl; ctx.fillStyle = '#FFC98A'; ctx.beginPath(); ctx.ellipse(x, y - s * 0.03, s * 0.34, s * 0.08, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; // glowing coals
+    ctx.fillStyle = '#E8834A'; ctx.beginPath(); ctx.arc(x, y - s * 0.14, s * 0.15, Math.PI, 0); ctx.fill(); // the imp's head over the rim
+    ctx.fillStyle = '#B5552A'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + sd * s * 0.1, y - s * 0.22); ctx.lineTo(x + sd * s * 0.17, y - s * 0.36); ctx.lineTo(x + sd * s * 0.04, y - s * 0.26); ctx.fill(); } // horns
+    ctx.strokeStyle = '#3A2018'; ctx.lineWidth = Math.max(1, s * 0.025); // a scowl: slanted brows over little eyes
+    for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + sd * s * 0.1, y - s * 0.22); ctx.lineTo(x + sd * s * 0.03, y - s * 0.19); ctx.stroke(); }
+    ctx.fillStyle = '#FFE9A8'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.arc(x + sd * s * 0.06, y - s * 0.16, Math.max(0.8, s * 0.02), 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 0.7; ctx.fillStyle = '#FFB36B'; // soft flames round it
+    for (const [dx, h] of [[-0.25, 0.16], [0.24, 0.2], [-0.12, 0.1], [0.13, 0.12]]) { const hh = s * h * (0.75 + 0.25 * Math.sin(time * 7 + dx * 20)); ctx.beginPath(); ctx.moveTo(x + s * dx - s * 0.05, y - s * 0.03); ctx.quadraticCurveTo(x + s * dx, y - s * 0.03 - hh * 1.4, x + s * dx + s * 0.05, y - s * 0.03); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  }
   // any kind without a drawing of its own: a block in the kind's colour with a roof band in the team colour and its
   // initials (a part, such as a mine's exit: a small marker in the kind's colour)
   function drawMpbPlain(kind, x, y, t, side, o) {
@@ -8306,17 +8784,61 @@ const Render2D = (cv, view, opts = {}) => {
     ctx.fillStyle = c; ctx.fillRect(x - s / 2, y - s * 0.42, s, s * 0.14);
     if (t >= 22) { ctx.font = `600 ${Math.max(8, Math.round(t * 0.26))}px "IBM Plex Mono", monospace`; ctx.fillStyle = '#F4EFE3'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(K.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(), x, y + s * 0.05); }
   }
+  // what a building lays on the floor (both boards; the 3D board's floor too): MPB_FLOOR[kind](v, side, rec, t)
+  const MPB_FLOOR = {
+    // ===== oak (floor) =====
+    // Sticky moss: every tile within Mpb.OAK.moss of the Oak, mossy green with tufts, the patch edged in the team colour
+    oak(v, side, rec, t) {
+      const tiles = Mpb.oakMossTiles(v, rec);
+      if (!tiles.length) return;
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const tl of tiles) {
+        const x = scol(tl.col) * t, y = srow(tl.row) * t;
+        x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + t); y1 = Math.max(y1, y + t);
+        ctx.fillStyle = '#6F8F45'; ctx.globalAlpha = 0.26; ctx.fillRect(x, y, t, t);
+        ctx.fillStyle = '#9DBB6A'; ctx.globalAlpha = 0.55;
+        for (let k = 0; k < 3; k++) { const h = ((tl.col * 7 + tl.row * 13 + k * 5) % 11) / 11, j = ((tl.col * 3 + tl.row * 5 + k * 7) % 9) / 9; ctx.beginPath(); ctx.ellipse(x + t * (0.15 + 0.7 * h), y + t * (0.15 + 0.7 * j), t * 0.09, t * 0.05, 0, 0, Math.PI * 2); ctx.fill(); }
+      }
+      ctx.globalAlpha = 0.6; ctx.strokeStyle = teamCol(side); ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]); ctx.strokeRect(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2); ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    },
+  };
+  function drawMpbFloor(v) {
+    if (typeof Mpb === 'undefined' || !Mpb.on(v)) return;
+    const t = tilePx();
+    for (const side of [0, 1]) for (const rec of Mpb.recs(v, side)) if (MPB_FLOOR[rec.kind]) MPB_FLOOR[rec.kind](v, side, rec, t);
+  }
+  // (a part: MPB_DRAW['<kind>:<part>'] when it has one)
   function drawMpb(kind, x, y, t, side, o) {
-    (!o.part && MPB_DRAW[kind] ? MPB_DRAW[kind] : (a, b, c2, d, e, f) => drawMpbPlain(kind, a, b, c2, d, e, f))(x, y, t, side, o);
+    const own = o.part ? MPB_DRAW[kind + ':' + o.part] : MPB_DRAW[kind];
+    (own || ((a, b, c2, d, e, f) => drawMpbPlain(kind, a, b, c2, d, e, f)))(x, y, t, side, o);
     if (o.hpr != null) { ctx.strokeStyle = teamCol(side); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, t * 0.52, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, o.hpr)); ctx.stroke(); }
     if (o.fresh) { ctx.strokeStyle = teamCol(side); ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.strokeRect(x - t / 2 + 1.5, y - t / 2 + 1.5, t - 3, t - 3); ctx.setLineDash([]); }
+  }
+  // the building of kind drawn at screen (x, y) (MPB_DRAW looks up its record by where it is drawn), or null
+  function mpbRecAt(kind, side, x, y, t) {
+    if (typeof Mpb === 'undefined' || !Mpb.on(m)) return null;
+    return Mpb.recs(m, side).find(r => r.kind === kind && Math.abs((scol(r.col) + 0.5) * t - x) < 1 && Math.abs((srow(r.row) + 0.5) * t - y) < 1) || null;
   }
   // both teams' buildings on the board while deploying (and after a fight)
   function drawMpbs() {
     if (typeof Mpb === 'undefined' || !Mpb.on(m)) return;
     const t = tilePx();
+    // tiles a building lights up (Mpb.litTiles: the Jail's Skywatch), soft, under the buildings
+    ctx.fillStyle = 'rgba(255,226,160,0.16)';
+    for (const side of [me, foe()]) for (const rec of Mpb.recs(m, side)) for (const tl of Mpb.litTiles(m, side, rec)) ctx.fillRect(scol(tl.col) * t + 1, srow(tl.row) * t + 1, t - 2, t - 2);
     for (const side of [me, foe()]) for (const rec of Mpb.recs(m, side)) for (const tl of Mpb.tilesOf(rec)) {
-      drawMpb(rec.kind, (scol(tl.col) + 0.5) * t, (srow(tl.row) + 0.5) * t, t, side, { part: tl.part || null, fresh: phase === 'deploy' && rec.round === m.round && rec.round > 1, time: performance.now() / 1000 });
+      drawMpb(rec.kind, (scol(tl.col) + 0.5) * t, (srow(tl.row) + 0.5) * t, t, side, { part: tl.part || null, fresh: phase === 'deploy' && rec.round === m.round && rec.round > 1, time: performance.now() / 1000, rec });
+    }
+  }
+  // in a fight: the tiles of buildings that are no fight body (a mine's exit, a lake's water: parts, and kinds with no
+  // health), from the board as the fight began
+  function drawMpbGround(v) {
+    if (typeof Mpb === 'undefined' || !v || !Mpb.on(v)) return;
+    const t = tilePx();
+    for (const side of [me, foe()]) for (const rec of Mpb.recs(v, side)) for (const tl of Mpb.tilesOf(rec)) {
+      if (!tl.part && (Mpb.kindOf(rec.kind) || {}).hp > 0) continue;
+      drawMpb(rec.kind, (scol(tl.col) + 0.5) * t, (srow(tl.row) + 0.5) * t, t, side, { part: tl.part || null, time: bt ? bt.time() : 0, rec, fight: true });
     }
   }
   // grey smoke puffs rising from (x, y): Mechite constructs and buildings rattle and smoke
@@ -8394,6 +8916,7 @@ const Render2D = (cv, view, opts = {}) => {
     // a squad they moved this round still shows on its old tile
     // and one they sold this round still shows until the fight
     for (const sq of phase === 'deploy' ? Game.foeSeen(m, foe()) : m.armies[foe()].filter(q => !Game.hiddenFromFoe(m, q))) {
+      if (Game.mpbHeld(sq)) continue; // 2v2: in a Jail or a School (that building shows it)
       const p = phase === 'deploy' ? Game.seenAt(m, sq) : sq;
       const look = Game.shownUnit(m, me, foe(), sq.unit); // a disguised unit shows as what it pretends to be
       drawSquad(phase === 'deploy' ? { ...sq, unit: look, col: p.col, row: p.row, level: Game.seenLevel(m, sq) } : { ...sq, unit: look }, foe(), false); // a level-up bought this round stays hidden
@@ -8412,7 +8935,7 @@ const Render2D = (cv, view, opts = {}) => {
         ctx.strokeStyle = css('--muted'); ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
         ctx.strokeRect(scol(sq.from.col) * t + 4, srow(sq.from.row) * t + 4, t - 8, t - 8); ctx.setLineDash([]);
       }
-      if (Game.isRider(sq)) continue; // drawn as a badge on its carrier
+      if (Game.isRider(sq) || Game.mpbHeld(sq)) continue; // drawn as a badge on its carrier (2v2: in a Jail or a School, on that building)
       const at = drag && drag.moved && drag.id === sq.id ? { ...sq, col: drag.over.col, row: drag.over.row } : sq;
       drawSquad(at, me, (sq.round === m.round || sq.movedRound === m.round) && phase === 'deploy');
       riderBadge(at, Game.riderOf(m, me, sq));
@@ -8422,7 +8945,7 @@ const Render2D = (cv, view, opts = {}) => {
       }
     }
     // 2v2: the other pair of players on this board (m.team): your teammate's squads, and the other opponent's as you may see them
-    for (const side of [me, foe()]) for (const sq of Game.teamArmy(m, side)) if (!Game.isRider(sq)) { drawSquad(sq, side, false, true); if (side === me) riderBadge(sq, Game.riderOf(m, me, sq)); }
+    for (const side of [me, foe()]) for (const sq of Game.teamArmy(m, side)) if (!Game.isRider(sq) && !Game.mpbHeld(sq)) { drawSquad(sq, side, false, true); if (side === me) riderBadge(sq, Game.riderOf(m, me, sq)); }
     for (const side of [me, foe()]) if (towerVisible(side) && Game.towerUp(m, side)) drawTowerTile(side);
     if (Game.isDev(m)) drawLessers();
     if (Game.treasuryOn(m)) drawTreasuries();
@@ -8453,6 +8976,7 @@ const Render2D = (cv, view, opts = {}) => {
 
   function drawBattle() {
     drawBoard();
+    drawMpbGround(battlePre || m); // 2v2: a mine's exit, lake water
     const muted = css('--muted'), gold = css('--gold');
     for (const e of fx) {
       const a = 1 - e.age / e.life;
@@ -8513,6 +9037,14 @@ const Render2D = (cv, view, opts = {}) => {
       if (age < 0 || age > 0.6) continue;
       ctx.strokeStyle = '#B9A8FF'; ctx.globalAlpha = 1 - age / 0.6; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(PX(fx.x), PY(fx.y), tilePx() * (0.2 + age), 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    // 2v2 Coal mine: a puff of coal dust where a squad comes up the mine
+    for (const e of bt.mineFx ? bt.mineFx() : []) {
+      const age = bt.time() - e.t;
+      if (age < 0 || age > 0.9) continue;
+      ctx.fillStyle = '#4A4440'; ctx.globalAlpha = 0.55 * (1 - age / 0.9);
+      for (let k = 0; k < 5; k++) { const a = k * 1.26 + e.x; ctx.beginPath(); ctx.arc(PX(e.x) + Math.cos(a) * tilePx() * 0.3 * (0.4 + age), PY(e.y) + Math.sin(a) * tilePx() * 0.22 * (0.4 + age), tilePx() * (0.08 + 0.1 * age), 0, Math.PI * 2); ctx.fill(); }
       ctx.globalAlpha = 1;
     }
     drawArtifacts(); // 2v2: the artifacts (their meters go over the bodies, below)
@@ -8579,7 +9111,7 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.beginPath(); ctx.moveTo(PX(b.x), PY(b.y)); ctx.lineTo(PX(nx.x), PY(nx.y)); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
     }
     for (const b of bt.bodies) {
-      if (!b.alive || b.u.structure || b.u.aloft || b.u.building) continue;
+      if (!b.alive || b.u.structure || b.u.aloft || b.u.building || b.mineT > 0) continue; // (2v2: down a Coal mine, not seen)
       const c = teamCol(b.side), r = radius(b.u), hpr = b.hp / b.u.hp;
       if (b.hidden) { // stealthed: a dashed ghost while hidden (fainter for the enemy's)
         ctx.globalAlpha = b.side === me ? 0.6 : 0.3; ctx.strokeStyle = c; ctx.lineWidth = 1.5; ctx.setLineDash([2, 2]);
@@ -9215,7 +9747,7 @@ const Camera3D = (THREE, camera, el, opts) => {
   return { update, resize, groundAt, goStrategic, setLevel, strategic, handsOn, level, busy, dispose, zoom: () => z, yaw: () => yaw, LEVELS: MAX + 1, focus };
 };
 
-const DATA = {"units":[{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Goblin Swarm","cost":1,"bodies":12,"hp":26,"hit":19,"aps":1.2,"range":2,"speed":7.5,"splash":0,"shape":"goblin","color":"#9BD35A","skills":["aaargh","tacticalness","moreGoblins"],"skillMods":[null,null,null],"skillsInnate":[false,false,false],"skillOr":[[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":30,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Skeleton Archers","cost":1,"bodies":8,"hp":32,"hit":14,"aps":0.75,"range":18,"speed":2.1,"splash":0,"shape":"skull","color":"#E9E3CF","skills":["longbones","graverot","dreadRangers"],"skillMods":[null,null,null],"skillsInnate":[false,false,false],"skillOr":[[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Ember Imps","cost":1,"bodies":4,"hp":90,"hit":20,"aps":0.8,"range":10,"speed":4,"splash":3,"shape":"imp","color":"#FFA94D","skills":["spitfire","flare","emberMortar","hellfiend"],"skillMods":[null,null,null,null],"skillsInnate":[false,false,false,false],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":35,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Fire Mage","cost":1,"bodies":1,"hp":155,"hit":33,"aps":0.68,"range":20,"speed":3,"splash":4,"shape":"firestaff","color":"#fb0022","skills":["range","armorHp","dualFlame"],"skillMods":[null,null,null],"skillsInnate":[false,false,false]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":1,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Sniper","cost":1,"bodies":1,"hp":140,"hit":210,"aps":0.25,"range":29,"speed":2,"splash":0,"shape":"reticle","color":"#F7D154","skills":["rangerScope","deadeye","assaultgunner","hunter"],"skillMods":[null,null,null,null],"skillsInnate":[false,false,false,false],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"armor","defVal":3,"level":0,"unlock":50,"name":"Brute","cost":2,"bodies":1,"hp":1100,"hit":98,"aps":1.1,"range":2,"speed":5,"splash":0,"shape":"square","color":"#8D99AE","skills":["tuffSkin","rampager","bullhead","berserkers"],"skillMods":[null,null,null,null],"skillsInnate":[false,false,false,false],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":20,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":40,"level":0,"unlock":50,"name":"Wisps","cost":1,"bodies":2,"hp":65,"hit":75,"aps":0.595,"range":19,"speed":4,"splash":0,"shape":"wisp","color":"#ff90ff","skills":["sightweavers","transphysical","shadowborn","spiritWalk"],"skillMods":[null,null,null,null],"skillsInnate":[false,false,false,false],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":35,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Leaf Wizard","cost":2,"bodies":1,"hp":111,"hit":95,"aps":1.2,"range":20,"speed":5,"splash":0,"shape":"hexagon","color":"#00d200","skills":["windWalk","bouncingBlade","petalburst","leafblade"],"skillMods":[null,null,null,null],"skillsInnate":[false,false,false,false],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":3,"projSpeed":35,"minRange":0,"charge":1,"knockback":0,"windUp":0.5,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Earth Wizard","cost":2,"bodies":1,"hp":650,"hit":440,"aps":0.2,"range":24,"speed":3,"splash":2,"shape":"circle","color":"#24590d","skills":["regen","stoneSpikes","livingArmor"],"skillMods":[{"params":{"hp":25,"pct":2}},null,null],"skillsInnate":[false,false,false],"skillOr":[[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":30,"defense":"none","defVal":0,"level":0,"unlock":100,"name":"Flame Wizard","cost":3,"bodies":1,"hp":1530,"hit":11,"aps":4,"range":12,"speed":2,"splash":0,"shape":"flame","color":"#b95018","skills":["armorHp","range"],"skillMods":[null,null],"skillsInnate":[false,false]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"armor","defVal":6,"level":0,"unlock":100,"name":"Steel Wizard","cost":3,"bodies":1,"hp":1900,"hit":150,"aps":0.9,"range":15,"speed":2,"splash":2,"shape":"bar","color":"#57535a","skills":["heavyMetal","reforge","titanSpears"],"skillMods":[null,null,null],"skillsInnate":[false,false,false],"trait":{"name":"Steel armor","text":"6 armor."},"skillOr":[[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":40,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":100,"name":"Slime Wizard","cost":3,"bodies":1,"hp":620,"hit":480,"aps":0.2,"range":25,"speed":2.5,"splash":5,"shape":"ring","color":"#81f038","skills":["skmv5oxpgk2","range"],"skillMods":[null,null],"skillsInnate":[false,false]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"armor","defVal":6,"level":0,"unlock":150,"splash":3,"skillsInnate":[false,false],"skillMods":[null,null],"name":"Ether Golem","cost":5,"bodies":1,"hp":3450,"hit":69,"aps":0.6,"range":5,"speed":2.5,"shape":"square","color":"#51005c","skills":["regen","armorHp"]},{"burst":1,"pellets":1,"spinUp":50,"spinHit":175,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":150,"splash":0,"skillsInnate":[false,false],"skillMods":[null,null],"name":"Sun Priest","cost":5,"bodies":1,"hp":2800,"hit":15,"aps":2,"range":18,"speed":3,"shape":"sun","color":"#FFD23F","skills":["split","shrink"],"spinHitCap":8,"lockOn":0.5},{"burst":3,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":22,"minRange":16,"charge":1,"knockback":0,"windUp":2,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":150,"splash":5.5,"skillsInnate":[false,false],"skillMods":[null,null],"name":"Meteor Caller","cost":5,"bodies":1,"hp":400,"hit":105,"aps":0.3,"range":50,"speed":2,"shape":"diamond","color":"#FF6B35","skills":["range","skmv5oxpgk2"]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":3,"knockback":4,"windUp":0,"flame":0,"defense":"armor","defVal":6,"level":0,"unlock":150,"splash":0,"skillsInnate":[false,false],"skillMods":[null,null],"name":"War Mammoth","cost":5,"bodies":1,"hp":2650,"hit":169,"aps":0.5,"range":3,"speed":8,"shape":"pentagon","color":"#A0785A","skills":["swift","armorHp"],"trample":50,"chargeStun":0,"chargeCd":10,"trampleRun":14,"trampleSpeed":1.5,"stomp":3.5},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":150,"splash":0,"skillsInnate":[true,false],"skillMods":[null,null],"name":"Necromancer","cost":5,"bodies":1,"hp":2300,"hit":52,"aps":1,"range":20,"speed":2.2,"shape":"hexagon","color":"#9D4EDD","skills":["raiseDead","healer"]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Ent","cost":1,"bodies":2,"hp":360,"hit":25,"aps":1.1,"range":4,"speed":2.2,"splash":2,"shape":"tree","color":"#0d3000","skills":["forwardRoots","reinforcedBark","graspingRoots","entExplode"],"skillsInnate":[false,false,false,false],"skillMods":[null,null,null,null],"deathBlast":0,"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0.1,"pierce":0,"projSpeed":30,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"name":"Slimeshots","cost":2,"unlock":50,"bodies":10,"hp":95,"hit":7,"aps":0.8,"range":21,"speed":6,"splash":3,"shape":"diamond","color":"#20d300","skills":["range","heavy"],"skillsInnate":[false,false],"skillMods":[{"params":{"m":3},"cost":150},{"params":{"hit":25,"slow":0,"instant":0},"cost":150}]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Just a horse","cost":2,"bodies":1,"hp":500,"hit":200,"aps":1,"range":1,"speed":6,"splash":0,"shape":"horse","color":"#C8A27A","ram":1,"noFlank":1,"carrier":1,"noPack":1,"skills":["gallop","armorHp","deathBurst"],"skillMods":[null,{"params":{"armor":4,"hp":20},"cost":150},null],"skillsInnate":[false,false,false]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":30,"minRange":0,"charge":4,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"defense":"none","defVal":0,"level":0,"unlock":100,"name":"Rogue","cost":3,"bodies":2,"hp":310,"hit":80,"aps":1.1,"range":4,"speed":5.5,"splash":0,"shape":"triangle","color":"#460000","skills":["stealth","skmv5oxj501","frenzy"],"skillsInnate":[true,false,false],"skillMods":[null,{"params":{"cap":200},"cost":150},null]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Spiders","cost":2,"bodies":6,"hp":185,"hit":20,"aps":0.8,"range":2,"speed":6,"splash":0,"shape":"spider","color":"#000000","skills":["poisonousFangs","spiderlings","cavestalkers","webShots"],"skillsInnate":[false,false,false,false],"skillMods":[null,null,null,null],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":35,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"pctHit":8,"defense":"none","defVal":0,"level":0,"unlock":150,"name":"Truespear","cost":5,"bodies":1,"hp":1260,"hit":150,"aps":0.765,"range":23,"speed":3,"splash":0,"shape":"spear","color":"#C9D1D9","skills":["lifesteal","armorHp","dualSpear"],"skillMods":[null,null,null],"skillsInnate":[false,false,false]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"defense":"none","defVal":0,"level":0,"projSpeed":30,"unlock":50,"name":"Shiv","cost":2,"noPack":1,"bodies":3,"hp":200,"hit":17.3,"aps":1.5,"range":18,"speed":3,"splash":0,"shape":"knife","color":"#B7A6C9","bleedEvery":2,"trait":{"name":"Apply bleed","text":"Every 2nd knife on a target adds bleed. Stacks to 4, past armor."},"skills":["aeroblades","tooDeep","anemia"],"skillsInnate":[false,false,false],"skillMods":[null,null,null],"skillOr":[[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"defense":"none","defVal":0,"level":0,"projSpeed":15,"unlock":100,"name":"Water Mage","cost":3,"bodies":1,"hp":600,"hit":50,"aps":0.9,"range":22,"speed":2.1,"splash":3.5,"shape":"drop","color":"#3B5BDB","waterHeal":1,"trait":{"name":"Waterhealing","text":"Its splash heals allies for its hit."},"trait2":{"name":"Medic","text":"With no enemy in reach, shoots wounded allies."},"skills":["waterbomb","poolShaper","flowState","waterElemental"],"skillsInnate":[false,false,false,false],"skillMods":[null,null,null,null],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"defense":"none","defVal":0,"level":0,"unlock":150,"name":"Assassin","cost":5,"bodies":1,"hp":350,"hit":500,"aps":0.35,"range":2,"speed":6,"splash":0,"shape":"dagger","color":"#3A3550","stealth":true,"dash":10,"bldgPct":50,"bleedHit":3,"anywhere":true,"noBldg":true,"trait":{"name":"Stealthed","text":"Hidden until it attacks. Hides again 1.5 s after it stops attacking. Place it on any free tile, even in enemy land, but not next to a building."},"trait2":{"name":"Shadow dash","text":"Dashes unseen to targets within 10 m."},"trait3":{"name":"Bloodrush","text":"Hits add 3 bleed."},"trait4":{"name":"Light blade","text":"−50% damage to buildings. Ignores buildings while any unit is left to hit."},"skills":["silentBlade","deathFlurry","shadowHunter"],"skillsInnate":[false,false,false],"skillMods":[null,null,null],"skillOr":[[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"defense":"armor","defVal":4,"level":0,"projSpeed":0,"unlock":100,"name":"Frost Wizard","cost":3,"bodies":1,"hp":900,"hit":21,"aps":3.2,"range":25,"speed":2,"splash":0,"shape":"snowflake","color":"#9ED8F5","tag":"FRO","frost":{"every":2.5,"pct":[20,30,40],"keep":2},"trait":{"name":"Frost","text":"Beam stacks Frost: up to 40% slower. Melts 2 s after."},"skills":["deepfreeze","multibeam","glacialGaze","snowStorm"],"skillsInnate":[false,false,false,false],"skillMods":[null,null,null,null],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"defense":"none","defVal":0,"level":0,"projSpeed":0,"unlock":100,"name":"Obelisk","cost":3,"bodies":1,"hp":1300,"hit":90,"aps":0.7,"range":3,"speed":4,"splash":0,"shape":"obelisk","color":"#4E6B35","tag":"OBE","glut":{"max":15,"cap":3,"hp":6,"hit":6,"speed":0,"aps":0},"lifesteal":20,"trait":{"name":"Glut","text":"Eats kills: +6% health, +6% hit each. Max 3 a round, 15 in all."},"trait2":{"name":"Devour","text":"Heals 20% of damage dealt."},"skills":["gluttony","hungerHaste","crushingMaw","obeliskEye"],"skillsInnate":[false,false,false,false],"skillMods":[null,null,null,null],"skillOr":[[1,2]],"levelHp":75}],"matrix":[[0,-0.668,-0.885,-0.963,0.844,0.492,0.428,0.739,0.594,-1,-0.563,0.186,-0.707,0.867,-0.299,-0.542,0.533,-0.208,-0.757,0.958,0.675,0.475,0.875,0.313,-1,0.975,0.325,0.808],[0.668,0,-0.215,-0.683,0.433,0.512,0.579,0.708,0.217,-0.53,-0.496,0.171,-0.134,0.75,-0.93,0.5,-0.298,0.677,-0.675,0.938,0.792,0.513,0.804,0.187,-0.791,0.967,-1,0.842],[0.885,0.215,0,-0.776,0.358,0.167,0.147,0.642,0.1,-0.83,-0.668,-0.51,0.035,0.774,-0.983,0.205,0.363,0.73,-0.274,0.875,0.761,0.789,0.642,0.479,-0.513,0.95,0.27,0.733],[0.963,0.683,0.776,0,-1,-0.337,0.503,0.652,-0.888,-0.355,-0.43,-0.691,-0.384,-0.21,-1,-0.628,-0.373,0.875,0.101,0.733,-0.197,0.751,-0.363,0.463,-0.134,0.767,-0.646,0.21],[-0.844,-0.433,-0.358,1,0,-0.095,0.633,1,-0.49,0.774,-0.142,-0.131,0.836,0.666,-1,-0.205,-0.527,0.994,-0.567,0.8,-0.415,0.548,0.8,1,1,0.8,0.54,0.9],[-0.492,-0.512,-0.167,0.337,0.095,0,-0.317,0.466,-0.809,0.153,-0.558,-0.968,0.156,-0.416,0.181,-0.473,0.209,0.379,0.649,0.821,0.253,0.723,0.353,-0.402,0.217,0.773,0.612,0.733],[-0.428,-0.579,-0.147,-0.503,-0.633,0.317,0,0.533,-0.492,-0.392,-0.431,-0.703,0.167,0.642,-0.875,-0.006,-0.567,0.926,-0.712,0.933,0.35,0.624,0.517,0.149,-0.475,0.9,-0.642,0.817],[-0.739,-0.708,-0.642,-0.652,-1,-0.466,-0.533,0,-0.932,-0.545,-0.728,-1,-0.362,-0.556,-0.881,-0.587,-0.794,0.377,-0.76,0.533,-0.654,-0.316,-0.686,-0.47,-0.574,0.533,-0.889,0.546],[-0.594,-0.217,-0.1,0.888,0.49,0.809,0.492,0.932,0,0.876,0.779,-0.316,0.915,0.666,-0.5,0.439,-0.131,1,0.464,1,0.47,0.797,0.788,0.775,0.933,0.758,0.671,0.991],[1,0.53,0.83,0.355,-0.774,-0.153,0.392,0.545,-0.876,0,-0.728,-1,-0.442,-0.598,-1,-0.547,-0.188,1,0.599,0.817,0.527,0.995,-0.498,0.307,0.624,0.744,-0.218,0.553],[0.563,0.496,0.668,0.43,0.142,0.558,0.431,0.728,-0.779,0.728,0,-0.952,0.775,-0.384,-0.938,0.571,0.511,0.837,0.911,0.908,0.475,0.817,0.307,0.278,0.757,0.82,0.653,0.867],[-0.186,-0.171,0.51,0.691,0.131,0.968,0.703,1,0.316,1,0.952,0,0.922,0.767,-1,0.596,0.594,1,0.511,0.968,-0.6,0.887,0.871,0.899,1,0.409,0.956,1],[0.707,0.134,-0.035,0.384,-0.836,-0.156,-0.167,0.362,-0.915,0.442,-0.775,-0.922,0,-0.893,0.094,-0.326,-0.496,0.506,0.885,0.859,0.324,0.871,-0.9,-0.479,0.4,0.444,0.286,0.409],[-0.867,-0.75,-0.774,0.21,-0.666,0.416,-0.642,0.556,-0.666,0.598,0.384,-0.767,0.893,0,-0.315,0.658,-0.799,-0.238,-0.736,0.845,-0.618,0.312,0.132,-0.589,0.664,0.655,0.564,0.855],[0.299,0.93,0.983,1,1,-0.181,0.875,0.881,0.5,1,0.938,1,-0.094,0.315,0,-0.751,0.728,1,0.501,0.75,-1,0.612,0.772,1,1,-1,1,-0.184],[0.542,-0.5,-0.205,0.628,0.205,0.473,0.006,0.587,-0.439,0.547,-0.571,-0.596,0.326,-0.658,0.751,0,-0.264,0.426,0.858,0.866,-0.1,0.874,-0.342,-0.269,0.602,0.666,0.604,0.683],[-0.533,0.298,-0.363,0.373,0.527,-0.209,0.567,0.794,0.131,0.188,-0.511,-0.594,0.496,0.799,-0.728,0.264,0,0.483,-0.438,0.937,0.683,0.333,0.802,0.308,0.298,0.986,0.397,0.771],[0.208,-0.677,-0.73,-0.875,-0.994,-0.379,-0.926,-0.377,-1,-1,-0.837,-1,-0.506,0.238,-1,-0.426,-0.483,0,-0.623,0.874,0.391,0.561,0.459,-0.656,-1,0.867,0.203,0.564],[0.757,0.675,0.274,-0.101,0.567,-0.649,0.712,0.76,-0.464,-0.599,-0.911,-0.511,-0.885,0.736,-0.501,-0.858,0.438,0.623,0,0.907,0.7,0.57,0.673,0.648,-0.226,0.947,-0.613,0.72],[-0.958,-0.938,-0.875,-0.733,-0.8,-0.821,-0.933,-0.533,-1,-0.817,-0.908,-0.968,-0.859,-0.845,-0.75,-0.866,-0.937,-0.874,-0.907,0,-0.65,-0.833,-0.735,-0.711,-0.717,-0.238,-0.748,-0.769],[-0.675,-0.792,-0.761,0.197,0.415,-0.253,-0.35,0.654,-0.47,-0.527,-0.475,0.6,-0.324,0.618,1,0.1,-0.683,-0.391,-0.7,0.65,0,0.187,0.744,-0.12,0.292,0,0.699,0.664],[-0.475,-0.513,-0.789,-0.751,-0.548,-0.723,-0.624,0.316,-0.797,-0.995,-0.817,-0.887,-0.871,-0.312,-0.612,-0.874,-0.333,-0.561,-0.57,0.833,-0.187,0,0.354,-0.289,-1,0.844,-0.349,-0.598],[-0.875,-0.804,-0.642,0.363,-0.8,-0.353,-0.517,0.686,-0.788,0.498,-0.307,-0.871,0.9,-0.132,-0.772,0.342,-0.802,-0.459,-0.673,0.735,-0.744,-0.354,0,-0.519,0.169,0.553,-0.33,0.714],[-0.313,-0.187,-0.479,-0.463,-1,0.402,-0.149,0.47,-0.775,-0.307,-0.278,-0.899,0.479,0.589,-1,0.269,-0.308,0.656,-0.648,0.711,0.12,0.289,0.519,0,-0.456,0.867,-0.104,0.823],[1,0.791,0.513,0.134,-1,-0.217,0.475,0.574,-0.933,-0.624,-0.757,-1,-0.4,-0.664,-1,-0.602,-0.298,1,0.226,0.717,-0.292,1,-0.169,0.456,0,0.652,-0.642,1],[-0.975,-0.967,-0.95,-0.767,-0.8,-0.773,-0.9,-0.533,-0.758,-0.744,-0.82,-0.409,-0.444,-0.655,1,-0.666,-0.986,-0.867,-0.947,0.238,0,-0.844,-0.553,-0.867,-0.652,0,-0.653,-0.697],[-0.325,1,-0.27,0.646,-0.54,-0.612,0.642,0.889,-0.671,0.218,-0.653,-0.956,-0.286,-0.564,-1,-0.604,-0.397,-0.203,0.613,0.748,-0.699,0.349,0.33,0.104,0.642,0.653,0,0.57],[-0.808,-0.842,-0.733,-0.21,-0.9,-0.733,-0.817,-0.546,-0.991,-0.553,-0.867,-1,-0.409,-0.855,0.184,-0.683,-0.771,-0.564,-0.72,0.769,-0.664,0.598,-0.714,-0.823,-1,0.697,-0.57,0]],"skills":[{"id":"regen","type":"regen","name":"Regeneration","cost":100,"params":{}},{"id":"poison","type":"poison","name":"Poison shot","cost":100,"params":{"pct":150,"duration":6}},{"id":"stealth","type":"stealth","name":"Stealth","cost":100,"params":{}},{"id":"armorHp","type":"armorHp","name":"Armor and health","cost":200,"params":{}},{"id":"spawn","type":"spawn","name":"Spawn goblins","cost":200,"params":{"every":7}},{"id":"rapid","type":"rapid","name":"Rapid fire","cost":100,"params":{}},{"id":"swift","type":"swift","name":"Swift strikes","cost":100,"params":{}},{"id":"heavy","type":"heavy","name":"Heavy shot","cost":100,"params":{}},{"id":"healer","type":"healer","name":"Healing touch","cost":200,"params":{}},{"id":"range","type":"range","name":"Long reach","cost":200,"params":{}},{"id":"shrink","type":"shrink","name":"Shortsight","cost":100,"params":{"m":6,"duration":4}},{"id":"skmv5oxj501","type":"ward","name":"Ward","cost":100,"params":{}},{"id":"skmv5oxpgk2","type":"slow","name":"Slow","cost":100,"params":{}},{"id":"raiseDead","type":"spawn","name":"Raise dead","cost":0,"params":{"unit":"Skeleton Archers","count":3,"every":2,"max":12}},{"id":"spiderlings","type":"deathSpawn","name":"Spiderlings","cost":200,"params":{"unit":"Spiders","count":2,"strength":50}},{"id":"poisonousFangs","type":"poison","name":"Poisonous fangs","cost":100,"params":{"pct":150,"duration":6}},{"id":"cavestalkers","type":"stealth","name":"Cavestalkers","cost":200,"params":{"hit":25},"text":"Gain stealth and +25% hit."},{"id":"webShots","type":"web","name":"Web-shots","cost":300,"params":{"shots":1,"range":10,"slow":10,"dmg":5,"max":90,"secs":3},"flat":true,"master":true,"text":"Each spider shoots one web a fight: it slows the target and weakens its attacks, and stacks."},{"id":"split","type":"split","name":"Split beam","cost":100,"params":{}},{"id":"forward","type":"forward","name":"Forward planting","cost":100,"params":{}},{"id":"gallop","type":"swift","name":"Gallop","cost":200,"params":{"speed":25,"hit":0}},{"id":"deathBurst","type":"blast","name":"Death burst","cost":200,"params":{"radius":7,"pct":100}},{"id":"dualFlame","type":"turret","name":"Dual Flame","cost":200,"params":{"turrets":2}},{"id":"lifesteal","type":"lifesteal","name":"Lifesteal","cost":150,"params":{"pct":10}},{"id":"dualSpear","type":"turret","name":"Dual Spear","cost":300,"params":{"turrets":2}},{"id":"frenzy","type":"frenzy","name":"Frenzy","cost":250,"params":{"pct":10,"cap":2}},{"id":"spread","type":"spread","name":"Spread","cost":300,"params":{"min":1,"max":6}},{"id":"boneShield","type":"shield","name":"Bone shield","cost":200,"params":{"hits":1}},{"id":"emberMortar","type":"mortar","name":"Ember Mortar","cost":150,"params":{"range":12,"min":5,"aps":0,"speed":20},"also":[{"type":"stats","params":{"hit":-20,"aps":-0.1,"apsPct":-20}}]},{"id":"explode","type":"explode","name":"Explode on death","cost":200,"params":{"pct":30,"radius":5}},{"id":"dodge","type":"dodge","name":"Dodge","cost":200,"params":{"pct":33}},{"id":"steelPlating","type":"armorHp","name":"Steel plating","cost":300,"params":{"armor":16,"hp":0}},{"id":"aeroblades","type":"double","name":"Aeroblades","cost":150,"params":{"every":3,"hit":15}},{"id":"tooDeep","type":"bleedDeep","name":"Too deep","cost":150,"params":{"secs":1}},{"id":"anemia","type":"bleedStun","name":"Anemia","cost":150,"params":{"secs":1.2}},{"id":"waterbomb","type":"stats","name":"Waterbomb","cost":100,"params":{"splash":1.2,"hitAdd":50}},{"id":"poolShaper","type":"pools","name":"Pool shaper","cost":150,"params":{"splash":2,"aps":0.2,"pct":25,"speed":0.5,"secs":2}},{"id":"flowState","type":"flow","name":"Flow state","cost":150,"params":{"aps":0.1,"range":0.4,"max":5}},{"id":"waterElemental","type":"elemental","name":"Summon water elemental","cost":300,"params":{"hp":600,"unit":"Ember Imps","level":1,"ahead":9,"pool":4,"pct":50,"speed":0.5,"secs":2},"flat":true,"master":true},{"id":"heavyMetal","type":"armorHp","name":"Heavy metal","cost":150,"params":{"armor":4,"hp":25}},{"id":"reforge","type":"aura","name":"Reforge","cost":200,"params":{"armor":2,"radius":8,"hit":20,"aps":0.1}},{"id":"titanSpears","type":"spears","name":"Shape Titanium spears","cost":200,"params":{"forge":1.5,"speed":35,"hit":200,"bleed":1}},{"id":"stoneSpikes","type":"stats","name":"Stone spikes","cost":150,"params":{"range":5,"burst":1,"apsPct":-20}},{"id":"livingArmor","type":"slam","name":"Living armor","cost":150,"params":{"armor":8,"range":13,"hit":200,"stun":1,"cone":25}},{"id":"aaargh","type":"stats","name":"AAARGH!","cost":100,"params":{"speed":0.8,"aps":0.3}},{"id":"tacticalness","type":"spread","name":"Tacticalness","cost":150,"params":{"min":1,"max":6},"also":[{"type":"stats","params":{"bodies":3}}]},{"id":"moreGoblins","type":"killSpawn","name":"More where that came from","cost":150,"params":{"count":1}},{"id":"tuffSkin","type":"armorHp","name":"Tuff skin","cost":150,"params":{"armor":4,"hp":25}},{"id":"rampager","type":"killStack","name":"Rampager","cost":150,"params":{"speed":0.4,"aps":0.2,"max":4}},{"id":"bullhead","type":"bull","name":"Bullhead","cost":150,"params":{"every":5,"hit":100,"push":6,"armor":4,"run":6},"also":[{"type":"stats","params":{"armor":4}}]},{"id":"longbones","type":"stats","name":"Longbones","cost":100,"params":{"range":3,"hit":5}},{"id":"graverot","type":"poison","name":"Graverot arrows","cost":150,"params":{"pct":150,"duration":6,"slow":0},"also":[{"type":"stats","params":{"aps":-0.15}}]},{"id":"dreadRangers","type":"shield","name":"Dread rangers","cost":150,"params":{"hits":1},"also":[{"type":"stats","params":{"range":2}}]},{"id":"forwardRoots","type":"forward","name":"Forward planting","cost":100,"params":{},"also":[{"type":"stats","params":{"hp":10}}]},{"id":"reinforcedBark","type":"stats","name":"Reinforced Bark","cost":150,"params":{"hp":20,"armor":4}},{"id":"graspingRoots","type":"roots","name":"Grasping roots","cost":150,"params":{"min":5,"max":13,"dps":10,"pull":1.5}},{"id":"entExplode","type":"explode","name":"Explode on death","cost":300,"params":{"pct":30,"radius":5},"flat":true,"master":true},{"id":"rangerScope","type":"range","name":"Ranger scope","cost":100,"params":{"m":3}},{"id":"deadeye","type":"stats","name":"Deadeye","cost":150,"params":{"range":5,"hit":20,"apsPct":-35},"also":[{"type":"pctHit","params":{"pct":5}}]},{"id":"assaultgunner","type":"stats","name":"Assaultgunner","cost":150,"params":{"apsPct":300,"range":-8,"hit":-50}},{"id":"overwatch","type":"overwatch","name":"Overwatch","cost":300,"params":{"hp":200},"also":[{"type":"stats","params":{"range":2}}],"flat":true,"master":true},{"id":"hunter","type":"hunter","name":"Hunter","cost":300,"params":{"dmg":100},"also":[{"type":"stealth","params":{}}],"flat":true},{"id":"sightweavers","type":"stats","name":"Sightweavers","cost":100,"params":{"range":2},"also":[{"type":"shrink","params":{"m":2,"duration":3}}]},{"id":"transphysical","type":"ward","name":"Transphysical","cost":150,"params":{"cap":40}},{"id":"shadowborn","type":"stealth","name":"Shadowborn","cost":150,"params":{},"also":[{"type":"firstHit","params":{"pct":25}}],"text":"Hidden until it attacks."},{"id":"spiritWalk","type":"freeMove","name":"Spirit walk","cost":300,"params":{},"flat":true,"master":true},{"id":"spitfire","type":"burn","name":"Spitfire","cost":100,"params":{"pct":50}},{"id":"flare","type":"flare","name":"Flare","cost":150,"params":{"per":10,"max":100,"shot":25}},{"id":"hellfiend","type":"portal","name":"Summon hellfiend","cost":300,"params":{"unit":"Brute","level":1,"speed":3.15,"cone":90,"secs":4,"hp":-30,"hit":-30,"aps":-30},"flat":true},{"id":"silentBlade","type":"silent","name":"Silent blade","cost":100,"params":{}},{"id":"deathFlurry","type":"flurry","name":"Death Flurry","cost":200,"params":{"hits":3,"hit":200,"gap":0.5,"aps":0.2,"leap":10}},{"id":"shadowHunter","type":"lone","name":"Shadow hunter","cost":200,"params":{"secs":5}},{"id":"windWalk","type":"windWalk","name":"Wind walk","cost":100,"params":{"every":5,"step":4}},{"id":"bouncingBlade","type":"bounce","name":"Bouncing blade","cost":150,"params":{"n":2,"pct":30,"reach":10}},{"id":"petalburst","type":"rapid","name":"Petalburst","cost":150,"params":{"aps":100,"range":50}},{"id":"leafblade","type":"leafblade","name":"Leafblade","cost":300,"params":{"dashCooldown":1.5,"mhit":100},"flat":true},{"id":"berserkers","type":"berserk","name":"Berserkers","cost":300,"params":{},"flat":true,"master":true},{"id":"deepfreeze","type":"deepfreeze","name":"Deepfreeze","cost":150,"params":{"secs":2}},{"id":"multibeam","type":"multibeam","name":"Multibeam","cost":150,"params":{"beams":2}},{"id":"glacialGaze","type":"stats","name":"Glacial gaze","cost":150,"params":{"range":5,"hit":20},"also":[{"type":"healthiest","params":{}}]},{"id":"snowStorm","type":"storm","name":"Snow storm","cost":300,"params":{"radius":10},"flat":true,"master":true},{"id":"gluttony","type":"glutCap","name":"Gluttony","cost":150,"params":{"add":1}},{"id":"hungerHaste","type":"glutSpeed","name":"Hunger’s haste","cost":150,"params":{"speed":0.1,"aps":1.5}},{"id":"crushingMaw","type":"stats","name":"Crushing maw","cost":150,"params":{"splash":3}},{"id":"obeliskEye","type":"ranged","name":"Eye of the Obelisk","cost":0,"params":{"range":18,"speed":25,"poison":50,"duration":4},"flat":true,"evolve":true,"needs":"glutMax"}],"cacheKey":"ae4d53aa05fd","sigs":["2c8329f4c9ae","7798db111444","6e2012bee7cd","23ba3c9cd23d","7ff357b98847","dd511e485234","d38425a8f36d","e08893a21002","f0982269b507","18d7835f36d8","d529e52a04e9","1a49dd3ab7da","74b184a96c88","e4e4af87400b","fa1999b3879d","baeb1929c1e7","658f0d6fa214","bb2ae1d49928","d065b64cfd15","f0f2d213b4af","2ca90aafd2b7","d100064bacad","c5e9a7ace352","cf48dd71bdb4","ff2d7b785d64","f9a40012ec4c","8cb7daf5ad65","7e8ad9c75913"]};
+const DATA = {"units":[{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Goblin Swarm","cost":1,"bodies":12,"hp":26,"hit":19,"aps":1.2,"range":2,"speed":7.5,"splash":0,"shape":"goblin","color":"#9BD35A","skills":["aaargh","tacticalness","moreGoblins"],"skillMods":[null,null,null],"skillsInnate":[false,false,false],"skillOr":[[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":30,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Skeleton Archers","cost":1,"bodies":8,"hp":32,"hit":14,"aps":0.75,"range":18,"speed":2.1,"splash":0,"shape":"skull","color":"#E9E3CF","skills":["longbones","graverot","dreadRangers"],"skillMods":[null,null,null],"skillsInnate":[false,false,false],"skillOr":[[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Ember Imps","cost":1,"bodies":4,"hp":90,"hit":20,"aps":0.8,"range":10,"speed":4,"splash":3,"shape":"imp","color":"#FFA94D","skills":["spitfire","flare","emberMortar","hellfiend"],"skillMods":[null,null,null,null],"skillsInnate":[false,false,false,false],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":35,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Fire Mage","cost":1,"bodies":1,"hp":155,"hit":33,"aps":0.68,"range":20,"speed":3,"splash":4,"shape":"firestaff","color":"#fb0022","skills":["range","armorHp","dualFlame"],"skillMods":[null,null,null],"skillsInnate":[false,false,false]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":1,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Sniper","cost":1,"bodies":1,"hp":140,"hit":210,"aps":0.25,"range":29,"speed":2,"splash":0,"shape":"reticle","color":"#F7D154","skills":["rangerScope","deadeye","assaultgunner","hunter"],"skillMods":[null,null,null,null],"skillsInnate":[false,false,false,false],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"armor","defVal":3,"level":0,"unlock":50,"name":"Brute","cost":2,"bodies":1,"hp":1100,"hit":98,"aps":1.1,"range":2,"speed":5,"splash":0,"shape":"square","color":"#8D99AE","skills":["tuffSkin","rampager","bullhead","berserkers"],"skillMods":[null,null,null,null],"skillsInnate":[false,false,false,false],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":20,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":40,"level":0,"unlock":50,"name":"Wisps","cost":1,"bodies":2,"hp":65,"hit":75,"aps":0.595,"range":19,"speed":4,"splash":0,"shape":"wisp","color":"#ff90ff","skills":["sightweavers","transphysical","shadowborn","spiritWalk"],"skillMods":[null,null,null,null],"skillsInnate":[false,false,false,false],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":35,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Leaf Wizard","cost":2,"bodies":1,"hp":111,"hit":95,"aps":1.2,"range":20,"speed":5,"splash":0,"shape":"hexagon","color":"#00d200","skills":["windWalk","bouncingBlade","petalburst","leafblade"],"skillMods":[null,null,null,null],"skillsInnate":[false,false,false,false],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":3,"projSpeed":35,"minRange":0,"charge":1,"knockback":0,"windUp":0.5,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Earth Wizard","cost":2,"bodies":1,"hp":650,"hit":440,"aps":0.2,"range":24,"speed":3,"splash":2,"shape":"circle","color":"#24590d","skills":["regen","stoneSpikes","livingArmor"],"skillMods":[{"params":{"hp":25,"pct":2}},null,null],"skillsInnate":[false,false,false],"skillOr":[[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":30,"defense":"none","defVal":0,"level":0,"unlock":100,"name":"Flame Wizard","cost":3,"bodies":1,"hp":1530,"hit":11,"aps":4,"range":12,"speed":2,"splash":0,"shape":"flame","color":"#b95018","skills":["armorHp","range"],"skillMods":[null,null],"skillsInnate":[false,false]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"armor","defVal":6,"level":0,"unlock":100,"name":"Steel Wizard","cost":3,"bodies":1,"hp":1900,"hit":150,"aps":0.9,"range":15,"speed":2,"splash":2,"shape":"bar","color":"#57535a","skills":["heavyMetal","reforge","titanSpears"],"skillMods":[null,null,null],"skillsInnate":[false,false,false],"trait":{"name":"Steel armor","text":"6 armor."},"skillOr":[[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":40,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":100,"name":"Slime Wizard","cost":3,"bodies":1,"hp":620,"hit":480,"aps":0.2,"range":25,"speed":2.5,"splash":5,"shape":"ring","color":"#81f038","skills":["skmv5oxpgk2","range"],"skillMods":[null,null],"skillsInnate":[false,false]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"armor","defVal":6,"level":0,"unlock":150,"splash":3,"skillsInnate":[false,false],"skillMods":[null,null],"name":"Ether Golem","cost":5,"bodies":1,"hp":3450,"hit":69,"aps":0.6,"range":5,"speed":2.5,"shape":"square","color":"#51005c","skills":["regen","armorHp"]},{"burst":1,"pellets":1,"spinUp":50,"spinHit":175,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":150,"splash":0,"skillsInnate":[false,false],"skillMods":[null,null],"name":"Sun Priest","cost":5,"bodies":1,"hp":2800,"hit":15,"aps":2,"range":18,"speed":3,"shape":"sun","color":"#FFD23F","skills":["split","shrink"],"spinHitCap":8,"lockOn":0.5},{"burst":3,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":22,"minRange":16,"charge":1,"knockback":0,"windUp":2,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":150,"splash":5.5,"skillsInnate":[false,false],"skillMods":[null,null],"name":"Meteor Caller","cost":5,"bodies":1,"hp":400,"hit":105,"aps":0.3,"range":50,"speed":2,"shape":"diamond","color":"#FF6B35","skills":["range","skmv5oxpgk2"]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":3,"knockback":4,"windUp":0,"flame":0,"defense":"armor","defVal":6,"level":0,"unlock":150,"splash":0,"skillsInnate":[false,false],"skillMods":[null,null],"name":"War Mammoth","cost":5,"bodies":1,"hp":2650,"hit":169,"aps":0.5,"range":3,"speed":8,"shape":"pentagon","color":"#A0785A","skills":["swift","armorHp"],"trample":50,"chargeStun":0,"chargeCd":10,"trampleRun":14,"trampleSpeed":1.5,"stomp":3.5},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":150,"splash":0,"skillsInnate":[true,false],"skillMods":[null,null],"name":"Necromancer","cost":5,"bodies":1,"hp":2300,"hit":52,"aps":1,"range":20,"speed":2.2,"shape":"hexagon","color":"#9D4EDD","skills":["raiseDead","healer"]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Ent","cost":1,"bodies":2,"hp":360,"hit":25,"aps":1.1,"range":4,"speed":2.2,"splash":2,"shape":"tree","color":"#0d3000","skills":["forwardRoots","reinforcedBark","graspingRoots","entExplode"],"skillsInnate":[false,false,false,false],"skillMods":[null,null,null,null],"deathBlast":0,"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0.1,"pierce":0,"projSpeed":30,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"name":"Slimeshots","cost":2,"unlock":50,"bodies":10,"hp":95,"hit":7,"aps":0.8,"range":21,"speed":6,"splash":3,"shape":"diamond","color":"#20d300","skills":["range","heavy"],"skillsInnate":[false,false],"skillMods":[{"params":{"m":3},"cost":150},{"params":{"hit":25,"slow":0,"instant":0},"cost":150}]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Just a horse","cost":2,"bodies":1,"hp":500,"hit":200,"aps":1,"range":1,"speed":6,"splash":0,"shape":"horse","color":"#C8A27A","ram":1,"noFlank":1,"carrier":1,"noPack":1,"skills":["gallop","armorHp","deathBurst"],"skillMods":[null,{"params":{"armor":4,"hp":20},"cost":150},null],"skillsInnate":[false,false,false]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":30,"minRange":0,"charge":4,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"defense":"none","defVal":0,"level":0,"unlock":100,"name":"Rogue","cost":3,"bodies":2,"hp":310,"hit":80,"aps":1.1,"range":4,"speed":5.5,"splash":0,"shape":"triangle","color":"#460000","skills":["stealth","skmv5oxj501","frenzy"],"skillsInnate":[true,false,false],"skillMods":[null,{"params":{"cap":200},"cost":150},null]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"defense":"none","defVal":0,"level":0,"unlock":50,"name":"Spiders","cost":2,"bodies":6,"hp":185,"hit":20,"aps":0.8,"range":2,"speed":6,"splash":0,"shape":"spider","color":"#000000","skills":["poisonousFangs","spiderlings","cavestalkers","webShots"],"skillsInnate":[false,false,false,false],"skillMods":[null,null,null,null],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":35,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"pctHit":8,"defense":"none","defVal":0,"level":0,"unlock":150,"name":"Truespear","cost":5,"bodies":1,"hp":1260,"hit":150,"aps":0.765,"range":23,"speed":3,"splash":0,"shape":"spear","color":"#C9D1D9","skills":["lifesteal","armorHp","dualSpear"],"skillMods":[null,null,null],"skillsInnate":[false,false,false]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"defense":"none","defVal":0,"level":0,"projSpeed":30,"unlock":50,"name":"Shiv","cost":2,"noPack":1,"bodies":3,"hp":200,"hit":17.3,"aps":1.5,"range":18,"speed":3,"splash":0,"shape":"knife","color":"#B7A6C9","bleedEvery":2,"trait":{"name":"Apply bleed","text":"Every 2nd knife on a target adds bleed. Stacks to 4, past armor."},"skills":["aeroblades","tooDeep","anemia"],"skillsInnate":[false,false,false],"skillMods":[null,null,null],"skillOr":[[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"defense":"none","defVal":0,"level":0,"projSpeed":15,"unlock":100,"name":"Water Mage","cost":3,"bodies":1,"hp":600,"hit":50,"aps":0.9,"range":22,"speed":2.1,"splash":3.5,"shape":"drop","color":"#3B5BDB","waterHeal":1,"trait":{"name":"Waterhealing","text":"Its splash heals allies for its hit."},"trait2":{"name":"Medic","text":"With no enemy in reach, shoots wounded allies."},"skills":["waterbomb","poolShaper","flowState","waterElemental"],"skillsInnate":[false,false,false,false],"skillMods":[null,null,null,null],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"projSpeed":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"defense":"none","defVal":0,"level":0,"unlock":150,"name":"Assassin","cost":5,"bodies":1,"hp":350,"hit":500,"aps":0.35,"range":2,"speed":6,"splash":0,"shape":"dagger","color":"#3A3550","stealth":true,"dash":10,"bldgPct":50,"bleedHit":3,"anywhere":true,"noBldg":true,"trait":{"name":"Stealthed","text":"Hidden until it attacks. Hides again 1.5 s after it stops attacking. Place it on any free tile, even in enemy land, but not next to a building."},"trait2":{"name":"Shadow dash","text":"Dashes unseen to targets within 10 m."},"trait3":{"name":"Bloodrush","text":"Hits add 3 bleed."},"trait4":{"name":"Light blade","text":"−50% damage to buildings. Ignores buildings while any unit is left to hit."},"skills":["silentBlade","deathFlurry","shadowHunter"],"skillsInnate":[false,false,false],"skillMods":[null,null,null],"skillOr":[[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"defense":"armor","defVal":4,"level":0,"projSpeed":0,"unlock":100,"name":"Frost Wizard","cost":3,"bodies":1,"hp":900,"hit":21,"aps":3.2,"range":25,"speed":2,"splash":0,"shape":"snowflake","color":"#9ED8F5","tag":"FRO","frost":{"every":2.5,"pct":[20,30,40],"keep":2},"trait":{"name":"Frost","text":"Beam stacks Frost: up to 40% slower. Melts 2 s after."},"skills":["deepfreeze","multibeam","glacialGaze","snowStorm"],"skillsInnate":[false,false,false,false],"skillMods":[null,null,null,null],"skillOr":[[1,2]],"skillNeedsAny":[null,null,null,[1,2]]},{"burst":1,"pellets":1,"spinUp":0,"pierce":0,"minRange":0,"charge":1,"knockback":0,"windUp":0,"flame":0,"trample":0,"deathBlast":0,"defense":"none","defVal":0,"level":0,"projSpeed":0,"unlock":100,"name":"Obelisk","cost":3,"bodies":1,"hp":1300,"hit":90,"aps":0.7,"range":3,"speed":4,"splash":0,"shape":"obelisk","color":"#4E6B35","tag":"OBE","glut":{"max":15,"cap":3,"hp":6,"hit":6,"speed":0,"aps":0},"lifesteal":20,"trait":{"name":"Glut","text":"Eats kills: +6% health, +6% hit each. Max 3 a round, 15 in all."},"trait2":{"name":"Devour","text":"Heals 20% of damage dealt."},"skills":["gluttony","hungerHaste","crushingMaw","obeliskEye"],"skillsInnate":[false,false,false,false],"skillMods":[null,null,null,null],"skillOr":[[1,2]],"levelHp":75}],"matrix":[[0,-0.668,-0.885,-0.963,0.844,0.492,0.428,0.739,0.594,-1,-0.563,0.186,-0.707,0.867,-0.299,-0.542,0.533,-0.208,-0.757,0.958,0.675,0.475,0.875,0.313,-1,0.975,0.325,0.808],[0.668,0,-0.215,-0.683,0.433,0.512,0.579,0.708,0.217,-0.53,-0.496,0.171,-0.134,0.75,-0.93,0.5,-0.298,0.677,-0.675,0.938,0.792,0.513,0.804,0.187,-0.791,0.967,-1,0.842],[0.885,0.215,0,-0.776,0.358,0.167,0.147,0.642,0.1,-0.83,-0.668,-0.51,0.035,0.774,-0.983,0.205,0.363,0.73,-0.274,0.875,0.761,0.789,0.642,0.479,-0.513,0.95,0.27,0.733],[0.963,0.683,0.776,0,-1,-0.337,0.503,0.652,-0.888,-0.355,-0.43,-0.691,-0.384,-0.21,-1,-0.628,-0.373,0.875,0.101,0.733,-0.197,0.751,-0.363,0.463,-0.134,0.767,-0.646,0.21],[-0.844,-0.433,-0.358,1,0,-0.095,0.633,1,-0.49,0.774,-0.142,-0.131,0.836,0.666,-1,-0.205,-0.527,0.994,-0.567,0.8,-0.415,0.548,0.8,1,1,0.8,0.54,0.9],[-0.492,-0.512,-0.167,0.337,0.095,0,-0.317,0.466,-0.809,0.153,-0.558,-0.968,0.156,-0.416,0.181,-0.473,0.209,0.379,0.649,0.821,0.253,0.723,0.353,-0.402,0.217,0.773,0.612,0.733],[-0.428,-0.579,-0.147,-0.503,-0.633,0.317,0,0.533,-0.492,-0.392,-0.431,-0.703,0.167,0.642,-0.875,-0.006,-0.567,0.926,-0.712,0.933,0.35,0.624,0.517,0.149,-0.475,0.9,-0.642,0.817],[-0.739,-0.708,-0.642,-0.652,-1,-0.466,-0.533,0,-0.932,-0.545,-0.728,-1,-0.362,-0.556,-0.881,-0.587,-0.794,0.377,-0.76,0.533,-0.654,-0.316,-0.686,-0.47,-0.574,0.533,-0.889,0.546],[-0.594,-0.217,-0.1,0.888,0.49,0.809,0.492,0.932,0,0.876,0.779,-0.316,0.915,0.666,-0.5,0.439,-0.131,1,0.464,1,0.47,0.797,0.788,0.775,0.933,0.758,0.671,0.991],[1,0.53,0.83,0.355,-0.774,-0.153,0.392,0.545,-0.876,0,-0.728,-1,-0.442,-0.598,-1,-0.547,-0.188,1,0.599,0.817,0.527,0.995,-0.498,0.307,0.624,0.744,-0.218,0.553],[0.563,0.496,0.668,0.43,0.142,0.558,0.431,0.728,-0.779,0.728,0,-0.952,0.775,-0.384,-0.938,0.571,0.511,0.837,0.911,0.908,0.475,0.817,0.307,0.278,0.757,0.82,0.653,0.867],[-0.186,-0.171,0.51,0.691,0.131,0.968,0.703,1,0.316,1,0.952,0,0.922,0.767,-1,0.596,0.594,1,0.511,0.968,-0.6,0.887,0.871,0.899,1,0.409,0.956,1],[0.707,0.134,-0.035,0.384,-0.836,-0.156,-0.167,0.362,-0.915,0.442,-0.775,-0.922,0,-0.893,0.094,-0.326,-0.496,0.506,0.885,0.859,0.324,0.871,-0.9,-0.479,0.4,0.444,0.286,0.409],[-0.867,-0.75,-0.774,0.21,-0.666,0.416,-0.642,0.556,-0.666,0.598,0.384,-0.767,0.893,0,-0.315,0.658,-0.799,-0.238,-0.736,0.845,-0.618,0.312,0.132,-0.589,0.664,0.655,0.564,0.855],[0.299,0.93,0.983,1,1,-0.181,0.875,0.881,0.5,1,0.938,1,-0.094,0.315,0,-0.751,0.728,1,0.501,0.75,-1,0.612,0.772,1,1,-1,1,-0.184],[0.542,-0.5,-0.205,0.628,0.205,0.473,0.006,0.587,-0.439,0.547,-0.571,-0.596,0.326,-0.658,0.751,0,-0.264,0.426,0.858,0.866,-0.1,0.874,-0.342,-0.269,0.602,0.666,0.604,0.683],[-0.533,0.298,-0.363,0.373,0.527,-0.209,0.567,0.794,0.131,0.188,-0.511,-0.594,0.496,0.799,-0.728,0.264,0,0.483,-0.438,0.937,0.683,0.333,0.802,0.308,0.298,0.986,0.397,0.771],[0.208,-0.677,-0.73,-0.875,-0.994,-0.379,-0.926,-0.377,-1,-1,-0.837,-1,-0.506,0.238,-1,-0.426,-0.483,0,-0.623,0.874,0.391,0.561,0.459,-0.656,-1,0.867,0.203,0.564],[0.757,0.675,0.274,-0.101,0.567,-0.649,0.712,0.76,-0.464,-0.599,-0.911,-0.511,-0.885,0.736,-0.501,-0.858,0.438,0.623,0,0.907,0.7,0.57,0.673,0.648,-0.226,0.947,-0.613,0.72],[-0.958,-0.938,-0.875,-0.733,-0.8,-0.821,-0.933,-0.533,-1,-0.817,-0.908,-0.968,-0.859,-0.845,-0.75,-0.866,-0.937,-0.874,-0.907,0,-0.65,-0.833,-0.735,-0.711,-0.717,-0.238,-0.748,-0.769],[-0.675,-0.792,-0.761,0.197,0.415,-0.253,-0.35,0.654,-0.47,-0.527,-0.475,0.6,-0.324,0.618,1,0.1,-0.683,-0.391,-0.7,0.65,0,0.187,0.744,-0.12,0.292,0,0.699,0.664],[-0.475,-0.513,-0.789,-0.751,-0.548,-0.723,-0.624,0.316,-0.797,-0.995,-0.817,-0.887,-0.871,-0.312,-0.612,-0.874,-0.333,-0.561,-0.57,0.833,-0.187,0,0.354,-0.289,-1,0.844,-0.349,-0.598],[-0.875,-0.804,-0.642,0.363,-0.8,-0.353,-0.517,0.686,-0.788,0.498,-0.307,-0.871,0.9,-0.132,-0.772,0.342,-0.802,-0.459,-0.673,0.735,-0.744,-0.354,0,-0.519,0.169,0.553,-0.33,0.714],[-0.313,-0.187,-0.479,-0.463,-1,0.402,-0.149,0.47,-0.775,-0.307,-0.278,-0.899,0.479,0.589,-1,0.269,-0.308,0.656,-0.648,0.711,0.12,0.289,0.519,0,-0.456,0.867,-0.104,0.823],[1,0.791,0.513,0.134,-1,-0.217,0.475,0.574,-0.933,-0.624,-0.757,-1,-0.4,-0.664,-1,-0.602,-0.298,1,0.226,0.717,-0.292,1,-0.169,0.456,0,0.652,-0.642,1],[-0.975,-0.967,-0.95,-0.767,-0.8,-0.773,-0.9,-0.533,-0.758,-0.744,-0.82,-0.409,-0.444,-0.655,1,-0.666,-0.986,-0.867,-0.947,0.238,0,-0.844,-0.553,-0.867,-0.652,0,-0.653,-0.697],[-0.325,1,-0.27,0.646,-0.54,-0.612,0.642,0.889,-0.671,0.218,-0.653,-0.956,-0.286,-0.564,-1,-0.604,-0.397,-0.203,0.613,0.748,-0.699,0.349,0.33,0.104,0.642,0.653,0,0.57],[-0.808,-0.842,-0.733,-0.21,-0.9,-0.733,-0.817,-0.546,-0.991,-0.553,-0.867,-1,-0.409,-0.855,0.184,-0.683,-0.771,-0.564,-0.72,0.769,-0.664,0.598,-0.714,-0.823,-1,0.697,-0.57,0]],"skills":[{"id":"regen","type":"regen","name":"Regeneration","cost":100,"params":{}},{"id":"poison","type":"poison","name":"Poison shot","cost":100,"params":{"pct":150,"duration":6}},{"id":"stealth","type":"stealth","name":"Stealth","cost":100,"params":{}},{"id":"armorHp","type":"armorHp","name":"Armor and health","cost":200,"params":{}},{"id":"spawn","type":"spawn","name":"Spawn goblins","cost":200,"params":{"every":7}},{"id":"rapid","type":"rapid","name":"Rapid fire","cost":100,"params":{}},{"id":"swift","type":"swift","name":"Swift strikes","cost":100,"params":{}},{"id":"heavy","type":"heavy","name":"Heavy shot","cost":100,"params":{}},{"id":"healer","type":"healer","name":"Healing touch","cost":200,"params":{}},{"id":"range","type":"range","name":"Long reach","cost":200,"params":{}},{"id":"shrink","type":"shrink","name":"Shortsight","cost":100,"params":{"m":6,"duration":4}},{"id":"skmv5oxj501","type":"ward","name":"Ward","cost":100,"params":{}},{"id":"skmv5oxpgk2","type":"slow","name":"Slow","cost":100,"params":{}},{"id":"raiseDead","type":"spawn","name":"Raise dead","cost":0,"params":{"unit":"Skeleton Archers","count":3,"every":2,"max":12}},{"id":"spiderlings","type":"deathSpawn","name":"Spiderlings","cost":200,"params":{"unit":"Spiders","count":2,"strength":50}},{"id":"poisonousFangs","type":"poison","name":"Poisonous fangs","cost":100,"params":{"pct":150,"duration":6}},{"id":"cavestalkers","type":"stealth","name":"Cavestalkers","cost":200,"params":{"hit":25},"text":"Gain stealth and +25% hit."},{"id":"webShots","type":"web","name":"Web-shots","cost":300,"params":{"shots":1,"range":10,"slow":10,"dmg":5,"max":90,"secs":3},"flat":true,"master":true,"text":"Each spider shoots one web a fight: it slows the target and weakens its attacks, and stacks."},{"id":"split","type":"split","name":"Split beam","cost":100,"params":{}},{"id":"forward","type":"forward","name":"Forward planting","cost":100,"params":{}},{"id":"gallop","type":"swift","name":"Gallop","cost":200,"params":{"speed":25,"hit":0}},{"id":"deathBurst","type":"blast","name":"Death burst","cost":200,"params":{"radius":7,"pct":100}},{"id":"dualFlame","type":"turret","name":"Dual Flame","cost":200,"params":{"turrets":2}},{"id":"lifesteal","type":"lifesteal","name":"Lifesteal","cost":150,"params":{"pct":10}},{"id":"dualSpear","type":"turret","name":"Dual Spear","cost":300,"params":{"turrets":2}},{"id":"frenzy","type":"frenzy","name":"Frenzy","cost":250,"params":{"pct":10,"cap":2}},{"id":"spread","type":"spread","name":"Spread","cost":300,"params":{"min":1,"max":6}},{"id":"boneShield","type":"shield","name":"Bone shield","cost":200,"params":{"hits":1}},{"id":"emberMortar","type":"mortar","name":"Ember Mortar","cost":150,"params":{"range":12,"min":5,"aps":0,"speed":20},"also":[{"type":"stats","params":{"hit":-20,"aps":-0.1,"apsPct":-20}}]},{"id":"explode","type":"explode","name":"Explode on death","cost":200,"params":{"pct":30,"radius":5}},{"id":"dodge","type":"dodge","name":"Dodge","cost":200,"params":{"pct":33}},{"id":"steelPlating","type":"armorHp","name":"Steel plating","cost":300,"params":{"armor":16,"hp":0}},{"id":"aeroblades","type":"double","name":"Aeroblades","cost":150,"params":{"every":3,"hit":15}},{"id":"tooDeep","type":"bleedDeep","name":"Too deep","cost":150,"params":{"secs":1}},{"id":"anemia","type":"bleedStun","name":"Anemia","cost":150,"params":{"secs":1.2}},{"id":"waterbomb","type":"stats","name":"Waterbomb","cost":100,"params":{"splash":1.2,"hitAdd":50}},{"id":"poolShaper","type":"pools","name":"Pool shaper","cost":150,"params":{"splash":2,"aps":0.2,"pct":25,"speed":0.5,"secs":2}},{"id":"flowState","type":"flow","name":"Flow state","cost":150,"params":{"aps":0.1,"range":0.4,"max":5}},{"id":"waterElemental","type":"elemental","name":"Summon water elemental","cost":300,"params":{"hp":600,"unit":"Ember Imps","level":1,"ahead":9,"pool":4,"pct":50,"speed":0.5,"secs":2},"flat":true,"master":true},{"id":"heavyMetal","type":"armorHp","name":"Heavy metal","cost":150,"params":{"armor":4,"hp":25}},{"id":"reforge","type":"aura","name":"Reforge","cost":200,"params":{"armor":2,"radius":8,"hit":20,"aps":0.1}},{"id":"titanSpears","type":"spears","name":"Shape Titanium spears","cost":200,"params":{"forge":1.5,"speed":35,"hit":200,"bleed":1}},{"id":"stoneSpikes","type":"stats","name":"Stone spikes","cost":150,"params":{"range":5,"burst":1,"apsPct":-20}},{"id":"livingArmor","type":"slam","name":"Living armor","cost":150,"params":{"armor":8,"range":13,"hit":200,"stun":1,"cone":25}},{"id":"aaargh","type":"stats","name":"AAARGH!","cost":100,"params":{"speed":0.8,"aps":0.3}},{"id":"tacticalness","type":"spread","name":"Tacticalness","cost":150,"params":{"min":1,"max":6},"also":[{"type":"stats","params":{"bodies":3}}]},{"id":"moreGoblins","type":"killSpawn","name":"More where that came from","cost":150,"params":{"count":1}},{"id":"tuffSkin","type":"armorHp","name":"Tuff skin","cost":150,"params":{"armor":4,"hp":25}},{"id":"rampager","type":"killStack","name":"Rampager","cost":150,"params":{"speed":0.4,"aps":0.2,"max":4}},{"id":"bullhead","type":"bull","name":"Bullhead","cost":150,"params":{"every":5,"hit":100,"push":6,"armor":4,"run":6},"also":[{"type":"stats","params":{"armor":4}}]},{"id":"longbones","type":"stats","name":"Longbones","cost":100,"params":{"range":3,"hit":5}},{"id":"graverot","type":"poison","name":"Graverot arrows","cost":150,"params":{"pct":150,"duration":6,"slow":0},"also":[{"type":"stats","params":{"aps":-0.15}}]},{"id":"dreadRangers","type":"shield","name":"Dread rangers","cost":150,"params":{"hits":1},"also":[{"type":"stats","params":{"range":2}}]},{"id":"forwardRoots","type":"forward","name":"Forward planting","cost":100,"params":{},"also":[{"type":"stats","params":{"hp":10}}]},{"id":"reinforcedBark","type":"stats","name":"Reinforced Bark","cost":150,"params":{"hp":20,"armor":4}},{"id":"graspingRoots","type":"roots","name":"Grasping roots","cost":150,"params":{"min":5,"max":13,"dps":10,"pull":1.5}},{"id":"entExplode","type":"explode","name":"Explode on death","cost":300,"params":{"pct":30,"radius":5},"flat":true,"master":true},{"id":"rangerScope","type":"range","name":"Ranger scope","cost":100,"params":{"m":3}},{"id":"deadeye","type":"stats","name":"Deadeye","cost":150,"params":{"range":5,"hit":20,"apsPct":-35},"also":[{"type":"pctHit","params":{"pct":5}}]},{"id":"assaultgunner","type":"stats","name":"Assaultgunner","cost":150,"params":{"apsPct":300,"range":-8,"hit":-50}},{"id":"overwatch","type":"overwatch","name":"Overwatch","cost":300,"params":{"hp":200},"also":[{"type":"stats","params":{"range":2}}],"flat":true,"master":true},{"id":"hunter","type":"hunter","name":"Hunter","cost":300,"params":{"dmg":100},"also":[{"type":"stealth","params":{}}],"flat":true},{"id":"sightweavers","type":"stats","name":"Sightweavers","cost":100,"params":{"range":2},"also":[{"type":"shrink","params":{"m":2,"duration":3}}]},{"id":"transphysical","type":"ward","name":"Transphysical","cost":150,"params":{"cap":40}},{"id":"shadowborn","type":"stealth","name":"Shadowborn","cost":150,"params":{},"also":[{"type":"firstHit","params":{"pct":25}}],"text":"Hidden until it attacks."},{"id":"spiritWalk","type":"freeMove","name":"Spirit walk","cost":300,"params":{},"flat":true,"master":true},{"id":"spitfire","type":"burn","name":"Spitfire","cost":100,"params":{"pct":50}},{"id":"flare","type":"flare","name":"Flare","cost":150,"params":{"per":10,"max":100,"shot":25}},{"id":"hellfiend","type":"portal","name":"Summon hellfiend","cost":300,"params":{"unit":"Brute","level":1,"speed":3.15,"cone":90,"secs":4,"hp":-30,"hit":-30,"aps":-30},"flat":true},{"id":"silentBlade","type":"silent","name":"Silent blade","cost":100,"params":{}},{"id":"deathFlurry","type":"flurry","name":"Death Flurry","cost":200,"params":{"hits":3,"hit":200,"gap":0.5,"aps":0.2,"leap":10}},{"id":"shadowHunter","type":"lone","name":"Shadow hunter","cost":200,"params":{"secs":5}},{"id":"windWalk","type":"windWalk","name":"Wind walk","cost":100,"params":{"every":5,"step":4}},{"id":"bouncingBlade","type":"bounce","name":"Bouncing blade","cost":150,"params":{"n":2,"pct":30,"reach":10}},{"id":"petalburst","type":"rapid","name":"Petalburst","cost":150,"params":{"aps":100,"range":50}},{"id":"leafblade","type":"leafblade","name":"Leafblade","cost":300,"params":{"dashCooldown":1.5,"mhit":100},"flat":true},{"id":"berserkers","type":"berserk","name":"Berserkers","cost":300,"params":{},"flat":true,"master":true},{"id":"deepfreeze","type":"deepfreeze","name":"Deepfreeze","cost":150,"params":{"secs":2}},{"id":"multibeam","type":"multibeam","name":"Multibeam","cost":150,"params":{"beams":2}},{"id":"glacialGaze","type":"stats","name":"Glacial gaze","cost":150,"params":{"range":5,"hit":20},"also":[{"type":"healthiest","params":{}}]},{"id":"snowStorm","type":"storm","name":"Snow storm","cost":300,"params":{"radius":10},"flat":true,"master":true},{"id":"gluttony","type":"glutCap","name":"Gluttony","cost":150,"params":{"add":1}},{"id":"hungerHaste","type":"glutSpeed","name":"Hunger’s haste","cost":150,"params":{"speed":0.1,"aps":1.5}},{"id":"crushingMaw","type":"stats","name":"Crushing maw","cost":150,"params":{"splash":3}},{"id":"obeliskEye","type":"ranged","name":"Eye of the Obelisk","cost":0,"params":{"range":18,"speed":25,"poison":50,"duration":4},"flat":true,"evolve":true,"needs":"glutMax"}],"cacheKey":"8c5a77a3a276","sigs":["2c8329f4c9ae","7798db111444","6e2012bee7cd","23ba3c9cd23d","7ff357b98847","dd511e485234","d38425a8f36d","e08893a21002","f0982269b507","18d7835f36d8","d529e52a04e9","1a49dd3ab7da","74b184a96c88","e4e4af87400b","fa1999b3879d","baeb1929c1e7","658f0d6fa214","bb2ae1d49928","d065b64cfd15","f0f2d213b4af","2ca90aafd2b7","d100064bacad","c5e9a7ace352","cf48dd71bdb4","ff2d7b785d64","f9a40012ec4c","8cb7daf5ad65","7e8ad9c75913"]};
 </script>
 <script type="module">
 import * as THREE from './vendor/three.module.min.js';
@@ -9927,15 +10459,215 @@ const Models3D = (THREE) => {
   BUILD['mpb:golem:silver'] = golem('#C9CED6', '#8A929A');
   BUILD['mpb:golem:gold'] = golem(GOLD, '#9A7418');
   // ===== treeKojja (3D) =====
+  // The Tree kojja: a stubby, gnarled tree whose lopsided crown hugs a plank lookout hut (a watchtower that grew rather
+  // than was built): roots splayed on the ground, a rope ladder up the trunk, the hut's lookout slit facing its enemy
+  // (-z), a pointed roof in the team colour and a small bird on the ridge, the one thing awake up there
+  BUILD['mpb:treeKojja'] = () => [
+    ...[0, 1, 2, 3, 4].map(k => { const a = k * 1.26 + 0.3; return P(cone(0.35, 1.6, 5), '#5A3E26', [Math.cos(a) * 0.75, 0.2, Math.sin(a) * 0.75], [Math.sin(a) * 1.2, 0, -Math.cos(a) * 1.2]); }), // roots
+    P(cyl(0.55, 0.85, 3.2, 7), '#6B4A2B', [0, 1.6, 0], [0.05, 0, -0.06]),
+    P(cyl(0.18, 0.25, 1.4, 5), '#6B4A2B', [0.75, 2.6, 0.3], [0.2, 0, -0.9]), // a crooked branch
+    ...[-1, 1].map(sd => P(box(0.06, 2.7, 0.06), '#C9B48A', [sd * 0.22, 1.5, -0.86])), // the rope ladder
+    ...[0, 1, 2, 3, 4].map(k => P(box(0.5, 0.06, 0.08), '#A88E6E', [0, 0.45 + k * 0.5, -0.86])),
+    ...[[0, 3.6, 0.2, 1.7, '#6B8E3D'], [-1.3, 3.2, 0.4, 1.2, '#56763A'], [1.3, 3.4, -0.2, 1.25, '#5F8040'], [0.3, 4.4, 0.9, 1.1, '#7C9C4A'], [-0.6, 4.1, -0.9, 1.0, '#86A657'], [1.0, 2.9, 1.0, 0.9, '#56763A']]
+      .map(([x, y, z, r, col]) => P(ball(r), col, [x, y, z])), // the crown: leaf clumps
+    P(box(2.1, 1.25, 1.9), '#9C7A54', [0, 3.75, -0.55]), // the hut, wedged in the crown
+    ...[0, 1, 2].map(k => P(box(2.14, 0.06, 1.94), '#5B3F24', [0, 3.3 + k * 0.4, -0.55])), // plank seams
+    P(box(1.3, 0.28, 0.08), DARK, [0, 3.85, -1.52]), // the lookout slit
+    P(box(2.5, 0.16, 2.3), '#5B3F24', [0, 3.08, -0.55]), // its floor
+    P(cone(1.75, 1.2, 4), 'team', [0, 4.98, -0.55], [0, Math.PI / 4, 0]),
+    P(ball(0.17), '#3A3026', [0.15, 5.65, -0.55]), P(cone(0.06, 0.18, 4), '#E8A04A', [0.15, 5.66, -0.78], [-Math.PI / 2, 0, 0])]; // the bird
   // ===== fieldHospital (3D) =====
+  // The Field hospital: a canvas ridge tent (the kind's colour, 'tint') on a ground sheet, its front (-z, toward its
+  // own side) with the flaps tied open round a dark doorway and a white disc with a soft green cross over it, hems
+  // and a pennant in the team colour, a supply crate by the door and its world detail: bandages drying on a line
+  const fhCross = (x, y, z, k = 1) => [P(box(0.16 * k, 0.56 * k, 0.06), '#6FB07E', [x, y, z]), P(box(0.56 * k, 0.16 * k, 0.06), '#6FB07E', [x, y, z])];
+  BUILD['mpb:fieldHospital'] = () => [
+    P(box(4.3, 0.1, 4.4), '#B9AE8E', [0, 0.05, 0]),
+    P(cyl(1.95, 1.95, 3.7, 3), 'tint', [0, 1.0, 0], [-Math.PI / 2, 0, 0]), // the tent: a three-sided prism lying along z, its ridge up
+    P(cyl(0.85, 0.85, 0.06, 3), '#4A4236', [0, 0.45, -1.86], [-Math.PI / 2, 0, 0]), // the doorway
+    ...[-1, 1].map(sd => P(box(0.5, 1.2, 0.06), '#DCD3BC', [sd * 0.62, 0.6, -1.9], [0, sd * 0.5, sd * -0.35])), // the flaps, tied back
+    P(cyl(0.36, 0.36, 0.05, 12), '#FAF7EE', [0, 1.95, -1.88], [Math.PI / 2, 0, 0]), ...fhCross(0, 1.95, -1.92, 0.9),
+    ...[-1, 1].map(sd => P(box(0.1, 0.22, 3.75), 'team', [sd * 1.62, 0.16, 0])), // the hems
+    P(cyl(0.05, 0.05, 1.3, 5), WOOD, [0, 3.45, 1.5]), P(box(0.05, 0.42, 0.75), 'team', [0, 3.85, 1.9]), // the ridge pole and its pennant
+    P(box(0.75, 0.6, 0.75), WOOD, [1.85, 0.32, -1.35]), ...fhCross(1.85, 0.36, -1.75, 0.6), // a supply crate
+    ...[-1, 1].map(sd => P(cyl(0.05, 0.05, 1.6, 5), WOOD, [-2.2, 0.8, sd * 1.25])), P(box(0.03, 0.03, 2.5), '#8E8670', [-2.2, 1.5, 0]), // the washing line
+    ...[-0.7, 0, 0.7].map((z, k) => P(box(0.04, 0.55 - k * 0.08, 0.22), '#FAF7EE', [-2.2, 1.2 + k * 0.04, z]))]; // and the bandages on it
   // ===== coalMine (3D) =====
+  // The entrance: a heap of grey-brown rock with a timber-framed adit on its front (-z, toward its own side): two posts
+  // and a lintel in the team colour round a black opening, rails with sleepers running out to a little iron cart heaped
+  // with coal, a lantern on a hook, a few loose lumps. The exit: a round shaft ringed with planks under a winch frame
+  // (two legs, a wheel, a rope) with a pennant in the team colour
+  const COAL_ROCK = '#6B625A', COAL_DARK = '#857A6E', COAL_LUMP = '#1E1C1B';
+  BUILD['mpb:coalMine'] = () => [
+    P(ball(2.3), COAL_ROCK, [0, 0.9, 0.7], [0.2, 0.4, 0], [1.25, 0.8, 1.0]), P(ball(1.5), COAL_DARK, [-1.3, 0.7, 1.1], [0.5, 0, 0.3], [1, 0.75, 1]),
+    P(ball(1.2), COAL_DARK, [1.5, 0.6, 0.6], [0, 0.8, 0.4], [1, 0.8, 1]), P(ball(0.6), COAL_ROCK, [1.9, 0.35, -0.9]),
+    P(box(1.6, 1.9, 0.3), '#0E0D0C', [0, 0.95, -1.25]),
+    ...[-1, 1].map(sd => P(box(0.32, 2.2, 0.32), WOOD, [sd * 0.95, 1.1, -1.38])),
+    P(box(2.5, 0.4, 0.45), 'team', [0, 2.3, -1.38]),
+    P(box(2.1, 0.12, 0.5), WOOD, [0, 2.0, -1.38]),
+    ...[-1, 1].map(sd => P(box(0.1, 0.08, 2.4), METAL, [sd * 0.4, 0.05, -2.5])),
+    ...[0, 1, 2, 3].map(k => P(box(1.15, 0.07, 0.2), WOOD, [0, 0.03, -1.6 - k * 0.6])),
+    P(box(1.1, 0.6, 0.85), IRON, [0, 0.45, -2.7]), ...[-1, 1].flatMap(sd => [-1, 1].map(fz => P(cyl(0.16, 0.16, 0.1, 8), DARK, [sd * 0.45, 0.16, -2.7 + fz * 0.28], [0, 0, Math.PI / 2]))),
+    ...[[-0.25, -2.6], [0.2, -2.8], [0, -2.5], [0.25, -2.55], [-0.15, -2.85]].map(([x, z], k) => P(ball(0.24), COAL_LUMP, [x, 0.85 + (k % 2) * 0.1, z])),
+    P(box(0.05, 0.5, 0.05), METAL, [-1.35, 1.9, -1.45]), P(box(0.22, 0.3, 0.22), BRASS, [-1.35, 1.5, -1.45]), P(ball(0.13), EMBER, [-1.35, 1.5, -1.58]),
+    ...[[1.4, -1.9], [1.7, -1.6], [-1.6, -2.1]].map(([x, z]) => P(ball(0.2), COAL_LUMP, [x, 0.12, z]))];
+  BUILD['mpb:coalMine:exit'] = () => [
+    P(cyl(1.55, 1.7, 0.4, 10), WOOD, [0, 0.2, 0]), P(cyl(1.15, 1.15, 0.42, 10), '#0E0D0C', [0, 0.22, 0]),
+    ...[...Array(10)].map((_, k) => { const a = k * Math.PI / 5; return P(box(0.08, 0.42, 0.5), '#6B4A2A', [Math.cos(a) * 1.4, 0.21, Math.sin(a) * 1.4], [0, -a, 0]); }),
+    ...[-1, 1].map(sd => P(box(0.22, 3.6, 0.22), WOOD, [sd * 0.95, 1.7, 0], [0, 0, sd * 0.28])),
+    P(box(0.9, 0.2, 0.3), WOOD, [0, 3.4, 0]),
+    P(new THREE.TorusGeometry(0.42, 0.08, 4, 12), IRON, [0, 3.65, 0]), P(cyl(0.05, 0.05, 3.1, 4), PAPER, [0, 1.95, -0.3]),
+    P(cyl(0.04, 0.04, 1.3, 4), WOOD, [0, 4.3, 0]), P(box(0.04, 0.45, 0.75), 'team', [0, 4.65, -0.38])];
   // ===== scorch (3D) =====
+  // A Scorch turret: a squat stone brazier with a band in the team colour, iron feet and glowing coals, with a grumpy
+  // Ember Imp sitting in it up to its chest (horns, a scowl, little glowing eyes) and soft amber flames round the rim.
+  // 'mpb:scorch:mobile' (Legs): the same brazier, smaller (a walker of radius 1), on four stubby iron legs.
+  const brazier = (k, y0) => lifted([
+    P(cyl(1.15 * k, 0.8 * k, 1.0 * k, 8), '#7A746C', [0, 0.5 * k, 0]),
+    P(cyl(1.2 * k, 1.2 * k, 0.2 * k, 8), '#4E4A45', [0, 1.02 * k, 0]),
+    P(cyl(1.18 * k, 1.0 * k, 0.22 * k, 8), 'team', [0, 0.62 * k, 0]),
+    P(cyl(1.0 * k, 1.0 * k, 0.12 * k, 8), '#FFC98A', [0, 1.1 * k, 0]), // the coals
+    P(cyl(0.42 * k, 0.5 * k, 0.6 * k, 7), '#E8834A', [0, 1.35 * k, 0]), // the imp: chest, head, horns, scowl
+    P(ball(0.45 * k), '#E8834A', [0, 1.95 * k, 0]),
+    ...[-1, 1].flatMap(sd => [P(cone(0.12 * k, 0.5 * k, 4), '#B5552A', [sd * 0.3 * k, 2.4 * k, 0.05 * k], [0, 0, -sd * 0.5]),
+      P(ball(0.07 * k), GLOW, [sd * 0.16 * k, 2.0 * k, -0.4 * k]),
+      P(box(0.22 * k, 0.05 * k, 0.05 * k), '#3A2018', [sd * 0.15 * k, 2.12 * k, -0.42 * k], [0, 0, sd * 0.4]),
+      P(cyl(0.1 * k, 0.12 * k, 0.5 * k, 5), '#E8834A', [sd * 0.55 * k, 1.3 * k, -0.1 * k], [0, 0, sd * 0.9])]), // arms on the rim
+    ...[0, 1, 2, 3, 4, 5].map(j => { const a = j * Math.PI / 3 + 0.4; return P(cone(0.16 * k, (0.55 + (j % 2) * 0.3) * k, 4), j % 2 ? EMBER : '#FFB36B', [Math.cos(a) * 0.85 * k, 1.35 * k, Math.sin(a) * 0.85 * k]); })], y0);
+  BUILD['mpb:scorch'] = () => [P(cyl(1.5, 1.6, 0.3, 8), STONE, [0, 0.15, 0]), ...[0, 1, 2].map(j => { const a = j * 2.09; return P(box(0.3, 0.4, 0.3), IRON, [Math.cos(a) * 0.9, 0.45, Math.sin(a) * 0.9]); }), ...brazier(1, 0.5)];
+  BUILD['mpb:scorch:mobile'] = () => [...[[-1, -1], [1, -1], [-1, 1], [1, 1]].flatMap(([x, z]) => [P(box(0.16, 0.6, 0.16), IRON, [x * 0.38, 0.3, z * 0.3]), P(box(0.26, 0.08, 0.3), DARK, [x * 0.38, 0.04, z * 0.3 - 0.05])]),
+    ...brazier(0.55, 0.55)];
   // ===== oak (3D) =====
+  // The Oak: an old broad tree: a thick gnarled trunk (the kind's colour, 'tint') on spreading roots, a ribbon in the
+  // team colour round it, a calm sleeping face on its front (-z: shut eyes, a small smile), crooked boughs under a
+  // wide lumpy crown of three dusty greens with acorns, and its world detail: a rope swing from the low bough
+  const OAK_LEAF = ['#66864A', '#7A9856', '#93AE66'];
+  BUILD['mpb:oak'] = () => [
+    P(cyl(0.75, 1.05, 3.4, 8), 'tint', [0, 1.7, 0]),
+    ...[0, 1, 2, 3, 4].map(k => { const a = k * Math.PI * 2 / 5 + 0.3; return P(box(0.45, 0.4, 1.5), '#5E4329', [Math.sin(a) * 1.05, 0.2, Math.cos(a) * 1.05], [0, a, 0]); }), // roots
+    P(new THREE.TorusGeometry(0.86, 0.1, 4, 14), 'team', [0, 1.05, 0], [Math.PI / 2, 0, 0]), // the ribbon
+    ...[-1, 1].map(sd => P(box(0.26, 0.05, 0.05), '#3A2616', [sd * 0.24, 2.15, -0.8], [0, 0, sd * 0.25])), P(box(0.3, 0.05, 0.05), '#3A2616', [0, 1.85, -0.82]), // shut eyes, a small smile
+    ...[[-1, 3.0, 0.9], [1, 3.2, -0.8], [-0.4, 3.5, -1.1]].map(([sd, y, a]) => P(cyl(0.18, 0.28, 1.7, 6), '#6A4C2C', [sd * 0.8, y, 0], [0, a, sd * 0.9])), // boughs
+    ...[[0, 4.9, 0, 1.75, 1], [-1.45, 4.2, 0.3, 1.35, 0], [1.45, 4.35, -0.25, 1.3, 0], [0.35, 5.75, 0.55, 1.15, 2], [-0.65, 5.3, -0.95, 1.05, 2], [0.9, 4.0, 1.0, 1.0, 1]]
+      .map(([x, y, z, r, c]) => P(ball(r), OAK_LEAF[c], [x, y, z])), // the crown
+    ...[[-1.9, 3.7, -0.5], [1.7, 3.6, -0.9], [0.2, 4.0, -1.7], [-0.9, 5.6, -1.4]].map(p => P(ball(0.13), '#8C6239', p)), // acorns
+    ...[-1, 1].map(sd => P(box(0.03, 2.1, 0.03), '#B79A6E', [-1.75 + sd * 0.28, 2.35, -0.7])), P(box(0.75, 0.08, 0.3), WOOD, [-1.75, 1.3, -0.7])]; // the swing
   // ===== factory (3D) =====
+  // The 2v2 team Factory: the Cog Builder's brick workshop (factory() above, in the kind's colour) with a band in the team
+  // colour round the eaves and a tall flagpole at its left front corner flying a big swallow-tailed team banner with a
+  // brass cog on it, so it reads as the team's and not one player's
+  BUILD['mpb:factory'] = () => [...factory(),
+    P(box(4.15, 0.22, 3.35), 'team', [0, 2.45, 0]),
+    P(cyl(0.09, 0.11, 5.6, 6), DARK, [-2.35, 2.8, -1.85]), P(ball(0.17), BRASS, [-2.35, 5.65, -1.85]),
+    P(box(1.5, 1.6, 0.08), 'team', [-1.55, 4.7, -1.85]), // the banner, facing its own side (-z)
+    P(box(0.6, 0.8, 0.08), 'team', [-0.62, 5.1, -1.85], [0, 0, -0.55]), P(box(0.6, 0.8, 0.08), 'team', [-0.62, 4.3, -1.85], [0, 0, 0.55]), // its swallow tail
+    P(cyl(0.42, 0.42, 0.1, 10), BRASS, [-1.65, 4.7, -1.92], [Math.PI / 2, 0, 0]), P(cyl(0.17, 0.17, 0.12, 8), DARK, [-1.65, 4.7, -1.95], [Math.PI / 2, 0, 0])];
   // ===== magicLake (3D) =====
+  // A lakePond filling its tile: deep blue water under a pale shimmer, a thin shore in the team colour, a lily pad with a
+  // pink flower, a clump of reeds and two bank stones. Waterspirits: two small pale lakeSpirits hover over it; Water
+  // elemental: a lakeWhirl of pale rings in its middle (both: both). The Water Elemental it becomes (a walker, radius 1):
+  // a tall calm drop of water with a curling crest, sleepy eyes and a ripple at its foot
+  const LAKE_DEEP = '#2F6F99', LAKE_SHIMMER = '#7FC2E3', LAKE_FOAM = '#D6EEF7';
+  const lakePond = () => [
+    P(cyl(3.15, 3.15, 0.1, 8), LAKE_DEEP, [0, 0.04, 0], [0, Math.PI / 8, 0]),
+    P(cyl(1.9, 1.9, 0.04, 8), LAKE_SHIMMER, [-0.5, 0.11, -0.4], [0, 0.3, 0], [1, 1, 0.7]),
+    P(new THREE.TorusGeometry(3.0, 0.1, 3, 8), 'team', [0, 0.1, 0], [Math.PI / 2, 0, Math.PI / 8]),
+    P(new THREE.TorusGeometry(1.0, 0.04, 3, 14), LAKE_FOAM, [0.7, 0.13, 0.5], [Math.PI / 2, 0, 0]),
+    P(cyl(0.5, 0.5, 0.05, 7), '#6E9E5A', [-1.5, 0.14, 1.3]), P(ball(0.16), '#F2C6D6', [-1.4, 0.24, 1.25]),
+    ...[[1.9, -1.9, 1.3], [2.15, -1.6, 1.0], [1.65, -2.15, 1.1], [2.3, -2.0, 0.8]].map(([x, z, h]) => P(cyl(0.05, 0.07, h, 4), '#7A8F4A', [x, h / 2, z], [0.12, 0, -0.1])),
+    P(cone(0.12, 0.35, 5), '#8A6A3A', [2.0, 1.4, -1.85]),
+    P(ball(0.45), STONE, [-2.5, 0.15, -1.9], [0, 0, 0], [1, 0.55, 1]), P(ball(0.32), ROCK, [2.6, 0.12, 1.7], [0, 0, 0], [1, 0.6, 1])];
+  const lakeSpirits = () => [[-0.9, 0.2, 1.3], [1.0, -0.6, 1.7]].flatMap(([x, z, y]) => [
+    P(ball(0.32), '#E8F7FC', [x, y, z]), P(cone(0.26, 0.6, 5), '#E8F7FC', [x, y - 0.42, z], [Math.PI, 0, 0]),
+    P(ball(0.06), LAKE_DEEP, [x - 0.11, y + 0.06, z - 0.27]), P(ball(0.06), LAKE_DEEP, [x + 0.11, y + 0.06, z - 0.27])]);
+  const lakeWhirl = () => [0, 1, 2].map(k => P(new THREE.TorusGeometry(0.4 + k * 0.38, 0.06, 3, 14), LAKE_FOAM, [0.3, 0.16 + k * 0.05, 0.1], [Math.PI / 2, 0, k * 0.7]));
+  BUILD['mpb:magicLake'] = () => lakePond();
+  BUILD['mpb:magicLake:spirits'] = () => [...lakePond(), ...lakeSpirits()];
+  BUILD['mpb:magicLake:elemental'] = () => [...lakePond(), ...lakeWhirl()];
+  BUILD['mpb:magicLake:both'] = () => [...lakePond(), ...lakeWhirl(), ...lakeSpirits()];
+  BUILD['mpb:magicLake:walker'] = () => [
+    P(new THREE.TorusGeometry(0.85, 0.05, 3, 14), LAKE_FOAM, [0, 0.05, 0], [Math.PI / 2, 0, 0]),
+    P(new THREE.TorusGeometry(0.62, 0.06, 3, 12), 'team', [0, 0.12, 0], [Math.PI / 2, 0, 0]),
+    P(ball(0.68), 'tint', [0, 0.85, 0], [0, 0, 0], [1, 1.15, 1]),
+    P(cone(0.5, 1.1, 7), 'tint', [0, 1.95, 0.05]),
+    P(new THREE.TorusGeometry(0.28, 0.07, 4, 10, Math.PI * 1.3), LAKE_FOAM, [0, 2.45, 0.1], [0, Math.PI / 2, 0.4]),
+    P(box(0.2, 0.06, 0.05), LAKE_DEEP, [-0.22, 1.12, -0.62]), P(box(0.2, 0.06, 0.05), LAKE_DEEP, [0.22, 1.12, -0.62]), // calm, half-shut eyes
+    P(ball(0.12), LAKE_FOAM, [0.35, 1.45, -0.45])];
   // ===== jail (3D) =====
+  // The Jail: a stern grey stone lock-up on a heavy plinth, stone courses, crenels on its roof above a band in the team
+  // colour, a big barred window and an iron door on its front (-z), a ring of brass keys by the door, and on top a squat
+  // lamp turret with a glowing amber lantern under a dark cap (Skywatch), its four lamp brackets pointing out
+  BUILD['mpb:jail'] = () => [
+    P(box(4.3, 0.5, 3.9), '#4E4A45', [0, 0.25, 0]), P(box(4.6, 0.15, 4.2), ROCK, [0, 0.05, 0]),
+    P(box(3.6, 2.6, 3.2), '#7C7F86', [0, 1.8, 0]),
+    ...[1.25, 2.15].map(y => P(box(3.66, 0.09, 3.26), '#62656B', [0, y, 0])), // stone courses
+    P(box(3.76, 0.32, 3.36), 'team', [0, 3.2, 0]),
+    ...[[-1.45, -1.25], [0, -1.25], [1.45, -1.25], [-1.45, 1.25], [0, 1.25], [1.45, 1.25], [-1.45, 0], [1.45, 0]].map(([x, z]) => P(box(0.62, 0.5, 0.62), '#6A6D74', [x, 3.6, z])), // crenels
+    P(box(1.9, 1.15, 0.1), DARK, [-0.55, 1.95, -1.62]), // the barred window
+    ...[-1.3, -0.92, -0.55, -0.18, 0.2].map(x => P(cyl(0.05, 0.05, 1.2, 5), METAL, [x, 1.95, -1.7])),
+    P(box(2.05, 0.1, 0.14), METAL, [-0.55, 2.55, -1.7]), P(box(2.05, 0.1, 0.14), METAL, [-0.55, 1.35, -1.7]),
+    P(box(0.95, 1.7, 0.12), IRON, [1.15, 1.35, -1.63]), // the iron door, studded
+    ...[0.85, 1.35, 1.85].map(y => P(box(1.0, 0.07, 0.06), DARK, [1.15, y, -1.71])),
+    P(new THREE.TorusGeometry(0.17, 0.04, 4, 10), BRASS, [1.15, 2.45, -1.72]), // keys on a ring
+    P(box(0.06, 0.32, 0.04), BRASS, [1.08, 2.18, -1.74], [0, 0, 0.25]), P(box(0.06, 0.28, 0.04), BRASS, [1.22, 2.2, -1.74], [0, 0, -0.3]),
+    P(cyl(0.6, 0.72, 1.0, 8), '#5A5D63', [0, 3.95, 0.25]), // the lamp turret
+    P(ball(0.44), '#FFE2A0', [0, 4.78, 0.25]), // its lantern, in an open iron cage
+    ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => P(box(0.08, 0.8, 0.08), DARK, [x * 0.42, 4.82, 0.25 + z * 0.42])),
+    P(cyl(0.22, 0.78, 0.28, 8), DARK, [0, 5.34, 0.25]), P(ball(0.1), BRASS, [0, 5.55, 0.25])];
   // ===== school (3D) =====
+  // The School: a little brick-red schoolhouse on a stone step: a hipped slate roof over a band in the team colour, a
+  // white bell turret with a brass bell on its ridge, a green chalkboard door (with a chalk line) and a round window
+  // glowing warm on its front (-z), a pennant in the team colour, and a red apple left on the step
+  const hipRoof = (r, h, col, y, [sx, sz]) => { const g = cone(r, h, 4); g.rotateY(Math.PI / 4); return P(g, col, [0, y, 0], [0, 0, 0], [sx, 1, sz]); };
+  BUILD['mpb:school'] = () => [
+    P(box(4.1, 0.35, 3.7), STONE, [0, 0.18, 0]),
+    P(box(3.4, 2.0, 2.8), '#A8443A', [0, 1.35, 0]),
+    ...[0.85, 1.5].map(y => P(box(3.44, 0.06, 2.84), '#8E3830', [0, y, 0])), // brick courses
+    P(box(3.55, 0.28, 2.95), 'team', [0, 2.45, 0]),
+    hipRoof(2.55, 1.5, '#56606A', 3.3, [1.0, 0.82]),
+    ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => P(box(0.1, 0.6, 0.1), PAPER, [x * 0.28, 4.25, z * 0.28])), // the bell turret's posts
+    P(cone(0.32, 0.4, 8), BRASS, [0, 4.15, 0]), P(ball(0.07), BRASS, [0, 3.92, 0]), // the bell
+    hipRoof(0.55, 0.5, '#56606A', 4.8, [1, 1]),
+    P(box(1.0, 1.55, 0.06), WOOD, [0.75, 1.1, -1.42]), P(box(0.82, 1.38, 0.08), '#2F4A3A', [0.75, 1.1, -1.45]), // the chalkboard door
+    P(box(0.5, 0.05, 0.03), PAPER, [0.72, 1.45, -1.5], [0, 0, 0.2]),
+    P(cyl(0.42, 0.42, 0.1, 12), GLOW, [-0.8, 1.5, -1.42], [Math.PI / 2, 0, 0]), // the round window
+    P(new THREE.TorusGeometry(0.44, 0.06, 4, 14), PAPER, [-0.8, 1.5, -1.47]),
+    P(ball(0.17), '#C4473A', [1.55, 0.5, -1.62]), P(box(0.03, 0.12, 0.03), '#5E8C3A', [1.55, 0.7, -1.62]), // an apple for the teacher
+    P(cyl(0.05, 0.05, 1.5, 4), WOOD, [-1.5, 3.2, 1.1]), P(box(0.05, 0.5, 0.85), 'team', [-1.5, 3.7, 1.52])];
   // ===== shadowDen (3D) =====
+  // The Shadow Den: a crooked hideout of dark violet stone (the kind's colour, 'tint') on a rough plinth, a steep slate
+  // roof with a band in the team colour under its eaves, a pale mask with glowing violet eyes on the gable over a black
+  // arched doorway (-z, toward its own side), two crossed daggers on the wall, a violet lantern on a post, a cloth in the
+  // team colour hung from the side, crates in the shadows
+  const VIOLET = '#B79CFF', SLATE = '#231E2E';
+  BUILD['mpb:shadowDen'] = () => [
+    P(box(4.0, 0.35, 3.6), ROCK, [0, 0.17, 0]),
+    P(box(3.3, 2.3, 2.9), 'tint', [0, 1.5, 0], [0, 0.05, 0.03]),
+    P(box(3.5, 0.3, 3.1), 'team', [0, 2.62, 0], [0, 0.05, 0.03]),
+    P(cone(2.75, 2.5, 4), SLATE, [0.1, 3.95, 0], [0, Math.PI / 4 + 0.05, 0.05], [1, 1, 0.9]),
+    P(box(0.12, 0.9, 0.12), SLATE, [0.25, 5.3, 0.1], [0, 0, 0.3]), // a bent chimney
+    P(box(1.0, 1.4, 0.15), '#0B0910', [0, 0.95, -1.47]), P(cyl(0.5, 0.5, 0.15, 8), '#0B0910', [0, 1.65, -1.47], [Math.PI / 2, 0, 0]), // the doorway
+    // the mask on the gable, its eyes glowing
+    P(ball(0.52), BONE, [0, 3.3, -1.45], [0, 0, 0], [1, 1.15, 0.4]),
+    ...[-1, 1].map(sd => P(box(0.26, 0.1, 0.06), VIOLET, [sd * 0.2, 3.38, -1.67], [0, 0, sd * 0.35])),
+    // crossed daggers on the wall, left of the door
+    ...[-1, 1].flatMap(sd => [P(box(0.08, 1.0, 0.05), METAL, [-1.0, 1.55, -1.5], [0, 0, sd * 0.7]), P(box(0.25, 0.08, 0.08), WOOD, [-1.0 + sd * 0.27, 1.27, -1.52], [0, 0, sd * 0.7])]),
+    // a lantern on a post at the right front corner
+    P(cyl(0.06, 0.07, 2.2, 5), WOOD, [1.9, 1.1, -1.7]), P(box(0.5, 0.06, 0.06), WOOD, [1.7, 2.15, -1.7]),
+    P(box(0.36, 0.46, 0.36), DARK, [1.5, 1.85, -1.7]), P(box(0.28, 0.34, 0.38), VIOLET, [1.5, 1.85, -1.7]),
+    // a cloth in the team colour hung from the right wall, crates at the left back
+    P(box(0.06, 1.3, 0.9), 'team', [1.7, 1.55, 0.3]),
+    P(box(0.7, 0.6, 0.7), WOOD, [-1.95, 0.65, 1.1], [0, 0.4, 0]), P(box(0.5, 0.45, 0.5), '#5B4A3A', [-1.85, 1.18, 1.05], [0, 0.9, 0])];
+  // a Shadowhand (the Den's walker, u.mpb 'shadowDen', u.mpbSkin 'hand'): a slight hooded figure, cloak and hood in the
+  // unit's violet, a pale mask with violet eyes, a sash in the team colour, a long dagger held low; for a body of radius 1
+  BUILD['mpb:shadowDen:hand'] = () => [...legs(0.7, 0.15, 0.17),
+    P(cyl(0.22, 0.3, 0.72, 6), 'tint', [0, 1.05, 0]),
+    P(cone(0.52, 1.4, 6), 'tint', [0, 0.92, 0.1], [-0.12, 0, 0], [1, 1, 0.6]),
+    P(box(0.1, 0.8, 0.07), 'team', [0, 1.08, -0.27], [0, 0, -0.7]),
+    P(ball(0.21), BONE, [0, 1.62, -0.02], [0, 0, 0], [1, 1.1, 0.9]),
+    ...[-1, 1].map(sd => P(box(0.1, 0.04, 0.04), VIOLET, [sd * 0.08, 1.66, -0.2])),
+    P(cone(0.3, 0.68, 6), 'tint', [0, 1.86, 0.06], [0.28, 0, 0]),
+    P(box(0.09, 0.09, 0.15), DARK, [0.38, 0.95, -0.15]), P(cone(0.05, 0.7, 4), METAL, [0.4, 0.98, -0.58], [-1.4, 0, 0.1])];
 
   // the Leafblade suit (an awakened Leaf Wizard): a leaf-green mech on thick legs, a glowing visor, missile pods on its
   // shoulders and two long leaf blades held out from its arms
@@ -10887,7 +11619,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
     const muted = color(css('--muted') || '#8DA1A1');
     for (const b of bt.bodies) {
       if (!b.alive) { if (!b.boarded && !b.removed) { const [wx, wz] = world(f, b.x, b.y); scene_(() => disc(wx, wz, Math.max(0.3, size(b.u) * 0.45), muted, 0.18)); } continue; }
-      if (b.boarded) continue;
+      if (b.boarded || b.mineT > 0) continue; // (2v2: down a Coal mine, not seen)
       const p = glide(b, dt);
       const look = b.u.aloft || (b.site && b.site.work < b.site.need) ? 'glass' : b.hidden ? (b.side === me ? 'ghost' : 'ghostFoe') : b.delay > 0 ? 'ghost' : 'solid'; // a building site is a see-through scaffold
       const crest = b.u.structure ? Game.charOf(src, b.side) : null;
@@ -10896,6 +11628,19 @@ const Render3D = (THREE, el, view, opts = {}) => {
       bodies.push({ u, side: b.side, x: p.x, y: p.y, hx: b.hx, hy: b.hy, look, moving: p.moving, phase: p.phase, b, crest, edge: Art.teamCol(b.side, me), tag, raise: b.inside && b.inside.alive ? roofOf(b.inside.u) : 0 });
       if (v.duo && (b.lane === 0 || b.lane === 1) && !b.u.structure && !b.u.aloft && !(b.hidden && b.side !== me)) { const [wx, wz] = world(f, p.x, p.y), rc = color(v.duo.ring(b.side, b.lane)); arc(wx, wz, Math.max(0.6, size(b.u) * 0.62), rc, 0.9, 1, 0.14); } // 2v2: its player's colour (a marker: not in the ground view)
       if (b.u.structure && b.walls) addWalls(f, b.x, b.y, b.walls);
+    }
+    // 2v2 buildings that are no fight body (a mine's exit, lake water: parts, and kinds with no health), as the fight began
+    if (typeof Mpb !== 'undefined' && Mpb.on(src)) for (const side of [0, 1]) for (const rec of Mpb.recs(src, side)) for (const tl of Mpb.tilesOf(rec)) {
+      if (!tl.part && (Mpb.kindOf(rec.kind) || {}).hp > 0) continue;
+      const w = Game.tileToWorld(tl.col, tl.row), u = Mpb.unitOf(src, side, rec);
+      bodies.push({ u: tl.part ? { ...u, mpbPart: tl.part } : u, side, x: w.x, y: w.y, look: 'solid', edge: Art.teamCol(side, me) });
+    }
+    // 2v2 Coal mine: a puff of coal dust where a squad comes up the mine
+    for (const e of bt.mineFx ? bt.mineFx() : []) {
+      const age = bt.time() - e.t;
+      if (age < 0 || age > 0.9) continue;
+      const [wx, wz] = world(f, e.x, e.y);
+      scene_(() => disc(wx, wz, 1.2 + 2.2 * age, color('#4A4440'), 0.55 * (1 - age / 0.9)));
     }
     // Pool shaper's pools: water on the ground, ringed in their side's colour
     for (const q of bt.pools ? bt.pools() : []) {
@@ -10982,8 +11727,9 @@ const Render3D = (THREE, el, view, opts = {}) => {
       const u = awake && Game.unitFor(m, side, sq.unit, sq).mech ? { ...base, mech: true } : awake && Game.unitFor(m, side, sq.unit, sq).eye ? { ...base, eye: true } : base, w = Game.tileToWorld(sq.col, sq.row), st = tileCenter(v, sq.col, sq.row);
       const list = Engine.buildSquad(u, side, w.x, w.y, sq.id, T);
       squadTiles.add(sq.col + ',' + sq.row);
+      const held = typeof Mpb !== 'undefined' && Mpb.on(m) ? Mpb.recAt(m, sq.col, sq.row) : null; // a 2v2 building holding it (a Tree kojja's Nest)
       const raise = Game.garrisonAt(m, side, sq.col, sq.row) ? roofOf(Game.towerAt(m, side, sq.col, sq.row) ? towerUnit(m, side, Game.towerTypeShown(m, me, deploying, side))
-        : Game.treasuryAt(m, side, sq.col, sq.row) ? Game.treasuryUnit() : { building: 'factory' }) : 0; // Overwatch: it stands on top of the building it is in
+        : Game.treasuryAt(m, side, sq.col, sq.row) ? Game.treasuryUnit() : held ? Mpb.unitOf(m, held.side, held.rec) : { building: 'factory' }) : 0; // Overwatch: it stands on top of the building it is in
       for (const b of list) bodies.push({ u, side, x: b.x, y: b.y, look: 'solid', tag: side + '|' + sq.id, tile: sq, raise });
       if (fresh) tileSq(st.c, st.r, teamColor(side, me), 0.8, 0.05, 14);
       // badges over the squad: level pips, charisma pips (or the Gentleman's hat), ready to level up (its tag goes
@@ -11007,6 +11753,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
     // the opponent's squads from this round stay hidden until the fight; a squad they moved shows on its old tile
     // and one they sold this round still shows until the fight
     for (const sq of deploying ? Game.foeSeen(m, foe) : m.armies[foe].filter(q => !Game.hiddenFromFoe(m, q))) {
+      if (Game.mpbHeld(sq)) continue; // 2v2: in a Jail or a School (that building shows it)
       const p = deploying ? Game.seenAt(m, sq) : sq;
       const look = Game.shownUnit(m, me, foe, sq.unit); // a disguised unit shows as what it pretends to be
       squad(deploying ? { ...sq, unit: look, col: p.col, row: p.row, level: Game.seenLevel(m, sq) } : { ...sq, unit: look }, foe, false); // a level-up bought this round stays hidden
@@ -11019,14 +11766,14 @@ const Render3D = (THREE, el, view, opts = {}) => {
     };
     for (const sq of m.armies[me]) {
       if (deploying && sq.from && sq.movedRound === m.round) { const s = tileCenter(v, sq.from.col, sq.from.row); tileSq(s.c, s.r, color(css('--muted') || '#8DA1A1'), 0.6, 0.04, 10, 0.1); }
-      if (Game.isRider(sq)) continue; // shown as a badge on its carrier
+      if (Game.isRider(sq) || Game.mpbHeld(sq)) continue; // shown as a badge on its carrier (2v2: in a Jail or a School)
       const at = drag && drag.moved && drag.id === sq.id ? { ...sq, col: drag.over.col, row: drag.over.row } : sq;
       const [wx, wz] = squad(at, me, (sq.round === m.round || sq.movedRound === m.round) && deploying);
       riderIcon(wx, wz, Game.riderOf(m, me, sq));
       if (moving === sq.id && deploying) { const s = tileCenter(v, sq.col, sq.row); tileSq(s.c, s.r, gold, 1, 0.08, 0, 0.02); }
     }
     // 2v2: the other pair of players on this board (m.team): your teammate's squads, and the other opponent's as you may see them
-    for (const side of [me, foe]) for (const sq of Game.teamArmy(m, side)) if (!Game.isRider(sq)) { const [wx, wz] = squad(sq, side, false, true); if (side === me) riderIcon(wx, wz, Game.riderOf(m, me, sq)); }
+    for (const side of [me, foe]) for (const sq of Game.teamArmy(m, side)) if (!Game.isRider(sq) && !Game.mpbHeld(sq)) { const [wx, wz] = squad(sq, side, false, true); if (side === me) riderIcon(wx, wz, Game.riderOf(m, me, sq)); }
     // (the squad tapped last shows its range as a dotted ring drawn by the page over the board, as on the 2D board: boardMarks)
     // where things may go
     if ((selected !== null || (drag && drag.moved) || moving != null) && deploying) {
@@ -11092,6 +11839,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
       const w = Game.tileToWorld(tl.col, tl.row), u = Mpb.unitOf(m, side, rec);
       bodies.push({ u: tl.part ? { ...u, mpbPart: tl.part } : u, side, x: w.x, y: w.y, look: 'solid', edge: Art.teamCol(side, me) });
       if (deploying && rec.round === m.round && rec.round > 1) { const st = tileCenter(v, tl.col, tl.row); tileSq(st.c, st.r, teamColor(side, me), 0.8, 0.05, 14); }
+      if (!tl.part) for (const lt of Mpb.litTiles(m, side, rec)) { const st = tileCenter(v, lt.col, lt.row); tileSq(st.c, st.r, color('#FFE2A0'), 0.16, 1, 0, 0.02); } // tiles it lights up (the Jail's Skywatch)
     }
     if (v.placingBuilding && editable) for (const row of Game.zoneRows(me)) for (let c = 0; c < Game.COLS; c++) if (Game.buildingSpotOk(m, me, c, row)) { const s = tileCenter(v, c, row); tileSq(s.c, s.r, gold, 0.6, 0.06, 12); }
     if (Game.isIce(m)) for (const side of [me, foe]) {

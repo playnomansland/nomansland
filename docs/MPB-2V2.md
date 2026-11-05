@@ -100,25 +100,60 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
   - `spotOk(m, side, part, col, row)` → extra placement rule; `placed(m, side, rec)` → when a record is made;
     `acquire(m, team, card)` → instead of the placement vote when the team gets the card (each player places one,
     several tiles...); `info(m, side, rec)` → short plain lines for the generic sheet.
-  - (group B1, all default off) `canUndo(m, side, rec, sk, lane)` → false refuses a take-back (`Mpb.canUndo`; the
-    Tree kojja's Nest while a squad is in it). `holds(m, side, rec, ui)` → the building takes a squad of unit `ui`
-    (null: any) on its tile (`Mpb.holds` → `Game.garrisonFree` / `garrisonAt`; the Tree kojja's Nest).
-    `link(m, side, rec, list)` → ties fight bodies together once all are in (`Mpb.link`, from `Duo.battle`).
-    `bot(m, side, rec, r)` → a bot's buys (`Mpb.botTurn`, from `Duo.botTurn`, seeded `r`). `hide` returning `false`
-    drops the record from the opponents' view. `fellText(m, side, rec)` → the sheet's "destroyed in round N" line.
-  - (group B1) `rec.away = true`: the record takes no tile, has no body, holds nothing and can't buy (a Tree kojja
-    taken back, or standing for the other team). `Mpb.queue(m, side, kind, part, key, lane)`: a one-player placement
-    (only that lane places it, at once, no vote; `rec.data.lane` = whose). Each player places their own when they like:
-    `Mpb.voteEntry(m, side, lane)` is the entry that player acts on (the head, or their own in the run of one-player
-    entries at the head). A queue entry with `skill: true` (queued by a skill click) is hidden from the opponents.
+  - Hooks the B groups added (all default off: a kind without them changes nothing; integrated 6 Nov):
+    - Take-backs: `canUndo(m, side, rec, id, lane)` → false refuses a take-back (`Mpb.canUndo`; B1 the Tree kojja's
+      Nest while a squad is in it, Grow once the new kojja has a skill; B3 Dig a new exit once the old tile is taken).
+      `restoreOk(m, side, rec, was)` → false refuses Undo all (`Mpb.undoAllOk`, `was` = the record as Undo all would
+      leave it; B3 the exit back on a taken tile). `reconcile(lanes, side, rec)` → after Undo all, puts the record and
+      the lanes' squads right (`Mpb.reconcile`, end of `Duo.rebuildTeam`; B4 the School); its kind's acts are free and
+      never refuse Undo all (`Mpb.reconciles`).
+    - Squads and tiles: `holds(m, side, rec, ui)` → the building takes a squad of unit `ui` (null: any) on its tile
+      (`Mpb.holds` → `Game.mpbHolds` in `garrisonFree` / `garrisonAt`; B1 the Nest). `blocks(m, side, rec, col, row)` →
+      extra tiles no squad may take (`Mpb.at`; B3 the 8 tiles round the exit); `Mpb.at(m, col, row, true)` = building
+      tiles only (`Game.bldgSeen`, the Assassin). `place.terrain: true` → terrain, not a building (no spacing, not in
+      `Mpb.at`; `Mpb.terrainAt` → `Game.terrainBlocks`; B3 the Magic lake). `foeSquadBodies(m, side, rec, sq, list, u)`
+      → the other team's buildings over a squad's bodies (`Mpb.squadBodies`; B4 the Jail empties a jailed squad).
+      `settle(lanes, side, rec)` → before the fight, whatever the players left open (`Mpb.settle` from `Duo.settle`;
+      B3 lake tiles nobody put down). `lit(m, side, rec)` → tiles drawn lit (`Mpb.litTiles`; B4 Skywatch).
+    - Fight: `link(m, side, rec, list)` → ties fight bodies together once all are in (`Mpb.link(m, A, B)` from
+      `Duo.battle`; B1 the squad in a Nest). `foeBodies(m, side, rec, ctx)` → bodies a building gives the *other* team
+      (`Mpb.bodies`; B2 the Oak's Ent). `Mpb.bodies(m, side, idx0, lanes)` → `ctx.lanes` and `battleOpts(m, side, rec,
+      opts, lanes)` (B5: the Factory's unit and Impersonate's Shadowhand made from the buyer's own lane).
+      `teamHp(lanes, side, rec, hp, round, sums)` → Team HP before the fight's damage (`Mpb.teamHeal` from `Duo.fight`;
+      B2 the Oak's Heal).
+    - Units: kind field `extraUnits(units)` → units the kind adds to the 2v2 set (`Mpb.extraUnits`, appended by
+      `Duo.unitSet`; B5 Shadowhands), `u.mpbUnit = <kind>` → off for a team without that building (`Mpb.unitOff` from
+      `Game.isOff`). `Game.mpbLocked` (B5 Sabotage) and `Game.schoolLock` (B4) refuse a unit type in `Game.place` and
+      the AI; `Game.deploysLeft(m, side, ui)` adds `Mpb.shadowBonus` (B5); `Game.foeSeen` / `teamSeen` show a watched
+      team live (`Mpb.watching`, B5 Insider information; `Duo.cutFor` / `remainingFor` / `heldFor` cut its clock).
+      `Game.mpbHeld(sq)` (`sq.jailed || sq.school`, B4): no move, no take-back, no carrying.
+    - Bots: `bot(m, side, rec, r)` before the bot's squads (`Mpb.bots`) and `botAfter(m, side, rec, r)` after them
+      (`Mpb.botsAfter`), both from `Duo.botTurn` with one seeded stream (`D.seed`, the round, the seat); a throw is
+      caught (the turn goes on).
+    - Sheet and view: `hide` returning `false` drops the record from the opponents' view (B1). `info(m, side, rec,
+      viewer)` (B5: worded for the reader). `fellText(m, side, rec)` → the sheet's "destroyed in round N" line (B1). A
+      skill's `pick: true` shows "Pick above" instead of the generic Buy button (B2). Page: `MPB_SHEET[kind].panel()` /
+      `wirePanel(root)` (lines in the deploy panel: B3 lake tiles, B5 "You are being watched"), `marks(sq)` / `tap(t)`
+      (B3: tiles to tap on the board), `held(sq)` (B4: the note on a held squad's sheet), and the one-shot
+      `mpbPicking = (t) => bool` (B4: "tap one on the board"). render2d `MPB_DRAW['<kind>:<part>']` (B3),
+      `MPB_FLOOR[kind](v, side, rec, t)` (B2: drawn on both boards' floor), `drawMpbGround` (B3: parts and kinds without
+      health in a fight).
+  - `rec.away = true` (B1): the record takes no tile, has no body, holds nothing and can't buy (a Tree kojja taken
+    back, or standing for the other team). `rec.col < 0` (B3): not placed yet (the Magic lake's tiles), no main tile.
+    `Mpb.queue(m, side, kind, part, key, lane)`: a one-player placement (only that lane places it, at once, no vote;
+    `rec.data.lane` = whose). Each player places their own when they like: `Mpb.voteEntry(m, side, lane)` is the entry
+    that player acts on (the head, or their own in the run of one-player entries at the head), `Mpb.placeEntry` places
+    it; `Duo.mpbClock` keys a one-player head by its lane. A queue entry with `skill: true` (queued by a skill click) is
+    hidden from the opponents.
 - Opponents' view: `Mpb.hide(s, h)` (from `Referee.hide`): this round's clicks taken out of `n`/`by`, the team's votes
   blanked, then each kind's `hide`. Records themselves are seen as soon as they are placed (the draft is public).
 - Placement: `Mpb.spotOk(m, side, kind, part, col, row)`, `Mpb.spots(...)` (all allowed tiles, back of the zone and
   middle first), `Mpb.autoSpot(...)` (the first). `Game.mpbAt(m, col, row)` (in `Game.occupied`): every MPB tile and
   part is taken for both teams' squads (unless `place.open`). A kind that lets squads in (garrison, School) uses
   `hooks.holds` (group B1: `Game.garrisonFree` / `garrisonAt` ask `Mpb.holds`).
-- Fight: `Duo.battle` adds `Mpb.bodies(lanes[0], side)` for both sides (`b.lane = 0`), `opts.artifacts =
-  Mpb.artifactsFor(lanes[0])` in rounds 2 and 8, then `Mpb.battleOpts(lanes[0], opts)`. `Duo.teamBody` covers
+- Fight: `Duo.battle` adds `Mpb.bodies(lanes[0], side, undefined, lanes)` for both sides (`b.lane = 0`), then
+  `Mpb.link(lanes[0], A, B)`, `opts.artifacts = Mpb.artifactsFor(lanes[0])` in rounds 2 and 8, then
+  `Mpb.battleOpts(lanes[0], opts, lanes)`. `Duo.teamBody` covers
   `Mpb.isSquad(sq)` (-700 ... -1799), so lane 1 never gets MPB results. `Duo.fight` → `Mpb.afterFight(lanes, res,
   summaries, hp)` → `copyAll(lane 0 → lane 1)`.
 - Draw: render2d `MPB_DRAW[kind](x, y, t, side, o)` (a building; `o.part` for a part's tile, `o.hpr` in a fight) and
@@ -147,6 +182,9 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
   then taken back, latest first, by the rules of a single take-back (`Mpb.canUndo`, the kinds' `canUndo`). So a
   building a click added (Grow) stays in the list as taken back, keys never shift, and the teammate's later buys stay
   on the records they were made on. A click that can't be taken back stays bought and stays paid for by that player.
+  (`Duo.undoReplay`, used by `rebuildTeam`.) Undo all is refused (`'team'`, `Duo.undoAllAllowed`, group B3) while one
+  of the teammate's building actions this round works only with the presser's (the log replayed with them, and as
+  `undoReplay` leaves it), or a kind's `restoreOk` refuses; acts of a kind with `reconcile` don't count.
 
 ### Artifacts (rules side, group F; the fight part is group A's)
 
@@ -214,7 +252,7 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
 6. Look: `MPB_DRAW.<kind>` in src/render2d.js, `BUILD['mpb:<kind>']` in src/models3d.js (art direction:
    docs/art-direction.md), the page sheet part `MPB_SHEET.<kind>` in src/site-template.html if the generic sheet
    isn't enough (a squad to pick, a tile to tap).
-7. Bots: in `Duo.botTurn` (or your kind's `roundStart`) — must never throw with your kind present.
+7. Bots: `hooks.bot` (before the bot's squads) / `hooks.botAfter` (after them), called from `Duo.botTurn`.
 8. Tests: `tools/tests/mpb-<group>.js` (copy the helpers at the top of `tools/tests/mpb.js`: `match`, `playTo`,
    `addHut`), plus `node tools/tests/mpb.js`, `node tools/tests/duo.js`.
 

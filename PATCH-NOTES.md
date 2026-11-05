@@ -20,51 +20,124 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
-## 6 November 2026 – 2v2: the Vault, team buildings and the artifact draft
+## 6 November 2026 – 2v2: buildings, artifacts and the draft
 
-2v2 is still a developer test.
+2v2 is still a developer test. The Assassin and Bastion changes are for every mode and map.
+
+### For every mode and map
+
+**Assassin**
+- **Place it anywhere.** An Assassin can go on any free tile of the board from round 1: your zone, no man's land, the enemy's zone, even the flank tiles. Moves work the same way. The only rule: not on or next to a building (towers, treasuries, the Factory, the Altar, elf towers, your teammate's buildings, the 2v2 team buildings). Allowed tiles light up as usual when you pick it.
+- **They won't see it coming.** An Assassin you put in the enemy's zone stays hidden from them until the fight, like every new squad. They might put a squad on that same tile without knowing. Then the fight just starts the two close together.
+- **It lands, then strikes.** In its first fight, an Assassin in the enemy's zone or on a flank tile stands still for 3 s, like a flank squad (not with a Shadow Den, below).
+- **It ignores buildings.** It never goes for the tower, the treasury, walls or any other building while there is an enemy unit it can reach. If nothing else is left, it attacks buildings after all, so a fight never gets stuck. A wall right in its way it breaks through.
+- **Bloodrush: 3 bleed per hit** (was 2).
+- The AI sometimes drops its Assassins on your back rows now. Watch your back.
+
+**Bastion**
+- **Defensive walls are free** (were 250 gold). You still get them once a match, from the tower's sheet. The AI's Bastion takes them straight away.
+
+### 2v2: the Vault
 
 - **The Vault** stands where the treasury used to be, one per team. Each of you can put up to 200 gold a round into it or take up to 200 out; the first move of the round makes it a put round or a take round for the whole team. Tap the Vault to see what's inside and to move gold.
 - **Compound interest** (200 gold, once a match): the Vault's gold grows 10% at the start of every round.
 - **Coin golem** (100 gold each): when both of you click it in the same round, all the Vault's gold becomes a Coin Golem that fights next to the Vault this round. The more gold, the bigger it is: bronze, silver, and gold from 900.
 - **If the Vault is destroyed** in a fight, 80% of its gold is lost and each opponent gets 50 gold. It stands again in the next fight.
-- **The artifact draft replaces the round 3 tower vote.** The cards of round 2's artifacts are dealt in round 3, round 8's in round 9. Win both and your team picks one first (the other team gets the one left); win one each and each team gets its own; an artifact nobody won goes to the team without a card. If nobody won either, a coin flip says who picks. Either of you can pick; you have 15 seconds.
-- **Your tower is an Outpost until your team gets a tower card.** A tower card in round 9 replaces the tower you have (its skills, walls and mage general go with it).
-- **Team buildings:** a building card opens a placement vote. Tap one of the glowing tiles; your teammate sees your vote in your colour. The same tile places it at once; two different tiles: one of the two after 15 seconds. Buildings go inside your zone (not on its outer edges) and at least 2 tiles away from every other building. Nobody can deploy on a building's tile.
-- **Building sheets:** tap a building to see what it does, its downside, and its skills. Either of you can buy them (whoever buys pays; only your own buys can be taken back). The other team can open the sheet too, but not what you bought this round.
-- The deploy clock waits while the draft or a vote is open.
-- The other buildings are on the board with their names and numbers; their skills and effects come in the next updates.
 - The loan works as before (every player's own).
 
+### 2v2: artifacts and the draft
+
+- **Artifacts** (rounds 2 and 8): two glowing orbs stand in no man's land, each inside a ring. Tap one to see the card it gives (a tower or a building).
+- **Holding one:** in the fight, every squad with a unit inside the ring scores its tier in points a second for its team (a tier 3 squad scores 3, however many bodies it has; summons score 1, towers and buildings nothing). Both teams score at the same time.
+- **First to 100 locks it,** and the team with more points wins it: +50 gold for each of its players. If the fight ends before that, more points wins; a tie goes to nobody.
+- **Your units go for it:** units that come near an unlocked artifact walk into its ring. Melee units still go after enemies close by; ranged units stay inside and shoot only what they can reach from there. Once an artifact is locked, they fight as usual.
+- **The meter:** around each orb, your team's bar (blue) climbs one side and theirs (red) the other. A locked artifact turns your colour or theirs and shows a lock. Tap the orb in the fight to see the score.
+- **The artifact draft replaces the round 3 tower vote.** The cards of round 2's artifacts are dealt in round 3, round 8's in round 9. Win both and your team picks one first (the other team gets the one left); win one each and each team gets its own; an artifact nobody won goes to the team without a card. If nobody won either, a coin flip says who picks. Either of you can pick; you have 15 seconds.
+- **Your tower is an Outpost until your team gets a tower card.** A tower card in round 9 replaces the tower you have (its skills, walls and mage general go with it).
+- **Team buildings:** a building card opens a placement vote. Tap one of the glowing tiles; your teammate sees your vote in your colour. The same tile places it at once; two different tiles: one of the two after 15 seconds. Buildings go inside your zone (not on its outer edges) and at least 2 tiles away from every other building, unless the building says otherwise. Nobody can deploy on a building's tile.
+- **Building sheets:** tap a building to see what it does, its downside, and its skills. Either of you can buy them (whoever buys pays; only your own buys can be taken back). The other team can open the sheet too, but not what you bought this round.
+- The deploy clock waits while the draft or a vote is open.
+- 1v1 is unchanged.
+
+### 2v2: the ten team buildings
+
+**Tree kojja** (defensive): a small watchtower grown into a tree. It shoots like the Outpost, reaches 20 m and sees stealthed units in that range.
+- *Grow another* (100, once a round for the team): whoever buys it places a new kojja within 3 tiles of one of your kojjas. You place it yourself, with no vote and no 2-tile room needed. Once someone has bought a skill on the new kojja, Grow can't be taken back.
+- *Nest* (50, once per kojja): the kojja holds one ranged squad, yours or your teammate's: place it on the kojja or move it in. Only one body shoots from inside, with +3 m range and stealth sight. After 10 s without seeing an enemy, or when the kojja falls, the whole squad steps out and fights on foot. Nest can't be taken back while a squad is in it.
+- Downside: a kojja destroyed in a fight stands for the other team the next round. It shoots for them, and they can use its Nest (or buy one) and put a ranged squad of theirs in it, even though it is on your board. The round after, it is yours again. A squad standing in a kojja when it changes hands steps out to the nearest free tile of its own zone.
+
+**Scorch turrets** (defensive): each of you places your own turret, whenever you like (neither of you waits for the other). A turret is one Ember Imp with Spitfire (burn), instant shots and +10 m range, and it always sees stealthed units. 450 health, 2 armor. It isn't a unit, so the other team doesn't need to destroy it to win the round.
+- *Blaze* (100): splash 5 m and +25% hit. *Rapid fire* (100): +25% attack speed and +5 m range. *Legs* (100): the turret walks and counts as a unit. Each turret has its own skills, and either of you can buy them.
+- Downside: a turret destroyed in a fight sits out the next fight and loses all its skills.
+
+**Field hospital** (support; 600 health, 2 armor, can't shoot): squads you or your teammate deploy on the 8 tiles round it get +20% health and regain 2% of their health a second in the fight. Every round your team wins with the hospital still standing: +5 Team HP (never above your starting 200). Downside: destroyed, −15 Team HP.
+- *Field dressing* (50 gold, +50 for each of your own clicks this round, as often as you like): a random squad of your team gets +25% health for this round's fight (picked when the fight starts, so nobody can tell beforehand).
+- *Second wind* (100 gold, once a round for the team): pick one of your team's squads. The first time it is wiped out in the fight it comes back whole, at full health, on the tile in front of the hospital. Either of you can move it to another squad for free once it is bought. The opponents don't see it. A squad that gives itself up on purpose (Ember Imps summoning their Hellfiend) wasn't wiped out: nothing comes back. A squad brought back keeps its Home ground, its Mark Bounty hunt and the like.
+
+**The Oak** (support; 1200 health, 3 armor, can't shoot): *Restoration*: while the Oak stands, every heal and every bit of regeneration on your team is 25% stronger (healers, water healing, pools, healbots, lifesteal, regen...). Downside: the round after it was destroyed, a level 3 Ent (one body, all four of its skills) fights for the opponents, in front of their tower.
+- *Heal* (50 gold, once a round each): +5 Team HP, counted before this round's fight takes its damage (never above 200). The results screen lists it.
+- *Double restoration* (100 gold, once a round for the team): Restoration is +50% this round.
+- *Sticky moss* (200 gold, once a match): every tile within 3 tiles of the Oak turns to moss for good. Enemies on it move 30% slower (the strongest slow counts; Berserkers can't be slowed). Both teams see the moss.
+
+**Coal mine** (technical): your team votes for the entrance in your zone, then for the exit in no man's land. Squads deployed on the 8 tiles round the entrance go down the mine when the fight starts and come up 2 seconds later on the matching tile round the exit, then stand still for 1.5 seconds (as a squad new on a flank tile) before they fight. While they are underground nobody can see or hit them. Nobody (either team) can deploy on the 8 tiles round the exit, even where they are the other team's zone. If an enemy squad already stands on the tile a squad would come up on, or that tile is water or a building, that squad stays where it was. The entrance can be destroyed (squads already on their way still come up); the exit can't be hit.
+- *Dig a new exit* (150 gold, once a match): move the exit once, anywhere in no man's land or to a flank tile of the enemy's half. Tap the mine, then a glowing tile. You can take it back the same round only while the old exit tile is still free.
+- *Fresh air* (200 gold, once a match): squads coming up the mine (and the healbots and Water Elementals that come with them) are 25% faster and have +4 armor for 5 seconds.
+
+**Magic lake** (technical, terrain): each of you puts down 2 water tiles of your own anywhere on your zone or in no man's land, flank tiles too (press Put down water, then tap a glowing blue tile), never on squads or buildings. Water is shot over but never walked on, and nobody can deploy on it. Water can never shut off a tile or a way across the board: a tile that would is not offered. A tile you put down can be moved until the fight; one you didn't put down goes on its own before the fight, and so does one that turns out to be on a squad the opponents hid there this round. Water can't be destroyed.
+- *Waterspirits allowal* (50 gold, per tile): your units can walk through that tile, 30% slower, and regain 5% health a second while on it.
+- *Become Water elemental* (200 gold, per tile): every fight a Water Elemental (as a level 2 Water Mage's Summon water elemental) rises from that tile and fights for your team. The tile stays water.
+
+**Jail** (technical; 1500 health, 8 armor). *Skywatch*: the enemy's stealthed units within 3 tiles of it are seen while they stand in its light (the lit tiles show on the board). Skywatch goes out the moment the jail falls in a fight.
+- *Jail a squad* (100 gold): pick an enemy squad from an earlier round (either opponent's); from this round's fight on it takes no part in any fight until the jail is destroyed. Each of you keeps one squad in it (2 cells). They find out at the fight; after that their squad sits in your jail (they can still sell it, which frees your cell after that round's fight). A horse jailed leaves its rider behind.
+- *Jail guards* (150 gold, once a match): 4 Keep guards stand round the jail in every fight and hold their posts until an enemy comes into their awareness.
+- Downside: destroyed, the jailed squads go free (back to their own zone), their unit types can't be jailed again this match, and the next round the jail does nothing (no jailing, no Skywatch, no guards).
+
+**School** (support; 700 health, 2 armor). Either of you can put one of your squads in it: it leaves the board and doesn't fight, and you can't place another squad of that unit while it is inside. Tap the School to see the squad inside and open its sheet.
+- *Study* (free): it gets a level's worth of XP every round (levelling up still costs gold).
+- *Learn* (free): a skill of its unit, ready 2 rounds later; it can't leave meanwhile, and the other skill of an either-or pair can't be bought meanwhile.
+- *Take out*: free, onto the tile it came from (or the nearest free one), or a tile you tap; a squad you put in this round can only be taken back onto its own tile.
+- *Double study* (200, once a match): twice the XP. *Quick learning* (300, once a match): skills in 1 round.
+- Downside: destroyed, the squad that destroyed it gets half a level's XP, and the squad inside comes out with the XP and level it went in with (a skill being learnt is lost).
+
+**Shadow Den** (technical; 800 health, 2 armor). While your team has it:
+- Rogues, Assassins and Shadowhands placed on a flank tile (an Assassin also in the enemy's zone) don't stand still the 3 s flank delay in their first fight.
+- **Shadowhands** are in your shop (tier 1, 100 gold, no unlock): a Rogue at half health and half damage, 1 body, stealthed. They can go in no man's land.
+- **Shadow deployment:** each of you gets 1 more deployment a round that only a Rogue, an Assassin or a Shadowhands can use.
+- *Impersonate* (200 gold, once a round each): pick an enemy tier 1 or 2 squad you can see. 5 s into the fight one of its bodies becomes a Shadowhand of yours.
+- *Sabotage* (100 gold, once a round for the team): pick a unit type. Next round the other team can't deploy it. They see a big red X on its card. A Sabotage keeps working through its round even if you buy (or take back) a new one that round.
+- *Insider information* (350 gold, once a round for the team): next round your team sees the other team's squads live as they place and move them (not their gold, buys or levels), and their deploy clock is 15 s shorter (never below 5 s left after a pause). They see "You are being watched". If your Den is destroyed in the fight of the round you bought it, they get it for free next round.
+- Downside: destroyed, you lose all your Shadowhands squads (no gold back), and no Den skills the next round. It stands again in the next fight.
+
+**Factory** (economic): the Cog Builder's Factory as a team building. It is built at once, no Cog Builder needed. Each round either of you can buy one of its units for the team: Cogbot Fighter (100), Cogbot Machinegunner (100) or CogMech (300). Whoever buys pays, and the unit shows in their colour. One unit a round per Factory. If it is destroyed in a fight, it is being rebuilt and makes nothing the next round. A Cog Builder's own Factory still works beside it. It flies a big team banner, so you can tell it from a Cog Builder's.
+
+- Bots use every building's skills too.
+
+### 2v2: Undo all with team buildings
+
+- **Undo all** takes back your own building clicks one by one, latest first, by the same rules as a single take-back: a click that can't be taken back (a Nest with a squad in it, a Grow whose kojja already has a skill) stays bought and paid for. Buildings never vanish, so your teammate's buys stay where they made them.
+- **Undo all is refused** while your teammate's moves this round rely on yours (for example a skill they bought on your new water tile, or water where your exit stood), so nobody loses gold or a tile to someone else's take-back. A School enrolment of theirs that needed the seat you freed isn't such a move: their squad simply comes out again.
+
 ### To check with Vilhelm
+
+**Vault, votes and the draft**
 - **The 15 s of a placement vote** run from when the vote opens, not from the first vote; nobody voting gets the first allowed tile (back of the zone, middle first).
 - **A bot teammate** votes at once and switches to your tile when you vote (so it places at once); in the draft, you make your team's pick (a team of two bots picks at once; a bot prefers a tower while it has the Outpost, then a building it doesn't have).
 - **Vault moves are counted over the round** per player (four 50s are 200), and a take round can't put; Undo all takes back only your own moves.
 - **Coin golem:** both clicks cost 100 each; the golem counts as a unit for winning the round (it walks and fights); a take-back of either click puts the gold back in the Vault. Gold put in after it was summoned stays in the Vault.
 - **Golem numbers** (coordinator's): 300 + 3 health and 30 + 0.12 hit per gold spent, armor 2 + 1 per 250 gold (at most 8), speed 4.
-- **"+50 per click this round"** skills (Field hospital) go up per player, not per team.
+- **"+50 per click this round"** skills (Field dressing) go up per player, not per team.
 - **A replaced tower's skills** are lost with no refund (as the design says).
 - **Buildings are seen by the opponents as soon as they are placed**; only this round's skills and Vault moves stay hidden until the fight.
 
----
+**Artifacts**
+- **Points per squad, not per body:** a squad with any unit inside the ring scores its tier (otherwise a goblin swarm would outscore a giant eight to one).
+- **Ring 9 m (1.5 tiles), cap 100.** With fights lasting up to 60 s, a single tier 1 squad can't lock one on its own.
+- **"Prefer attacking" for melee** means: while an enemy is within its awareness (its range plus sight) it fights as usual, even outside the ring, and it walks back once none is.
+- **Ranged units** walk into the ring first (they shoot what's in range on the way) and then hold it; they never walk out after an enemy until it locks.
+- **Colours:** each phone shows its own team blue and the other red (as everywhere else on the board), rather than one fixed colour per team.
 
-## 6 November 2026 – The Assassin strikes anywhere, free Bastion walls
-
-For every mode and map, 1v1 and 2v2.
-
-### Assassin
-- **Place it anywhere.** An Assassin can go on any free tile of the board from round 1: your zone, no man's land, the enemy's zone, even the flank tiles. Moves work the same way. The only rule: not on or next to a building (towers, treasuries, the Factory, the Altar, elf towers, your teammate's buildings). Allowed tiles light up as usual when you pick it.
-- **They won't see it coming.** An Assassin you put in the enemy's zone stays hidden from them until the fight, like every new squad. They might put a squad on that same tile without knowing. Then the fight just starts the two close together.
-- **It lands, then strikes.** In its first fight, an Assassin in the enemy's zone or on a flank tile stands still for 3 s, like a flank squad.
-- **It ignores buildings.** It never goes for the tower, the treasury, walls or any other building while there is an enemy unit it can reach. If nothing else is left, it attacks buildings after all, so a fight never gets stuck. A wall right in its way it breaks through.
-- **Bloodrush: 3 bleed per hit** (was 2).
-- The AI sometimes drops its Assassins on your back rows now. Watch your back.
-
-### Bastion
-- **Defensive walls are free** (were 250 gold). You still get them once a match, from the tower's sheet. The AI's Bastion takes them straight away.
-
-### To check with Vilhelm
-- "Next to a building" means any of the 8 tiles around it (diagonals too). A building of the opponent's that they put down this round doesn't count yet, since you can't see it.
+**Assassin and Bastion**
+- "Next to a building" means any of the 8 tiles around it (diagonals too). A building of the opponent's that they put down this round doesn't count yet, since you can't see it. The 8 tiles round a Coal mine's exit keep squads off but are not a building: an Assassin may stand 2 tiles from an exit.
 - "Any tile" includes the edge tiles of your own zone that are kept as the enemy's flank tiles.
 - "A flank tile" for the 3 s wait means a flank tile on either side of the board. An Assassin in no man's land or in your own zone doesn't wait.
 - The map's elf tower counts as standing on both middle-row tiles of its column.
@@ -73,25 +146,71 @@ For every mode and map, 1v1 and 2v2.
 - A wall counts as "in its way" when it stands between the Assassin and the unit it is after, within its reach. It then hits the wall even mid-dash.
 - Free walls don't use up Blixten's discount.
 
----
+**Tree kojja and Scorch turrets**
+- Grow is once a round for the whole team, not once per kojja. The buyer places the new kojja alone, with the usual 15 s to tap (then the first allowed tile). The new kojja must be in your own zone (not a reserved flank tile) and needs no 2-tile room. The first kojja (from the draft) keeps the normal rules.
+- Does a kojja that stands for the other team count for Grow? We said no, for both teams.
+- Nest takes a squad whose range is over 5 m (the engine's melee reach). While inside, the squad's other bodies don't fight and can't be hit. They all come out together after 10 s without seeing an enemy, the same as Overwatch, or as soon as the kojja falls. +3 m and stealth sight apply only while inside.
+- Turned kojja: it stands for the opponents for exactly one round; a Nest the owners bought comes with it; a Nest the opponents buy on it lasts only that round (the kojja comes back without it); the owners can't buy on it while it is turned; squads standing on it when it changes hands are moved to the nearest free tile of their own zone at the round's start; a turned kojja destroyed again has no further effect.
+- Scorch turrets: "1 each" read as one card giving two turrets, one per player, each placed by its player alone (interior and 2-tile spacing, like other buildings). Either teammate can buy skills on either turret. Spitfire is the imps' burn (50% of each hit burns over 3 s past armor). "Always sees stealthed units" means at any distance (this matters for the walking one).
+- The Legs turret walks at the Ember Imps' speed, holds artifacts as a tier-1 unit, and must be destroyed to win the round. It loses Legs (and the other skills) when destroyed.
+- A grown kojja is visible to the opponents as soon as it is placed, as all building placements are. The Grow click and its pending placement stay hidden, and so does a grown kojja that was taken back.
+- Take-backs: Nest can't be taken back while a squad (yours or your teammate's) is in the kojja, and Grow can't be taken back once someone bought a skill on the new kojja. Undo all follows the same rule: such a click stays bought and stays paid for (take the squad out, or let the teammate take their buy back, first).
 
-## 6 November 2026 – 2v2: artifacts in the fight
+**Field hospital and The Oak**
+- Field hospital "1 tile range": the 8 tiles round it (Chebyshev 1), squads of both teammates; the bonus holds for the whole fight even after the hospital falls.
+- "+5 Team HP for a round won": only when the team won the fight (a draw gives nothing); capped at the team's starting 200. A destroyed hospital gives −15 and no +5 that round.
+- Field dressing: "a random allied unit" = a random squad of either player (not the buildings, the tower or summons), picked when the fight starts (so squads placed after the click count too) from a seed no player holds while deploying (so it can't be steered); two clicks may hit the same squad (then it gets +50%). The price step (+50) is per player.
+- Second wind: "chosen allied unit" = the squad picked on the sheet (either player's); it works even if the hospital has fallen by then; it comes back as fresh bodies (full health, no burn or poison) on the tile in front of the hospital, once a fight. Bodies won over by a Gentleman count as gone. A squad its own portal sacrificed (Summon hellfiend) didn't die: Second wind is spent and does nothing. A body the Shadow Den's Impersonate took is just gone: the rest of the squad can still be wiped out and come back whole.
+- The Oak's Restoration only works while the Oak stands in the fight (once it falls, heals are normal again). It covers every heal path (regen, healers, mending, water healing, pools, healbots, lifesteal, slime units drinking poison); a Mecha repairbot mending a building isn't a heal and isn't changed. "Double the effectiveness" read as +50% instead of +25%.
+- The Oak's Heal: 5 Team HP a click, applied with the fight (before its damage), so it can't lift a team that the same fight beats; never above 200. The HP bar shows it after the fight, the sheet says it is booked.
+- Sticky moss: "big 3 tile radius" = the 7×7 tiles round the Oak (its own tile too); permanent; only the opponents are slowed; it never slows Berserkers; the strongest slow on a body counts (as mud).
+- The Ent: one body, level 3 (the top level), all four Ent skills including Forward planting (which only adds +10% health in a fight) and both of the either/or pair; it stands in front of the opponents' tower and counts as one of their units for winning the round (a summon). It comes only the round right after the Oak fell (again each time it falls).
+- The Oak's and the hospital's health and armor are the table's numbers (1200/3 and 600/2).
 
-2v2 is still a developer test.
+**Coal mine and Magic lake**
+- Coal mine: the exit is drawn as a shaft and is not a structure that can be hit (only the entrance has 700 health / 4 armor). A destroyed entrance doesn't stop squads already underground.
+- Coal mine: a squad on the 8 tiles round the entrance travels in **every** fight, not only the round it was placed; it always has the 1.5 s wait after coming up.
+- Coal mine: "conflict with enemy deployed unit tiles" read as: an enemy squad's body standing on that exit tile as the fight starts (either lane). The squad stays at its own tile and fights from there. The squads of your own team on the tile don't stop it.
+- Coal mine: the 8 tiles round the exit also block buildings and lake tiles, but they are not building tiles. The exit may still be dug next to existing squads or water (only its own tile must be free); a squad whose tile at the exit is water or a building tile simply doesn't go down the mine.
+- Dig a new exit: allowed anywhere in no man's land (not flank tiles) or on any flank tile of the enemy's half (their zone's edge columns included). The new tile must be free; the old exit's tiles don't count. Taking the skill back the same round puts the exit back, but only while the old tile is still free (no water, other exit, building or squad of your team there now); otherwise the take-back (and Undo all) is refused. The new tile must be free as the mover sees it: a squad the opponents hid there this round doesn't stop the move; the exit then shares the tile with that squad, which is harmless. A move is seen by the opponents at once (as any placed building), the skill click itself only after the fight.
+- Fresh air: the 5 s count from coming up, so 1.5 s of them are spent standing; +25% speed and +4 armor.
+- Magic lake: "anywhere on their board and in no man's land" read as the team's whole own zone (the edge tiles that are the enemy's flank tiles too, so water there shuts those flank tiles for the enemy) or anywhere in no man's land (flank tiles too). Water is never on a squad, building, the exit's 8 tiles, or other water, as the player sees the board; one put down this round on a squad the opponents hid there moves to the first free tile as the fight starts. Placements are seen by the opponents at once.
+- "Never completely block in a tile or a walking path" read as: after the new water, every walkable tile of the board can still reach every other (4 ways, no diagonal squeezing between two water tiles).
+- A lake tile can be moved only in the round it was put down; tiles not put down by the fight go down on their own (no man's land on the team's half first).
+- Waterspirits: only the team that bought it walks on that tile; the 30% slow is the game's shallow-water slow; the regen is 5% of max health a second (the Oak's +25% healing counts).
+- Water elemental: "level 2 Water Mage" = the second level. The elemental stands on the water at first; without Waterspirits on that tile it steps onto the bank at once. It counts as a unit for winning the round (as the Coin Golem) and holds artifacts as a summon (tier 1). Bought once per tile; it fights every fight.
+- Undo all: refused while one of the teammate's building actions this round only works because of the presser's (a skill bought on the presser's new water tile, water put where the presser's exit stood). Before, the teammate silently lost the action and its gold.
 
-- **Artifacts:** in the rounds they appear, two glowing orbs stand in no man's land, each inside a ring. Tap one to see the card it gives (a tower or a building).
-- **Holding one:** in the fight, every squad with a unit inside the ring scores its tier in points a second for its team (a tier 3 squad scores 3, however many bodies it has; summons score 1, towers and buildings nothing). Both teams score at the same time.
-- **First to 100 locks it,** and the team with more points wins it. If the fight ends before that, more points wins; a tie goes to nobody.
-- **Your units go for it:** units that come near an unlocked artifact walk into its ring. Melee units still go after enemies close by; ranged units stay inside and shoot only what they can reach from there. Once an artifact is locked, they fight as usual.
-- **The meter:** around each orb, your team's bar (blue) climbs one side and theirs (red) the other. A locked artifact turns your colour or theirs and shows a lock. Tap the orb in the fight to see the score.
-- 1v1 is unchanged.
+**Jail and School**
+- Jail is "technical" (his text) though the brief's table had it with the defensive ones; 1500 health, 8 armor.
+- Jail a squad: a squad, not a single unit; only squads from earlier rounds that the buyer can see (riders can't be picked). The jailed team finds out at the fight (until then they may still move or sell it; a squad sold or put in their School before the fight refunds the 100). The jailed squad sits out the fight of the round it was jailed in.
+- Selling a jailed squad is allowed (half its worth, as always) and frees the jailer's cell (no refund) after that round's fight: sales are hidden from the opponents until the fight, so the jailer can't use the cell earlier.
+- "Freed unit types can't be jailed again": every unit type that was locked up in the jail when it fell, for the rest of the match, whoever owns them. A squad jailed in the very round the jail falls was never locked up: it goes free with no ban, and the jailer doesn't get the 100 back (the squad did sit that fight out).
+- A squad its owner puts in their School in the round it is jailed sits in the School, not the jail: the jailer gets the 100 back (whether or not the School falls in that fight).
+- "Can't be used next round": no jailing, no Skywatch and no guards, but the jail still stands in the fight (a target).
+- Skywatch's 3-tile range is a square (the 7 x 7 tiles round it), matching the lit tiles.
+- Jail guards: the Keep's 4 Wisps-based guards; they hold until an enemy is in their awareness (or one hits them), then fight as Keep guards do. They count as units for winning a round, as the Keep's do.
+- School: either player may put in one of their own squads; one squad in all. Not a rider, a carrier with a rider, a squad moved this round, or a building. A squad put in this round can't be taken back (unplaced) while inside.
+- Taking a squad out in the round it went in only undoes the enrolment (back onto its own tile), otherwise putting it in and out would be a free move to any tile. From the next round on it comes out onto any free tile of the zone (free).
+- While a squad learns skill k, its player can't buy the other skill of k's either-or pair for gold (they would end up with both). To switch, Stop learning (only the round it started) or wait.
+- "A level of XP": the XP between the threshold its XP has reached and the next one (a squad not levelled up yet still gets the next step); none at the top level. Levelling up still costs gold. Double study gives two steps' worth.
+- A skill learnt in the School is the unit type's (skills are per unit type in this game), so the player's other squads of that type get it too; it is free and counts like any bought skill for the price of the next one. One at a time; "Stop learning" only in the round it was started.
+- The squad inside can't be sold (take it out first, free). Taking it out is hidden from the opponents until the fight (they still see it in the School), and so is putting it in (they see it on its tile).
+- School destroyed: the squad that landed the killing blow gets half a level's XP (its own next step); the squad inside loses all XP and levels it gained inside, including levels bought with gold (no refund), and any skill being learnt; skills already learnt stay.
+- Tapping the School opens its sheet (with the squad inside and a Sheet button for the squad's own sheet) rather than the squad's sheet straight away.
+- Undo all by your teammate can take back the School seat your enrolment needed (their squad goes back in, yours comes out onto its tile): read as fine, since enrolling is free.
 
-### To check with Vilhelm
-- **Points per squad, not per body:** a squad with any unit inside the ring scores its tier (otherwise a goblin swarm would outscore a giant eight to one).
-- **Ring 9 m (1.5 tiles), cap 100.** With fights lasting up to 60 s, a single tier 1 squad can't lock one on its own.
-- **"Prefer attacking" for melee** means: while an enemy is within its awareness (its range plus sight) it fights as usual, even outside the ring, and it walks back once none is.
-- **Ranged units** walk into the ring first (they shoot what's in range on the way) and then hold it; they never walk out after an enemy until it locks.
-- **Colours:** each phone shows its own team blue and the other red (as everywhere else on the board), rather than one fixed colour per team.
+**Shadow Den and Factory**
+- Shadowhands are a unit of the 2v2 set that only a team with a Den sees in its shop (recruiting = placing it like any unit, 100 gold, tier 1, no unlock). They keep the Rogue's speed, range, attack speed and Stealth, get Forward planting built in (no man's land), and the Rogue's third skill can be bought for them. They level and sell like any squad (sell: half of 100).
+- "Shadow deployment" is read as one extra deployment per player per round, usable only by Rogues, Assassins and Shadowhands; your normal deployments never grow from it.
+- "0 deployment time in flanks" covers the Assassin's delay in the enemy's zone too.
+- Impersonate's timer: 5 s. The Shadowhand it makes fights only in that fight (it isn't a squad afterwards); the body taken out doesn't count as a kill. Only squads the buyer can see are targets (an enemy squad placed this round is hidden, unless you are watching them with Insider information).
+- Sabotage locks the type for both opponents for the next round (placing new squads only; their squads already on the board still fight and move). Any unit type may be picked. Bought two rounds in a row: both work, each in the round after its buy.
+- Insider information shows the other team's squads live (where they place and move them) to both watchers, but not their gold, buys, levels or Vault. Their clock (75 s of a 90 s round) runs out 15 s early: after that they can't act but the fight starts at the normal time. After a pause the cut never leaves them under 5 s.
+- Impersonate on a squad that is sold (or taken back) before the fight: nothing happens and the gold is spent (the buyer can take it back during the round). A Shadowhand made by a lane-1 buyer has that player's Shadowhands skills. "Destroyed while active" is read as: destroyed in the fight of the round it was bought.
+- Den destroyed: the Shadowhands squads are removed (no gold back); Shadowhands made by Impersonate during that fight keep fighting to its end. "No Den skills next round" blocks Impersonate, Sabotage and Insider information; recruiting Shadowhands and the Shadow deployment keep working.
+- The Factory building is not levelled, gets no builder skills (Master engineering etc., even if the buyer has a Cog Builder with them) and no Blessing, and has no build site: it simply stands. Its downside reading ("as the Cog Builder's"): destroyed in a fight, it makes nothing the next round (the Cog Builder's must be built again).
+- The Factory's units fight for the team; their XP and damage count for the Factory, not for the buyer's squads.
 
 ---
 
