@@ -238,6 +238,7 @@
       for (const sd of [0, 1]) { lost[sd] += BIG - m.hp[sd]; dmg[sd] += sm.dmg[sd] || 0; towerHp[sd] += (sm.towerHp && sm.towerHp[sd]) || 0; }
       return sm;
     });
+    M.teamHeal(lanes, hp, summaries[0].round); // Team HP the buildings add before the fight's damage (the Oak's Heal)
     for (const sd of [0, 1]) hp[sd] = Math.max(0, hp[sd] - lost[sd]);
     // the buildings: fell, their afterFight (Team HP, gold, next-round effects), the artifacts' winners; lane 0's team
     // state goes to lane 1
@@ -463,6 +464,7 @@
     if (G.needsPack(m, sd)) G.choosePack(m, sd, Math.floor(Math.random() * m.packages[sd].length));
     if (G.needsTowerPick(m, sd)) { const ch = G.towerChoices(m, sd); G.setTowerType(m, sd, ch[Math.floor(Math.random() * ch.length)].id); }
     G.aiDeploy(m, sd);
+    M.bots(m, sd); // the team's buildings' skills (each kind's hooks.bot)
     // the Vault: gold the carry cap would take next round goes in instead (a put round only)
     const spare = Math.min(m.gold[sd] - G.CARRY_CAP, M.vaultRoom(m, sd, 'put'));
     if (spare > 0) G.vaultPut(m, sd, spare);

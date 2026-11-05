@@ -801,8 +801,34 @@ const Engine = (() => {
       if (b.march) e.march = b.march.slice();
       list.push(e);
     }
+    // 2v2 Field hospital (src/mpb.js; only Duo.battle sets opts.mpb.fieldHospital = { dress: [[r, ...], [...]], pct }):
+    // Field dressing: each number r of a side gives one of its squads (its fighting squads, ids >= 0, by id; the
+    // r-th share of them) +pct % health for this fight. Second wind: bodies marked fhRevive = { x, y } (one squad)
+    // come back whole there, once, the first time all of them are down (see the end of step)
+    const fhOpt = opts.mpb && opts.mpb.fieldHospital;
+    if (fhOpt) for (const sd of [0, 1]) {
+      const list = sd === 0 ? A : B, ids = [...new Set(list.filter(b => b.squad >= 0 && !b.u.structure && !b.u.noCount && !b.u.aloft && !b.u.construct).map(b => b.squad))].sort((a, b) => a - b);
+      const add = {};
+      for (const r of (fhOpt.dress && fhOpt.dress[sd]) || []) if (ids.length) { const q = ids[Math.min(ids.length - 1, Math.floor(r * ids.length))]; add[q] = (add[q] || 0) + fhOpt.pct; }
+      const made = new Map();
+      for (const b of list) {
+        if (!(add[b.squad] > 0) || b.u.structure) continue;
+        if (!made.has(b.u)) made.set(b.u, { ...b.u, hp: b.u.hp * (1 + add[b.squad] / 100) });
+        const k = b.hp / b.u.hp; b.u = made.get(b.u); b.hp = b.u.hp * k;
+      }
+    }
+    const fhRevives = [];
+    if (fhOpt) for (const list of [A, B]) for (const b of list) if (b.fhRevive) {
+      let grp = fhRevives.find(x => x.side === b.side && x.squad === b.squad);
+      if (!grp) fhRevives.push(grp = { side: b.side, squad: b.squad, x: b.fhRevive.x, y: b.fhRevive.y, list: [], done: false });
+      grp.list.push(b); b.fhU = b.u;
+    }
     const all = A.concat(B);
     const sides = [A, B];
+    // 2v2 Oak (src/mpb.js; only Duo.battle sets opts.mpb.oak): while a body with oakRestore (an Oak) stands, every heal
+    // on its side is that many times as strong
+    const oakOn = !!(opts.mpb && opts.mpb.oak), oaks = oakOn ? all.filter(b => b.oakRestore > 0) : [];
+    const oakK = (sd) => { let k = 1; for (const b of oaks) if (b.side === sd && b.alive && b.oakRestore > k) k = b.oakRestore; return k; };
     const counts = (b) => !(b.u.structure || b.u.aloft || b.u.noCount); // what makes up a side's army (towers, drones and constructs don't)
     const stats = [
       { dealt: 0, wasted: 0, blocked: 0, missed: 0, windLost: 0, winds: 0, totalHp: A.reduce((s, b) => s + (counts(b) ? b.u.hp : 0), 0) },
@@ -917,6 +943,7 @@ const Engine = (() => {
     // to full health or saves a body just because of who went first; a body that fell meanwhile gets none
     let healLater = null;
     function heal(v, amt) {
+      if (oakOn) amt *= oakK(v.side); // the Oak's Restoration (2v2)
       if (healLater) { if (amt > 0) healLater.push(v, amt * healK(v)); return; }
       if (amt > 0 && v.hp < v.u.hp) v.hp = Math.min(v.u.hp, v.hp + amt * healK(v));
     }
@@ -3137,6 +3164,20 @@ const Engine = (() => {
         for (const x of live) { x.hp = 0; x.alive = false; x.diedTick = tick; x.sacrificed = true; }
         pendingKids.push(pt.hf);
       }
+      // 2v2 Field hospital's Second wind: a marked squad all down (fallen, or won over) comes back whole, once
+      for (const fr of fhRevives) {
+        if (fr.done || !fr.list.every(b => (!b.alive && !b.boarded) || b.side !== fr.side)) continue;
+        fr.done = true;
+        const kids = fr.list.map((b, k) => {
+          const [ox, oy] = SPAWN_SPOTS[k % SPAWN_SPOTS.length], fwd = fr.side === 0 ? 1 : -1;
+          const kid = newBody(b.fhU, fr.side, fr.x + ox * g.spacing * 0.6, fr.y + oy * fwd * g.spacing * 0.6, spawnNo[fr.side]++, fr.squad);
+          kid.tier = b.tier; kid.lane = b.lane; kid.level = b.level; kid.fhBack = true; b.fhGone = true;
+          return kid;
+        });
+        if (kids[0] && kids[0].u.link) { for (const kid of kids) kid.link = kids; groups.push(kids); }
+        if (opts.record) shots.push([fr.x, fr.y, fr.x, fr.y, fr.side, 0, 0, 1]);
+        pendingKids.push(...kids);
+      }
       // bodies spawned by deaths this tick join the fight
       for (const kid of pendingKids) { all.push(kid); sides[kid.side].push(kid); if (counts(kid)) stats[kid.side].totalHp += kid.u.hp; if (terBlock && !kid.u.aloft) keepOut(kid); } // not in the water
       pendingKids.length = 0;
@@ -3189,7 +3230,7 @@ const Engine = (() => {
         }
         const k = b.side + ':' + b.squad;
         const s = squads[k] || (squads[k] = { side: b.side, squad: b.squad, total: 0, alive: 0, xp: 0, dealt: 0 });
-        s.total++; if (b.alive || inside(b)) s.alive++;
+        if (!b.fhGone) { s.total++; if (b.alive || inside(b)) s.alive++; } // (a squad Second wind brought back counts its new bodies only)
         s.xp += b.xp; s.dealt += b.dealt || 0;
         if (b.glutGain > 0) s.glut = Math.max(s.glut || 0, b.glutGain); // Glut stacks eaten this fight (see u.glut)
       }

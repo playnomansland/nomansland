@@ -502,6 +502,7 @@ const Render2D = (cv, view, opts = {}) => {
       }
     }
     if (v && v.dev) devFloor(v, plain);
+    if (v && v.mpb) drawMpbFloor(v); // 2v2 buildings on the floor (the Oak's moss)
     if (v && !plain && phase === 'deploy') aimFloor(v);
     if (plain) return;
     if (v && v.buff) for (const side of [0, 1]) { // Zoe's buff tiles: a gold tile with a star
@@ -972,9 +973,61 @@ const Render2D = (cv, view, opts = {}) => {
     },
     // ===== treeKojja (2D) =====
     // ===== fieldHospital (2D) =====
+    // a canvas ridge tent seen from the front: a pale gable with its flaps tied open (a dark doorway), the roof's long
+    // side behind it, a white disc with a soft green cross over the door, a pennant in the team colour on the ridge
+    // pole, and its world detail: a line of bandages hung out to dry beside it
+    fieldHospital(x, y, t, side, o) {
+      const s = t * 0.82, c = teamCol(side), dx = s * 0.16, dy = -s * 0.14, by = y + s * 0.3, ay = y - s * 0.36, hw = s * 0.42;
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x + dx * 0.5, by + s * 0.04, s * 0.56, s * 0.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.lineJoin = 'round'; ctx.strokeStyle = '#8E8670'; ctx.lineWidth = Math.max(1, s * 0.03);
+      ctx.fillStyle = '#C9C0A6'; ctx.beginPath(); ctx.moveTo(x, ay); ctx.lineTo(x + dx, ay + dy); ctx.lineTo(x + hw + dx, by + dy); ctx.lineTo(x + hw, by); ctx.closePath(); ctx.fill(); ctx.stroke(); // the roof's long side
+      ctx.fillStyle = '#EDE7D6'; ctx.beginPath(); ctx.moveTo(x, ay); ctx.lineTo(x + hw, by); ctx.lineTo(x - hw, by); ctx.closePath(); ctx.fill(); ctx.stroke(); // the front gable
+      ctx.fillStyle = '#4A4236'; ctx.beginPath(); ctx.moveTo(x, y - s * 0.02); ctx.lineTo(x + s * 0.17, by); ctx.lineTo(x - s * 0.17, by); ctx.closePath(); ctx.fill(); // the doorway
+      ctx.fillStyle = '#DCD3BC'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x, y - s * 0.02); ctx.lineTo(x + sd * s * 0.25, by - s * 0.02); ctx.lineTo(x + sd * s * 0.12, by); ctx.closePath(); ctx.fill(); } // its flaps, tied back
+      const cx = x, cy = y - s * 0.16, cr = s * 0.11;
+      ctx.fillStyle = '#FAF7EE'; ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6FB07E'; ctx.fillRect(cx - cr * 0.22, cy - cr * 0.7, cr * 0.44, cr * 1.4); ctx.fillRect(cx - cr * 0.7, cy - cr * 0.22, cr * 1.4, cr * 0.44); // a soft green cross
+      ctx.fillStyle = c; ctx.fillRect(x - hw, by - s * 0.05, hw * 2, s * 0.05); // the team's hem
+      ctx.strokeStyle = '#6B5A44'; ctx.lineWidth = Math.max(1, s * 0.025); ctx.beginPath(); ctx.moveTo(x + dx, ay + dy); ctx.lineTo(x + dx, ay + dy - s * 0.2); ctx.stroke(); // the ridge pole
+      const wave = Math.sin((o.time || 0) * 3 + x * 0.1) * s * 0.02;
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x + dx, ay + dy - s * 0.2); ctx.lineTo(x + dx + s * 0.18, ay + dy - s * 0.16 + wave); ctx.lineTo(x + dx, ay + dy - s * 0.11); ctx.closePath(); ctx.fill();
+      // the bandages drying on a line to the left
+      const lx0 = x - hw - s * 0.06, lx1 = x - s * 0.2, ly = y - s * 0.02;
+      ctx.strokeStyle = '#8E8670'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(lx0, by); ctx.lineTo(lx0, ly - s * 0.04); ctx.moveTo(lx0, ly - s * 0.03); ctx.quadraticCurveTo((lx0 + lx1) / 2, ly + s * 0.04, lx1, ly - s * 0.08); ctx.stroke();
+      ctx.fillStyle = '#FAF7EE'; for (const k of [0.3, 0.62]) { const bx = lx0 + (lx1 - lx0) * k; ctx.fillRect(bx - s * 0.025, ly, s * 0.05, s * 0.13); }
+    },
     // ===== coalMine (2D) =====
     // ===== scorch (2D) =====
     // ===== oak (2D) =====
+    // an old broad oak: a gnarled trunk on spreading roots with a calm sleeping face in its bark (eyes shut, a small
+    // smile), a ribbon in the team colour round it, a wide lumpy crown of three dusty greens with acorns, its world
+    // detail (a rope swing from a low branch) and, in a fight, pale motes of Restoration drifting up
+    oak(x, y, t, side, o) {
+      const s = t * 0.92, c = teamCol(side), ty = y + s * 0.36;
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, ty, s * 0.5, s * 0.12, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#5E4329'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + sd * s * 0.08, y + s * 0.16); ctx.quadraticCurveTo(x + sd * s * 0.2, ty - s * 0.02, x + sd * s * 0.32, ty + s * 0.02); ctx.lineTo(x + sd * s * 0.1, ty); ctx.closePath(); ctx.fill(); } // roots
+      ctx.fillStyle = '#7A5A36'; ctx.strokeStyle = '#4B3420'; ctx.lineWidth = Math.max(1, s * 0.025);
+      ctx.beginPath(); ctx.moveTo(x - s * 0.13, ty); ctx.quadraticCurveTo(x - s * 0.09, y + s * 0.05, x - s * 0.12, y - s * 0.08); ctx.lineTo(x + s * 0.12, y - s * 0.08); ctx.quadraticCurveTo(x + s * 0.09, y + s * 0.05, x + s * 0.13, ty); ctx.closePath(); ctx.fill(); ctx.stroke(); // the trunk
+      // the swing: two ropes from the left branch and a plank (drawn before the crown, which hides the knots)
+      ctx.strokeStyle = '#B79A6E'; ctx.lineWidth = 1; const sx = x - s * 0.3, sw = Math.sin((o.time || 0) * 1.4 + x) * s * 0.02;
+      ctx.beginPath(); ctx.moveTo(sx - s * 0.05, y - s * 0.12); ctx.lineTo(sx - s * 0.05 + sw, y + s * 0.18); ctx.moveTo(sx + s * 0.05, y - s * 0.12); ctx.lineTo(sx + s * 0.05 + sw, y + s * 0.18); ctx.stroke();
+      ctx.fillStyle = '#8A5A32'; ctx.fillRect(sx - s * 0.08 + sw, y + s * 0.17, s * 0.16, s * 0.035);
+      for (const [fx, fy, r, col] of [[-0.24, -0.2, 0.25, '#5C7A42'], [0.24, -0.22, 0.24, '#5C7A42'], [0, -0.36, 0.28, '#6E8B4E'], [-0.12, -0.18, 0.22, '#87A35E'], [0.13, -0.3, 0.2, '#87A35E']]) {
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x + fx * s, y + fy * s, r * s, 0, Math.PI * 2); ctx.fill(); // the crown
+      }
+      ctx.fillStyle = '#8C6239'; for (const [fx, fy] of [[-0.3, -0.12], [0.2, -0.1], [0.05, -0.44], [0.32, -0.3]]) { ctx.beginPath(); ctx.ellipse(x + fx * s, y + fy * s, s * 0.025, s * 0.032, 0, 0, Math.PI * 2); ctx.fill(); } // acorns
+      ctx.fillStyle = c; ctx.fillRect(x - s * 0.125, y + s * 0.16, s * 0.25, s * 0.05); // the team's ribbon
+      if (t >= 22) { // its face: eyes shut, a small smile
+        ctx.strokeStyle = '#3A2616'; ctx.lineWidth = Math.max(1, s * 0.02);
+        for (const sd of [-1, 1]) { ctx.beginPath(); ctx.arc(x + sd * s * 0.045, y + s * 0.01, s * 0.028, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke(); }
+        ctx.beginPath(); ctx.arc(x, y + s * 0.07, s * 0.035, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+      }
+      if (o.hpr != null && o.hpr > 0) { // Restoration at work: motes drifting up
+        ctx.fillStyle = '#CFEAB8';
+        for (let k = 0; k < 4; k++) { const p = (((o.time || 0) * 0.45 + k / 4) % 1 + 1) % 1; ctx.globalAlpha = 0.7 * (1 - p); ctx.beginPath(); ctx.arc(x + Math.sin(k * 2.1 + p * 4) * s * 0.35, y - s * 0.1 - p * s * 0.55, Math.max(1, s * 0.03), 0, Math.PI * 2); ctx.fill(); }
+        ctx.globalAlpha = 1;
+      }
+    },
     // ===== factory (2D) =====
     // ===== magicLake (2D) =====
     // ===== jail (2D) =====
@@ -1006,6 +1059,30 @@ const Render2D = (cv, view, opts = {}) => {
     ctx.beginPath(); ctx.rect(x - s / 2, y - s * 0.32, s, s * 0.72); ctx.fill(); ctx.stroke();
     ctx.fillStyle = c; ctx.fillRect(x - s / 2, y - s * 0.42, s, s * 0.14);
     if (t >= 22) { ctx.font = `600 ${Math.max(8, Math.round(t * 0.26))}px "IBM Plex Mono", monospace`; ctx.fillStyle = '#F4EFE3'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(K.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(), x, y + s * 0.05); }
+  }
+  // what a building lays on the floor (both boards; the 3D board's floor too): MPB_FLOOR[kind](v, side, rec, t)
+  const MPB_FLOOR = {
+    // ===== oak (floor) =====
+    // Sticky moss: every tile within Mpb.OAK.moss of the Oak, mossy green with tufts, the patch edged in the team colour
+    oak(v, side, rec, t) {
+      const tiles = Mpb.oakMossTiles(v, rec);
+      if (!tiles.length) return;
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const tl of tiles) {
+        const x = scol(tl.col) * t, y = srow(tl.row) * t;
+        x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + t); y1 = Math.max(y1, y + t);
+        ctx.fillStyle = '#6F8F45'; ctx.globalAlpha = 0.26; ctx.fillRect(x, y, t, t);
+        ctx.fillStyle = '#9DBB6A'; ctx.globalAlpha = 0.55;
+        for (let k = 0; k < 3; k++) { const h = ((tl.col * 7 + tl.row * 13 + k * 5) % 11) / 11, j = ((tl.col * 3 + tl.row * 5 + k * 7) % 9) / 9; ctx.beginPath(); ctx.ellipse(x + t * (0.15 + 0.7 * h), y + t * (0.15 + 0.7 * j), t * 0.09, t * 0.05, 0, 0, Math.PI * 2); ctx.fill(); }
+      }
+      ctx.globalAlpha = 0.6; ctx.strokeStyle = teamCol(side); ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]); ctx.strokeRect(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2); ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    },
+  };
+  function drawMpbFloor(v) {
+    if (typeof Mpb === 'undefined' || !Mpb.on(v)) return;
+    const t = tilePx();
+    for (const side of [0, 1]) for (const rec of Mpb.recs(v, side)) if (MPB_FLOOR[rec.kind]) MPB_FLOOR[rec.kind](v, side, rec, t);
   }
   function drawMpb(kind, x, y, t, side, o) {
     (!o.part && MPB_DRAW[kind] ? MPB_DRAW[kind] : (a, b, c2, d, e, f) => drawMpbPlain(kind, a, b, c2, d, e, f))(x, y, t, side, o);
