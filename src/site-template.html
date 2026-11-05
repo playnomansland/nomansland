@@ -2675,6 +2675,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
         ? (canBuy(selected) ? `Tap a tile in your zone${Game.flankOpen(m) ? ' or a flank tile in theirs' : ''} to place ${esc(units[selected].name)}.` : Game.capFull(m, me, selected) ? `${Game.LATE.cap} squads of ${esc(units[selected].name)} is the most you can have.` : Game.mpbLocked(m, me, selected) ? `Sabotaged by their Shadow Den: no ${esc(units[selected].name)} can be deployed this round.` : Game.deploysLeft(m, me, selected) <= 0 ? 'No deployments left this round.' : `Not enough gold for ${esc(units[selected].name)}.`)
         : (fresh ? 'Drag a squad to move it.' : 'Pick a unit, then tap a tile in your zone.');
       if (left <= 0 && selected === null) hint = Game.deployBuyable(m, me) ? `No deployments left. +1 costs ${Game.deployCost(m, me)}.` : 'No deployments left.';
+      if (left <= 0 && selected === null && duoOn() && units.some((u, i) => !Game.isOff(m, i, me) && Game.deploysLeft(m, me, i) > 0)) hint = `Shadow deployment left: a Rogue, an Assassin or Shadowhands only.${Game.deployBuyable(m, me) ? ` Any other unit: +1 costs ${Game.deployCost(m, me)}.` : ''}`; // (2v2: the Shadow Den, src/mpb.js shadowBonus)
       if (readyN && selected === null) hint = `${readyN} squad${readyN === 1 ? '' : 's'} ready to level up.`;
       if (Game.charOf(m, me) === 'zoe' && selected === null && (m.buff && m.buff[me] || []).length) hint += ` Starred tiles: ${zoeLine(Game.zoeBuff(m, me))} (tap one for more).`;
       if (Game.hailRound(m) && selected === null && !fresh) hint = `Hail this round: ${Game.ICE.hailDps} damage a second on hail tiles. ${MORE('map-more')}`;
@@ -9017,12 +9018,12 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     // panel(): the line over the shop while a team watches the other ("You are being watched").
     shadowDen: {
       html(side, rec, live) {
-        const mine = side === me, L = duoMyLane(), key = rec.key, info = Mpb.kindOf('shadowDen').hooks.info(m, side, rec);
+        const mine = side === me, L = duoMyLane(), key = rec.key, info = Mpb.kindOf('shadowDen').hooks.info(m, side, rec, me);
         let out = info.length ? `<p style="margin:0">${info.map(esc).join(' · ')}</p>` : '';
         if (!mine) return out;
         out += `<p class="hint" style="margin:0">Shadow deployment: ${Mpb.DEN.tokens} more a round for each of you, only for Rogues, Assassins and Shadowhands. Shadowhands are in your shop (tier 1) while the Den stands.</p>`;
         if (phase !== 'deploy') return out;
-        const imp = Mpb.impNow(m, rec), myImp = imp.find(x => x.lane === L), sab = rec.data.sab && rec.data.sab.round === m.round ? rec.data.sab : null;
+        const imp = Mpb.impNow(m, rec), myImp = imp.find(x => x.lane === L), sab = Mpb.sabNow(m, rec);
         const ins = rec.data.insider && rec.data.insider.round === m.round;
         const nm = (ui) => esc((units[ui] || {}).name || '?');
         const ts = Mpb.impTargets(m, me);

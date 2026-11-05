@@ -67,6 +67,8 @@
   const teamOf = (o, half) => ({ half, armies: [0, 1].map(sd => (o.armies[sd] || []).map(moved)),
     buildings: [0, 1].map(sd => ((o.buildings && o.buildings[sd]) || []).map(b => ({ id: b.id, col: b.col, row: b.row, round: b.round, built: !!b.built }))),
     tech: [0, 1].map(sd => (o.tech && o.tech[sd]) || null),
+    // squads sold this round (as Game.soldNow): the Shadow Den's Impersonate may still pick one (src/mpb.js teamSold)
+    sold: [0, 1].map(sd => G.soldNow(o, sd).map(moved)),
     // each carrier's one in and one out this round (Game.horseOk), under the carrier's id as this lane sees it
     horse: [0, 1].map(sd => { const h = (o.horse && o.horse[sd]) || {}, out = {}; for (const k in h) out[flip(+k)] = { r: h[k].r, in: h[k].in != null ? 1 : null, out: h[k].out != null ? 1 : null }; return out; }) });
   // the server's copy: each lane gets the other lane's squads as they really stand (the rules check against them)
@@ -181,7 +183,7 @@
       if (c) for (const x of list) if (x.squad === r.rider) { x.boarded = true; x.alive = false; x.carrier = c; x.x = c.x; x.y = c.y; x.delay = 0; }
     }
     // the team's buildings (src/mpb.js): lane 0 builds them, once for the team
-    for (const sd of [0, 1]) for (const b of M.bodies(lanes[0], sd)) { b.lane = 0; (sd === 0 ? A : B).push(b); }
+    for (const sd of [0, 1]) for (const b of M.bodies(lanes[0], sd, undefined, lanes)) { b.lane = 0; (sd === 0 ? A : B).push(b); }
     G.useGrid(MAP);
     const ch = charm.map(c => Object.keys(c).length ? c : null);
     // portal: where a team's tower falls, a portal to the other team's tower opens (Engine opts.portal; 2v2 only)
@@ -189,7 +191,7 @@
     const o = { tiles: s0.opts.tiles || [], strikes: s0.opts.strikes || [], neutrals: s0.opts.neutrals || [], charm: ch, terrain: s0.opts.terrain || null, objective: null, record: opts.record !== false, portal };
     const art = M.artifactsFor(lanes[0]); // rounds 2 and 8: the two artifacts (Engine opts.artifacts)
     if (art) o.artifacts = art;
-    M.battleOpts(lanes[0], o); // what the buildings add (o.mpb and the rest)
+    M.battleOpts(lanes[0], o, lanes); // what the buildings add (o.mpb and the rest)
     G.useGrid(MAP);
     return E.createBattle(A, B, s0.g, o);
   }
@@ -303,7 +305,7 @@
     if (D.phase !== 'deploy') { D.deadline = 0; D.held = 0; mirror(D); return; }
     const stop = picksPending(D) || someoneAway(D, now);
     if (stop && D.deadline) { D.held = Math.max(MIN_LEFT_MS / 2, D.deadline - now); D.deadline = 0; }
-    else if (!stop && !D.deadline) { D.deadline = now + Math.max(MIN_LEFT_MS, D.held || deployMsOf(D)); D.held = 0; }
+    else if (!stop && !D.deadline) { D.deadline = now + Math.max(MIN_LEFT_MS, D.held || deployMsOf(D)); D.held = 0; setDenCut(D, now); }
     mirror(D);
   }
 
@@ -446,6 +448,7 @@
     const O = D.lanes[1 - lane].m, sc = Ref.withUnits(Ref.snapshot(O), O.units, O.matrix);
     if (D.tbase[sd]) putTeamState(sc, sd, D.tbase[sd]);
     sc.gold[sd] = 1e9;
+    sc.mpbReplay = true; // (a building's canBuy doesn't check the other team's squads again: the Shadow Den's Impersonate)
     for (const e of D.tlog[sd]) {
       const sys = e.fn.startsWith('sys:'), fn = sys ? M.SYS[e.fn.slice(4)] : G[e.fn === 'unfortify' ? 'unplaceBwall' : e.fn];
       sc.duoLane = sys ? e.as : O.duoLane; // who voted (who paid: the teammate)
@@ -503,8 +506,17 @@
   }
   const canAct = (D, seat) => D.phase === 'deploy' && !D.ready[seat] && !D.lanes[0].m.over;
   // ms off this seat's deploy clock: the other team's Shadow Den watches them (Insider information, src/mpb.js). The
-  // fight still starts at D.deadline; their actions stop that much sooner (act) and their clock shows it (the server)
-  const cutFor = (D, seat) => (D.phase === 'deploy' && D.lanes[0] ? M.deployCut(D.lanes[0].m, SEATS[seat].side) : 0);
+  // fight still starts at D.deadline; their actions stop that much sooner (act) and their clock shows it (the server:
+  // remainingFor, heldFor). The cut is fixed each time the clock (re)starts (D.denCut, by team) and leaves them at least
+  // DEN_MIN_MS: a clock back from a pause with 10 s left doesn't run out at once.
+  const DEN_MIN_MS = 5000;
+  const denCutOf = (D, sd, span) => (D.lanes[0] ? Math.min(M.deployCut(D.lanes[0].m, sd), Math.max(0, span - DEN_MIN_MS)) : 0);
+  function setDenCut(D, now) { D.denCut = [0, 1].map(sd => denCutOf(D, sd, D.deadline - now)); }
+  const cutFor = (D, seat) => (D.phase === 'deploy' && D.deadline && D.denCut ? D.denCut[SEATS[seat].side] || 0 : 0);
+  // what the server sends as the seat's clock: ms left (a watched team's at least 1 while the clock runs: "Time's up",
+  // not "paused"), and while it is held
+  function remainingFor(D, seat, now) { if (!D.deadline) return 0; const c = cutFor(D, seat); return c ? Math.max(1, D.deadline - c - now) : D.deadline - now; }
+  function heldFor(D, seat) { const c = D.held && D.phase === 'deploy' ? denCutOf(D, SEATS[seat].side, Math.max(MIN_LEFT_MS, D.held)) : 0; return c ? Math.max(1, D.held - c) : D.held; }
   // a placement vote or the draft's pick: both lanes at once (Referee.act's checks: the action's number, the clock,
   // its arguments)
   function sysAct(D, seat, d, now) {
@@ -618,9 +630,8 @@
   // placement votes (both players' tiles) and Vault are in m (team state); the opponents' buildings without this
   // round's skills, votes and Vault moves (Referee.hide -> Mpb.hide). The clocks: clocks(D, seat, now).
   function viewFor(D, seat) {
-    const own = SEATS[seat], R = D.lanes[own.lane], O = D.lanes[1 - own.lane];
-    // the Shadow Den's Insider information (src/mpb.js watching): this team sees the opponents' deployment live
-    const deploy = D.phase === 'deploy' && !M.watching(R.m, own.side);
+    const own = SEATS[seat], R = D.lanes[own.lane], O = D.lanes[1 - own.lane], deploy = D.phase === 'deploy';
+    // (the Shadow Den's Insider information: Referee.hide shows a watched team's squads live, Game.foeSeen)
     const v = Ref.view(R.m, own.side, deploy, R.base), o = Ref.view(O.m, own.side, deploy, O.base);
     v.team = teamOf(o, own.lane);
     return { m: v };
@@ -636,7 +647,7 @@
   const api = {
     V, MAP, OFF, HP, PINGS, EMOTES, EMOTE_TEXT, SEATS, SEAT_NAMES, seatOf, mateOf, remap, unmap, laneOfId, move, teamOf, setTeam, setTeams,
     MECHITES, unitSet, TEAM_FIELDS, TEAM_FNS, SYS_FNS, copyTeam, copyAll, teamBody, settle, battle, laneResult, fight, view,
-    create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, viewFor, clock, clocks, canAct, cutFor, save, load, humans,
+    create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, viewFor, clock, clocks, canAct, cutFor, remainingFor, heldFor, save, load, humans,
     mpbPending, mpbTick, mpbSettle, rebuildTeam, teamState,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

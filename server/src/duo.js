@@ -140,7 +140,7 @@ export class DuoRoom extends DurableObject {
     const pair = (arr) => [arr[Duo.seatOf(own.lane, 0)], arr[Duo.seatOf(own.lane, 1)]];
     const v = Duo.viewFor(D, seat);
     return {
-      t: 'sync', phase: D.phase, round: R.m.round, m: v.m, remaining: D.deadline ? D.deadline - Duo.cutFor(D, seat) - now : 0, held: D.held && Math.max(1, D.held - Duo.cutFor(D, seat)), // (cutFor: the Shadow Den's Insider information, src/mpb.js)
+      t: 'sync', phase: D.phase, round: R.m.round, m: v.m, remaining: Duo.remainingFor(D, seat, now), held: Duo.heldFor(D, seat), // (the Shadow Den's Insider information cuts a watched team's clock, src/duo.js)
       ready: pair(D.ready), nextReady: pair(D.nextReady), rematch: pair(D.rematch), summary: D.summary ? D.summary[own.lane] : null, fights: D.fights,
       ack: R.seq[own.side], here: pair(here.map((h, k) => h || D.bots[k])), forfeit: D.forfeit != null ? Duo.SEATS[D.forfeit].side : null,
       names: pair(this.names()), players: null, ranked: null,
@@ -296,7 +296,7 @@ export class DuoRoom extends DurableObject {
       if (a.role !== 'p') continue;
       const own = Duo.SEATS[a.seat], pair = (arr) => [arr[Duo.seatOf(own.lane, 0)], arr[Duo.seatOf(own.lane, 1)]];
       this.send(s, { t: 'status', ready: pair(D.ready), nextReady: pair(D.nextReady), rematch: pair(D.rematch), here: pair(here.map((h, k) => h || D.bots[k])),
-        remaining: D.deadline ? D.deadline - Duo.cutFor(D, a.seat) - now : 0, held: D.held && Math.max(1, D.held - Duo.cutFor(D, a.seat)), phase: D.phase, duo: this.duoInfo(a.seat, here) });
+        remaining: Duo.remainingFor(D, a.seat, now), held: Duo.heldFor(D, a.seat), phase: D.phase, duo: this.duoInfo(a.seat, here) });
     }
   }
   welcome(seat) {

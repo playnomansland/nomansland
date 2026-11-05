@@ -3349,15 +3349,18 @@ const Game = (() => {
     aiHunt(m, side); // Hunters mark the priciest enemy squad they may
     let guard = 0;
     while (m.gold[side] - reserve >= minCost && guard++ < 60) {
+      let shadowOnly = false; // 2v2 Shadow Den: only its Shadow deployment is left (src/mpb.js shadowBonus): one of its units, no buy
       if (deploysLeft(m, side) <= 0) {
+        shadowOnly = !!(MPB && m.mpb) && m.units.some((u, i) => !isOff(m, i, side) && !mpbLocked(m, side, i) && deploysLeft(m, side, i) > 0 && shopCost(m, side, i) + (isUnlocked(m, side, i) ? 0 : unlockCost(m, i, side)) <= m.gold[side] - reserve);
         // out of deployments: buy one more only if a squad is still affordable after it
-        if (m.extraDeploys[side] >= AI.maxExtraDeploys || m.gold[side] - reserve < minCost + deployCost(m, side)) break;
-        if (!aiCall('buyDeploy', m, side)) break;
+        if (!shadowOnly && (m.extraDeploys[side] >= AI.maxExtraDeploys || m.gold[side] - reserve < minCost + deployCost(m, side))) break;
+        if (!shadowOnly && !aiCall('buyDeploy', m, side)) break;
       }
       const budget = m.gold[side] - reserve;
       let best = -1, bs = -Infinity;
       m.units.forEach((u, i) => {
         if (isOff(m, i, side) || capFull(m, side, i) || mpbLocked(m, side, i)) return;
+        if (shadowOnly && deploysLeft(m, side, i) <= 0) return;
         if (u.building && ((own[i] || 0) >= 1 || m.round < 3)) return; // a building (Altar of Build): one, from round 3
         const extra = isUnlocked(m, side, i) ? 0 : unlockCost(m, i, side); // a locked unit costs its unlock on top
         if (shopCost(m, side, i) + extra > budget) return;

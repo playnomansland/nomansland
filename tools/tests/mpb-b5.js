@@ -252,7 +252,7 @@ check('No flank delay for Rogues, Assassins and Shadowhands while the Den stands
 });
 
 // round 2 with a Den for team A; enemy package squads (round 1) are visible targets
-const standUp = (x, key) => { for (const L of [0, 1]) recIn(x, L, 0, key).fell = 0; }; // (as if it wasn't destroyed in the fights so far)
+const standUp = (x, key) => { for (const L of [0, 1]) recIn(x, L, 0, key).fell = 0; const t = x.D.tbase[0] && x.D.tbase[0].mpb.find(r => r.key === key); if (t) t.fell = 0; }; // (as if it wasn't destroyed in the fights so far; Undo all starts from tbase)
 function denRound2(seed, round = 2) {
   const x = match(seed), { D } = x, key = addKind(D, 0, 'shadowDen');
   playTo(x, round);
@@ -310,7 +310,7 @@ check('Sabotage: the other team can\'t deploy that unit type next round (both la
   assert.ok(try1(x, 1, 'mpbBuy', key, 'sabotage', BRUTE).ok, 'A2 sabotages the Brute');
   assert.ok(!x.act(0, 'mpbBuy', key, 'sabotage', WISPS).ok, 'once a round for the team');
   assert.strictEqual(x.m(1).gold[0], 1900);
-  for (const seat of [2, 3]) { const v = Duo.viewFor(D, seat).m; assert.ok(!Mpb.recOf(v, 0, key).data.sab, 'hidden from seat ' + seat); }
+  for (const seat of [2, 3]) { const v = Duo.viewFor(D, seat).m; assert.ok(!Mpb.sabNow(v, Mpb.recOf(v, 0, key)), 'hidden from seat ' + seat); }
   assert.ok(placeAt(x, 2, BRUTE, Game.zoneRows(1)), 'this round they still may');
   playTo(x, 3);
   for (const L of [0, 1]) for (const sd of [0, 1]) gold(x, L, sd, 2000);
@@ -406,6 +406,186 @@ check('Den destroyed: the team\'s Shadowhands are lost, no Den skills next round
   assert.ok(x.act(1, 'mpbBuy', key, 'insider').ok, 'the round after: Den skills again');
 });
 
+// ----- after review (2026-11-05): fixes of the Den and the Factory -----
+check('Sabotage two rounds in a row: the lock in force holds through its round (a new buy, its take-back, Undo all), the new one locks the next', () => {
+  const { x, D, key } = denRound2(37);
+  for (const seat of [2, 3]) x.act(seat, 'unlock', BRUTE);
+  assert.ok(x.act(1, 'mpbBuy', key, 'sabotage', BRUTE).ok, 'round 2: A2 sabotages the Brute');
+  playTo(x, 3);
+  standUp(x, key);
+  for (const L of [0, 1]) for (const sd of [0, 1]) gold(x, L, sd, 2000);
+  teams(D);
+  const locked = (ui) => [0, 1].map(L => Game.mpbLocked(x.m(L), 1, ui));
+  const seen = () => [2, 3].map(seat => Game.mpbLocked(W(Duo.viewFor(D, seat).m), 1, BRUTE) && !Game.mpbLocked(W(Duo.viewFor(D, seat).m), 1, WISPS));
+  assert.deepStrictEqual(locked(BRUTE), [true, true], 'round 3: the Brute is locked in both lanes');
+  assert.ok(try1(x, 0, 'mpbBuy', key, 'sabotage', WISPS).ok, 'A1 sabotages the Wisps for round 4');
+  assert.deepStrictEqual(locked(BRUTE), [true, true], 'the Brute stays locked');
+  assert.deepStrictEqual(locked(WISPS), [false, false], 'the Wisps not yet');
+  assert.deepStrictEqual(seen(), [true, true], 'their pages: still the X on the Brute only (the new buy stays hidden)');
+  const t = tileFor(x, 2, BRUTE, Game.zoneRows(1));
+  assert.ok(!x.act(2, 'place', BRUTE, t.col, t.row).ok, 'B1 still can\'t deploy a Brute');
+  assert.ok(try1(x, 0, 'mpbUndo', key, 'sabotage').ok, 'A1 takes it back');
+  assert.deepStrictEqual(locked(BRUTE), [true, true], 'the Brute stays locked after the take-back');
+  assert.ok(try1(x, 0, 'mpbBuy', key, 'sabotage', WISPS).ok, 'and buys it again');
+  assert.ok(placeAt(x, 1, WISPS, Game.zoneRows(0)) && x.act(1, 'undoAll').ok, 'A2 places a squad, then Undo all');
+  for (const L of [0, 1]) { assert.deepStrictEqual(locked(BRUTE)[L], true); assert.strictEqual((Mpb.sabNow(x.m(L), recIn(x, L, 0, key)) || {}).ui, WISPS, 'lane ' + L + ': A1\'s new buy stays'); }
+  sameTeam(D, 0); inStep(D);
+  assert.ok(!x.act(2, 'place', BRUTE, t.col, t.row).ok, 'still no Brute for B1');
+  playTo(x, 4);
+  for (const L of [0, 1]) gold(x, L, 1, 2000);
+  assert.deepStrictEqual(locked(BRUTE), [false, false], 'round 4: the Brute is free again');
+  assert.deepStrictEqual(locked(WISPS), [true, true], 'the Wisps are locked');
+  assert.ok(recIn(x, 0, 0, key).data.sab.every(e => e.round === 3), 'round 2\'s buy is dropped');
+  assert.ok(placeAt(x, 2, BRUTE, Game.zoneRows(1)), 'B1 deploys a Brute');
+});
+
+check('Impersonate: a squad sold this round stays a target (server and page agree, either lane); Undo all keeps the teammate\'s paid buy', () => {
+  const { x, D, key } = denRound2(31);
+  const tA2 = Mpb.impTargets(x.m(1), 0).filter(t => t.who === 1); // A2: B1's squads (lane 0)
+  assert.ok(tA2.length >= 2, 'B1 has two targets');
+  const [s0, s1] = tA2;
+  assert.ok(x.act(2, 'sell', s0.id).ok, 'B1 sells one');
+  teams(D);
+  assert.ok(Mpb.impTargets(x.m(1), 0).some(t => t.who === 1 && t.id === s0.id), 'the server still offers it to A2 (the sale is hidden)');
+  assert.ok(Mpb.impTargets(W(Duo.viewFor(D, 1).m), 0).some(t => t.who === 1 && t.id === s0.id), 'and A2\'s page');
+  assert.ok(try1(x, 1, 'mpbBuy', key, 'impersonate', 1, s0.id).ok, 'A2 impersonates the sold squad');
+  assert.ok(x.act(2, 'sell', s1.id).ok, 'B1 sells the other too');
+  assert.ok(placeAt(x, 0, WISPS, Game.zoneRows(0)) && x.act(0, 'undoAll').ok, 'A1 places a squad and does Undo all');
+  for (const L of [0, 1]) {
+    const r = recIn(x, L, 0, key);
+    assert.ok(Mpb.impNow(x.m(L), r).some(e => e.lane === 1 && e.id === s0.id) && r.skills.impersonate.by[1] === 1, 'lane ' + L + ': A2\'s Impersonate stays');
+  }
+  assert.strictEqual(x.m(1).gold[0], 1800, 'A2 paid for it');
+  sameTeam(D, 0); inStep(D);
+  // the sold squad isn't in the fight: nothing happens
+  const bt = fightTo(x, Mpb.DEN.impAt + 0.3);
+  assert.ok(!bt.bodies.some(b => b.impersonated), 'no Shadowhand from a squad that was sold');
+  assert.ok(x.act(1, 'mpbUndo', key, 'impersonate').ok && x.m(1).gold[0] === 2000, 'A2 can take it back, gold back');
+});
+
+check('Impersonate a live squad while watching: a squad id used again after their Undo all is no target', () => {
+  const { x, D, key } = denRound2(38, 3);
+  assert.ok(x.act(1, 'mpbBuy', key, 'insider').ok);
+  playTo(x, 4);
+  standUp(x, key);
+  for (const L of [0, 1]) for (const sd of [0, 1]) gold(x, L, sd, 3000);
+  const t1 = units.findIndex((u, i) => Game.tierOf(units, i) === 1 && !u.building && !u.mpbUnit && !u.carrier && !Game.isOff(x.m(0), i, 1));
+  const t3 = units.findIndex((u, i) => Game.tierOf(units, i) >= 3 && !u.building && !u.carrier && !Game.isOff(x.m(0), i, 1));
+  const s1 = placeAt(x, 2, t1, [0, 1, 2]); // (at the back: alive 5 s in)
+  teams(D);
+  assert.ok(Mpb.impTargets(x.m(0), 0).some(t => t.who === 0 && t.id === s1.id), 'A1 (watching) may pick B1\'s new ' + units[t1].name);
+  assert.ok(try1(x, 0, 'mpbBuy', key, 'impersonate', 0, s1.id).ok, 'A1 impersonates it');
+  assert.strictEqual(Mpb.impNow(x.m(0), recIn(x, 0, 0, key))[0].u, t1, 'the buy keeps its unit type');
+  // the target stays: the Shadowhand comes
+  let bt = fightTo(x, Mpb.DEN.impAt + 0.3);
+  assert.strictEqual(bt.bodies.filter(b => b.impersonated).length, 1, 'with the squad there: a Shadowhand');
+  assert.ok(x.act(2, 'undoAll').ok, 'B1\'s Undo all');
+  x.act(2, 'unlock', t3);
+  const s3 = placeAt(x, 2, t3, [0, 1, 2]);
+  assert.strictEqual(s3.id, s1.id, 'their ' + units[t3].name + ' (tier ' + Game.tierOf(units, t3) + ') gets the same id');
+  bt = fightTo(x, Mpb.DEN.impAt + 0.3);
+  assert.ok(!bt.bodies.some(b => b.impersonated) && !bt.bodies.some(b => b.side === 1 && b.sacrificed), 'no body of it is taken, no Shadowhand');
+});
+
+check('Insider information: the watchers see the squads live, but not the watched team\'s gold, buys, Vault or levels', () => {
+  const { x, D, key } = denRound2(33, 3);
+  const fkey = addKind(D, 1, 'factory');
+  assert.ok(x.act(1, 'mpbBuy', key, 'insider').ok);
+  playTo(x, 4);
+  standUp(x, key);
+  for (const L of [0, 1]) { recIn(x, L, 1, fkey).fell = 0; for (const sd of [0, 1]) gold(x, L, sd, 2000); }
+  for (const R of D.lanes) R.base = { gold: R.m.gold.slice(), nextId: R.m.nextId.slice() };
+  assert.ok(Mpb.watching(x.m(0), 0));
+  assert.ok(x.act(2, 'mpbBuy', fkey, 'cogmech').ok && x.act(2, 'vaultPut', 150).ok, 'B1 buys a CogMech and puts 150 in the Vault');
+  const old = x.m(0).armies[1].find(q => q.round < x.m(0).round);
+  assert.ok(x.act(2, 'levelUp', old.id).ok, 'B1 levels a squad');
+  const nw = placeAt(x, 2, WISPS, Game.zoneRows(1));
+  for (const seat of [0, 1]) {
+    const v = Duo.viewFor(D, seat).m, vb = seat === 0 ? v.armies[1] : v.team.armies[1].map(q => ({ ...q, id: q.id - Duo.OFF }));
+    assert.ok(vb.some(q => q.id === nw.id), 'seat ' + seat + ' sees B1\'s new squad');
+    if (seat === 0) {
+      assert.strictEqual(v.gold[1], 2000, 'A1: their gold as the round began');
+      assert.ok(!Mpb.facNow(v, Mpb.recOf(v, 1, fkey)), 'nor their Factory buy');
+      assert.strictEqual(v.vault[1].gold, 0, 'nor their Vault move');
+      assert.strictEqual(v.armies[1].find(q => q.id === old.id).level, old.level - 1, 'nor the level bought this round');
+    }
+  }
+  inStep(D);
+});
+
+check('Insider information\'s cut after a pause: the watched team keeps at least 5 s, and its clock reads time up, not paused', () => {
+  const { x, D, key } = denRound2(33, 3);
+  assert.ok(x.act(1, 'mpbBuy', key, 'insider').ok);
+  playTo(x, 4);
+  for (const L of [0, 1]) for (const sd of [0, 1]) gold(x, L, sd, 2000);
+  assert.strictEqual(Duo.remainingFor(D, 2, x.T), D.deadline - x.T - Mpb.DEN.cut, 'a full round: 15 s less');
+  assert.strictEqual(Duo.remainingFor(D, 0, x.T), D.deadline - x.T, 'the watchers: all of it');
+  const t1 = D.deadline - 12000;
+  Duo.setAway(D, 0, true, t1);
+  assert.ok(!D.deadline && D.held === 12000);
+  assert.ok(Duo.heldFor(D, 2) >= 5000 && Duo.heldFor(D, 2) < 12000 && Duo.heldFor(D, 0) === 12000, 'held: ' + Duo.heldFor(D, 2) + ' for team B');
+  const t2 = t1 + 3000;
+  Duo.setAway(D, 0, false, t2);
+  assert.strictEqual(Duo.remainingFor(D, 0, t2), 12000, 'team A: 12 s');
+  assert.strictEqual(Duo.remainingFor(D, 2, t2), 5000, 'team B: 5 s, not less than nothing');
+  D.now = t2 + 100;
+  const tB = tileFor(x, 2, WISPS, Game.zoneRows(1));
+  assert.ok(x.act(2, 'place', WISPS, tB.col, tB.row).ok, 'B1 may still act');
+  assert.strictEqual(Duo.remainingFor(D, 2, t2 + 8000), 1, 'once their time is up the server sends 1 ms (the page says time\'s up)');
+  D.now = t2 + 5000 + Ref.GRACE_MS + 1;
+  const tB2 = tileFor(x, 2, WISPS, Game.zoneRows(1));
+  assert.strictEqual(x.act(2, 'place', WISPS, tB2.col, tB2.row).why, 'time', 'then refused');
+  D.now = 0;
+});
+
+check('the buyer\'s own lane: a lane-1 Impersonate gets A2\'s Shadowhands skills, a lane-1 Factory unit is made from lane 1', () => {
+  const { x, D, key } = denRound2(39), fkey = addKind(D, 0, 'factory');
+  for (const L of [0, 1]) recIn(x, L, 0, fkey).fell = 0;
+  // A2 has Frenzy for Shadowhands (lane 1 only)
+  x.m(1).tech[0][SH] = Engine.SLOTS.map((s, k) => (k === 2 ? 1 : 0));
+  const u0 = Engine.leveled(Game.unitFor(x.m(0), 0, SH), 0), u1 = Engine.leveled(Game.unitFor(x.m(1), 0, SH), 0);
+  assert.notDeepStrictEqual(JSON.parse(JSON.stringify(u0)), JSON.parse(JSON.stringify(u1)), 'the two lanes\' Shadowhands differ');
+  const t = Mpb.impTargets(x.m(1), 0)[0];
+  assert.ok(x.act(1, 'mpbBuy', key, 'impersonate', t.who, t.id).ok, 'A2 impersonates');
+  assert.ok(x.act(1, 'mpbBuy', fkey, 'fighter').ok, 'A2 buys the Factory\'s Fighter');
+  const seen = [], orig = Game.buildingMakes;
+  Game.buildingMakes = (m, ...a) => { seen.push(m.duoLane); return orig(m, ...a); };
+  let bt;
+  try { bt = fightTo(x, Mpb.DEN.impAt + 0.3); } finally { Game.buildingMakes = orig; }
+  assert.deepStrictEqual(seen, [1], 'the Factory unit is made from A2\'s lane');
+  const k = bt.bodies.find(b => b.impersonated);
+  assert.ok(k && k.lane === 1, 'a Shadowhand in A2\'s colour');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(k.u.skills || null)), JSON.parse(JSON.stringify(u1.skills || null)), 'with A2\'s skills');
+  assert.strictEqual(k.u.frenzy, u1.frenzy, 'Frenzy as lane 1 has it');
+});
+
+check('the Den\'s sheet lines read right for both teams', () => {
+  const { x, D, key } = denRound2(40, 3);
+  for (const seat of [2, 3]) x.act(seat, 'unlock', BRUTE);
+  assert.ok(x.act(0, 'mpbBuy', key, 'sabotage', BRUTE).ok && x.act(1, 'mpbBuy', key, 'insider').ok);
+  playTo(x, 4);
+  standUp(x, key);
+  const info = Mpb.kindOf('shadowDen').hooks.info, rec = recIn(x, 0, 0, key);
+  assert.deepStrictEqual(info(x.m(0), 0, rec, 0), ['Sabotage: their Brute can’t be deployed this round.', 'Insider information: you see their deployment live.'], 'the owners');
+  assert.deepStrictEqual(info(x.m(0), 0, rec, 1), ['Sabotage: your Brute can’t be deployed this round.', 'Insider information: they see your deployment live.'], 'the opponents');
+});
+
+check('the Shadow deployment: once the normal deployments are used, a bot places a Den unit on it instead of buying one', () => {
+  const { x, D } = denRound2(41);
+  const m = x.m(0);
+  for (const L of [0, 1]) gold(x, L, 0, 3000);
+  let guard = 0;
+  while (Game.deploysLeft(m, 0) > 0 && guard++ < 20) assert.ok(placeAt(x, 0, WISPS, Game.zoneRows(0)), 'a Wisps');
+  assert.ok(Game.deploysLeft(m, 0) <= 0 && Game.deploysLeft(m, 0, SH) === 1, 'no normal deployment left, the Shadow one is');
+  const extra = m.extraDeploys[0], n = m.armies[0].length;
+  teams(D);
+  Game.aiDeploy(m, 0);
+  const fresh = m.armies[0].slice(n);
+  assert.ok(fresh.length >= 1 && Mpb.denUnit(m, fresh[0].unit), 'its first squad is a Den unit: ' + (fresh[0] ? units[fresh[0].unit].name : 'none'));
+  assert.ok(m.extraDeploys[0] >= extra, '(it may buy deployments after)');
+  assert.ok(fresh.filter(q => Mpb.denUnit(m, q.unit)).length >= 1 && m.extraDeploys[0] - extra <= fresh.length - 1, 'the Den unit came without a bought deployment');
+});
+
 check('mirror: both teams\' Impersonate and Factory give mirrored fight effects', () => {
   Game.useGrid('duo');
   const Wb = Engine.withTraits(units[WISPS]), fac = Mpb.unitOf({}, 0, { kind: 'factory' });
@@ -448,7 +628,7 @@ check('hidden info and the page\'s copy: Den and Factory actions hash as the ser
   inStep(D);
   for (const seat of [2, 3]) {
     const v = Duo.viewFor(D, seat).m, r = Mpb.recOf(v, 0, key), f = Mpb.recOf(v, 0, fkey);
-    assert.ok(!(r.data.imp || []).length && !r.data.sab && !r.data.insider && !r.skills.impersonate && !Mpb.facNow(v, f), 'seat ' + seat + ' sees none of this round\'s buys');
+    assert.ok(!(r.data.imp || []).length && !Mpb.sabNow(v, r) && !r.data.insider && !r.skills.impersonate && !Mpb.facNow(v, f), 'seat ' + seat + ' sees none of this round\'s buys');
   }
 });
 
@@ -465,7 +645,7 @@ check('full bot 2v2s, rounds 1 to 10, both kinds on both teams: no exception, te
       inStep(D);
       const m = D.lanes[0].m;
       for (const sd of [0, 1]) for (const r of Mpb.recs(m, sd)) {
-        if (r.kind === 'shadowDen') { used.imp += Mpb.impNow(m, r).length; used.sab += r.data.sab && r.data.sab.round === m.round ? 1 : 0; used.ins += r.data.insider && r.data.insider.round === m.round ? 1 : 0; }
+        if (r.kind === 'shadowDen') { used.imp += Mpb.impNow(m, r).length; used.sab += Mpb.sabNow(m, r) ? 1 : 0; used.ins += r.data.insider && r.data.insider.round === m.round ? 1 : 0; }
         if (r.kind === 'factory' && Mpb.facNow(m, r)) used.fac++;
       }
       for (const R of D.lanes) for (const sd of [0, 1]) used.hands += R.m.armies[sd].filter(q => q.unit === SH && q.round === R.m.round).length;
