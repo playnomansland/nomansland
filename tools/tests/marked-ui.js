@@ -65,7 +65,7 @@ let bad = 0; const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') + msg)
   // a Hunter's mark on our Brute as well: two boxes. Their Sniper, awakened as a Hunter in an earlier round
   const hunt = await p.evaluate((a) => {
     const { m, me } = window.__pb(), fo = 1 - me, sn = m.units.findIndex(u => u.name === 'Sniper');
-    m.unlocks[fo][sn] = 1;
+    m.unlocks[fo][sn] = 1; m.gold[fo] = 99999;
     const h = Game.place(m, fo, sn, 6, Game.zoneRows(fo)[3]);
     h.round = m.round - 1;
     const k = m.units[sn].skills ? m.units[sn].skills.length : 0;
