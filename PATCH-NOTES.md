@@ -20,6 +20,14 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 5 November 2026 – Exploit bot (developers)
+
+- **Developer > Exploit bot:** pick one of six tactics the exploit hunt found (Flank snipers, Steel Wizard flank, Necromancer home guard, Back-line wizards, Hoarder, Arrow rush) and the AI opponent plays it in any match against the computer, so you can feel each exploit from the other side of the board. Off is the normal AI.
+- Developers only: nobody else sees the picker, and standard and ranked matches can't get it. Every move goes through the game's normal rules, so the bot never cheats.
+- Checked on today's engine: win rates against the normal AI from 40% (Back-line wizards) to about 90% (Steel Wizard flank), with no refused moves in 180 matches.
+
+---
+
 ## 5 November 2026 – Sniper tower: paratroopers, and marked squads say so
 
 ### Sniper tower: paratroopers
