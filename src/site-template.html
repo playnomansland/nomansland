@@ -2187,7 +2187,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
         }
         if (mode !== 'guest' && mode !== 'spec' && mode !== 'net' && left <= (mode === 'host' ? -500 : 0)) runFight();
         else if ((mode === 'guest' || mode === 'net') && left <= 0 && !timeUp) { commitPick(); timeUp = true; selected = null; closeSheet(); sendSide(); panelDeploy(); render(); }
-      } else if (el) { el.textContent = heldMs || ((mode === 'guest' || mode === 'net') && net.connected && m && m.round === Game.TOWER_PICK_ROUND) ? 'picking towers' : solo() ? '' : 'paused'; el.classList.remove('low'); }
+      } else if (el) { el.textContent = mpbOn() && (Mpb.draftOpen(m) || Mpb.voteHead(m, 0) || Mpb.voteHead(m, 1) || mpbClockAt.vote > now() || mpbClockAt.draft > now()) ? 'placing' : heldMs || ((mode === 'guest' || mode === 'net') && net.connected && m && m.round === Game.TOWER_PICK_ROUND) ? 'picking towers' : solo() ? '' : 'paused'; el.classList.remove('low'); }
     }
     if ((phase === 'result' || phase === 'end') && resultShownAt) {
       const left = resultShownAt + nextSecs() * 1000 - t;
@@ -8897,7 +8897,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function mpbClockIn(c) { if (!c) return; const t = now(); mpbClockAt = { vote: c.vote ? t + c.vote : 0, draft: c.draft ? t + c.draft : 0 }; }
   const mpbLeft = (k) => Math.max(0, Math.ceil((mpbClockAt[k] - now()) / 1000));
   setInterval(() => { for (const k of ['vote', 'draft']) { const el = $('mpb-' + k + '-s'); if (el) el.textContent = mpbClockAt[k] ? mpbLeft(k) + ' s' : ''; } }, 250);
-  const mpbOn = () => duoOn() && !!m && typeof Mpb !== 'undefined' && Mpb.on(m);
+  function mpbOn() { return duoOn() && !!m && typeof Mpb !== 'undefined' && Mpb.on(m); }
   const teamName = (sd) => sd === me ? 'Your team' : 'Their team';
   const MPB_PER = { round: 'Once a round for the team', roundPlayer: 'Once a round for each of you', match: 'Once a match', building: 'Once for this building', free: 'As often as you like' };
   const mpbPerText = (sk) => (MPB_PER[sk.per] || MPB_PER.free) + (sk.costStep ? `, +${sk.costStep} gold for each of your clicks this round` : '');
@@ -9022,7 +9022,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const fell = rec.fell ? `<p class="hint" style="margin:0">Destroyed in round ${rec.fell}’s fight; it stands again in every fight.</p>` : '';
     $('sheet').innerHTML = `
       <div class="bar"><h3 id="sheet-h">${teamName(side)}’s ${esc(K.name.replace(/^The /, ''))}</h3><button class="btn small" id="close">Close</button></div>
-      <p style="margin:0"><span class="chip" style="border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px;color:${K.color}">${esc(K.kind)}</span> ${K.hp > 0 ? `${K.hp} health · ${K.armor} armor` : 'Terrain'}${rec.round > 1 ? ` · placed in round ${rec.round}` : ''}</p>
+      <p style="margin:0"><span class="chip" style="border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px;color:var(--gold)"><i class="duo-dot" style="background:${K.color}"></i>${esc(K.kind)}</span> ${K.hp > 0 ? `${K.hp} health · ${K.armor} armor` : 'Terrain'}${rec.round > 1 ? ` · placed in round ${rec.round}` : ''}</p>
       <p class="role" style="margin:0">${esc(K.text)}</p>
       ${K.downside ? `<p style="margin:0"><span style="color:var(--foe)">Downside:</span> ${esc(K.downside)}</p>` : ''}
       ${fell}

@@ -9862,10 +9862,10 @@ const Models3D = (THREE) => {
   // The Coin Golem: a hulk of stacked coins (bronze, silver or gold by the gold spent): coin-stack legs and arms, a
   // barrel chest of big coins, a coin head with glowing eyes under smug brows and a coin slot on top (a piggy bank's),
   // a sash in the team colour; for a body of radius 1
-  const coinStack = (r, n, [x, y, z], col, edge) => [...Array(n)].map((_, k) => P(cyl(r * (k % 2 ? 0.94 : 1), r * (k % 2 ? 0.94 : 1), 0.13, 10), k % 2 ? edge : col, [x, y + k * 0.13, z]));
+  const coinStack = (r, n, [x, y, z], col, edge) => [...Array(n)].map((_, k) => P(cyl(r * (k % 2 ? 0.94 : 1), r * (k % 2 ? 0.94 : 1), 0.13, 7), k % 2 ? edge : col, [x, y + k * 0.13, z]));
   const golem = (col, edge) => () => [
     ...coinStack(0.24, 6, [-0.3, 0.07, 0], col, edge), ...coinStack(0.24, 6, [0.3, 0.07, 0], col, edge),
-    ...[0, 1, 2, 3, 4].map(k => P(cyl(0.62 - Math.abs(k - 2) * 0.06, 0.62 - Math.abs(k - 2) * 0.06, 0.2, 12), k % 2 ? edge : col, [0, 0.95 + k * 0.2, 0])),
+    ...[0, 1, 2, 3, 4].map(k => P(cyl(0.62 - Math.abs(k - 2) * 0.06, 0.62 - Math.abs(k - 2) * 0.06, 0.2, 10), k % 2 ? edge : col, [0, 0.95 + k * 0.2, 0])),
     P(box(1.3, 0.16, 0.2), 'team', [0, 1.45, -0.55], [0, 0, 0.5]),
     ...[-1, 1].flatMap(sd => [...coinStack(0.18, 5, [sd * 0.78, 1.1, 0], col, edge), P(cyl(0.28, 0.28, 0.24, 10), col, [sd * 0.8, 1.0, -0.05])]),
     P(cyl(0.34, 0.34, 0.14, 12), col, [0, 2.1, 0], [Math.PI / 2, 0, 0]),
