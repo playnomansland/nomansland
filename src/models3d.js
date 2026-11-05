@@ -719,6 +719,31 @@ const Models3D = (THREE) => {
     ...[-1, 1].map(sd => P(cyl(0.05, 0.05, 1.6, 5), WOOD, [-2.2, 0.8, sd * 1.25])), P(box(0.03, 0.03, 2.5), '#8E8670', [-2.2, 1.5, 0]), // the washing line
     ...[-0.7, 0, 0.7].map((z, k) => P(box(0.04, 0.55 - k * 0.08, 0.22), '#FAF7EE', [-2.2, 1.2 + k * 0.04, z]))]; // and the bandages on it
   // ===== coalMine (3D) =====
+  // The entrance: a heap of grey-brown rock with a timber-framed adit on its front (-z, toward its own side): two posts
+  // and a lintel in the team colour round a black opening, rails with sleepers running out to a little iron cart heaped
+  // with coal, a lantern on a hook, a few loose lumps. The exit: a round shaft ringed with planks under a winch frame
+  // (two legs, a wheel, a rope) with a pennant in the team colour
+  const COAL_ROCK = '#6B625A', COAL_DARK = '#857A6E', COAL_LUMP = '#1E1C1B';
+  BUILD['mpb:coalMine'] = () => [
+    P(ball(2.3), COAL_ROCK, [0, 0.9, 0.7], [0.2, 0.4, 0], [1.25, 0.8, 1.0]), P(ball(1.5), COAL_DARK, [-1.3, 0.7, 1.1], [0.5, 0, 0.3], [1, 0.75, 1]),
+    P(ball(1.2), COAL_DARK, [1.5, 0.6, 0.6], [0, 0.8, 0.4], [1, 0.8, 1]), P(ball(0.6), COAL_ROCK, [1.9, 0.35, -0.9]),
+    P(box(1.6, 1.9, 0.3), '#0E0D0C', [0, 0.95, -1.25]),
+    ...[-1, 1].map(sd => P(box(0.32, 2.2, 0.32), WOOD, [sd * 0.95, 1.1, -1.38])),
+    P(box(2.5, 0.4, 0.45), 'team', [0, 2.3, -1.38]),
+    P(box(2.1, 0.12, 0.5), WOOD, [0, 2.0, -1.38]),
+    ...[-1, 1].map(sd => P(box(0.1, 0.08, 2.4), METAL, [sd * 0.4, 0.05, -2.5])),
+    ...[0, 1, 2, 3].map(k => P(box(1.15, 0.07, 0.2), WOOD, [0, 0.03, -1.6 - k * 0.6])),
+    P(box(1.1, 0.6, 0.85), IRON, [0, 0.45, -2.7]), ...[-1, 1].flatMap(sd => [-1, 1].map(fz => P(cyl(0.16, 0.16, 0.1, 8), DARK, [sd * 0.45, 0.16, -2.7 + fz * 0.28], [0, 0, Math.PI / 2]))),
+    ...[[-0.25, -2.6], [0.2, -2.8], [0, -2.5], [0.25, -2.55], [-0.15, -2.85]].map(([x, z], k) => P(ball(0.24), COAL_LUMP, [x, 0.85 + (k % 2) * 0.1, z])),
+    P(box(0.05, 0.5, 0.05), METAL, [-1.35, 1.9, -1.45]), P(box(0.22, 0.3, 0.22), BRASS, [-1.35, 1.5, -1.45]), P(ball(0.13), EMBER, [-1.35, 1.5, -1.58]),
+    ...[[1.4, -1.9], [1.7, -1.6], [-1.6, -2.1]].map(([x, z]) => P(ball(0.2), COAL_LUMP, [x, 0.12, z]))];
+  BUILD['mpb:coalMine:exit'] = () => [
+    P(cyl(1.55, 1.7, 0.4, 10), WOOD, [0, 0.2, 0]), P(cyl(1.15, 1.15, 0.42, 10), '#0E0D0C', [0, 0.22, 0]),
+    ...[...Array(10)].map((_, k) => { const a = k * Math.PI / 5; return P(box(0.08, 0.42, 0.5), '#6B4A2A', [Math.cos(a) * 1.4, 0.21, Math.sin(a) * 1.4], [0, -a, 0]); }),
+    ...[-1, 1].map(sd => P(box(0.22, 3.6, 0.22), WOOD, [sd * 0.95, 1.7, 0], [0, 0, sd * 0.28])),
+    P(box(0.9, 0.2, 0.3), WOOD, [0, 3.4, 0]),
+    P(new THREE.TorusGeometry(0.42, 0.08, 4, 12), IRON, [0, 3.65, 0]), P(cyl(0.05, 0.05, 3.1, 4), PAPER, [0, 1.95, -0.3]),
+    P(cyl(0.04, 0.04, 1.3, 4), WOOD, [0, 4.3, 0]), P(box(0.04, 0.45, 0.75), 'team', [0, 4.65, -0.38])];
   // ===== scorch (3D) =====
   // ===== oak (3D) =====
   // The Oak: an old broad tree: a thick gnarled trunk (the kind's colour, 'tint') on spreading roots, a ribbon in the
@@ -746,6 +771,36 @@ const Models3D = (THREE) => {
     P(box(0.6, 0.8, 0.08), 'team', [-0.62, 5.1, -1.85], [0, 0, -0.55]), P(box(0.6, 0.8, 0.08), 'team', [-0.62, 4.3, -1.85], [0, 0, 0.55]), // its swallow tail
     P(cyl(0.42, 0.42, 0.1, 10), BRASS, [-1.65, 4.7, -1.92], [Math.PI / 2, 0, 0]), P(cyl(0.17, 0.17, 0.12, 8), DARK, [-1.65, 4.7, -1.95], [Math.PI / 2, 0, 0])];
   // ===== magicLake (3D) =====
+  // A lakePond filling its tile: deep blue water under a pale shimmer, a thin shore in the team colour, a lily pad with a
+  // pink flower, a clump of reeds and two bank stones. Waterspirits: two small pale lakeSpirits hover over it; Water
+  // elemental: a lakeWhirl of pale rings in its middle (both: both). The Water Elemental it becomes (a walker, radius 1):
+  // a tall calm drop of water with a curling crest, sleepy eyes and a ripple at its foot
+  const LAKE_DEEP = '#2F6F99', LAKE_SHIMMER = '#7FC2E3', LAKE_FOAM = '#D6EEF7';
+  const lakePond = () => [
+    P(cyl(3.15, 3.15, 0.1, 8), LAKE_DEEP, [0, 0.04, 0], [0, Math.PI / 8, 0]),
+    P(cyl(1.9, 1.9, 0.04, 8), LAKE_SHIMMER, [-0.5, 0.11, -0.4], [0, 0.3, 0], [1, 1, 0.7]),
+    P(new THREE.TorusGeometry(3.0, 0.1, 3, 8), 'team', [0, 0.1, 0], [Math.PI / 2, 0, Math.PI / 8]),
+    P(new THREE.TorusGeometry(1.0, 0.04, 3, 14), LAKE_FOAM, [0.7, 0.13, 0.5], [Math.PI / 2, 0, 0]),
+    P(cyl(0.5, 0.5, 0.05, 7), '#6E9E5A', [-1.5, 0.14, 1.3]), P(ball(0.16), '#F2C6D6', [-1.4, 0.24, 1.25]),
+    ...[[1.9, -1.9, 1.3], [2.15, -1.6, 1.0], [1.65, -2.15, 1.1], [2.3, -2.0, 0.8]].map(([x, z, h]) => P(cyl(0.05, 0.07, h, 4), '#7A8F4A', [x, h / 2, z], [0.12, 0, -0.1])),
+    P(cone(0.12, 0.35, 5), '#8A6A3A', [2.0, 1.4, -1.85]),
+    P(ball(0.45), STONE, [-2.5, 0.15, -1.9], [0, 0, 0], [1, 0.55, 1]), P(ball(0.32), ROCK, [2.6, 0.12, 1.7], [0, 0, 0], [1, 0.6, 1])];
+  const lakeSpirits = () => [[-0.9, 0.2, 1.3], [1.0, -0.6, 1.7]].flatMap(([x, z, y]) => [
+    P(ball(0.32), '#E8F7FC', [x, y, z]), P(cone(0.26, 0.6, 5), '#E8F7FC', [x, y - 0.42, z], [Math.PI, 0, 0]),
+    P(ball(0.06), LAKE_DEEP, [x - 0.11, y + 0.06, z - 0.27]), P(ball(0.06), LAKE_DEEP, [x + 0.11, y + 0.06, z - 0.27])]);
+  const lakeWhirl = () => [0, 1, 2].map(k => P(new THREE.TorusGeometry(0.4 + k * 0.38, 0.06, 3, 14), LAKE_FOAM, [0.3, 0.16 + k * 0.05, 0.1], [Math.PI / 2, 0, k * 0.7]));
+  BUILD['mpb:magicLake'] = () => lakePond();
+  BUILD['mpb:magicLake:spirits'] = () => [...lakePond(), ...lakeSpirits()];
+  BUILD['mpb:magicLake:elemental'] = () => [...lakePond(), ...lakeWhirl()];
+  BUILD['mpb:magicLake:both'] = () => [...lakePond(), ...lakeWhirl(), ...lakeSpirits()];
+  BUILD['mpb:magicLake:walker'] = () => [
+    P(new THREE.TorusGeometry(0.85, 0.05, 3, 14), LAKE_FOAM, [0, 0.05, 0], [Math.PI / 2, 0, 0]),
+    P(new THREE.TorusGeometry(0.62, 0.06, 3, 12), 'team', [0, 0.12, 0], [Math.PI / 2, 0, 0]),
+    P(ball(0.68), 'tint', [0, 0.85, 0], [0, 0, 0], [1, 1.15, 1]),
+    P(cone(0.5, 1.1, 7), 'tint', [0, 1.95, 0.05]),
+    P(new THREE.TorusGeometry(0.28, 0.07, 4, 10, Math.PI * 1.3), LAKE_FOAM, [0, 2.45, 0.1], [0, Math.PI / 2, 0.4]),
+    P(box(0.2, 0.06, 0.05), LAKE_DEEP, [-0.22, 1.12, -0.62]), P(box(0.2, 0.06, 0.05), LAKE_DEEP, [0.22, 1.12, -0.62]), // calm, half-shut eyes
+    P(ball(0.12), LAKE_FOAM, [0.35, 1.45, -0.45])];
   // ===== jail (3D) =====
   // ===== school (3D) =====
   // ===== shadowDen (3D) =====

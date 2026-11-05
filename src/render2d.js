@@ -997,6 +997,41 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.fillStyle = '#FAF7EE'; for (const k of [0.3, 0.62]) { const bx = lx0 + (lx1 - lx0) * k; ctx.fillRect(bx - s * 0.025, ly, s * 0.05, s * 0.13); }
     },
     // ===== coalMine (2D) =====
+    // the entrance: a rocky mound with a timber-framed adit (a black arch under a lintel in the team colour), rails
+    // running out of it and a little cart heaped with coal; a lantern hangs by the door
+    coalMine(x, y, t, side, o) {
+      const s = t * 0.8, c = teamCol(side);
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y + s * 0.36, s * 0.52, s * 0.11, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#6B625A'; ctx.strokeStyle = '#3A342F'; ctx.lineWidth = Math.max(1, s * 0.03); // the mound
+      ctx.beginPath(); ctx.moveTo(x - s * 0.5, y + s * 0.34); ctx.quadraticCurveTo(x - s * 0.46, y - s * 0.4, x, y - s * 0.44); ctx.quadraticCurveTo(x + s * 0.46, y - s * 0.4, x + s * 0.5, y + s * 0.34); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#857A6E'; for (const [fx, fy, fr] of [[-0.3, -0.12, 0.07], [0.28, -0.2, 0.06], [0.34, 0.1, 0.05], [-0.36, 0.14, 0.05]]) { ctx.beginPath(); ctx.arc(x + s * fx, y + s * fy, s * fr, 0, Math.PI * 2); ctx.fill(); } // stones
+      ctx.fillStyle = '#121212'; ctx.beginPath(); ctx.moveTo(x - s * 0.2, y + s * 0.3); ctx.lineTo(x - s * 0.2, y - s * 0.08); ctx.quadraticCurveTo(x, y - s * 0.26, x + s * 0.2, y - s * 0.08); ctx.lineTo(x + s * 0.2, y + s * 0.3); ctx.closePath(); ctx.fill(); // the dark adit
+      ctx.fillStyle = '#8A5A32'; ctx.fillRect(x - s * 0.26, y - s * 0.14, s * 0.07, s * 0.46); ctx.fillRect(x + s * 0.19, y - s * 0.14, s * 0.07, s * 0.46); // timber posts
+      ctx.fillStyle = c; ctx.fillRect(x - s * 0.3, y - s * 0.22, s * 0.6, s * 0.09); // the lintel, in the team colour
+      ctx.strokeStyle = '#9AA1A8'; ctx.lineWidth = Math.max(1, s * 0.025); // rails
+      for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + sd * s * 0.08, y + s * 0.3); ctx.lineTo(x + sd * s * 0.14, y + s * 0.5); ctx.stroke(); }
+      ctx.fillStyle = '#55595E'; ctx.fillRect(x + s * 0.02, y + s * 0.24, s * 0.26, s * 0.13); // the cart
+      ctx.fillStyle = '#1E1C1B'; for (const [fx, fy] of [[0.08, 0.23], [0.15, 0.21], [0.22, 0.23], [0.12, 0.18]]) { ctx.beginPath(); ctx.arc(x + s * fx, y + s * fy, s * 0.045, 0, Math.PI * 2); ctx.fill(); } // its coal
+      ctx.fillStyle = '#2B2F33'; for (const fx of [0.07, 0.23]) { ctx.beginPath(); ctx.arc(x + s * fx, y + s * 0.38, s * 0.03, 0, Math.PI * 2); ctx.fill(); }
+      const glow = 0.75 + 0.25 * Math.sin((o.time || 0) * 3 + x); // the lantern
+      ctx.fillStyle = '#FFD27A'; ctx.globalAlpha = 0.35 * glow; ctx.beginPath(); ctx.arc(x - s * 0.32, y - s * 0.02, s * 0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(x - s * 0.32, y - s * 0.02, s * 0.035, 0, Math.PI * 2); ctx.fill();
+    },
+    // the exit: a round shaft ringed with planks under a small winch frame with a pennant in the team colour; while
+    // deploying, a dashed square round the 8 tiles nobody may deploy on (where the squads come up)
+    'coalMine:exit'(x, y, t, side, o) {
+      const s = t * 0.95, c = teamCol(side);
+      if (!o.fight) { ctx.strokeStyle = c; ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]); ctx.strokeRect(x - t * 1.5 + 2, y - t * 1.5 + 2, t * 3 - 4, t * 3 - 4); ctx.setLineDash([]); ctx.globalAlpha = 1; }
+      ctx.fillStyle = '#8A5A32'; ctx.strokeStyle = '#4E3218'; ctx.lineWidth = Math.max(1, s * 0.03);
+      ctx.beginPath(); ctx.ellipse(x, y + s * 0.08, s * 0.36, s * 0.28, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); // the plank rim
+      ctx.strokeStyle = '#6B4A2A'; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * s * 0.24, y + s * 0.08 + Math.sin(a) * s * 0.19); ctx.lineTo(x + Math.cos(a) * s * 0.36, y + s * 0.08 + Math.sin(a) * s * 0.28); ctx.stroke(); }
+      ctx.fillStyle = '#0E0D0C'; ctx.beginPath(); ctx.ellipse(x, y + s * 0.08, s * 0.24, s * 0.18, 0, 0, Math.PI * 2); ctx.fill(); // the shaft
+      ctx.strokeStyle = '#6B4A2A'; ctx.lineWidth = Math.max(1.5, s * 0.05); // the winch frame
+      ctx.beginPath(); ctx.moveTo(x - s * 0.3, y + s * 0.14); ctx.lineTo(x, y - s * 0.38); ctx.lineTo(x + s * 0.3, y + s * 0.14); ctx.stroke();
+      ctx.strokeStyle = '#C8B89A'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y - s * 0.36); ctx.lineTo(x, y + s * 0.04); ctx.stroke(); // the rope
+      ctx.fillStyle = '#55595E'; ctx.beginPath(); ctx.arc(x, y - s * 0.36, s * 0.06, 0, Math.PI * 2); ctx.fill(); // its wheel
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x, y - s * 0.38); ctx.lineTo(x + s * 0.24, y - s * 0.32); ctx.lineTo(x, y - s * 0.24); ctx.closePath(); ctx.fill(); // the pennant
+    },
     // ===== scorch (2D) =====
     // ===== oak (2D) =====
     // an old broad oak: a gnarled trunk on spreading roots with a calm sleeping face in its bark (eyes shut, a small
@@ -1045,6 +1080,31 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.fillStyle = c; ctx.beginPath(); ctx.arc(cx, cy, cr * 0.45, 0, Math.PI * 2); ctx.fill();
     },
     // ===== magicLake (2D) =====
+    // a pond filling its tile: soft blue water with a pale shimmer, slow ripples, a lily pad and reeds at its edge, a
+    // thin bank in the team colour. Waterspirits: two small pale spirits bob on it; Water elemental: a swirl in its middle
+    magicLake(x, y, t, side, o) {
+      const s = t * 0.96, c = teamCol(side), tm = o.time || 0, rec = o.rec, sk = (id) => !!(rec && rec.skills && rec.skills[id] && rec.skills[id].n > 0);
+      const r = s * 0.14;
+      ctx.fillStyle = '#2F6F99'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - s / 2, y - s / 2, s, s, r) : ctx.rect(x - s / 2, y - s / 2, s, s); ctx.fill();
+      const g = ctx.createRadialGradient(x - s * 0.15, y - s * 0.18, s * 0.05, x, y, s * 0.6); g.addColorStop(0, 'rgba(170,220,240,0.55)'); g.addColorStop(1, 'rgba(62,143,196,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - s / 2, y - s / 2, s, s, r) : ctx.rect(x - s / 2, y - s / 2, s, s); ctx.fill();
+      ctx.strokeStyle = '#D6EEF7'; ctx.lineWidth = 1;
+      for (let k = 0; k < 2; k++) { const p = ((tm * 0.35 + k * 0.5) % 1); ctx.globalAlpha = 0.45 * (1 - p); ctx.beginPath(); ctx.ellipse(x + s * 0.08, y + s * 0.06, s * (0.08 + p * 0.26), s * (0.05 + p * 0.17), 0, 0, Math.PI * 2); ctx.stroke(); } // ripples
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#6E9E5A'; ctx.beginPath(); ctx.arc(x - s * 0.24, y + s * 0.22, s * 0.1, 0.5, Math.PI * 2 + 0.1); ctx.lineTo(x - s * 0.24, y + s * 0.22); ctx.fill(); // a lily pad
+      ctx.fillStyle = '#F2C6D6'; ctx.beginPath(); ctx.arc(x - s * 0.22, y + s * 0.2, s * 0.03, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#7A8F4A'; ctx.lineWidth = Math.max(1, s * 0.025); for (const fx of [0.3, 0.36, 0.41]) { ctx.beginPath(); ctx.moveTo(x + s * fx, y - s * 0.4); ctx.lineTo(x + s * (fx - 0.03), y - s * 0.18); ctx.stroke(); } // reeds
+      ctx.strokeStyle = c; ctx.globalAlpha = 0.7; ctx.lineWidth = Math.max(1, t * 0.04); ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - s / 2 + 1, y - s / 2 + 1, s - 2, s - 2, r) : ctx.rect(x - s / 2 + 1, y - s / 2 + 1, s - 2, s - 2); ctx.stroke(); ctx.globalAlpha = 1;
+      if (sk('spirits')) for (let k = 0; k < 2; k++) { // two little water spirits
+        const sx = x + s * (k ? 0.18 : -0.12), sy = y + s * (k ? -0.12 : -0.02) + Math.sin(tm * 2 + k * 2) * s * 0.03;
+        ctx.fillStyle = '#E8F7FC'; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.arc(sx, sy, s * 0.07, Math.PI, 0); ctx.lineTo(sx + s * 0.07, sy + s * 0.07); ctx.lineTo(sx - s * 0.07, sy + s * 0.07); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#2F6F99'; ctx.globalAlpha = 1; for (const e of [-1, 1]) { ctx.beginPath(); ctx.arc(sx + e * s * 0.025, sy, Math.max(0.8, s * 0.012), 0, Math.PI * 2); ctx.fill(); }
+      }
+      if (sk('elemental')) { // a swirl: the elemental waiting under it
+        ctx.strokeStyle = '#BFE6F2'; ctx.lineWidth = Math.max(1.2, s * 0.03); ctx.globalAlpha = 0.85;
+        ctx.beginPath(); for (let k = 0; k <= 24; k++) { const a = tm * 1.5 + k * 0.45, d = s * 0.02 + k * s * 0.009; const px = x + Math.cos(a) * d, py = y + Math.sin(a) * d * 0.8; k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke(); ctx.globalAlpha = 1;
+      }
+    },
     // ===== jail (2D) =====
     // ===== school (2D) =====
     // ===== shadowDen (2D) =====
@@ -1103,6 +1163,19 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.strokeStyle = c; ctx.lineWidth = Math.max(1.5, r * 0.12); ctx.beginPath(); ctx.arc(x, y, r * 1.08, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     },
+    // ===== magicLake (2D walker) =====
+    // the Water Elemental a lake tile becomes: a tall drop of water with a curling crest, calm eyes, a ripple at its foot
+    magicLake(x, y, r, side, u, o) {
+      const c = teamCol(side), tm = o.time || 0;
+      ctx.globalAlpha = o.alpha == null ? 1 : o.alpha;
+      ctx.strokeStyle = '#D6EEF7'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x, y + r * 0.75, r * (0.8 + 0.1 * Math.sin(tm * 3)), r * 0.25, 0, 0, Math.PI * 2); ctx.stroke(); // the ripple
+      ctx.fillStyle = '#5FA8D3'; ctx.strokeStyle = '#2F6F99'; ctx.lineWidth = Math.max(1, r * 0.1);
+      ctx.beginPath(); ctx.moveTo(x, y - r * 1.05); ctx.bezierCurveTo(x + r * 0.95, y - r * 0.1, x + r * 0.8, y + r * 0.8, x, y + r * 0.8); ctx.bezierCurveTo(x - r * 0.8, y + r * 0.8, x - r * 0.95, y - r * 0.1, x, y - r * 1.05); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#E8F7FC'; ctx.lineWidth = Math.max(1, r * 0.12); ctx.beginPath(); ctx.arc(x - r * 0.25, y - r * 0.55, r * 0.28, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); // its crest
+      ctx.fillStyle = '#16384F'; for (const e of [-1, 1]) { ctx.beginPath(); ctx.ellipse(x + e * r * 0.25, y + r * 0.05, r * 0.08, r * 0.05, 0, 0, Math.PI * 2); ctx.fill(); } // calm half-shut eyes
+      ctx.strokeStyle = c; ctx.lineWidth = Math.max(1.5, r * 0.12); ctx.beginPath(); ctx.arc(x, y, r * 1.12, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    },
   };
   // any kind without a drawing of its own: a block in the kind's colour with a roof band in the team colour and its
   // initials (a part, such as a mine's exit: a small marker in the kind's colour)
@@ -1138,8 +1211,10 @@ const Render2D = (cv, view, opts = {}) => {
     const t = tilePx();
     for (const side of [0, 1]) for (const rec of Mpb.recs(v, side)) if (MPB_FLOOR[rec.kind]) MPB_FLOOR[rec.kind](v, side, rec, t);
   }
+  // (a part: MPB_DRAW['<kind>:<part>'] when it has one)
   function drawMpb(kind, x, y, t, side, o) {
-    (!o.part && MPB_DRAW[kind] ? MPB_DRAW[kind] : (a, b, c2, d, e, f) => drawMpbPlain(kind, a, b, c2, d, e, f))(x, y, t, side, o);
+    const own = o.part ? MPB_DRAW[kind + ':' + o.part] : MPB_DRAW[kind];
+    (own || ((a, b, c2, d, e, f) => drawMpbPlain(kind, a, b, c2, d, e, f)))(x, y, t, side, o);
     if (o.hpr != null) { ctx.strokeStyle = teamCol(side); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, t * 0.52, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, o.hpr)); ctx.stroke(); }
     if (o.fresh) { ctx.strokeStyle = teamCol(side); ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.strokeRect(x - t / 2 + 1.5, y - t / 2 + 1.5, t - 3, t - 3); ctx.setLineDash([]); }
   }
@@ -1148,7 +1223,17 @@ const Render2D = (cv, view, opts = {}) => {
     if (typeof Mpb === 'undefined' || !Mpb.on(m)) return;
     const t = tilePx();
     for (const side of [me, foe()]) for (const rec of Mpb.recs(m, side)) for (const tl of Mpb.tilesOf(rec)) {
-      drawMpb(rec.kind, (scol(tl.col) + 0.5) * t, (srow(tl.row) + 0.5) * t, t, side, { part: tl.part || null, fresh: phase === 'deploy' && rec.round === m.round && rec.round > 1, time: performance.now() / 1000 });
+      drawMpb(rec.kind, (scol(tl.col) + 0.5) * t, (srow(tl.row) + 0.5) * t, t, side, { part: tl.part || null, fresh: phase === 'deploy' && rec.round === m.round && rec.round > 1, time: performance.now() / 1000, rec });
+    }
+  }
+  // in a fight: the tiles of buildings that are no fight body (a mine's exit, a lake's water: parts, and kinds with no
+  // health), from the board as the fight began
+  function drawMpbGround(v) {
+    if (typeof Mpb === 'undefined' || !v || !Mpb.on(v)) return;
+    const t = tilePx();
+    for (const side of [me, foe()]) for (const rec of Mpb.recs(v, side)) for (const tl of Mpb.tilesOf(rec)) {
+      if (!tl.part && (Mpb.kindOf(rec.kind) || {}).hp > 0) continue;
+      drawMpb(rec.kind, (scol(tl.col) + 0.5) * t, (srow(tl.row) + 0.5) * t, t, side, { part: tl.part || null, time: bt ? bt.time() : 0, rec, fight: true });
     }
   }
   // grey smoke puffs rising from (x, y): Mechite constructs and buildings rattle and smoke
@@ -1285,6 +1370,7 @@ const Render2D = (cv, view, opts = {}) => {
 
   function drawBattle() {
     drawBoard();
+    drawMpbGround(battlePre || m); // 2v2: a mine's exit, lake water
     const muted = css('--muted'), gold = css('--gold');
     for (const e of fx) {
       const a = 1 - e.age / e.life;
@@ -1345,6 +1431,14 @@ const Render2D = (cv, view, opts = {}) => {
       if (age < 0 || age > 0.6) continue;
       ctx.strokeStyle = '#B9A8FF'; ctx.globalAlpha = 1 - age / 0.6; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(PX(fx.x), PY(fx.y), tilePx() * (0.2 + age), 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    // 2v2 Coal mine: a puff of coal dust where a squad comes up the mine
+    for (const e of bt.mineFx ? bt.mineFx() : []) {
+      const age = bt.time() - e.t;
+      if (age < 0 || age > 0.9) continue;
+      ctx.fillStyle = '#4A4440'; ctx.globalAlpha = 0.55 * (1 - age / 0.9);
+      for (let k = 0; k < 5; k++) { const a = k * 1.26 + e.x; ctx.beginPath(); ctx.arc(PX(e.x) + Math.cos(a) * tilePx() * 0.3 * (0.4 + age), PY(e.y) + Math.sin(a) * tilePx() * 0.22 * (0.4 + age), tilePx() * (0.08 + 0.1 * age), 0, Math.PI * 2); ctx.fill(); }
       ctx.globalAlpha = 1;
     }
     drawArtifacts(); // 2v2: the artifacts (their meters go over the bodies, below)
@@ -1411,7 +1505,7 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.beginPath(); ctx.moveTo(PX(b.x), PY(b.y)); ctx.lineTo(PX(nx.x), PY(nx.y)); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
     }
     for (const b of bt.bodies) {
-      if (!b.alive || b.u.structure || b.u.aloft || b.u.building) continue;
+      if (!b.alive || b.u.structure || b.u.aloft || b.u.building || b.mineT > 0) continue; // (2v2: down a Coal mine, not seen)
       const c = teamCol(b.side), r = radius(b.u), hpr = b.hp / b.u.hp;
       if (b.hidden) { // stealthed: a dashed ghost while hidden (fainter for the enemy's)
         ctx.globalAlpha = b.side === me ? 0.6 : 0.3; ctx.strokeStyle = c; ctx.lineWidth = 1.5; ctx.setLineDash([2, 2]);

@@ -506,7 +506,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
     const muted = color(css('--muted') || '#8DA1A1');
     for (const b of bt.bodies) {
       if (!b.alive) { if (!b.boarded && !b.removed) { const [wx, wz] = world(f, b.x, b.y); scene_(() => disc(wx, wz, Math.max(0.3, size(b.u) * 0.45), muted, 0.18)); } continue; }
-      if (b.boarded) continue;
+      if (b.boarded || b.mineT > 0) continue; // (2v2: down a Coal mine, not seen)
       const p = glide(b, dt);
       const look = b.u.aloft || (b.site && b.site.work < b.site.need) ? 'glass' : b.hidden ? (b.side === me ? 'ghost' : 'ghostFoe') : b.delay > 0 ? 'ghost' : 'solid'; // a building site is a see-through scaffold
       const crest = b.u.structure ? Game.charOf(src, b.side) : null;
@@ -515,6 +515,19 @@ const Render3D = (THREE, el, view, opts = {}) => {
       bodies.push({ u, side: b.side, x: p.x, y: p.y, hx: b.hx, hy: b.hy, look, moving: p.moving, phase: p.phase, b, crest, edge: Art.teamCol(b.side, me), tag, raise: b.inside && b.inside.alive ? roofOf(b.inside.u) : 0 });
       if (v.duo && (b.lane === 0 || b.lane === 1) && !b.u.structure && !b.u.aloft && !(b.hidden && b.side !== me)) { const [wx, wz] = world(f, p.x, p.y), rc = color(v.duo.ring(b.side, b.lane)); arc(wx, wz, Math.max(0.6, size(b.u) * 0.62), rc, 0.9, 1, 0.14); } // 2v2: its player's colour (a marker: not in the ground view)
       if (b.u.structure && b.walls) addWalls(f, b.x, b.y, b.walls);
+    }
+    // 2v2 buildings that are no fight body (a mine's exit, lake water: parts, and kinds with no health), as the fight began
+    if (typeof Mpb !== 'undefined' && Mpb.on(src)) for (const side of [0, 1]) for (const rec of Mpb.recs(src, side)) for (const tl of Mpb.tilesOf(rec)) {
+      if (!tl.part && (Mpb.kindOf(rec.kind) || {}).hp > 0) continue;
+      const w = Game.tileToWorld(tl.col, tl.row), u = Mpb.unitOf(src, side, rec);
+      bodies.push({ u: tl.part ? { ...u, mpbPart: tl.part } : u, side, x: w.x, y: w.y, look: 'solid', edge: Art.teamCol(side, me) });
+    }
+    // 2v2 Coal mine: a puff of coal dust where a squad comes up the mine
+    for (const e of bt.mineFx ? bt.mineFx() : []) {
+      const age = bt.time() - e.t;
+      if (age < 0 || age > 0.9) continue;
+      const [wx, wz] = world(f, e.x, e.y);
+      scene_(() => disc(wx, wz, 1.2 + 2.2 * age, color('#4A4440'), 0.55 * (1 - age / 0.9)));
     }
     // Pool shaper's pools: water on the ground, ringed in their side's colour
     for (const q of bt.pools ? bt.pools() : []) {

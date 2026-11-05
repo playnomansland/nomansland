@@ -225,10 +225,114 @@
   });
 
   // ===== coalMine =====
-  def({ id: 'coalMine', name: 'Coal mine', short: 'cm', kind: 'technical', hp: 700, armor: 4, color: '#4A4440',
-    text: 'Squads deployed within 1 tile of the entrance go underground and come out at the exit in no man’s land.',
-    downside: 'No squad of either team may deploy within 1 tile of its exit.',
-    place: { where: 'interior', spacing: true, parts: [{ id: 'exit', name: 'exit', where: 'nml', spacing: false }] }, skills: [], hooks: {} });
+  // An entrance in the team's zone and an exit in no man's land (two placement votes, one after the other). Squads
+  // deployed on the 8 tiles round the entrance go down the mine as the fight starts and come up on the matching tile
+  // round the exit (the same offset) COAL.travel s later, then stand COAL.rise s more (vulnerable, as a squad new on a
+  // flank tile). No squad of either team may be deployed on the 8 tiles round the exit (hooks.blocks; enemy tiles too).
+  // A squad whose tile at the exit an enemy squad stands on as the fight starts doesn't go in (Engine: mineTo). The
+  // entrance is a structure that can be destroyed (squads already on their way still come up); the exit is a shaft on
+  // the board, not a fight body. Skills: Dig a new exit (move it once; a flank tile of the enemy's half too), Fresh
+  // air (squads coming up faster and tougher for a while).
+  const COAL = { hp: 700, armor: 4, travel: 2, rise: 1.5, moveCost: 150, airCost: 200, air: { speed: 25, armor: 4, secs: 5 } };
+  const exitOf = (rec) => (rec && rec.parts && rec.parts.exit) || null;
+  const cheb = (c0, r0, c1, r1) => Math.max(Math.abs(c0 - c1), Math.abs(r0 - r1));
+  // the tile a squad on (col, row) comes up on, or null (not round the entrance, no exit yet, off the board, or that
+  // tile is water or a building's: the squad stays home)
+  function mineOut(m, rec, col, row) {
+    const x = exitOf(rec);
+    if (!x || rec.col < 0 || cheb(col, row, rec.col, rec.row) !== 1) return null;
+    grid(m);
+    const c = x.col + col - rec.col, r = x.row + row - rec.row;
+    if (!inBoard(c, r) || G.terrainBlocks(m, c, r) || buildingTiles(m).some(t => t.col === c && t.row === r)) return null;
+    return { col: c, row: r };
+  }
+  // may the exit stand on (col, row), as this player sees the board (squads the opponents put down this round don't
+  // count: a refusal would show where they are)? Its own tile and the tiles round it don't count: the exit leaves them
+  function exitFree(m, side, rec, col, row) {
+    const x = exitOf(rec);
+    if (!on(m) || !x || !Number.isInteger(col) || !Number.isInteger(row)) return false;
+    grid(m);
+    if (!inBoard(col, row) || G.terrainBlocks(m, col, row)) return false;
+    delete rec.parts.exit;
+    try { return !seenTaken(m, side, col, row); } finally { rec.parts.exit = x; }
+  }
+  // may the exit be moved to (col, row) (Dig a new exit)? No man's land (not flank tiles) as before, or a flank tile of
+  // the enemy's half; a free tile
+  function exitMoveOk(m, side, rec, col, row) {
+    const x = exitOf(rec);
+    if (!x || (x.col === col && x.row === row)) return false;
+    grid(m);
+    if (!(nmlOk(col, row) || G.isFlank(side, col, row))) return false;
+    return exitFree(m, side, rec, col, row);
+  }
+  // may Dig a new exit (or Undo all) put the exit back on its old tile? Only while that tile is still free (no water, no
+  // other exit or building, no squad of the team's) – else the take-back is refused
+  const exitBackOk = (m, side, rec, t) => !t || exitFree(m, side, rec, t.col, t.row);
+  function exitSpots(m, side, rec) {
+    const out = [];
+    if (!on(m)) return out;
+    const { COLS, ROWS } = grid(m);
+    for (let row = 0; row < ROWS; row++) for (let col = 0; col < COLS; col++) if (exitMoveOk(m, side, rec, col, row)) out.push({ col, row });
+    return out;
+  }
+  const canMoveExit = (m, side, rec) => skillN(rec, 'shaft') > 0 && !rec.data.moved && !!exitOf(rec);
+  def({ id: 'coalMine', name: 'Coal mine', short: 'cm', kind: 'technical', hp: COAL.hp, armor: COAL.armor, color: '#4A4440',
+    text: `Squads deployed on the 8 tiles round the entrance go down the mine as the fight starts and come up round the exit in no man’s land ${COAL.travel} s later (on the matching tile), then stand ${COAL.rise} s before they fight.`,
+    downside: 'No squad of either team may be deployed on the 8 tiles round its exit. A squad whose tile at the exit an enemy squad holds stays where it is.',
+    place: { where: 'interior', spacing: true, parts: [{ id: 'exit', name: 'exit', where: 'nml', spacing: false }] },
+    skills: [
+      { id: 'shaft', name: 'Dig a new exit', cost: COAL.moveCost, per: 'match', text: 'Move the exit once, to any tile of no man’s land or a flank tile of the enemy’s half.' },
+      { id: 'air', name: 'Fresh air', cost: COAL.airCost, per: 'match', text: `Squads coming up the mine move ${COAL.air.speed}% faster and have +${COAL.air.armor} armor for ${COAL.air.secs} s.` },
+    ],
+    COAL, mineOut, exitMoveOk, exitBackOk, exitSpots, canMoveExit,
+    hooks: {
+      // the 8 tiles round the exit: no squad of either team (Game.occupied through Mpb.at)
+      blocks(m, side, rec, col, row) { const x = exitOf(rec); return !!x && cheb(col, row, x.col, x.row) === 1; },
+      // a squad round the entrance: its bodies go down (Engine mineTo; the Engine leaves out a squad whose exit tile an enemy holds)
+      squadBodies(m, side, rec, sq, list) {
+        if (sq.in != null || !list.length) return; // a rider goes with its carrier
+        const t = mineOut(m, rec, sq.col, sq.row);
+        if (!t) return;
+        const a = G.tileToWorld(sq.col, sq.row), b = G.tileToWorld(t.col, t.row);
+        const air = skillN(rec, 'air') > 0 ? { ...COAL.air } : null;
+        for (const x of list) x.mineTo = { x: b.x, y: b.y, dx: b.x - a.x, dy: b.y - a.y, h: G.TILE / 2, t: COAL.travel, rise: COAL.rise, boost: air };
+      },
+      canBuy: (m, side, rec) => !!exitOf(rec),
+      // Dig a new exit taken back the round it was bought: the exit goes back too (refused once its old tile is taken)
+      canUndo: (m, side, rec, id) => id !== 'shaft' || !(rec.data.moved === m.round && rec.data.from) || exitBackOk(m, side, rec, rec.data.from),
+      // Undo all would put the exit back where it stood (restoreOk: was = the record as it would be again)
+      restoreOk(m, side, rec, was) { const a = exitOf(rec), b = exitOf(was); return !b || (a && a.col === b.col && a.row === b.row) || exitBackOk(m, side, rec, b); },
+      unbuy(m, side, rec, sk) { if (sk.id === 'shaft' && rec.data.moved === m.round && rec.data.from) { rec.parts.exit = { ...rec.data.from }; rec.data.moved = 0; rec.data.from = null; } },
+      canAct: (m, side, rec, action, args) => action === 'exit' && canMoveExit(m, side, rec) && exitMoveOk(m, side, rec, args[0], args[1]),
+      act(m, side, rec, action, args, lane) {
+        rec.data.from = { ...exitOf(rec) }; rec.data.moved = m.round; rec.data.by = lane;
+        rec.parts.exit = { col: args[0], row: args[1] };
+        return true;
+      },
+      // bots: now and then one of the squads they put down this round goes round the entrance (down the mine), Fresh
+      // air when they have gold to spare, and sometimes a new exit nearer the enemy
+      botAfter(m, side, rec, r) {
+        if (!exitOf(rec)) return;
+        if (r() < 0.5) {
+          const sq = m.armies[side].find(q => q.round === m.round && q.in == null && !(m.units[q.unit] || {}).building && !mineOut(m, rec, q.col, q.row));
+          const to = [];
+          for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (dc || dr) to.push({ col: rec.col + dc, row: rec.row + dr });
+          if (sq) for (const t of to.sort((a, b) => (side === 0 ? a.row - b.row : b.row - a.row) || Math.abs(a.col - rec.col) - Math.abs(b.col - rec.col) || a.col - b.col)) if (mineOut(m, rec, t.col, t.row) && G.moveSquad(m, side, sq.id, t.col, t.row)) break;
+        }
+        const spare = () => m.gold[side] - G.CARRY_CAP / 2;
+        if (!skillN(rec, 'air') && spare() >= COAL.airCost && r() < 0.35) G.mpbBuy(m, side, rec.key, 'air');
+        if (!skillN(rec, 'shaft') && spare() >= COAL.moveCost && r() < 0.2) {
+          const fwd = (t) => side === 0 ? t.row : G.ROWS - 1 - t.row, mid = (G.COLS - 1) / 2; // nearer the enemy: smaller
+          const best = exitSpots(m, side, rec).filter(t => !G.isFlank(side, t.col, t.row)).sort((a, b) => fwd(a) - fwd(b) || Math.abs(a.col - mid) - Math.abs(b.col - mid) || a.col - b.col)[0];
+          if (best && G.mpbBuy(m, side, rec.key, 'shaft')) G.mpbAct(m, side, rec.key, 'exit', best.col, best.row);
+        }
+      },
+      info(m, side, rec) {
+        const x = exitOf(rec);
+        return [x ? `Exit at column ${x.col + 1}, row ${x.row + 1}` : 'No exit yet', skillN(rec, 'shaft') ? (rec.data.moved ? 'The exit has been moved' : 'The exit can be moved once') : '', skillN(rec, 'air') ? 'Fresh air' : ''].filter(Boolean);
+      },
+    },
+  });
 
   // ===== scorch =====
   def({ id: 'scorch', name: 'Scorch turrets', short: 'sc', kind: 'defensive', hp: 450, armor: 2, color: '#D9622B',
@@ -368,8 +472,173 @@
   });
 
   // ===== magicLake =====
+  // Terrain, not a building: each player of the team puts down LAKE.tiles water tiles (their own, no vote: Game.mpbAct
+  // 'place') anywhere on the team's own zone or in no man's land (flank tiles too), never on a squad or building (as
+  // the player sees the board: the opponents' squads of this round don't count, so a refusal gives nothing away), and
+  // never so that some tile can no longer be walked to (lakeFree: the board's walkable tiles stay one area). As the
+  // fight starts (hooks.settle) a tile not put down yet, or one put down this round on a squad or building the player
+  // couldn't see, goes on the first tile allowed with everything known. Water is the
+  // game's water (Game.terrainBlocks, via Mpb.terrainAt; the Engine's terrain): shot over, not walked on, nobody can
+  // be deployed on it; it can't be destroyed. Each tile is a record of its own (rec.data.lane: whose), so its skills
+  // are its own. Waterspirits allowal: the team walks on that tile LAKE.slow % slower and regains LAKE.regen % health
+  // a second on it (Engine opts.mpb.lakeWalk, 'wade' and 'mpbLake' tiles). Become Water elemental: each fight a Water
+  // Elemental (the Water Mage's Summon water elemental, as a level LAKE.mageLevel + 1 Water Mage summons it) rises
+  // from the tile for the team; the tile stays water.
+  const LAKE = { tiles: 2, slow: 30, regen: 5, spiritsCost: 50, elementalCost: 200, mageLevel: 1 };
+  const LAKE_ELEMENTAL = { type: 'elemental', params: { hp: 600, unit: 'Ember Imps', level: 1, ahead: 9, pool: 4, pct: 50, speed: 0.5, secs: 2 } }; // (a roster with no Water Mage)
+  const lakeRecs = (m, side) => recs(m, side).filter(r => r.kind === 'magicLake');
+  // the board's walkable tiles (no walls or water) still one area (4 ways round) with (col, row) water too
+  let lakeWet = null; // (lakeSpots: the board's water, worked out once for all its tiles)
+  function lakeFree(m, col, row) {
+    const { COLS, ROWS } = grid(m), N = COLS * ROWS, base = lakeWet || Uint8Array.from({ length: N }, (_, i) => G.terrainBlocks(m, i % COLS, Math.floor(i / COLS)) ? 1 : 0);
+    // all 8 tiles round it on the board and dry: the ways round it stay open (a ring of 8 is one area)
+    let ring = true;
+    for (let dr = -1; dr <= 1 && ring; dr++) for (let dc = -1; dc <= 1; dc++) { const c = col + dc, r = row + dr; if ((dc || dr) && (!inBoard(c, r) || base[r * COLS + c])) { ring = false; break; } }
+    if (ring) return true;
+    const wet = Uint8Array.from(base);
+    wet[row * COLS + col] = 1;
+    let open = 0, start = -1;
+    for (let i = 0; i < N; i++) if (!wet[i]) { open++; if (start < 0) start = i; }
+    if (start < 0) return false;
+    const seen = new Uint8Array(N), stack = [start];
+    seen[start] = 1;
+    let n = 0;
+    while (stack.length) {
+      const i = stack.pop(), c = i % COLS, r = (i - c) / COLS;
+      n++;
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const c2 = c + dc, r2 = r + dr, j = r2 * COLS + c2;
+        if (c2 < 0 || r2 < 0 || c2 >= COLS || r2 >= ROWS || wet[j] || seen[j]) continue;
+        seen[j] = 1; stack.push(j);
+      }
+    }
+    return n === open;
+  }
+  // the team's own zone or no man's land, any column
+  const lakeWhere = (side, col, row) => inBoard(col, row) && (G.inZone(side, row) || G.inNoMans(row));
+  // may this player put lake tile rec on (col, row)? (their own tile, not down yet or put down this round.) strict: with
+  // the squads the player can't see too (the fight's start, hooks.settle)
+  function lakeOk(m, side, rec, col, row, strict) {
+    if (!on(m) || !rec || rec.kind !== 'magicLake' || rec.data.lane !== laneOf(m) || !(rec.col < 0 || rec.round === m.round)) return false;
+    if (!Number.isInteger(col) || !Number.isInteger(row)) return false;
+    grid(m);
+    if (!lakeWhere(side, col, row)) return false;
+    const was = { col: rec.col, row: rec.row };
+    rec.col = -1; rec.row = -1; // (a tile being moved: its old tile is dry for the check)
+    try { return !G.terrainBlocks(m, col, row) && !(strict ? taken : seenTaken)(m, side, col, row) && lakeFree(m, col, row); } finally { rec.col = was.col; rec.row = was.row; }
+  }
+  // where lake tile rec may go, best first: no man's land on the team's own half (the rows nearest its zone first),
+  // then the rest of no man's land, then the zone (its front first); each player toward the columns of their own half
+  function lakeSpots(m, side, rec, strict) {
+    const out = [];
+    if (!on(m) || !rec) return out;
+    const { COLS, ROWS } = grid(m), was = { col: rec.col, row: rec.row };
+    rec.col = -1; rec.row = -1;
+    try {
+      lakeWet = Uint8Array.from({ length: COLS * ROWS }, (_, i) => G.terrainBlocks(m, i % COLS, Math.floor(i / COLS)) ? 1 : 0);
+      rec.col = was.col; rec.row = was.row;
+      for (let row = 0; row < ROWS; row++) for (let col = 0; col < COLS; col++) if (lakeOk(m, side, rec, col, row, strict)) out.push({ col, row });
+    } finally { lakeWet = null; rec.col = was.col; rec.row = was.row; }
+    const half = (rec.data.lane === 1 ? 3 : 1) * COLS / 4 - 0.5, own = (r) => side === 0 ? r >= ROWS / 2 : r < ROWS / 2;
+    const band = (t) => G.inNoMans(t.row) ? (own(t.row) ? 0 : 1) : 2, back = (t) => side === 0 ? ROWS - 1 - t.row : t.row;
+    return out.sort((a, b) => band(a) - band(b) || (band(a) === 1 ? back(b) - back(a) : back(a) - back(b)) || Math.abs(a.col - half) - Math.abs(b.col - half) || a.col - b.col);
+  }
+  // this player's lake tiles still to put down
+  const lakeTodo = (m, side, lane) => lakeRecs(m, side).filter(r => r.col < 0 && r.data.lane === lane);
+  // the Water Elemental a lake tile becomes: the roster's Water Mage's Summon water elemental, as fast as she is (its
+  // bodies are made at level LAKE.mageLevel, 0 = as bought: as a Water Mage of that level summons it)
+  function lakeElemental(m) {
+    const wm = (m.units || []).find(u => u && u.name === 'Water Mage');
+    const d = (wm && (wm.skillDefs || []).find(x => x && x.type === 'elemental')) || LAKE_ELEMENTAL;
+    const src = wm || { name: 'Water Mage', cost: 0, bodies: 1, hp: 600, hit: 50, aps: 0.9, range: 22, speed: 2.1, splash: 3.5 };
+    const el = E.applySkills({ ...src, level: 0 }, [d], m.units || []).elemental;
+    if (!el) return null;
+    return { ...el.unit, speed: src.speed, mpb: 'magicLake', mpbSkin: 'walker' };
+  }
+  const lakeSkin = (rec) => { const s = skillN(rec, 'spirits') > 0, e = skillN(rec, 'elemental') > 0; return s && e ? 'both' : s ? 'spirits' : e ? 'elemental' : ''; };
   def({ id: 'magicLake', name: 'Magic lake', short: 'ml', kind: 'technical', hp: 0, armor: 0, color: '#3E8FC4',
-    text: 'Water tiles on your half or in no man’s land: shot over, not walked.', downside: '—', place: { where: 'board', spacing: false }, skills: [], hooks: {} });
+    text: `Each of you puts down ${LAKE.tiles} water tiles on your zone or in no man’s land: shot over, never walked on, nobody deploys on them. Water never shuts a tile or a way off.`,
+    downside: '', place: { where: 'board', spacing: false, terrain: true },
+    skills: [
+      { id: 'spirits', name: 'Waterspirits allowal', cost: LAKE.spiritsCost, per: 'building', text: `Your units can walk through this tile, ${LAKE.slow}% slower, and regain ${LAKE.regen}% health a second while on it.` },
+      { id: 'elemental', name: 'Become Water elemental', cost: LAKE.elementalCost, per: 'building', text: 'Every fight a Water Elemental rises from this tile and fights for your team (the Water Mage’s Summon water elemental). The tile stays water.' },
+    ],
+    LAKE, lakeOk, lakeSpots, lakeFree, lakeTodo, lakeElemental,
+    hooks: {
+      // the card: each player gets LAKE.tiles tiles to put down (col -1 until then)
+      acquire(m, team) { for (const L of [0, 1]) for (let k = 0; k < LAKE.tiles; k++) addRec(m, team, 'magicLake', -1, -1).data.lane = L; },
+      // a lake that came by a placement vote: that tile is the voter's, the rest are still to put down
+      placed(m, side, rec) {
+        if (rec.col < 0 || rec.data.lane != null) return;
+        rec.data.lane = laneOf(m);
+        for (const L of [0, 1]) for (let k = lakeRecs(m, side).filter(r => r.data.lane === L).length; k < LAKE.tiles; k++) addRec(m, side, 'magicLake', -1, -1).data.lane = L;
+      },
+      spotOk: (m, side, part, col, row) => lakeFree(m, col, row), // (a lake by a placement vote, never in a real match)
+      // (for the boards: its look shows its skills)
+      unit: (m, side, rec) => E.withTraits({ name: 'Magic lake', cost: 0, bodies: 1, hp: 1, hit: 0, aps: 1, range: 0, speed: 0, splash: 0, shape: 'square', color: '#3E8FC4',
+        structure: true, lesser: true, kind: 'mpb', mpb: 'magicLake', level: 0, ...(lakeSkin(rec) ? { mpbSkin: lakeSkin(rec) } : {}) }),
+      canBuy: (m, side, rec) => rec.col >= 0,
+      canAct: (m, side, rec, action, args) => action === 'place' && lakeOk(m, side, rec, args[0], args[1]),
+      act(m, side, rec, action, args) { rec.col = args[0]; rec.row = args[1]; rec.round = m.round; return true; },
+      // as the fight starts: a tile nobody put down, or one put down this round on an opponent's squad (or building) its
+      // player couldn't see (either lane), goes on the first tile its player could have put it, everything known
+      settle(lanes, side, rec) {
+        const m = lanes[0];
+        if (rec.col >= 0 && !(rec.round === m.round && lanes.some(L => G.squadAt(L, 1 - side, rec.col, rec.row) || G.buildingAt(L, 1 - side, rec.col, rec.row)))) return;
+        const was = m.duoLane;
+        m.duoLane = rec.data.lane;
+        const t = lakeSpots(m, side, rec, true)[0];
+        m.duoLane = was;
+        if (t) { rec.col = t.col; rec.row = t.row; rec.round = m.round; }
+      },
+      // each fight: the Water Elemental of a tile that became one
+      bodies(m, side, rec, ctx) {
+        if (rec.col < 0 || !(skillN(rec, 'elemental') > 0)) return [];
+        const u = lakeElemental(m);
+        if (!u) return [];
+        const w = G.tileToWorld(rec.col, rec.row), out = E.buildSquad(u, side, w.x, w.y, ctx.xsq(0), G.TILE, ctx.idx + 1, LAKE.mageLevel);
+        for (const b of out) b.tier = 1; // a summon (for the artifacts)
+        return out;
+      },
+      // the water in the fight, once for both teams: the Engine's terrain, and each team's Waterspirits tiles
+      battleOpts(m, side, rec, opts) {
+        if (opts.mpb.lake) return;
+        opts.mpb.lake = true;
+        const all = [0, 1].flatMap(sd => lakeRecs(m, sd).filter(r => r.col >= 0).map(r => ({ sd, r })));
+        if (!all.length) return;
+        const { COLS, ROWS } = grid(m), k = G.TERRAIN.sub, cols = COLS * k, rows = ROWS * k, base = opts.terrain, T2 = G.TILE / 2, n = cols * rows;
+        const ter = { cols, rows, cell: G.TILE / k, x0: -COLS * G.TILE / 2, y1: ROWS * G.TILE / 2,
+          block: base ? Uint8Array.from(base.block) : new Uint8Array(n), sight: base ? Uint8Array.from(base.sight) : new Uint8Array(n), level: base ? Int8Array.from(base.level) : new Int8Array(n) };
+        const walk = [[], []], tiles = [];
+        for (const { sd, r } of all) {
+          const cells = [];
+          for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) cells.push((r.row * k + j) * cols + r.col * k + i);
+          for (const c of cells) ter.block[c] = 1;
+          if (!(skillN(r, 'spirits') > 0)) continue;
+          walk[sd].push(...cells);
+          const w = G.tileToWorld(r.col, r.row), box = { x0: w.x - T2, x1: w.x + T2, y0: w.y - T2, y1: w.y + T2 };
+          tiles.push({ type: 'wade', slow: LAKE.slow, ...box }, { type: 'mpbLake', side: sd, pct: LAKE.regen, ...box });
+        }
+        opts.terrain = ter;
+        if (walk[0].length || walk[1].length) opts.mpb.lakeWalk = walk;
+        if (tiles.length) opts.tiles = (opts.tiles || []).concat(tiles);
+      },
+      // bots: they put their tiles down at once, and now and then buy a tile's skill
+      botAfter(m, side, rec, r) {
+        if (rec.data.lane !== laneOf(m)) return;
+        if (rec.col < 0) { const t = lakeSpots(m, side, rec)[0]; if (t) G.mpbAct(m, side, rec.key, 'place', t.col, t.row); }
+        if (rec.col < 0) return;
+        const spare = () => m.gold[side] - G.CARRY_CAP / 2;
+        if (!skillN(rec, 'spirits') && spare() >= LAKE.spiritsCost && r() < 0.3) G.mpbBuy(m, side, rec.key, 'spirits');
+        if (!skillN(rec, 'elemental') && spare() >= LAKE.elementalCost && r() < 0.2) G.mpbBuy(m, side, rec.key, 'elemental');
+      },
+      info(m, side, rec) {
+        return [rec.col < 0 ? 'Not put down yet' : 'Water: shot over, never walked on',
+          skillN(rec, 'spirits') ? `Waterspirits: the team walks it ${LAKE.slow}% slower and regains ${LAKE.regen}% health a second on it` : '',
+          skillN(rec, 'elemental') ? 'A Water Elemental rises from it every fight' : ''].filter(Boolean);
+      },
+    },
+  });
 
   // ===== jail =====
   def({ id: 'jail', name: 'Jail', short: 'j', kind: 'defensive', hp: 1500, armor: 8, color: '#5E6168',
@@ -572,15 +841,27 @@
     if (K.hooks.placed) K.hooks.placed(m, side, rec);
     return rec;
   }
-  // every tile a building takes, with its part ('' for the building itself)
-  const tilesOf = (rec) => [{ col: rec.col, row: rec.row, part: '' }].concat(Object.entries(rec.parts || {}).map(([p, t]) => ({ col: t.col, row: t.row, part: p })));
+  // every tile a building takes, with its part ('' for the building itself; none while it isn't placed yet: col < 0,
+  // the Magic lake's tiles before their player puts them down)
+  const tilesOf = (rec) => (rec.col >= 0 ? [{ col: rec.col, row: rec.row, part: '' }] : []).concat(Object.entries(rec.parts || {}).map(([p, t]) => ({ col: t.col, row: t.row, part: p })));
   // the building (and part) on a tile, either side: { side, rec, part } or null
   function recAt(m, col, row) {
     for (const side of [0, 1]) for (const rec of recs(m, side)) for (const t of tilesOf(rec)) if (t.col === col && t.row === row) return { side, rec, part: t.part };
     return null;
   }
-  // Game.mpbAt: a tile no squad of either team may take (a kind's place.open leaves its tiles free, for its own rules)
-  const at = (m, col, row) => { const x = recAt(m, col, row); return !!x && !(kindOf(x.rec.kind) || {}).place.open; };
+  // Game.mpbAt: a tile no squad of either team may take (a kind's place.open leaves its tiles free, for its own rules;
+  // place.terrain: terrain, see terrainAt), or one a kind's hooks.blocks(m, side, rec, col, row) keeps free (the tiles
+  // round a Coal mine's exit)
+  // (only: building tiles alone, not the tiles a kind keeps free: Game.bldgSeen, the Assassin's 'next to a building')
+  function at(m, col, row, only) {
+    const x = recAt(m, col, row);
+    if (x) { const pl = (kindOf(x.rec.kind) || {}).place || {}; if (!pl.open && !pl.terrain) return true; }
+    if (only) return false;
+    for (const side of [0, 1]) for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.blocks && K.hooks.blocks(m, side, rec, col, row)) return true; }
+    return false;
+  }
+  // Game.terrainBlocks: a tile of a kind that is terrain (place.terrain: the Magic lake's water), either team
+  const terrainAt = (m, col, row) => on(m) && [0, 1].some(side => recs(m, side).some(rec => !!((kindOf(rec.kind) || {}).place || {}).terrain && tilesOf(rec).some(t => t.col === col && t.row === row)));
 
   // the starting state of a 2v2 lane: both Vaults, no votes (Duo.start, in both lanes)
   function init(m, lane) {
@@ -613,7 +894,7 @@
     for (const sd of [0, 1]) {
       const t = (m.towers && m.towers[sd]) || G.towerSpot(m, sd);
       if (t) out.push({ col: t.col, row: t.row });
-      for (const r of recs(m, sd)) out.push(...tilesOf(r));
+      for (const r of recs(m, sd)) if (!((kindOf(r.kind) || {}).place || {}).terrain) out.push(...tilesOf(r)); // (terrain isn't a building)
       for (const b of G.buildingsOf(m, sd).concat(G.teamBuildings(m, sd))) out.push({ col: b.col, row: b.row });
     }
     return out;
@@ -621,6 +902,9 @@
   const spaced = (m, col, row) => buildingTiles(m).every(t => Math.max(Math.abs(t.col - col), Math.abs(t.row - row)) >= SPACING);
   // no squad (either team, either lane), tower, building or MPB on it
   const taken = (m, side, col, row) => G.occupied(m, side, col, row) || G.occupied(m, 1 - side, col, row) || G.enemyHolds(m, side, col, row) || !!recAt(m, col, row);
+  // the same, as team `side`'s player sees the board while deploying: the opponents' squads and buildings only once
+  // they may be seen (a refusal never shows where a hidden one stands; the Coal mine's exit, the Magic lake)
+  const seenTaken = (m, side, col, row) => G.occupied(m, side, col, row) || G.bldgSeen(m, side, col, row) || G.enemyHolds(m, side, col, row) || !!recAt(m, col, row);
   const placeOf = (kindId, part) => { const K = kindOf(kindId); if (!K) return null; return part ? (K.place.parts || []).find(p => p.id === part) || null : K.place; };
   // may team `side` put building kind (or its part) on this tile?
   function spotOk(m, side, kindId, part, col, row) {
@@ -717,8 +1001,24 @@
     if (K.hooks.bought) K.hooks.bought(m, side, rec, sk, args, L);
     return true;
   }
-  // a player takes back their own last click of skill id this round (never the teammate's: their gold)
-  const canUndo = (m, side, key, id) => { const rec = recOf(m, side, key); return !!rec && thisRound(m, rec.skills[id]).some(e => e.lane === laneOf(m)) && !m.over; };
+  // a player takes back their own last click of skill id this round (never the teammate's: their gold; hooks.canUndo
+  // (m, side, rec, id): a kind may refuse, the Coal mine's exit can't go back to a tile taken since)
+  const canUndo = (m, side, key, id) => { const rec = recOf(m, side, key), K = rec && kindOf(rec.kind); return !!rec && thisRound(m, rec.skills[id]).some(e => e.lane === laneOf(m)) && !m.over && !(K && K.hooks.canUndo && !K.hooks.canUndo(m, side, rec, id)); };
+  // Undo all (Duo): may team `side`'s buildings go back to how they would be again (sc: the rebuilt copy)? Each of
+  // this player's clicks this round must be one they could take back, and each kind's hooks.restoreOk(m, side, rec,
+  // was) agree (the Coal mine: its exit back on a tile still free). m: the player's lane as it stands.
+  function undoAllOk(m, side, sc) {
+    if (!on(m)) return true;
+    const L = laneOf(m);
+    for (const rec of recs(m, side)) {
+      const K = kindOf(rec.kind);
+      if (!K) continue;
+      for (const id of Object.keys(rec.skills)) if (thisRound(m, rec.skills[id]).some(e => e.lane === L) && K.hooks.canUndo && !K.hooks.canUndo(m, side, rec, id)) return false;
+      const was = sc && recOf(sc, side, rec.key);
+      if (was && K.hooks.restoreOk && !K.hooks.restoreOk(m, side, rec, was)) return false;
+    }
+    return true;
+  }
   function mpbUndo(m, side, key, id) {
     if (!canUndo(m, side, key, id)) return false;
     const rec = recOf(m, side, key), e = rec.skills[id], L = laneOf(m), sk = skillOf(rec.kind, id);
@@ -855,6 +1155,13 @@
     if (!on(m)) return;
     for (const side of [0, 1]) for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.teamHp) K.hooks.teamHp(lanes, side, rec, hp, round, sums); }
   }
+  // before a fight (Duo.settle, the lanes as they will fight): whatever the kinds leave unsettled (hooks.settle(lanes,
+  // side, rec): a Magic lake tile nobody put down); change lanes[0], Duo copies it to lane 1
+  function settle(lanes) {
+    const m = lanes[0];
+    if (!on(m)) return;
+    for (const side of [0, 1]) for (const rec of recs(m, side).slice()) { const K = kindOf(rec.kind); if (K && K.hooks.settle) K.hooks.settle(lanes, side, rec); }
+  }
   // the start of a round (Duo.beginRound): this round's skill logs start empty, then the kinds' roundStart
   function roundStart(lanes) {
     const m = lanes[0];
@@ -974,10 +1281,10 @@
 
   const api = {
     SQ, XSQ, VOTE_MS, DRAFT_MS, SPACING, ARTIFACT, DRAFT_ROUNDS, VAULT_SPOT, PER, VAULT, GOLEM, KINDS, SYS,
-    def, kindOf, recs, recOf, has, skillOf, skillN, addRec, tilesOf, recAt, at, init,
+    def, kindOf, recs, recOf, has, skillOf, skillN, addRec, tilesOf, recAt, at, terrainAt, settle, init,
     interior, spaced, spotOk, spots, autoSpot,
     voteQueue, voteHead, queue, placeHead, mpbVote, voteResult,
-    skillCost, whyNot, canBuy, mpbBuy, canUndo, mpbUndo, mpbAct,
+    skillCost, whyNot, canBuy, mpbBuy, canUndo, undoAllOk, mpbUndo, mpbAct, seenTaken,
     vaultOf, vaultRec, vaultMode, vaultMoved, vaultRoom, canVault, vaultPut, vaultTake, golemOf, golemUnit, golemSkin,
     hide, unitOf, squadOf, extraOf, indexOf, isSquad, bodies, battleOpts, squadMods, squadBodies, news, afterFight, roundStart, teamHeal, FH, OAK, oakMossTiles, oakEntUnit,
     cardPool, cardName, cardText, rollArtifacts, artifactsFor,
