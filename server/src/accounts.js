@@ -580,8 +580,12 @@ function isDevEmail(claims, env) {
 // is saved on the phone, and sent here as the player's army: { k, army: [[unit name, col, row], ...] }. The server sets
 // the fight up exactly as the page's startPuzzle does (the built-in units on the Old standard board, the enemy's
 // squads as if from an earlier round, the puzzle's gold and shop) and plays it with the same referee, so a phone can't
-// claim a win it didn't get. One row per solved puzzle (table 'puzzles'); solving the last one sets players.initiate.
-export const PUZZLE = { title: 'initiate', count: PUZZLES.length, maxArmy: 12 };
+// claim a win it didn't get. One row per solved puzzle (table 'puzzles'). Solving the last Easy puzzle sets
+// players.initiate (2026-11-05: puzzles have a level; the Easy ones come first in the file, and only they count for
+// the title, so the Medium ones are extra practice and the title kept its meaning).
+const PUZZLE_EASY = PUZZLES.filter((P) => (P.level || 'Easy') === 'Easy').length;
+if (PUZZLES.slice(0, PUZZLE_EASY).some((P) => (P.level || 'Easy') !== 'Easy')) throw new Error('puzzles.json: the Easy puzzles must come first');
+export const PUZZLE = { title: 'initiate', count: PUZZLES.length, initiate: PUZZLE_EASY, maxArmy: 12 };
 export function puzzleWon(k, army) {
   const P = PUZZLES[k];
   if (!P || !Array.isArray(army) || army.length > PUZZLE.maxArmy) return false;
@@ -1013,8 +1017,8 @@ export async function handleAccount(request, env, cors) {
         try { won = puzzleWon(k, body.army); } catch (e) { console.warn('puzzle', e && e.message); won = false; }
         if (won) {
           await db.prepare('INSERT OR IGNORE INTO puzzles (player, k, created) VALUES (?, ?, ?)').bind(me.player, k, now).run();
-          const n = await db.prepare('SELECT COUNT(*) AS n FROM puzzles WHERE player = ?').bind(me.player).first();
-          if (n && n.n >= PUZZLE.count) await db.prepare('UPDATE players SET initiate = COALESCE(initiate, ?) WHERE id = ?').bind(now, me.player).run();
+          const n = await db.prepare('SELECT COUNT(*) AS n FROM puzzles WHERE player = ? AND k < ?').bind(me.player, PUZZLE.initiate).first();
+          if (n && n.n >= PUZZLE.initiate) await db.prepare('UPDATE players SET initiate = COALESCE(initiate, ?) WHERE id = ?').bind(now, me.player).run();
         }
       }
       const out = await playerOut(db, me.player);

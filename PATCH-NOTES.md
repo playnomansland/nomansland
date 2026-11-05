@@ -20,6 +20,18 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 5 November 2026 – Medium tutorial puzzles
+
+- **Three new puzzles, level Medium.** The Tutorial puzzles list is now split into **Easy** and **Medium**, each with its own "solved" count, and the coach line says which one you're on ("Medium 2 of 3"). Finishing the last Easy puzzle offers **On to Medium**. Each Medium puzzle teaches something new:
+  - **Hold the line:** two Spider nests charge your back line. Put something tough in front: an **Ent** with the Fire Mages right behind it. Fire Mages in front lose.
+  - **The long way round:** the Out of reach army tucked into one corner, and no Snipers this time. Squads march down their own side of the board, so **Goblin Swarms on the far side** run past the Brute and reach the Fire Mages. Goblins facing the Brute lose every time.
+  - **Through the wall:** a Brute and an Ent in front of a Fire Mage, with a Leaf Wizard on the wing. Snipers alone can't break the wall; the new **Earth Wizard** throws stones that go through the first target. Two Snipers and an Earth Wizard, facing them.
+- **Initiate title:** still for the three Easy puzzles. The Medium ones are extra practice, so nobody who has the title loses it.
+- **Fix:** a puzzle's enemy army now always shows in full, also when it has more squads than one round's deployments.
+- Every answer was checked in simulated fights: it wins 80–93% of the time from where its hint points, and the tempting wrong answers almost always lose.
+
+---
+
 ## 5 November 2026 – Exploit bot (developers)
 
 - **Developer > Exploit bot:** pick one of six tactics the exploit hunt found (Flank snipers, Steel Wizard flank, Necromancer home guard, Back-line wizards, Hoarder, Arrow rush) and the AI opponent plays it in any match against the computer, so you can feel each exploit from the other side of the board. Off is the normal AI.

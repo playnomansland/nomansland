@@ -4583,7 +4583,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
       <button id="rw-discord" class="${dc ? 'done' : ''}"><span class="rw-pic">${titleHtml('bababa')}</span>
         <span><b>Join our Discord</b><small>${dc ? 'BABABABA title: yours!' : 'Get the orange BABABABA title'}</small></span></button>
       <button id="rw-puzzles" class="${init ? 'done' : ''}"><span class="rw-pic">${titleHtml('initiate')}</span>
-        <span><b>Solve the puzzles</b><small>${init ? 'Initiate title: yours!' : `Get the Initiate title (${puzSolvedAll().length}/${PUZZLES.length} solved)`}</small></span></button>
+        <span><b>Solve the puzzles</b><small>${init ? 'Initiate title: yours!' : `Get the Initiate title (${puzTitleSolved()}/${PUZ_TITLE.length} solved)`}</small></span></button>
     </div>`;
   }
   function rewardsDraw() {
@@ -4612,7 +4612,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
       </section>
       <section class="rw-sec">
         <div class="rw-head"><div class="rw-chip">${titleHtml('initiate', true)}</div></div>
-        <p class="hint" style="margin:0">Solve all ${PUZZLES.length} puzzles (one fight each, the enemy army in plain sight) and the light blue Initiate title goes under your name. Solved: ${puzSolvedAll().length} of ${PUZZLES.length}.</p>
+        <p class="hint" style="margin:0">Solve all ${PUZ_TITLE.length} Easy puzzles (one fight each, the enemy army in plain sight) and the light blue Initiate title goes under your name. Solved: ${puzTitleSolved()} of ${PUZ_TITLE.length}.</p>
         ${hasInitiate() ? '<p class="rw-got">Initiate is yours! Pick which title shows in Profile.</p>'
           : !a ? '<p class="hint" style="margin:0">Puzzles you solve count once you have an account (a guest is enough): the game keeps them until then.</p>' : ''}
         <button class="btn ${hasInitiate() ? '' : 'primary'}" id="rw-puz-open">${hasInitiate() ? 'Play the puzzles again' : 'Open the puzzles'}</button>
@@ -5135,6 +5135,14 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   try { puzWins = JSON.parse(localStorage.getItem(PUZZLE_WINS) || '{}') || {}; } catch (e) { puzWins = {}; }
   const puzSolvedAll = () => Array.from(new Set(puzSolved.concat(acct && acct.puzzles || []))).sort((a, b) => a - b); // this phone's and the account's
   const hasInitiate = () => !!(acct && acct.titles && acct.titles.includes('initiate'));
+  // Levels (2026-11-05): each puzzle has a level ('Easy' when none is set), listed in the order of src/puzzles.json.
+  // The Initiate title needs the Easy ones only (they come first; the server counts them the same way, accounts.js
+  // PUZZLE.initiate). The Medium ones are extra practice.
+  const puzLevel = (k) => (PUZZLES[k] && PUZZLES[k].level) || 'Easy';
+  const PUZ_LEVELS = Array.from(new Set(PUZZLES.map((P, k) => puzLevel(k))));
+  const puzOfLevel = (L) => PUZZLES.map((P, k) => k).filter(k => puzLevel(k) === L);
+  const PUZ_TITLE = puzOfLevel('Easy');
+  const puzTitleSolved = () => puzSolvedAll().filter(k => PUZ_TITLE.includes(k)).length;
   let puzSyncing = false;
   async function puzzleSync() {
     if (puzSyncing || !acct || !acct.session || typeof acctCall !== 'function') return;
@@ -5164,8 +5172,10 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     m = Game.createMatch(units, M, 1, 'standard');
     m.packages = [[], []];
     for (const n of P.shop) m.unlocks[0][unitIx(n)] = 1;
-    tutEnemy(P.foe);
-    for (const q of m.armies[1]) q.round = 0; // as if placed in an earlier round: in plain sight
+    // the enemy's squads, each as if placed in an earlier round: in plain sight, and not counted against this round's
+    // deployments (a puzzle can have more than three; the server and tools/tests/puzzles.js place them the same way)
+    for (const [n, c, r] of P.foe) { m.unlocks[1][unitIx(n)] = 1; m.gold[1] = Game.SQUAD_COST * 9; const q = Game.place(m, 1, unitIx(n), c, r); if (q) q.round = 0; }
+    m.gold[1] = 0;
     m.gold = [P.gold, 0];
     tut = { intro: 2, wrong: false, tskillSeen: true, sheetSeen: true, puzzle: k, hint: false };
     nextReady = [false, false]; rematch = [false, false];
@@ -5175,8 +5185,10 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function openPuzzles() {
     $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Tutorial puzzles</h3><button class="btn small" id="close">Close</button></div>
       <p class="hint" style="margin:0">One fight each. You see the whole enemy army; win with the gold you have.</p>
-      <p class="hint" style="margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${hasInitiate() ? 'All solved: the title is yours.' : `Solve all ${PUZZLES.length} for the title`} ${titleHtml('initiate')}</p>
-      <div style="display:grid;gap:8px">${PUZZLES.map((P, k) => `<button class="btn" data-puz="${k}" style="display:flex;justify-content:space-between;gap:8px;text-align:left"><span><b>${k + 1}. ${esc(P.name)}</b><br><span class="hint">${esc(P.goal)}</span></span><span style="color:var(--gold)">${puzSolvedAll().includes(k) ? '✓ Solved' : ''}</span></button>`).join('')}</div>`;
+      <p class="hint" style="margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${hasInitiate() ? 'The title is yours.' : `Solve the ${PUZ_TITLE.length} Easy puzzles for the title`} ${titleHtml('initiate')}</p>
+      ${PUZ_LEVELS.map(L => { const ks = puzOfLevel(L), done = ks.filter(k => puzSolvedAll().includes(k)).length;
+        return `<h4 class="puz-level" style="margin:6px 0 0;display:flex;justify-content:space-between;gap:8px">${esc(L)}<span class="hint" style="font-weight:normal">${done} of ${ks.length} solved</span></h4>
+      <div style="display:grid;gap:8px">${ks.map((k, i) => { const P = PUZZLES[k]; return `<button class="btn" data-puz="${k}" style="display:flex;justify-content:space-between;gap:8px;text-align:left"><span><b>${i + 1}. ${esc(P.name)}</b><br><span class="hint">${esc(P.goal)}</span></span><span style="color:var(--gold)">${puzSolvedAll().includes(k) ? '✓ Solved' : ''}</span></button>`; }).join('')}</div>`; }).join('')}`;
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', closeSheet);
     $('sheet').querySelectorAll('[data-puz]').forEach(b => b.addEventListener('click', () => startPuzzle(+b.dataset.puz)));
@@ -5191,7 +5203,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       puzzleSync();
     }
     const more = k + 1 < PUZZLES.length;
-    if (won) coach(`<b>Solved!</b> ${esc(P.why)}`, [['Main menu', showStart], ...(more ? [['Next puzzle', () => startPuzzle(k + 1), true]] : [['Play vs AI', () => { matchKind = 'standard'; startAiMatch(); }, true]])]);
+    if (won) coach(`<b>Solved!</b> ${esc(P.why)}`, [['Main menu', showStart], ...(more ? [[puzLevel(k + 1) !== puzLevel(k) ? `On to ${puzLevel(k + 1)}` : 'Next puzzle', () => startPuzzle(k + 1), true]] : [['Play vs AI', () => { matchKind = 'standard'; startAiMatch(); }, true]])]);
     else coach(`<b>Not this time.</b> ${tut.hint ? esc(P.hint) : 'Look at what they have, and what beats it.'}`, [['Main menu', showStart], ...(tut.hint ? [] : [['Hint', () => { const h = tut.hint = true; coach(`<b>Hint:</b> ${esc(P.hint)}`, [['Try again', () => { startPuzzle(k); tut.hint = h; panelDeploy(); }, true]]); }]]), ['Try again', () => { const h = tut.hint; startPuzzle(k); tut.hint = h; panelDeploy(); }, true]]);
   }
 
@@ -5301,7 +5313,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const next = () => { tut.intro++; panelDeploy(); render(); };
     if (dockTask && dockTask.text) coach(null); // the task line on the board says what the next tap does
     else if (P && tut.coachOff) coach(null); // folded away with its X
-    else if (P) coach(`<b>Puzzle ${tut.puzzle + 1} of ${PUZZLES.length} · ${esc(P.name)}.</b> ${esc(P.goal)} Win the fight.${tut.hint ? ` <b>Hint:</b> ${esc(P.hint)}` : ''}`, tut.hint ? [] : [['Hint', () => { tut.hint = true; tut.coachOff = false; panelDeploy(); }]]);
+    else if (P) coach(`<b>${esc(puzLevel(tut.puzzle))} ${puzOfLevel(puzLevel(tut.puzzle)).indexOf(tut.puzzle) + 1} of ${puzOfLevel(puzLevel(tut.puzzle)).length} · ${esc(P.name)}.</b> ${esc(P.goal)} Win the fight.${tut.hint ? ` <b>Hint:</b> ${esc(P.hint)}` : ''}`, tut.hint ? [] : [['Hint', () => { tut.hint = true; tut.coachOff = false; panelDeploy(); }]]);
     else if (step === 'tower') coach('This is your <b>Tower</b>. Protect it.', [['Next', next, true]]);
     else if (step === 'zone') coach('This is your <b>deployment zone</b>. You can put troops here.', [['Next', next, true]]);
     else if (step === 'pick') { coach(`Tap <b>${esc(TUT.start)}</b> to recruit your first squad.`); glow(card(TUT.start)); }

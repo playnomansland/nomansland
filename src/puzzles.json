@@ -6,7 +6,8 @@
     "foe": [["Goblin Swarm",5,4],["Goblin Swarm",6,4],["Skeleton Archers",5,2]],
     "goal": "Two Goblin Swarms and Skeleton Archers: a crowd of small bodies. You have 200 gold.",
     "hint": "Splash hits many bodies at once. Fire Mage beats crowds.",
-    "why": "Fire Mage’s splash hits a whole crowd with every shot."
+    "why": "Fire Mage’s splash hits a whole crowd with every shot.",
+    "level": "Easy"
   },
   {
     "name": "Two giants",
@@ -15,7 +16,8 @@
     "foe": [["Brute",5,4],["Brute",6,4]],
     "goal": "Two Brutes: huge health, huge hits. You have 300 gold.",
     "hint": "A Brute hits one body at a time. Many cheap bodies swamp it: Goblin Swarms, up front.",
-    "why": "A Brute kills one goblin a hit while the whole swarm hits back."
+    "why": "A Brute kills one goblin a hit while the whole swarm hits back.",
+    "level": "Easy"
   },
   {
     "name": "Out of reach",
@@ -24,6 +26,37 @@
     "foe": [["Fire Mage",5,3],["Fire Mage",6,3],["Brute",5,4]],
     "goal": "Two Fire Mages behind a Brute. Crowds melt in their splash. You have 300 gold.",
     "hint": "Few targets, all of them single bodies: Snipers outrange Fire Mages and land one big hit each shot.",
-    "why": "Snipers shoot from beyond the Fire Mages’ reach, and their splash finds no crowd."
+    "why": "Snipers shoot from beyond the Fire Mages’ reach, and their splash finds no crowd.",
+    "level": "Easy"
+  },
+  {
+    "name": "Hold the line",
+    "level": "Medium",
+    "gold": 300,
+    "shop": ["Fire Mage","Sniper","Ent","Wisps","Skeleton Archers"],
+    "foe": [["Spiders",5,5],["Spiders",6,4]],
+    "goal": "Two Spider nests: twelve fast biters that run straight for your back line. You have 300 gold.",
+    "hint": "Fire Mages burn spiders, but not if the spiders reach them first. Put an Ent in front, with the Fire Mages right behind it.",
+    "why": "The spiders stopped to chew on the Ent, and the Fire Mages burned them while they were busy. Tough units go in front, damage behind."
+  },
+  {
+    "name": "The long way round",
+    "level": "Medium",
+    "gold": 300,
+    "shop": ["Goblin Swarm","Fire Mage","Skeleton Archers","Ember Imps"],
+    "foe": [["Brute",1,4],["Fire Mage",1,2],["Fire Mage",2,2]],
+    "goal": "A Brute guards two Fire Mages in their corner, and there are no Snipers this time. You have 300 gold.",
+    "hint": "Squads march straight down their own side of the board. Goblins on the far side run past the Brute and reach the Fire Mages first.",
+    "why": "Down the far side the goblins slipped past the Brute and caught the Fire Mages. Where you place a squad decides who it meets first."
+  },
+  {
+    "name": "Through the wall",
+    "level": "Medium",
+    "gold": 400,
+    "shop": ["Goblin Swarm","Fire Mage","Sniper","Ent","Earth Wizard","Wisps"],
+    "foe": [["Ent",6,3],["Brute",7,3],["Fire Mage",7,2],["Leaf Wizard",9,3]],
+    "goal": "A Brute and an Ent stand in front of a Fire Mage, with a Leaf Wizard out on the wing. You have 400 gold.",
+    "hint": "Snipers alone can't break the Brute and the Ent. The Earth Wizard throws huge stones that go through their first target: two Snipers and an Earth Wizard, facing them.",
+    "why": "The Earth Wizard's stones broke the wall and hit what stood behind it, while the Snipers picked off the casters from out of reach."
   }
 ]

@@ -66,7 +66,8 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 6 * 60 *
     ok(/Initiate title: yours!/.test(await p.locator('#rw-puzzles').textContent()), 'the card says so');
     await p.screenshot({ path: '/tmp/initiate-menu.png' });
     await p.click('#puzzles-open');
-    ok((await p.locator('[data-puz]').allTextContents()).every(t => /Solved/.test(t)), 'all three show as solved');
+    const rows = await p.locator('[data-puz]').allTextContents(); // the 3 Easy puzzles first, then the Medium ones (not needed for the title)
+    ok(rows.slice(0, 3).every(t => /Solved/.test(t)) && !rows.slice(3).some(t => /Solved/.test(t)), 'all three Easy show as solved, the Medium ones not');
     await p.screenshot({ path: '/tmp/initiate-sheet.png' });
   } finally { await b.close(); srv.stop(); }
   console.log(fails ? `${fails} FAILED` : 'initiate-ui: all ok');
