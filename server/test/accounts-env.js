@@ -46,7 +46,7 @@ async function startAccounts(port, vars = {}, extra = []) {
   args.push(...extra);
   const srv = await startServer(port, args);
   const stop = srv.stop;
-  srv.stop = () => { stop(); keys.close(); fs.rmSync(state, { recursive: true, force: true }); };
+  srv.stop = () => { stop(); keys.close(); try { fs.rmSync(state, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (e) { /* the local worker may still be writing as it stops: a temp folder left behind is harmless */ } };
   return srv;
 }
 
