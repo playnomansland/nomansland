@@ -910,8 +910,8 @@ const Engine = (() => {
         if (opts.record) shots.push([v.x, v.y, v.x, v.y, v.side, v.u.blastR, 1, 0, 0]);
         for (const f of sides[1 - v.side]) if (f.alive && f !== v.rammed && hyp(f.x - v.x, f.y - v.y) <= v.u.blastR) hurt(v, f, dmg, v.x, v.y);
       }
-      // a carrier is gone: whoever rode inside jumps out where it fell
-      if (v.u.carrier) {
+      // a carrier is gone: whoever rode inside jumps out where it fell (a Tree kojja's one body too: b.nest)
+      if (v.u.carrier || v.nest) {
         let k = 0;
         for (const r of sides[v.side]) {
           if (r.carrier !== v || !r.boarded) continue;
@@ -1427,6 +1427,23 @@ const Engine = (() => {
       }
       return true;
     }
+    // 2v2 Tree kojja (src/mpb.js treeKojja; its link hook sets b.nest = { range, sight } on the one body of a squad
+    // sitting in the kojja, the squad's other bodies ride in that body: boarded, carrier = it): the body leaves the
+    // kojja (it saw no enemy for WATCH_IDLE s, or the kojja fell): it loses the kojja's extra range and sight, and the
+    // rest of its squad steps out round it
+    function unnest(b) {
+      const n = b.nest;
+      b.nest = null;
+      b.u = { ...b.u, range: b.u.range - n.range, trueSight: n.sight };
+      let k = 0;
+      for (const r of sides[b.side]) {
+        if (r.carrier !== b || !r.boarded) continue;
+        const [ox, oy] = SPAWN_SPOTS[k++ % SPAWN_SPOTS.length], fwd = b.side === 0 ? 1 : -1;
+        r.boarded = false; r.alive = true; r.carrier = null;
+        r.x = b.x + ox * g.spacing * 0.5; r.y = b.y + oy * fwd * g.spacing * 0.5;
+      }
+      invalidateTargetIndex();
+    }
     // the side's tower (not a lesser structure: treasury, watchtower, wall, building)
     const isTower = (f) => !!f.u.structure && !f.u.lesser;
     // noTower: whether side s has any body an enemy could pick other than its tower (worked out once a tick)
@@ -1447,7 +1464,8 @@ const Engine = (() => {
     // seesHidden: b can pick f although f is stealthed: Overwatch (u.trueSight) within b's range, or a Sniper
     // (b.sniperMark, set by the game) looking for the squad its side's Sniper tower marked (f.marked), or a Hunter (b.u.hunter)
     // looking for a squad its side's Hunters marked (f.prey, set by the game)
-    const seesHidden = (b, f) => f.u.stealth && !f.u.aloft && ((f.marked && b.sniperMark > 0) || (f.prey && b.u.hunter) || (b.u.trueSight && gap(f, b) <= b.u.range + 1e-9));
+    // (2v2 Scorch turrets, src/mpb.js scorch: u.scorchSight sees stealthed units at any distance)
+    const seesHidden = (b, f) => f.u.stealth && !f.u.aloft && ((f.marked && b.sniperMark > 0) || (f.prey && b.u.hunter) || (b.u.trueSight && gap(f, b) <= b.u.range + 1e-9) || !!b.u.scorchSight);
     const pickable = (b, f) => f.alive && (!f.hidden || seesHidden(b, f)) && !sheltered(f) && !(b.hunt && !isLone(f)) && !ignores(b, f);
     // damage that skips armor and ward (poison)
     function direct(owner, v, amount) {
@@ -2564,6 +2582,7 @@ const Engine = (() => {
         if (b.inside) { // Overwatch: it stays in its building while that stands, and while it sees enemies now and then
           if (b.inside.alive && !watchIdle(b)) { b.x = b.inside.x; b.y = b.inside.y; continue; }
           b.inside = null;
+          if (b.nest) unnest(b); // 2v2 Tree kojja: the rest of its squad steps out with it
         }
         if (b.stunT > 0) { b.stunT = Math.max(0, b.stunT - dt); continue; } // stunned: can't move (or attack, below)
         if (b.channel) continue; // summoning through its portal: it holds still (and doesn't attack, below)

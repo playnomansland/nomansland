@@ -1098,10 +1098,12 @@ const Game = (() => {
   // A squad of a unit with Overwatch can stand in one of its player's buildings: the tower, the treasury (once it is
   // up) or a building (the Factory). One squad per building. In a fight it sits inside, safe until the
   // building falls (Engine: b.inside); a squad of it anywhere else fights from a small watchtower of its own.
+  // (2v2: also a team building that holds a squad, src/mpb.js hooks.holds: the Tree kojja's Nest; mpbHolds below)
   const garrisonAt = (m, side, col, row) => !!m && ((towerAt(m, side, col, row) && towerUp(m, side)) || (treasuryAt(m, side, col, row) && treasuryUp(m)) ||
-    !!buildingAt(m, side, col, row));
-  // a building tile with room for a squad of ui
-  const garrisonFree = (m, side, col, row, ui) => ui != null && !!m && !!m.units[ui] && !m.units[ui].building && hasSkillType(m, side, ui, 'overwatch') && garrisonAt(m, side, col, row) &&
+    !!buildingAt(m, side, col, row) || mpbHolds(m, side, col, row, null));
+  // a building tile with room for a squad of ui (a 2v2 building that holds squads: any unit it takes, Overwatch or not)
+  const garrisonFree = (m, side, col, row, ui) => ui != null && !!m && !!m.units[ui] && !m.units[ui].building &&
+    (mpbHolds(m, side, col, row, null) ? mpbHolds(m, side, col, row, ui) : hasSkillType(m, side, ui, 'overwatch') && garrisonAt(m, side, col, row)) &&
     !m.armies[side].some(s => covers(m, s, col, row)) && !teamArmy(m, side).some(s => covers(m, s, col, row));
   const inBuilding = (m, side, sq) => !!sq && !isRider(sq) && garrisonAt(m, side, sq.col, sq.row);
   const WATCH_SQ = -500; // watchtowers in a fight: squad ids -500, -501, ...
@@ -1948,6 +1950,8 @@ const Game = (() => {
   const mpbAt = (m, col, row) => !!(MPB && m && m.mpb) && MPB.at(m, col, row);
   // a unit type side may not deploy this round (the other team's Shadow Den: Sabotage)
   const mpbLocked = (m, side, ui) => !!(MPB && m && m.mpb) && MPB.sabotaged(m, side, ui);
+  // a 2v2 building of side's on the tile that holds a squad of unit ui (ui null: any squad at all) (Mpb.holds)
+  const mpbHolds = (m, side, col, row, ui) => !!(MPB && m && m.mpb && MPB.holds) && MPB.holds(m, side, col, row, ui);
   const occupied = (m, side, col, row) => towerAt(m, side, col, row) || treasuryAt(m, side, col, row) || elfOwnAt(m, side, col, row) || !!buildingAt(m, side, col, row) || teamBuildingAt(m, side, col, row) || m.armies[side].some(s => covers(m, s, col, row)) || teamArmy(m, side).some(s => covers(m, s, col, row)) || devOccupied(m, side, col, row) || mpbAt(m, col, row);
   const needsTower = (m, side) => !!(m.towers && !m.towers[side]);
   // the tower can be placed (or moved) during round 1 only

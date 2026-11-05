@@ -614,8 +614,9 @@ const Render3D = (THREE, el, view, opts = {}) => {
       const u = awake && Game.unitFor(m, side, sq.unit, sq).mech ? { ...base, mech: true } : awake && Game.unitFor(m, side, sq.unit, sq).eye ? { ...base, eye: true } : base, w = Game.tileToWorld(sq.col, sq.row), st = tileCenter(v, sq.col, sq.row);
       const list = Engine.buildSquad(u, side, w.x, w.y, sq.id, T);
       squadTiles.add(sq.col + ',' + sq.row);
+      const held = typeof Mpb !== 'undefined' && Mpb.on(m) ? Mpb.recAt(m, sq.col, sq.row) : null; // a 2v2 building holding it (a Tree kojja's Nest)
       const raise = Game.garrisonAt(m, side, sq.col, sq.row) ? roofOf(Game.towerAt(m, side, sq.col, sq.row) ? towerUnit(m, side, Game.towerTypeShown(m, me, deploying, side))
-        : Game.treasuryAt(m, side, sq.col, sq.row) ? Game.treasuryUnit() : { building: 'factory' }) : 0; // Overwatch: it stands on top of the building it is in
+        : Game.treasuryAt(m, side, sq.col, sq.row) ? Game.treasuryUnit() : held ? Mpb.unitOf(m, held.side, held.rec) : { building: 'factory' }) : 0; // Overwatch: it stands on top of the building it is in
       for (const b of list) bodies.push({ u, side, x: b.x, y: b.y, look: 'solid', tag: side + '|' + sq.id, tile: sq, raise });
       if (fresh) tileSq(st.c, st.r, teamColor(side, me), 0.8, 0.05, 14);
       // badges over the squad: level pips, charisma pips (or the Gentleman's hat), ready to level up (its tag goes

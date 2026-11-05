@@ -8930,9 +8930,10 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   // the placement vote of the team's first building in the queue
   function mpbVoteHtml() {
-    const h = Mpb.voteHead(m, me);
+    const h = Mpb.voteEntry(m, me, duoMyLane()) || Mpb.voteHead(m, me); // (my own one-player placement first)
     if (!h) return '';
     const K = Mpb.kindOf(h.kind), L = duoMyLane(), mine = h.votes[L], theirs = h.votes[1 - L], part = h.part && ((K.place.parts || []).find(p => p.id === h.part) || {}).name;
+    if (h.lane != null) return `<div class="mpb-box"><div><b>${h.lane === L ? `Place your ${esc(K.single || K.name)}` : `Your teammate places their ${esc(K.single || K.name)}`}</b>${h.lane === L ? ' · tap a glowing tile (it goes there at once).' : '.'} <span class="num" id="mpb-vote-s">${mpbClockAt.vote ? mpbLeft('vote') + ' s' : ''}</span></div></div>`; // one player places it alone (Mpb.queue's lane)
     return `<div class="mpb-box"><div><b>Place ${part ? `the ${esc(K.name.replace(/^The /, ''))}’s ${esc(part)}` : `your team’s ${esc(K.name.replace(/^The /, ''))}`}</b> · tap a glowing tile. ${mine ? '<span style="color:' + duoRing(duoMySeat()).col + '">Your vote is in.</span> ' : ''}${theirs ? `<span style="color:${duoRing(Duo.mateOf(duoMySeat())).col}">Your teammate voted.</span>` : 'Waiting for your teammate.'} The same tile places it at once; two tiles: one of them when the time runs out. <span class="num" id="mpb-vote-s">${mpbClockAt.vote ? mpbLeft('vote') + ' s' : ''}</span></div></div>`;
   }
   // (a kind's own lines in the panel: MPB_SHEET[kind].panel() and wirePanel(root), e.g. the Magic lake's tiles to put down, the Shadow Den's "You are being watched")
@@ -8952,9 +8953,9 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   // the tiles the team may vote for now (cached: the 3D board redraws the marks every frame)
   function mpbVoteTiles() {
-    const h = Mpb.voteHead(m, me);
+    const h = Mpb.voteEntry(m, me, duoMyLane()); // (not the teammate's own to place)
     if (!h) return [];
-    const key = [m.round, h.kind, h.part, Mpb.recs(m, me).length, m.armies[me].length, Game.teamArmy(m, me).length].join('|');
+    const key =[m.round, h.kind, h.part, Mpb.recs(m, me).length, m.armies[me].length, Game.teamArmy(m, me).length].join('|');
     if (mpbSpotCache.key !== key || now() - mpbSpotCache.at > 400) mpbSpotCache = { key, at: now(), tiles: Mpb.spots(m, me, h.kind, h.part) };
     return mpbSpotCache.tiles;
   }
@@ -8965,7 +8966,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const pt = (x, y) => at(x, y).map(v => v.toFixed(1)).join(','), d = Game.TILE / 2 - 0.5;
     const sq = (t, cls, st) => { const c = Game.tileToWorld(t.col, t.row); return `<polygon class="${cls}"${st ? ` style="${st}"` : ''} points="${pt(c.x - d, c.y - d)} ${pt(c.x + d, c.y - d)} ${pt(c.x + d, c.y + d)} ${pt(c.x - d, c.y + d)}"/>`; };
     const own = Object.values(MPB_SHEET).map(x => x.marks ? x.marks(sq) : '').join('');
-    const h = Mpb.voteHead(m, me);
+    const h = Mpb.voteEntry(m, me, duoMyLane()); // (a one-player placement: only its own player's)
     if (!h) return own;
     let html = own + mpbVoteTiles().map(t => sq(t, 'mpb-ok')).join('');
     for (const L of [0, 1]) { const v = h.votes[L]; if (v) html += sq(v, 'mpb-vote', `stroke:${duoRing(Duo.seatOf(L, me)).col}`); }
@@ -8981,7 +8982,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (!mpbOn() || !t) return false;
     if (mpbPicking) { const f = mpbPicking; mpbPicking = null; if (phase === 'deploy' && f(t)) return true; }
     if (phase === 'deploy') for (const x of Object.values(MPB_SHEET)) if (x.tap && x.tap(t)) return true; // a kind's own tile to tap (MPB_SHEET[kind].tap)
-    const h = phase === 'deploy' && Mpb.voteHead(m, me);
+    const h = phase === 'deploy' && Mpb.voteEntry(m, me, duoMyLane());
     if (h && Mpb.spotOk(m, me, h.kind, h.part, t.col, t.row)) { if (editable() && Game.mpbVote(m, me, t.col, t.row)) changed(); return true; }
     const x = Mpb.recAt(m, t.col, t.row);
     if (x) { openMpbSheet(x.side, x.rec.key); return true; }
@@ -9017,6 +9018,23 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       },
     },
     // ===== treeKojja (page) =====
+    // who it stands for this round, the squad in its Nest (yours: a button to its sheet), how to use Nest and Grow
+    treeKojja: {
+      html(side, rec, live) {
+        const mine = side === me, K = Mpb.kindOf('treeKojja'), nest = Mpb.skillN(rec, 'nest') > 0;
+        const sq = m.armies[side].concat(Game.teamArmy(m, side)).find(q => q.col === rec.col && q.row === rec.row && !Game.isRider(q));
+        const own = sq && m.armies[side].includes(sq) && side === me;
+        const lines = [];
+        if (rec.data.ghost) lines.push(mine ? 'Their kojja, destroyed in the last fight: it stands for your team this round only (Nest works for you here, on their board).' : 'Your kojja, destroyed in the last fight: it stands for them this round, then it is yours again.');
+        if (nest) lines.push(sq ? `In it: <b>${esc((m.units[sq.unit] || {}).name || 'a squad')}</b>${own ? ' (yours)' : ''}. It shoots from 1 body, +${Mpb.KOJJA.nestRange} m range.` : mine && phase === 'deploy' ? `Nest: put a ranged squad (more than ${Mpb.KOJJA.ranged} m range) on this kojja: place one here or move one in.` : 'Nest: room for 1 ranged squad.');
+        if (mine && phase === 'deploy' && !rec.data.ghost && Mpb.voteQueue(m, me).some(e => e.kind === 'treeKojja' && e.lane != null)) lines.push('Grow: the new kojja is being placed (within ' + Mpb.KOJJA.grow + ' tiles of one of yours).');
+        return lines.map(l => `<p style="margin:0">${l}</p>`).join('') + (own ? '<button class="btn small" id="mpb-tk-sq">Its sheet</button>' : '');
+      },
+      wire(root, side, rec) {
+        const b = root.querySelector('#mpb-tk-sq'); if (!b) return;
+        b.addEventListener('click', () => { const sq = m.armies[me].find(q => q.col === rec.col && q.row === rec.row && !Game.isRider(q)); if (sq) openSheet(sq.unit, sq, me); });
+      },
+    },
     // ===== fieldHospital (page) =====
     // who stands within 1 tile, this round's Field dressing, and Second wind's squad: pick one of your team's squads
     // (yours or your teammate's) to buy it on, or move it to another once bought
@@ -9078,6 +9096,15 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       wire(root, side, rec) { const b = root.querySelector('#cm-move'); if (b) b.addEventListener('click', () => { this.pick = rec.key; closeSheet(); panelDeploy(); render(); }); },
     },
     // ===== scorch (page) =====
+    // whose turret it is, what it fights with now, and that it sits out the round after it falls
+    scorch: {
+      html(side, rec) {
+        const u = Mpb.scorchUnit(m, rec), whose = side !== me ? 'Their turret' : rec.data.lane === duoMyLane() ? 'Your turret' : 'Your teammate’s turret';
+        const out = rec.data.out === m.round ? ' · <span style="color:var(--foe)">destroyed in the last fight: it sits out this round</span>' : '';
+        return `<p style="margin:0"><b>${whose}</b>${out}</p><p class="hint" style="margin:0">${Math.round(u.range)} m range · ${Math.round(u.hit)} hit · ${u.aps.toFixed(2)} attacks/s · splash ${u.splash} m · burn ${u.burn || 0}% · ${u.structure ? 'not a unit (not needed to win)' : 'walks: a unit, it must be destroyed to win'}</p>`;
+      },
+      wire() {},
+    },
     // ===== oak (page) =====
     // ===== factory (page) =====
     // ===== magicLake (page) =====
@@ -9273,7 +9300,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       return upRow({ name: sk.name, act, text: esc(sk.text || ''), more: esc(mpbPerText(sk) + (state ? '. ' + state : '') + (mine ? '. Whoever buys pays.' : '')) });
     });
     const info = K.hooks.info ? K.hooks.info(m, side, rec).filter(Boolean) : [], extra = MPB_SHEET[rec.kind];
-    const fell = rec.fell ? `<p class="hint" style="margin:0">Destroyed in round ${rec.fell}’s fight; it stands again in every fight.</p>` : '';
+    const fell = rec.fell ? `<p class="hint" style="margin:0">${esc(K.hooks.fellText ? K.hooks.fellText(m, side, rec) : `Destroyed in round ${rec.fell}’s fight; it stands again in every fight.`)}</p>` : ''; // (a kind's own line: hooks.fellText)
     $('sheet').innerHTML = `
       <div class="bar"><h3 id="sheet-h">${teamName(side)}’s ${esc(K.name.replace(/^The /, ''))}</h3><button class="btn small" id="close">Close</button></div>
       <p style="margin:0"><span class="chip" style="border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px;color:var(--gold)"><i class="duo-dot" style="background:${K.color}"></i>${esc(K.kind)}</span> ${K.hp > 0 ? `${K.hp} health · ${K.armor} armor` : 'Terrain'}${rec.round > 1 ? ` · placed in round ${rec.round}` : ''}</p>

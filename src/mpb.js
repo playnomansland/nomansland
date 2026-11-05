@@ -149,8 +149,154 @@
   });
 
   // ===== treeKojja =====
-  def({ id: 'treeKojja', name: 'Tree kojja', short: 'tk', kind: 'defensive', hp: 500, armor: 0, color: '#6B8E3D',
-    text: 'Shoots like the Outpost, 20 m range, sees stealth in range.', downside: 'Destroyed: the next round it works for the opponents.', skills: [], hooks: {} });
+  // A small watchtower in a tree (Vilhelm, 6 Nov): it shoots like the Outpost (its hit and attack speed) with
+  // KOJJA.range m and sees stealthed units within that range (Engine u.trueSight).
+  // Grow (KOJJA.growCost, once a round for the team): the buyer places another kojja within KOJJA.grow tiles
+  // (Chebyshev) of one of the team's kojjas: own zone, no 2-tile spacing, on their own (Mpb.queue with the buyer's
+  // lane: no vote). The first kojja (from the draft) keeps the usual rules (interior, spacing).
+  // Nest (KOJJA.nestCost, once per kojja): the kojja holds one ranged squad (range over KOJJA.ranged m, the Engine's
+  // melee reach) of either player, placed or moved onto its tile (hooks.holds -> Game.garrisonFree). In a fight one
+  // body of it shoots from inside (the rest of the squad rides in that body: hooks.link, Engine b.nest), with
+  // +KOJJA.nestRange m and stealth sight in range; after Engine.WATCH_IDLE s seeing no enemy, or when the kojja falls,
+  // the whole squad steps out and fights on foot.
+  // Downside: destroyed in a fight, it stands for the opponents the next round: the kojja is away that round
+  // (rec.away, rec.data.turned = the round) and a record in the opponents' list stands in for it (rec.data.ghost = the
+  // kojja's key; one per kojja, used again each time): it shoots for them, they may buy Nest on it (a Nest the owners
+  // bought comes with it) and put a ranged squad of theirs in it. The round after, it is the owners' again (the
+  // opponents' Nest goes with the stand-in). A squad standing on a kojja when it changes hands steps out at the
+  // round's start to the nearest free tile of its own zone.
+  // Take-backs (hooks.canUndo): Nest not while a squad stands in it; Grow not once a skill was bought on the new kojja.
+  const KOJJA = { hp: 500, armor: 0, range: 20, nestRange: 3, ranged: 5, grow: 3, growCost: 100, nestCost: 50, botGold: 150 };
+  const isGhost = (rec) => !!(rec && rec.data && rec.data.ghost);
+  // the team's own kojjas standing this round (not one standing for the other team, nor one taken back)
+  const ownKojjas = (m, side) => recs(m, side).filter(r => r.kind === 'treeKojja' && !r.away && !isGhost(r));
+  const ghostOf = (m, side, rec) => recs(m, 1 - side).find(r => r.kind === 'treeKojja' && r.data.ghost === rec.key) || null;
+  const nestOn = (rec) => skillN(rec, 'nest') > 0;
+  const rangedUnit = (m, side, ui) => { const u = m && m.units && m.units[ui]; return !!u && !u.building && G.unitFor(m, side, ui).range > KOJJA.ranged; };
+  function kojjaUnit() {
+    const o = G.OUTPOST.unit;
+    return E.withTraits({ name: 'Tree kojja', cost: 0, bodies: 1, hp: KOJJA.hp, hit: o.hit, aps: o.aps, range: KOJJA.range, speed: 0, splash: o.splash || 0, projSpeed: o.projSpeed || 0,
+      shape: 'square', color: '#6B8E3D', structure: true, lesser: true, trueSight: true, kind: 'mpb', mpb: 'treeKojja', level: 0 });
+  }
+  // the nearest tile (Chebyshev rings round col, row) of side's own zone with nothing on it in either lane
+  function freeTileNear(lanes, side, col, row) {
+    const m = lanes[0], { COLS, ROWS } = grid(m);
+    const busy = (c, r) => G.terrainBlocks(m, c, r) || !!recAt(m, c, r) || lanes.some(L => G.occupied(L, side, c, r) || G.occupied(L, 1 - side, c, r));
+    for (let d = 1; d < Math.max(COLS, ROWS); d++) for (let r = row - d; r <= row + d; r++) for (let c = col - d; c <= col + d; c++) {
+      if (Math.max(Math.abs(c - col), Math.abs(r - row)) !== d || !inBoard(c, r) || !G.inZone(side, r) || G.reserved(side, c, r)) continue;
+      if (!busy(c, r)) return { col: c, row: r };
+    }
+    return null;
+  }
+  // side's squads (both lanes) standing on (col, row) step out to the nearest free tile of their own zone
+  function evict(lanes, side, col, row) {
+    for (const L of lanes) for (const q of L.armies[side] || []) {
+      if (q.col !== col || q.row !== row || G.isRider(q)) continue;
+      const t = freeTileNear(lanes, side, col, row);
+      if (t) { q.col = t.col; q.row = t.row; }
+    }
+  }
+  // the squad standing in a kojja (either lane's: this lane's own or its m.team copy of the other's), or null
+  const nestSquad = (m, side, rec) => (m.armies[side] || []).concat(G.teamArmy(m, side)).find(q => q.col === rec.col && q.row === rec.row && !G.isRider(q)) || null;
+  // the kojja player `lane` grew this round (with rec's Grow), or null
+  const grownBy = (m, side, rec, lane) => ownKojjas(m, side).find(r => r.round === m.round && r.data.lane === lane && r !== rec) || null;
+  def({ id: 'treeKojja', name: 'Tree kojja', short: 'tk', kind: 'defensive', hp: KOJJA.hp, armor: KOJJA.armor, color: '#6B8E3D',
+    text: `A small watchtower: shoots like the Outpost with ${KOJJA.range} m range and sees stealthed units within it.`,
+    downside: 'Destroyed: the next round it works for the opponents (they may use its Nest, even on your board).',
+    place: { where: 'own', spacing: false }, // the first one: interior and spacing all the same (hooks.spotOk)
+    skills: [
+      { id: 'grow', name: 'Grow another', cost: KOJJA.growCost, per: 'round', text: `Place a new Tree kojja within ${KOJJA.grow} tiles of one of your kojjas (the one who buys it places it; no 2-tile room needed). Once a round for the team.` },
+      { id: 'nest', name: 'Nest', cost: KOJJA.nestCost, per: 'building', text: `This kojja holds 1 ranged squad (yours or your teammate’s: put it on the kojja). It shoots from 1 body, +${KOJJA.nestRange} m range, and sees stealth. After ${E.WATCH_IDLE} s with no enemy in sight it steps out with all its bodies.` },
+    ],
+    hooks: {
+      unit: () => kojjaUnit(),
+      spotOk(m, side, part, col, row) {
+        const mine = ownKojjas(m, side);
+        if (!mine.length) return interior(side, col, row) && spaced(m, col, row);
+        return mine.some(r => Math.max(Math.abs(r.col - col), Math.abs(r.row - row)) <= KOJJA.grow);
+      },
+      canBuy(m, side, rec, sk) {
+        if (rec.away) return false; // standing for the other team this round (or taken back)
+        if (sk.id !== 'grow') return true;
+        if (isGhost(rec) || ownKojjas(m, side).some(r => thisRound(m, r.skills.grow).length)) return false; // once a round for the team
+        if (voteQueue(m, side).some(e => e.kind === 'treeKojja')) return false;
+        return spots(m, side, 'treeKojja', null).length > 0;
+      },
+      // (the queue entry is hidden from the opponents as the click is: Mpb.hide drops entries with `skill`)
+      bought(m, side, rec, sk, args, lane) { if (sk.id === 'grow') { queue(m, side, 'treeKojja', null, null, lane); const q = voteQueue(m, side); q[q.length - 1].skill = true; } },
+      // no take-back of Nest while a squad stands in the kojja (it would be left on a building's tile; as Overwatch,
+      // game.js), nor of Grow once someone bought a skill on the new kojja (that gold would be stuck on it)
+      canUndo(m, side, rec, id, lane) {
+        if (id === 'nest') return !nestSquad(m, side, rec);
+        const g = id === 'grow' && grownBy(m, side, rec, lane);
+        return !g || !Object.values(g.skills).some(e => thisRound(m, e).length);
+      },
+      // Grow taken back: the kojja it was to place (or has placed) goes
+      unbuy(m, side, rec, sk, lane) {
+        if (sk.id !== 'grow') return;
+        const q = voteQueue(m, side), i = q.findIndex(e => e.kind === 'treeKojja' && e.lane === lane);
+        if (i >= 0) { q.splice(i, 1); return; }
+        const g = grownBy(m, side, rec, lane);
+        if (g) { g.away = true; g.data.undone = m.round; }
+      },
+      // the opponents never see a kojja that was grown and taken back
+      hide: (s, h, rec) => !rec.data.undone,
+      fellText: (m, side, rec) => `Destroyed in round ${rec.fell}’s fight: the round after, it stands for the other team; then it is back.`,
+      holds: (m, side, rec, ui) => nestOn(rec) && (ui == null || rangedUnit(m, side, ui)),
+      // the squad on a kojja with Nest: its bodies are marked for link (both lanes' squads, before their ids are moved)
+      squadBodies(m, side, rec, sq, list, u) {
+        if (rec.away || !nestOn(rec) || sq.col !== rec.col || sq.row !== rec.row || G.isRider(sq) || !(u.range > KOJJA.ranged)) return;
+        for (const b of list) b.nestOf = rec.key;
+      },
+      bodies(m, side, rec, ctx) { const out = ctx.main(); for (const b of out) b.mpbKey = rec.key; return out; },
+      // one body inside, the rest of the squad riding in it (Engine: b.inside, b.nest; boarded bodies)
+      link(m, side, rec, list) {
+        const host = list.find(b => b.mpbKey === rec.key), mine = list.filter(b => b.nestOf === rec.key);
+        if (!host || !mine.length) return;
+        for (const b of mine) if (b.inside && b.inside.u.kind === 'watchtower') { const i = list.indexOf(b.inside); if (i >= 0) list.splice(i, 1); } // (an Overwatch squad: the kojja instead of a watchtower)
+        const [lead, ...rest] = mine;
+        lead.inside = host; lead.x = host.x; lead.y = host.y; lead.delay = 0;
+        lead.nest = { range: KOJJA.nestRange, sight: lead.u.trueSight };
+        lead.u = { ...lead.u, range: lead.u.range + KOJJA.nestRange, trueSight: true };
+        for (const b of rest) { b.inside = null; b.boarded = true; b.alive = false; b.carrier = lead; b.x = host.x; b.y = host.y; b.delay = 0; }
+      },
+      afterFight(lanes, side, rec, res, sums, round) {
+        if (rec.fell === round && !isGhost(rec)) news(sums, side, { kind: 'treeKojja', key: rec.key, text: 'A Tree kojja was destroyed: next round it stands for the other team.' });
+      },
+      roundStart(lanes, side, rec) {
+        const m = lanes[0];
+        if (isGhost(rec) || rec.data.undone) return;
+        const g = ghostOf(m, side, rec);
+        if (rec.away && rec.data.turned < m.round) { // back from the other team; a squad of theirs in it steps out
+          delete rec.away;
+          if (g) { g.away = true; evict(lanes, 1 - side, rec.col, rec.row); }
+        }
+        if (!rec.away && rec.fell && rec.fell === m.round - 1) { // destroyed in the last fight: it stands for the opponents this round
+          rec.away = true; rec.data.turned = m.round;
+          evict(lanes, side, rec.col, rec.row);
+          const gh = g || addRec(m, 1 - side, 'treeKojja', rec.col, rec.row);
+          delete gh.away; gh.col = rec.col; gh.row = rec.row; gh.round = m.round; gh.fell = 0;
+          gh.data = { ghost: rec.key, turned: m.round };
+          gh.skills = nestOn(rec) ? { nest: { round: 0, n: 1, by: [0, 0], log: [] } } : {};
+        }
+      },
+      info(m, side, rec) {
+        const sq = nestSquad(m, side, rec);
+        return [isGhost(rec) ? 'Taken from the other team: it stands for this team this round only.' : '',
+          nestOn(rec) ? (sq ? `In it: ${(m.units[sq.unit] || {}).name || 'a squad'}` : 'Nest: room for 1 ranged squad') : ''].filter(Boolean);
+      },
+      // a bot: Nest now and then and a ranged squad of its own in it; Grow now and then
+      bot(m, side, rec, r) {
+        if (rec.away) return;
+        if (!nestOn(rec) && r() < 0.5 && m.gold[side] >= KOJJA.nestCost + KOJJA.botGold) mpbBuy(m, side, rec.key, 'nest');
+        if (nestOn(rec) && r() < 0.6 && m.gold[side] >= KOJJA.botGold) {
+          const can = m.units.map((u, ui) => ui).filter(ui => rangedUnit(m, side, ui) && G.garrisonFree(m, side, rec.col, rec.row, ui));
+          while (can.length) { const ui = can.splice(Math.floor(r() * can.length), 1)[0]; if (G.place(m, side, ui, rec.col, rec.row)) break; }
+        }
+        if (!isGhost(rec) && r() < 0.25 && m.gold[side] >= KOJJA.growCost + KOJJA.botGold) mpbBuy(m, side, rec.key, 'grow');
+      },
+    },
+  });
 
   // ===== fieldHospital =====
   // A canvas field tent (group B2). Squads of either teammate deployed on its tile's 8 neighbours (Chebyshev 1) get
@@ -337,9 +483,64 @@
   });
 
   // ===== scorch =====
-  def({ id: 'scorch', name: 'Scorch turrets', short: 'sc', kind: 'defensive', hp: 450, armor: 2, color: '#D9622B',
-    text: 'One Ember Imp turret per player: Spitfire burn, +10 m range, sees stealth. Not a unit.',
-    downside: 'A turret destroyed doesn’t fight the next round.', place: { where: 'own', spacing: true }, skills: [], hooks: {} });
+  // Scorch turrets (Vilhelm, 6 Nov): the card gives the team two, one for each player, who places it alone
+  // (hooks.acquire: Mpb.queue with the player's lane; interior and spacing as any building; rec.data.lane = whose).
+  // Each player places theirs when they like (Mpb.voteEntry: neither waits for the other's).
+  // A turret fights as one body of the match's Ember Imps with Spitfire (burn), its shots instant, +SCORCH.range m,
+  // SCORCH.hp health and SCORCH.armor armor, and sees stealthed units at any distance (Engine u.scorchSight). It is a
+  // structure: not needed to win the round. Its skills (each SCORCH.cost, once per turret, lost when it is
+  // destroyed): Blaze (splash SCORCH.splash m in all, +SCORCH.hitPct% hit), Rapid fire (+SCORCH.apsPct% attack speed,
+  // +SCORCH.range2 m), Legs (it walks at the Ember Imps' speed and counts as a unit: it must be destroyed to win).
+  // Downside: a turret destroyed in a fight sits out the next round's fight (rec.data.out = that round).
+  const SCORCH = { hp: 450, armor: 2, unit: 'Ember Imps', range: 10, cost: 100, splash: 5, hitPct: 25, apsPct: 25, range2: 5, botGold: 150,
+    imp: { name: 'Ember Imps', bodies: 1, hp: 90, hit: 20, aps: 0.8, range: 10, speed: 4, splash: 3, burn: 50 } }; // (imp: a roster without Ember Imps)
+  function scorchUnit(m, rec) {
+    const units = (m && m.units) || [], ui = units.findIndex(u => u && u.name === SCORCH.unit), base = ui >= 0 ? units[ui] : SCORCH.imp;
+    const burn = (base.skillDefs || []).find(d => d && d.type === 'burn');
+    const { skills, skillDefs, skillsOn, skillsInnate, skillMods, skillOr, skillNeedsAny, ...plain } = burn ? E.applySkills(base, [burn], units) : E.withTraits(base);
+    const blaze = skillN(rec, 'blaze') > 0, rapid = skillN(rec, 'rapid') > 0, legs = skillN(rec, 'legs') > 0;
+    return E.withTraits({ ...plain, name: 'Scorch turret', cost: 0, bodies: 1, level: 0, hp: SCORCH.hp, defense: 'armor', defVal: SCORCH.armor, projSpeed: 0,
+      hit: plain.hit * (blaze ? 1 + SCORCH.hitPct / 100 : 1), splash: blaze ? SCORCH.splash : plain.splash,
+      aps: plain.aps * (rapid ? 1 + SCORCH.apsPct / 100 : 1), range: plain.range + SCORCH.range + (rapid ? SCORCH.range2 : 0),
+      trueSight: true, scorchSight: true, shape: 'square', color: '#D9622B', kind: 'mpb', mpb: 'scorch',
+      ...(legs ? { speed: plain.speed, mpbSkin: 'mobile' } : { speed: 0, structure: true, lesser: true }) });
+  }
+  const scorchOut = (m, rec) => rec.data.out === m.round;
+  def({ id: 'scorch', name: 'Scorch turrets', short: 'sc', kind: 'defensive', hp: SCORCH.hp, armor: SCORCH.armor, color: '#D9622B', single: 'Scorch turret',
+    text: `Each of you places one turret: an Ember Imp with Spitfire (burn), instant shots, +${SCORCH.range} m range; it always sees stealthed units. Not a unit: it isn’t needed to win the round.`,
+    downside: 'A turret destroyed in a fight doesn’t fight the next round, and loses its upgrades.',
+    place: { where: 'interior', spacing: true },
+    skills: [
+      { id: 'blaze', name: 'Blaze', cost: SCORCH.cost, per: 'building', text: `Splash ${SCORCH.splash} m in all and +${SCORCH.hitPct}% hit. Lost when the turret is destroyed.` },
+      { id: 'rapid', name: 'Rapid fire', cost: SCORCH.cost, per: 'building', text: `+${SCORCH.apsPct}% attack speed and +${SCORCH.range2} m range. Lost when the turret is destroyed.` },
+      { id: 'legs', name: 'Legs', cost: SCORCH.cost, per: 'building', text: 'It walks (as fast as Ember Imps) and counts as a unit: the opponents must destroy it to win the round. Lost when the turret is destroyed.' },
+    ],
+    hooks: {
+      acquire(m, team) { queue(m, team, 'scorch', null, null, 0); queue(m, team, 'scorch', null, null, 1); }, // one each, placed alone
+      unit: (m, side, rec) => scorchUnit(m, rec),
+      bodies(m, side, rec, ctx) {
+        if (scorchOut(m, rec)) return [];
+        const out = ctx.main();
+        if (skillN(rec, 'legs') > 0) { const ui = (m.units || []).findIndex(u => u && u.name === SCORCH.unit); for (const b of out) b.tier = ui >= 0 ? G.tierOf(m.units, ui) : 1; } // a unit now: it holds artifacts
+        return out;
+      },
+      fellText: (m, side, rec) => `Destroyed in round ${rec.fell}’s fight: it sits out the fight after and loses its upgrades.`,
+      afterFight(lanes, side, rec, res, sums, round) {
+        if (rec.fell !== round) return;
+        rec.skills = {}; rec.data.out = round + 1;
+        news(sums, side, { kind: 'scorch', key: rec.key, lane: rec.data.lane, text: 'A Scorch turret was destroyed: it sits out the next fight and its upgrades are lost.' });
+      },
+      info(m, side, rec) {
+        const u = scorchUnit(m, rec);
+        return [scorchOut(m, rec) ? 'Destroyed in the last fight: it sits out this round.' : '', `${Math.round(u.range)} m range, ${Math.round(u.hit)} hit, splash ${u.splash} m${u.structure ? '' : ', walks'}`].filter(Boolean);
+      },
+      // a bot: its own turret's skills now and then (Blaze, Rapid fire, then Legs)
+      bot(m, side, rec, r) {
+        if (rec.data.lane !== laneOf(m)) return;
+        for (const id of ['blaze', 'rapid', 'legs']) if (skillN(rec, id) === 0) { if (r() < 0.35 && m.gold[side] >= SCORCH.cost + SCORCH.botGold) mpbBuy(m, side, rec.key, id); break; }
+      },
+    },
+  });
 
   // ===== oak =====
   // An old oak (group B2). Restoration: while it stands in a fight, every heal and regen on its team's bodies is
@@ -1240,8 +1441,9 @@
     return rec;
   }
   // every tile a building takes, with its part ('' for the building itself; none while it isn't placed yet: col < 0,
-  // the Magic lake's tiles before their player puts them down)
-  const tilesOf = (rec) => (rec.col >= 0 ? [{ col: rec.col, row: rec.row, part: '' }] : []).concat(Object.entries(rec.parts || {}).map(([p, t]) => ({ col: t.col, row: t.row, part: p })));
+  // the Magic lake's tiles before their player puts them down). A record with rec.away (set by its kind: a Tree kojja
+  // taken back, or standing for the other team this round) takes no tile, has no body and holds nothing.
+  const tilesOf = (rec) => rec.away ? [] : (rec.col >= 0 ? [{ col: rec.col, row: rec.row, part: '' }] : []).concat(Object.entries(rec.parts || {}).map(([p, t]) => ({ col: t.col, row: t.row, part: p })));
   // the building (and part) on a tile, either side: { side, rec, part } or null
   function recAt(m, col, row) {
     for (const side of [0, 1]) for (const rec of recs(m, side)) for (const t of tilesOf(rec)) if (t.col === col && t.row === row) return { side, rec, part: t.part };
@@ -1330,22 +1532,35 @@
   // =====================================================================
   const voteQueue = (m, side) => (m && m.mpbVote && m.mpbVote[side]) || [];
   const voteHead = (m, side) => voteQueue(m, side)[0] || null;
-  const queue = (m, side, kindId, part, key) => { if (!m.mpbVote) m.mpbVote = [[], []]; m.mpbVote[side].push({ kind: kindId, part: part || null, key: key || null, votes: [null, null] }); };
+  // the entry player L acts on now: the head (a team vote, or L's own one-player placement), or L's own first one in
+  // the run of one-player placements at the head (so each player places theirs without waiting for the other's)
+  function voteEntry(m, side, L) {
+    const q = voteQueue(m, side);
+    for (let i = 0; i < q.length; i++) { const e = q[i]; if (e.lane == null) return i === 0 ? e : null; if (e.lane === L) return e; }
+    return null;
+  }
+  // lane (optional, 0 or 1): only that player places it, at once, with no vote (Scorch turrets, a Tree kojja's Grow)
+  const queue = (m, side, kindId, part, key, lane) => { if (!m.mpbVote) m.mpbVote = [[], []]; const e = { kind: kindId, part: part || null, key: key || null, votes: [null, null] }; if (lane === 0 || lane === 1) e.lane = lane; m.mpbVote[side].push(e); };
   // the head of the queue goes on (col, row): a new building (its parts are voted on next), or a part of one
-  function placeHead(m, side, col, row) {
-    const q = voteQueue(m, side), head = q.shift();
-    if (!head) return null;
+  const placeHead = (m, side, col, row) => placeEntry(m, side, voteHead(m, side), col, row);
+  // an entry of the queue (the head, or a one-player placement: voteEntry) goes on (col, row)
+  function placeEntry(m, side, head, col, row) {
+    const q = voteQueue(m, side), i = head ? q.indexOf(head) : -1;
+    if (i < 0) return null;
+    q.splice(i, 1);
     if (head.part) { const rec = recOf(m, side, head.key); if (rec) rec.parts[head.part] = { col, row }; return rec; }
     const rec = addRec(m, side, head.kind, col, row);
-    ((kindOf(head.kind).place.parts) || []).slice().reverse().forEach(p => q.unshift({ kind: head.kind, part: p.id, key: rec.key, votes: [null, null] }));
+    if (head.lane != null) rec.data.lane = head.lane; // whose it is (placed by one player alone)
+    q.splice(i, 0, ...((kindOf(head.kind).place.parts) || []).map(p => ({ kind: head.kind, part: p.id, key: rec.key, votes: [null, null] })));
     return rec;
   }
   // a player's vote (Game.mpbVote): a tile allowed for the first building in the queue; the same tile as the
   // teammate's places it at once
   function mpbVote(m, side, col, row) {
-    const head = voteHead(m, side);
+    const L = laneOf(m), head = voteEntry(m, side, L);
     if (!head || !spotOk(m, side, head.kind, head.part, col, row)) return false;
-    const L = laneOf(m), o = head.votes[1 - L];
+    const o = head.votes[1 - L];
+    if (head.lane != null) { head.votes[L] = { col, row }; placeEntry(m, side, head, col, row); return true; } // one player's own: placed at once
     head.votes[L] = { col, row };
     if (o && o.col === col && o.row === row) placeHead(m, side, col, row);
     return true;
@@ -1399,19 +1614,23 @@
     if (K.hooks.bought) K.hooks.bought(m, side, rec, sk, args, L);
     return true;
   }
-  // a player takes back their own last click of skill id this round (never the teammate's: their gold; hooks.canUndo
-  // (m, side, rec, id): a kind may refuse, the Coal mine's exit can't go back to a tile taken since)
-  const canUndo = (m, side, key, id) => { const rec = recOf(m, side, key), K = rec && kindOf(rec.kind); return !!rec && thisRound(m, rec.skills[id]).some(e => e.lane === laneOf(m)) && !m.over && !(K && K.hooks.canUndo && !K.hooks.canUndo(m, side, rec, id)); };
-  // Undo all (Duo): may team `side`'s buildings go back to how they would be again (sc: the rebuilt copy)? Each of
-  // this player's clicks this round must be one they could take back, and each kind's hooks.restoreOk(m, side, rec,
-  // was) agree (the Coal mine: its exit back on a tile still free). m: the player's lane as it stands.
+  // a player takes back their own last click of skill id this round (never the teammate's: their gold). A kind's
+  // hooks.canUndo(m, side, rec, id, lane) may refuse it: the Coal mine's exit can't go back to a tile taken since, the
+  // Tree kojja's Nest not while a squad is in it.
+  function canUndo(m, side, key, id) {
+    const rec = recOf(m, side, key), K = rec && kindOf(rec.kind);
+    if (!rec || m.over || !thisRound(m, rec.skills[id]).some(e => e.lane === laneOf(m))) return false;
+    return !(K && K.hooks.canUndo && !K.hooks.canUndo(m, side, rec, id, laneOf(m)));
+  }
+  // Undo all (Duo): may team `side`'s buildings go back to how they would be again (sc: the rebuilt copy, Duo's
+  // undoReplay)? Each kind's hooks.restoreOk(m, side, rec, was) must agree (the Coal mine: its exit back on a tile still
+  // free). A click of this player's that canUndo refuses doesn't stop it: Undo all leaves it bought and paid (group B1).
+  // m: the player's lane as it stands.
   function undoAllOk(m, side, sc) {
     if (!on(m)) return true;
-    const L = laneOf(m);
     for (const rec of recs(m, side)) {
       const K = kindOf(rec.kind);
       if (!K) continue;
-      for (const id of Object.keys(rec.skills)) if (thisRound(m, rec.skills[id]).some(e => e.lane === L) && K.hooks.canUndo && !K.hooks.canUndo(m, side, rec, id)) return false;
       const was = sc && recOf(sc, side, rec.key);
       if (was && K.hooks.restoreOk && !K.hooks.restoreOk(m, side, rec, was)) return false;
     }
@@ -1442,6 +1661,7 @@
   // =====================================================================
   function hide(s, h) {
     if (!on(s)) return s;
+    const drop = new Set();
     for (const rec of recs(s, h)) {
       for (const id of Object.keys(rec.skills)) {
         const e = rec.skills[id];
@@ -1451,9 +1671,13 @@
         if (e.n <= 0) delete rec.skills[id];
       }
       const K = kindOf(rec.kind);
-      if (K && K.hooks.hide) K.hooks.hide(s, h, rec);
+      if (K && K.hooks.hide && K.hooks.hide(s, h, rec) === false) drop.add(rec); // (false: not seen at all)
     }
-    if (s.mpbVote && s.mpbVote[h]) for (const e of s.mpbVote[h]) e.votes = [null, null];
+    if (drop.size) s.mpb[h] = s.mpb[h].filter(r => !drop.has(r));
+    if (s.mpbVote && s.mpbVote[h]) {
+      s.mpbVote[h] = s.mpbVote[h].filter(e => !e.skill); // queued by a skill click this round (hidden as the click is)
+      for (const e of s.mpbVote[h]) e.votes = [null, null];
+    }
     return s;
   }
 
@@ -1480,7 +1704,7 @@
     const out = [];
     recs(m, side).forEach((rec, k) => {
       const K = kindOf(rec.kind);
-      if (!K) return;
+      if (!K || rec.away) return;
       const idx = idx0 + k * 20;
       const ctx = { k, squad: squadOf(k), xsq: (j) => extraOf(k, j), idx, lanes,
         main: () => { if (!(K.hp > 0)) return []; const w = G.tileToWorld(rec.col, rec.row); return E.buildSquad(unitOf(m, side, rec), side, w.x, w.y, squadOf(k), G.TILE, idx); } };
@@ -1493,6 +1717,23 @@
       if (K && K.hooks.foeBodies) out.push(...K.hooks.foeBodies(m, side, rec, { k, xsq: (j) => extraOf(k, j), idx: idx0 + 400 + k * 20 }));
     });
     return out;
+  }
+  // Duo.battle, once all bodies are in (A: side 0's, B: side 1's): a kind's link(m, side, rec, list) may tie bodies
+  // together (the Tree kojja: the squad standing on it goes inside)
+  function link(m, A, B) {
+    if (!on(m)) return;
+    for (const side of [0, 1]) for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && !rec.away && K.hooks.link) K.hooks.link(m, side, rec, side === 0 ? A : B); }
+  }
+  // Game.garrisonFree / garrisonAt: a building of side's on (col, row) that holds a squad of unit ui (null: any squad)
+  // (a kind's holds(m, side, rec, ui); Game checks the tile is free of the team's own squads)
+  function holds(m, side, col, row, ui) {
+    if (!on(m)) return false;
+    for (const rec of recs(m, side)) {
+      if (rec.away || rec.col !== col || rec.row !== row) continue;
+      const K = kindOf(rec.kind);
+      if (K && K.hooks.holds && K.hooks.holds(m, side, rec, ui)) return true;
+    }
+    return false;
   }
   // the Engine options the buildings add (opts.mpb: fields the kinds fill; opts as a whole for tiles and the like).
   // lanes (optional): both lanes' matches, the hook's 5th argument
@@ -1692,12 +1933,13 @@
 
   const api = {
     SQ, XSQ, VOTE_MS, DRAFT_MS, SPACING, ARTIFACT, DRAFT_ROUNDS, VAULT_SPOT, PER, VAULT, GOLEM, KINDS, SYS,
+    KOJJA, SCORCH, kojjaUnit, scorchUnit,
     def, kindOf, recs, recOf, has, skillOf, skillN, addRec, tilesOf, recAt, at, terrainAt, settle, init,
     interior, spaced, spotOk, spots, autoSpot,
-    voteQueue, voteHead, queue, placeHead, mpbVote, voteResult,
+    voteQueue, voteHead, voteEntry, queue, placeHead, placeEntry, mpbVote, voteResult,
     skillCost, whyNot, canBuy, mpbBuy, canUndo, undoAllOk, mpbUndo, mpbAct, seenTaken,
     vaultOf, vaultRec, vaultMode, vaultMoved, vaultRoom, canVault, vaultPut, vaultTake, golemOf, golemUnit, golemSkin,
-    hide, unitOf, squadOf, extraOf, indexOf, isSquad, bodies, battleOpts, squadMods, squadBodies, news, afterFight, roundStart, teamHeal, litTiles, reconcile,
+    hide, unitOf, squadOf, extraOf, indexOf, isSquad, bodies, link, holds, battleOpts, squadMods, squadBodies, news, afterFight, roundStart, teamHeal, litTiles, reconcile,
     FH, OAK, oakMossTiles, oakEntUnit,
     JAIL, jailWhy, jailable, jailSeen, homeTile, SCHOOL, pupilOf, pupilSq, levelXp, learnable, schoolWhy,
     cardPool, cardName, cardText, rollArtifacts, artifactsFor,

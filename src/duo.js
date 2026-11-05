@@ -185,6 +185,7 @@
     }
     // the team's buildings (src/mpb.js): lane 0 builds them, once for the team
     for (const sd of [0, 1]) for (const b of M.bodies(lanes[0], sd, undefined, lanes)) { b.lane = 0; (sd === 0 ? A : B).push(b); }
+    M.link(lanes[0], A, B); // a building that ties bodies to its own (hooks.link: the squad in a Tree kojja)
     G.useGrid(MAP);
     const ch = charm.map(c => Object.keys(c).length ? c : null);
     // portal: where a team's tower falls, a portal to the other team's tower opens (Engine opts.portal; 2v2 only)
@@ -340,7 +341,8 @@
     const m = D.lanes[0].m;
     if (!D.mclock) D.mclock = { vote: [null, null], draft: 0 };
     for (const sd of [0, 1]) {
-      const h = M.voteHead(m, sd), key = h ? [M.recs(m, sd).length, h.kind, h.part || '', h.key || ''].join('|') : '';
+      // (a one-player placement at the head keeps its clock while the teammate places theirs: Mpb.voteEntry)
+      const h = M.voteHead(m, sd), key = h ? [h.lane != null ? 'L' + h.lane : M.recs(m, sd).length, h.kind, h.part || '', h.key || ''].join('|') : '';
       if (!key) D.mclock.vote[sd] = null;
       else if (!D.mclock.vote[sd] || D.mclock.vote[sd].key !== key) D.mclock.vote[sd] = { key, until: now + M.VOTE_MS };
     }
@@ -359,10 +361,10 @@
       }
       if (!did) for (const sd of [0, 1]) {
         setTeams(lanes);
-        const head = M.voteHead(lanes[0], sd);
-        if (!head) continue;
+        if (!M.voteHead(lanes[0], sd)) continue;
         for (const L of [0, 1]) {
-          if (!D.bots[seatOf(L, sd)]) continue;
+          const head = M.voteEntry(lanes[0], sd, L); // (a building one player places alone: only their own, Mpb.queue's lane)
+          if (!D.bots[seatOf(L, sd)] || !head) continue;
           const mate = head.votes[1 - L], human = mate && !D.bots[seatOf(1 - L, sd)] && M.spotOk(lanes[L], sd, head.kind, head.part, mate.col, mate.row) ? mate : null;
           const mine = head.votes[L] && M.spotOk(lanes[L], sd, head.kind, head.part, head.votes[L].col, head.votes[L].row) ? head.votes[L] : null;
           const want = human || mine || M.autoSpot(lanes[L], sd, head.kind, head.part);
@@ -458,6 +460,25 @@
     }
     return { sc, ok };
   }
+  // the team's part as Undo all by lane `lane` leaves it: the round's start, then the log played again (the teammate's
+  // actions, the system's, and this player's own building clicks, mpbBuy / mpbUndo, in place), then this player's clicks
+  // taken back, latest first, by the rules of a single take-back (Mpb.canUndo; group B1: records keep their keys, a
+  // click that can't be taken back stays bought). { sc, ok (replayTeam's), log (the new D.tlog[sd]), kept (what this
+  // player's clicks still standing cost) }
+  function undoReplay(D, sd, lane) {
+    const click = (e) => e.lane === lane && (e.fn === 'mpbBuy' || e.fn === 'mpbUndo');
+    const log = D.tlog[sd].filter(e => e.lane !== lane || click(e));
+    const { sc, ok } = replayTeam(D, sd, 1 - lane, log);
+    sc.duoLane = lane;
+    for (let k = log.length - 1; k >= 0; k--) {
+      const e = log[k];
+      if (e.lane !== lane || e.fn !== 'mpbBuy') continue;
+      try { if (G.mpbUndo(sc, sd, e.a[0], e.a[1])) log.push({ lane, fn: 'mpbUndo', a: [e.a[0], e.a[1]] }); } catch (err) {}
+    }
+    let kept = 0;
+    for (const rec of M.recs(sc, sd)) for (const id of Object.keys(rec.skills)) { const x = rec.skills[id]; if (x.round === sc.round) for (const c of x.log) if (c.lane === lane) kept += c.cost; }
+    return { sc, ok, log, kept };
+  }
   // may this seat press Undo all? (2v2 buildings) Not while one of the teammate's building actions this round relied on
   // one of this seat's (a skill on this player's lake tile put down this round, water where the exit stood: played
   // again without this seat's actions it no longer works, so their gold or tile would be lost), nor while the buildings
@@ -467,7 +488,7 @@
     if (!M.on(m)) return true;
     const log = D.tlog[sd], mate = log.filter(e => e.lane !== own.lane);
     if (!log.some(e => e.lane === own.lane)) return M.undoAllOk(m, sd, null);
-    const all = replayTeam(D, sd, 1 - own.lane, log), without = replayTeam(D, sd, 1 - own.lane, mate);
+    const all = replayTeam(D, sd, 1 - own.lane, log), without = undoReplay(D, sd, own.lane); // (as rebuildTeam would leave it)
     // what is left of the teammate's: a buy they took back again, an act they did again later (moved the same tile
     // again) counts for nothing
     const net = new Set(mate.filter(e => e.lane >= 0 && CHECKED.has(e.fn))), same = (a, b) => a.lane === b.lane && a.a[0] === b.a[0] && a.a[1] === b.a[1];
@@ -481,9 +502,15 @@
   // after Undo all in one lane: the team's part is the round's start plus every team action the teammate made this
   // round and the system's (votes, placed buildings, the draft), replayed on a copy in order, in both lanes. The
   // tower type stays (only the draft sets it in 2v2).
+  // The player's own building skill clicks (mpbBuy / mpbUndo) are replayed too, in place, and then taken back, latest
+  // first, by the rules of a single take-back (Mpb.canUndo): so a building a click added stays in the list (taken
+  // back), the records keep their keys and the teammate's buys on them still find them. A click that can't be taken
+  // back (a Tree kojja's Nest with the teammate's squad in it) stays bought, and stays paid for by this player.
   function rebuildTeam(D, sd, lane) {
-    D.tlog[sd] = D.tlog[sd].filter(e => e.lane !== lane);
-    const O = D.lanes[1 - lane].m, { sc } = replayTeam(D, sd, 1 - lane, D.tlog[sd]);
+    setTeams(ms(D)); // this lane's squads as they stand after the undo (a take-back may look at them)
+    const O = D.lanes[1 - lane].m, { sc, log, kept } = undoReplay(D, sd, lane);
+    D.tlog[sd] = log;
+    if (kept) D.lanes[lane].m.gold[sd] -= kept; // what this player's clicks still standing cost (their gold is back at the round's start)
     const mine = D.lanes[lane].m;
     if (mine.towers && mine.towers[sd] && O.towers && O.towers[sd]) mine.towers[sd].type = O.towers[sd].type;
     for (const m of ms(D)) copyTeam(sc, m, sd);

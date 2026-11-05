@@ -972,6 +972,26 @@ const Render2D = (cv, view, opts = {}) => {
       for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.ellipse(x + w * 0.33, y0 + h * (0.82 - k * 0.12), s * 0.09, s * 0.035, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } // coins
     },
     // ===== treeKojja (2D) =====
+    // a lopsided leafy crown on a short trunk with a little plank hut wedged in it: a roof in the team colour, a dark
+    // lookout slit, a rope ladder down the trunk and a bird sitting on the roof's tip
+    treeKojja(x, y, t, side, o) {
+      const s = t * 0.82, c = teamCol(side), sway = Math.sin((o.time || 0) * 1.3 + x * 0.05) * s * 0.012;
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y + s * 0.4, s * 0.42, s * 0.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#6B4A2B'; ctx.fillRect(x - s * 0.07, y + s * 0.02, s * 0.14, s * 0.38); // trunk
+      ctx.strokeStyle = '#C9B48A'; ctx.lineWidth = Math.max(1, s * 0.02); // rope ladder
+      for (const dx of [-0.03, 0.03]) { ctx.beginPath(); ctx.moveTo(x + s * (0.1 + dx), y + s * 0.02); ctx.lineTo(x + s * (0.1 + dx), y + s * 0.36); ctx.stroke(); }
+      for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(x + s * 0.07, y + s * (0.08 + k * 0.08)); ctx.lineTo(x + s * 0.13, y + s * (0.08 + k * 0.08)); ctx.stroke(); }
+      for (const [dx, dy, r, col] of [[-0.24, -0.02, 0.2, '#56763A'], [0.22, 0.0, 0.19, '#5F8040'], [0.0, -0.2, 0.24, '#6B8E3D'], [-0.12, 0.08, 0.16, '#7C9C4A'], [0.14, -0.08, 0.17, '#86A657']]) {
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x + s * dx + sway, y + s * dy, s * r, 0, Math.PI * 2); ctx.fill(); } // the crown, leaf clumps
+      const hx = x + sway, hy = y - s * 0.12, hw = s * 0.34, hh = s * 0.2; // the hut
+      ctx.fillStyle = '#9C7A54'; ctx.strokeStyle = '#5B3F24'; ctx.lineWidth = Math.max(1, s * 0.02);
+      ctx.beginPath(); ctx.rect(hx - hw / 2, hy - hh / 2, hw, hh); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); for (let k = 1; k < 3; k++) { ctx.moveTo(hx - hw / 2, hy - hh / 2 + hh * k / 3); ctx.lineTo(hx + hw / 2, hy - hh / 2 + hh * k / 3); } ctx.stroke(); // planks
+      ctx.fillStyle = '#2B2F33'; ctx.fillRect(hx - hw * 0.28, hy - hh * 0.12, hw * 0.56, hh * 0.22); // the lookout slit
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(hx - hw * 0.62, hy - hh / 2); ctx.lineTo(hx + hw * 0.62, hy - hh / 2); ctx.lineTo(hx, hy - hh * 1.55); ctx.closePath(); ctx.fill(); // roof
+      ctx.fillStyle = '#3A3026'; ctx.beginPath(); ctx.arc(hx + s * 0.02, hy - hh * 1.62, Math.max(1.2, s * 0.035), 0, Math.PI * 2); ctx.fill(); // the bird on top
+      ctx.fillStyle = '#E8A04A'; ctx.beginPath(); ctx.moveTo(hx + s * 0.05, hy - hh * 1.64); ctx.lineTo(hx + s * 0.085, hy - hh * 1.6); ctx.lineTo(hx + s * 0.05, hy - hh * 1.56); ctx.fill();
+    },
     // ===== fieldHospital (2D) =====
     // a canvas ridge tent seen from the front: a pale gable with its flaps tied open (a dark doorway), the roof's long
     // side behind it, a white disc with a soft green cross over the door, a pennant in the team colour on the ridge
@@ -1033,6 +1053,9 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x, y - s * 0.38); ctx.lineTo(x + s * 0.24, y - s * 0.32); ctx.lineTo(x, y - s * 0.24); ctx.closePath(); ctx.fill(); // the pennant
     },
     // ===== scorch (2D) =====
+    // a squat stone brazier with a team-coloured band; a grumpy Ember Imp sits in its glowing coals, horns and
+    // scowl showing over the rim, licked by soft amber flames
+    scorch(x, y, t, side, o) { scorchShape(x, y, t * 0.78, side, o.time || 0, false); },
     // ===== oak (2D) =====
     // an old broad oak: a gnarled trunk on spreading roots with a calm sleeping face in its bark (eyes shut, a small
     // smile), a ribbon in the team colour round it, a wide lumpy crown of three dusty greens with acorns, its world
@@ -1239,7 +1262,29 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.strokeStyle = c; ctx.lineWidth = Math.max(1.5, r * 0.12); ctx.beginPath(); ctx.arc(x, y, r * 1.12, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     },
+    // ===== scorch (2D walker) =====
+    // a Scorch turret with Legs: the brazier on two stubby iron legs
+    scorch(x, y, r, side, u, o) { ctx.globalAlpha = o.alpha == null ? 1 : o.alpha; scorchShape(x, y, r * 2.4, side, o.time || 0, true); ctx.globalAlpha = 1; },
   };
+  // ===== scorch (2D, shared) =====
+  // the Scorch turret: s = its size in px; legs: the walking one (Legs) on two stubby iron legs
+  function scorchShape(x, y, s, side, time, legs) {
+    const c = teamCol(side), fl = Math.sin(time * 9 + x * 0.3) * 0.5 + 0.5;
+    ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y + s * 0.42, s * 0.4, s * 0.09, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+    if (legs) { ctx.fillStyle = '#3B3F44'; for (const sd of [-1, 1]) { ctx.fillRect(x + sd * s * 0.2 - s * 0.06, y + s * 0.18, s * 0.12, s * 0.24); ctx.fillRect(x + sd * s * 0.2 - s * 0.1, y + s * 0.38, s * 0.2, s * 0.06); } }
+    ctx.fillStyle = '#7A746C'; ctx.strokeStyle = '#4E4A45'; ctx.lineWidth = Math.max(1, s * 0.03);
+    ctx.beginPath(); ctx.moveTo(x - s * 0.36, y - s * 0.02); ctx.lineTo(x + s * 0.36, y - s * 0.02); ctx.lineTo(x + s * 0.26, y + s * 0.3); ctx.lineTo(x - s * 0.26, y + s * 0.3); ctx.closePath(); ctx.fill(); ctx.stroke(); // the bowl
+    ctx.fillStyle = c; ctx.fillRect(x - s * 0.33, y + s * 0.06, s * 0.66, s * 0.07); // the team's band
+    ctx.globalAlpha = 0.55 + 0.3 * fl; ctx.fillStyle = '#FFC98A'; ctx.beginPath(); ctx.ellipse(x, y - s * 0.03, s * 0.34, s * 0.08, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; // glowing coals
+    ctx.fillStyle = '#E8834A'; ctx.beginPath(); ctx.arc(x, y - s * 0.14, s * 0.15, Math.PI, 0); ctx.fill(); // the imp's head over the rim
+    ctx.fillStyle = '#B5552A'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + sd * s * 0.1, y - s * 0.22); ctx.lineTo(x + sd * s * 0.17, y - s * 0.36); ctx.lineTo(x + sd * s * 0.04, y - s * 0.26); ctx.fill(); } // horns
+    ctx.strokeStyle = '#3A2018'; ctx.lineWidth = Math.max(1, s * 0.025); // a scowl: slanted brows over little eyes
+    for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + sd * s * 0.1, y - s * 0.22); ctx.lineTo(x + sd * s * 0.03, y - s * 0.19); ctx.stroke(); }
+    ctx.fillStyle = '#FFE9A8'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.arc(x + sd * s * 0.06, y - s * 0.16, Math.max(0.8, s * 0.02), 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 0.7; ctx.fillStyle = '#FFB36B'; // soft flames round it
+    for (const [dx, h] of [[-0.25, 0.16], [0.24, 0.2], [-0.12, 0.1], [0.13, 0.12]]) { const hh = s * h * (0.75 + 0.25 * Math.sin(time * 7 + dx * 20)); ctx.beginPath(); ctx.moveTo(x + s * dx - s * 0.05, y - s * 0.03); ctx.quadraticCurveTo(x + s * dx, y - s * 0.03 - hh * 1.4, x + s * dx + s * 0.05, y - s * 0.03); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  }
   // any kind without a drawing of its own: a block in the kind's colour with a roof band in the team colour and its
   // initials (a part, such as a mine's exit: a small marker in the kind's colour)
   function drawMpbPlain(kind, x, y, t, side, o) {
