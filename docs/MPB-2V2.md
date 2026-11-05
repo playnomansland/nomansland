@@ -39,94 +39,167 @@ Branch: everything lands on `claude/exciting-meitner-889u3z` (merged there by th
   fight, as a flank squad does (the Shadow Den removes that). Enemy squads placed this round are hidden, so an Assassin
   may share a tile with one; the fight just starts them close (as with two Forward-planted Ents today).
 
-## Architecture (contracts every group codes against)
+## Architecture (contracts every group codes against; as built by group F, 6 Nov)
 
 2v2 is two lanes (two 1v1 `Game` matches, `src/duo.js`). Everything below is **team** state, kept **identical in both
-lanes** of a team, the way the tower part is today (`Duo.TEAM_FIELDS`, `copyTeam`).
+lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
 
-### New file `src/mpb.js` (global `Mpb`, node-requirable like `src/duo.js`)
+### `src/mpb.js` (global `Mpb`, node-requirable)
 
-- Loaded after game.js, before duo.js (page: a `/*MPB*/` slot in `src/site-template.html`, inlined by `src/build.js`;
-  node: `require('./mpb.js')` from duo.js; the server bundles it through duo.js).
-- `Mpb.KINDS` — the building definitions, one entry per kind, each in its own clearly marked region
-  `// ===== <kind> =====` so groups don't collide:
-  `{ id, name, kind: 'economic'|'support'|'technical'|'defensive', text, downside, hp, armor, unit (its fight unit),
-     skills: [{ id, name, cost, costStep?, per: 'round'|'roundPlayer'|'match'|'building'|'free', text, ... }],
-     place: { where: 'interior'|'nml'|'own'|'board'|..., spacing: true|false, parts?: [...] }, hooks: { ... } }`
-- Records: `m.mpb = [[rec, ...] /* side 0 */, [ ... ] /* side 1 */]`, rec =
-  `{ key: 'v1', kind: 'vault', col, row, parts: { exit: { col, row } }?, round /* placed */, fell /* round it was
-     destroyed in, or 0 */, skills: { <skillId>: { round, n, by: [lane0 count, lane1 count] } }, data: { ... } }`.
-  `key` is unique per side for the match ('v1', 'tk2', ...).
-- Fight squad ids: `Mpb.SQ = -700`; a side's MPB k (k = index in m.mpb[side]) fights as squad `-700 - k`, extra bodies
-  of a kind (mine exit, second lake tile...) at `-800 - ...`. `Duo.teamBody` treats these as team bodies (lane 0's
-  stand, lane 1's are dropped) — only lane 0 builds them.
-- Hooks the framework calls (a kind defines only what it needs):
-  - `bodies(m, side, rec, ctx)` → fight bodies of this building (structures), built in `Duo.battle`.
-  - `battleOpts(m, side, rec, opts)` → adds to the Engine opts (auras, terrain, teleports...).
-  - `squadMods(m, side, rec, sq, unit)` → changes a squad's fight unit before its bodies are made (Field hospital +hp...).
-  - `afterFight(lanes, side, rec, res, summaries)` → after the fight (gold, Team HP, fell, next-round effects).
-  - `roundStart(lanes, side, rec)` → when a round begins (interest, Study XP, golem reset...).
-  - `canAct(m, side, rec, action, args)` / `act(...)` → its skills and special actions.
-- Engine side: `Engine.createBattle(A, B, g, opts)` gets `opts.mpb = { auras, teleports, discover, ... }` (generic
-  fields each group adds with a default that changes nothing). **1v1, the counter table and Balance Lab must stay
-  byte-identical** (`node tools/tests/fairness.js`, `node tools/counter-table.js` reports no changes).
-- Actions: every MPB action is a `Game`-style function `(m, side, ...args)` exposed as `Game.<fn>` (e.g.
-  `Game.mpbBuy(m, side, key, skillId, ...args)`, `Game.mpbUndo`, `Game.mpbVote`, `Game.vaultPut`, `Game.vaultTake`,
-  `Game.draftPick`), allowed by `Referee` `ACTIONS`, and listed in `Duo.TEAM_FNS` (so the teammate's lane gets the
-  same team state) unless it is purely the player's own (gold moves are; the team part is copied after them).
-  Who paid: `skills[id].by[lane]`. A take-back of the teammate's buy is refused (as for tower buys).
-- Not sellable unless the kind says so. Opponents can tap an MPB and see its sheet (skills bought this round stay
-  hidden until the fight, like tower skills: `Referee.hide`).
-- `Game.occupied` / `canPlaceTile` treat every MPB tile (and its parts) as taken for both teams' squads (one small
-  hook in game.js: `Game.mpbAt(m, col, row)`), except where a kind says otherwise (Tree kojja garrison, School...).
+- Loaded after game.js and referee.js, before duo.js (page: the `/*MPB*/` slot in `src/site-template.html`, inlined by
+  `src/build.js`; node: `require('./mpb.js')` from duo.js; the server bundles it through duo.js). On load it puts the
+  player actions on `Game` (`mpbBuy`, `mpbUndo`, `mpbAct`, `mpbVote`, `vaultPut`, `vaultTake`, `draftPick`) and
+  registers itself with `Game.setMpb(Mpb)` (so `Game.mpbAt`, `Game.bodiesFor` and `Referee.hide` reach it).
+- `Mpb.KINDS[id]`, made with `Mpb.def({...})`, one region per kind `// ===== <kind> =====` (stubs for all ten B kinds,
+  with name/text/downside/hp/armor and `skills: []`). Fields: `id, name, short` (key prefix), `kind` ('economic' |
+  'support' | 'technical' | 'defensive'), `text, downside, hp, armor, color, draft` (false: never a card; only the Vault),
+  `skills: [{ id, name, cost, costStep?, per, text, max? }]`, `place: { where, spacing, open?, parts? }`, `hooks`.
+  - `per`: `'round'` (once a round for the team), `'roundPlayer'` (once a round each), `'match'` (once a match for the
+    team, across all buildings of the kind), `'building'` (once for this building record), `'free'` (no limit).
+    `costStep`: + that much for each click **this player** made of it this round (per player, so one player's
+    take-back never changes the other's price). `max`: at most that many in all (optional).
+  - `place.where`: `'interior'` (default: the tile and all 8 round it are the team's own zone, no flank tiles),
+    `'own'` (own zone, not the enemy's flank tiles), `'nml'` (no man's land, not flank tiles), `'board'` (own or
+    `nml`), `'fixed'` (never voted: the Vault). `spacing` (default true): Chebyshev ≥ `Mpb.SPACING` (3) from every
+    building tile (towers, MPBs and their parts, the Cog Builder's Factory; either team). `open: true`: its tiles do
+    not count as taken for squads (`Mpb.at`). `parts: [{ id, name, where, spacing }]`: voted on one after the other,
+    stored in `rec.parts[id] = { col, row }` (the coal mine stub has `exit`).
+- Records `m.mpb = [[rec, ...], [...]]`, rec = `{ key, kind, col, row, parts: {}, round (placed), fell (last round it was
+  destroyed in, 0 never), skills: { <id>: { round (last bought), n, by: [lane 0's, lane 1's], log: [{ lane, cost }]
+  (this round's clicks) } }, data: {} }` (`data` is the kind's own). `key` = short + index + 1 ('v1', 'tk2'); records
+  are never removed. Lookups: `Mpb.recs(m, side)`, `recOf(m, side, key)`, `has(m, side, kind)` (placed or in the vote
+  queue), `tilesOf(rec)`, `recAt(m, col, row)` → `{ side, rec, part }`, `skillN(rec, id)`, `kindOf(id)`.
+- Lane state: `m.duoLane` (0/1: who paid, whose vote; `Mpb.laneOf(m)`), `m.duoTowers` (2v2 towers: no tower pick,
+  `Game.towerType` gives the Outpost while a team has no tower card, any round). Set by `Mpb.init(m, lane)` in
+  `Duo.start`, which also puts both Vaults down.
+- Skills: `Mpb.whyNot(m, side, key, id, args)` (null = may buy; else 'round' | 'you' | 'have' | 'max' | 'gold' |
+  'rules' ...), `skillCost`, `canBuy`, `Game.mpbBuy(m, side, key, id, ...args)` (args: up to 3, each a whole number
+  0-999999 or a string ≤ 40), `canUndo`, `Game.mpbUndo(m, side, key, id)` (the player's own last click this round;
+  the teammate's can't be taken back), `Game.mpbAct(m, side, key, action, ...args)` (a kind's own action: hooks
+  `canAct` / `act`). All three are `Duo.TEAM_FNS` (copied to the other lane, logged for Undo all).
+- Hooks (all optional; `lanes` = the two matches `[m0, m1]`; change team state in `lanes[0]`, Duo copies it to lane 1;
+  each lane's own gold in that lane):
+  - `unit(m, side, rec)` → its fight unit (default `Mpb.unitOf`: a structure, `lesser`, `kind: 'mpb'`, `mpb: <kind>`,
+    hp/armor of the kind; structures never count for winning a round).
+  - `bodies(m, side, rec, ctx)` → its fight bodies (built once, from lane 0, in `Duo.battle`). `ctx = { k, squad
+    (Mpb.SQ - k), xsq(j) (Mpb.XSQ - 10k - j, j < 10: extra bodies), idx (body index base), main() (the default body) }`.
+    Set `b.tier` on a walking body that may hold an artifact (the Coin Golem: 3).
+  - `battleOpts(m, side, rec, opts)` → add to the Engine options (`opts.mpb` is `{}` for the kinds' fields; `opts.tiles`
+    and the rest are there too). Engine defaults must change nothing when a field is absent.
+  - `squadMods(m, side, rec, sq, u)` → a squad's unit before its bodies are made (called from `Game.bodiesFor` for both
+    lanes' squads; return the new unit). `squadBodies(m, side, rec, sq, bodies, u)` → after (flank delay, a tunnel...).
+  - `afterFight(lanes, side, rec, res, sums, round, hp)` → after both lanes are resolved (`res`: the whole fight, lane 0
+    ids for MPB squads; `sums`: both lanes' summaries; `hp`: the shared Team HP `[A, B]`, changeable). `rec.fell` is
+    already set when its main body (`SQ - k`) died. `Mpb.news(sums, side, { kind, ... })` adds a results line
+    (`summary.mpbNews[side]`; give `text` for the page's generic line).
+  - `roundStart(lanes, side, rec)` → at the start of each round (after the skill logs reset).
+  - `canBuy(m, side, rec, sk, args)`, `bought(m, side, rec, sk, args, lane)`, `unbuy(m, side, rec, sk, lane, entry)`.
+  - `canAct(m, side, rec, action, args)` / `act(m, side, rec, action, args, lane)` (`Game.mpbAct`).
+  - `hide(s, h, rec)` → what the opponents mustn't see while deploying (the framework already hides this round's skill
+    clicks and the team's votes).
+  - `spotOk(m, side, part, col, row)` → extra placement rule; `placed(m, side, rec)` → when a record is made;
+    `acquire(m, team, card)` → instead of the placement vote when the team gets the card (each player places one,
+    several tiles...); `info(m, side, rec)` → short plain lines for the generic sheet.
+- Opponents' view: `Mpb.hide(s, h)` (from `Referee.hide`): this round's clicks taken out of `n`/`by`, the team's votes
+  blanked, then each kind's `hide`. Records themselves are seen as soon as they are placed (the draft is public).
+- Placement: `Mpb.spotOk(m, side, kind, part, col, row)`, `Mpb.spots(...)` (all allowed tiles, back of the zone and
+  middle first), `Mpb.autoSpot(...)` (the first). `Game.mpbAt(m, col, row)` (in `Game.occupied`): every MPB tile and
+  part is taken for both teams' squads (unless `place.open`). A kind that lets squads in (garrison, School) adds its own
+  exception next to `Game.garrisonFree` (game.js) — the framework has no squad-level exception yet.
+- Fight: `Duo.battle` adds `Mpb.bodies(lanes[0], side)` for both sides (`b.lane = 0`), `opts.artifacts =
+  Mpb.artifactsFor(lanes[0])` in rounds 2 and 8, then `Mpb.battleOpts(lanes[0], opts)`. `Duo.teamBody` covers
+  `Mpb.isSquad(sq)` (-700 ... -1799), so lane 1 never gets MPB results. `Duo.fight` → `Mpb.afterFight(lanes, res,
+  summaries, hp)` → `copyAll(lane 0 → lane 1)`.
+- Draw: render2d `MPB_DRAW[kind](x, y, t, side, o)` (a building; `o.part` for a part's tile, `o.hpr` in a fight) and
+  `MPB_BODY[kind](x, y, r, side, u, o)` (a walker, by `u.mpb`); models3d `BUILD['mpb:<kind>']`
+  (`'mpb:<kind>:<part>'`, `'mpb:<kind>:<skin>'` with `u.mpbSkin`), fallbacks `BUILD.mpb` / `BUILD['mpb:part']`.
+  Page sheet: `MPB_SHEET[kind] = { html(side, rec, live), wire(root, side, rec, again) }` in site-template.html (a
+  region per kind); the generic sheet lists the kind's skills with Buy / Undo buttons for both teammates (read only for
+  the opponents).
 
-### Placement vote (when a team acquires an MPB)
+### Placement vote
 
-- `m.mpbVote = [{ kind, part, votes: [lane0 tile|null, lane1 tile|null], until }, ...] /* queue per side */` (team
-  state). While a team's queue has entries its players vote for the first entry with a tap on a tile allowed for that
-  kind/part; same tile from both players → placed at once; different tiles → 15 s after the first vote, a seeded pick
-  of one of the two; only one voted when the 15 s run out → theirs; nobody → the first allowed tile from
-  `Mpb.autoSpot`. A bot votes at once (the human's tile if there is one, else autoSpot). Two MPBs (or a mine's entrance
-  and exit) → one vote after the other.
-- The deploy clock waits while a vote or the draft is open (as `picksPending` does now), at most 15 s per vote.
-- The 15 s clock lives in `D` (src/duo.js, times passed in as `now`, the server's alarms call `Duo.tick`).
+- `m.mpbVote = [[{ kind, part, key, votes: [lane 0's { col, row } | null, lane 1's] }, ...], [...]]` (team state). The
+  first entry is open: `Game.mpbVote(m, side, col, row)` (a tile `spotOk` allows; a player may change their vote); the
+  same tile as the teammate's places it at once (`Mpb.placeHead`; its parts are queued next). `Mpb.queue(m, side,
+  kind, part, key)` adds an entry (a kind's buy can, e.g. Tree kojja's "build another").
+- The clock (`D.mclock.vote[side] = { key, until }`, src/duo.js): 15 s (`Mpb.VOTE_MS`) **from when the entry became
+  the head** of the queue (not from the first vote). Then (`Duo.tick`, the server's alarm via `Duo.due`):
+  `Mpb.voteResult`: two different allowed tiles → a seeded pick of the two; one → it; none (or no longer allowed) →
+  `autoSpot`; no room at all → the entry is dropped. A bot votes at once (its human teammate's tile if they voted,
+  else autoSpot; it switches to the human's tile when they vote, so that places at once). The deploy clock waits while
+  any vote or the draft is open (`Duo.picksPending`). `Duo.runFight` settles anything still open first.
+- Votes, placements and draft picks are **system** actions (`D.tlog` entries with `lane: -1`, `fn: 'sys:vote' |
+  'sys:place' | 'sys:drop' | 'sys:draft'`, `Mpb.SYS`): Undo all replays them, so it never takes a vote or a building
+  back. Seats see the clocks as `duo.clock = { vote, draft }` (ms left; `Duo.clocks(D, seat, now)`).
 
-### Artifacts (engine + duo)
+### Artifacts (rules side, group F; the fight part is group A's)
 
-- Rolled by `Duo` at the start of rounds 2 and 8 (seeded, `D.seed`): `m.artifacts = { round, list: [{ id: 0|1, col,
-  row, card: { type: 'tower'|'mpb', id } }] }` in all four views (the opponents see them too, cards included; a tap
-  shows the card). The two spots are point mirrors of each other (fair), in no man's land, not on flank tiles, at
-  least 10 tiles apart. Cards: two different ones from all tower types (`Game.TOWER_TYPES`) and all MPB kinds except
-  the Vault, minus MPB kinds either team already has and tower types either team already has.
-- Engine: `opts.artifacts = [{ x, y, r: 9, cap: 100 }]` → `battle.artifacts()` = `[{ x, y, r, pts: [a, b], rate: [a, b],
-  locked: bool, won: -1|0|1 }]` live, and `result().artifacts` the same at the end. Units: a body with an unlocked
-  artifact within its awareness (`max(range + sight, minSight)`) soft-prioritises it: it moves into the circle; melee
-  bodies still leave it to attack an enemy they have picked; ranged bodies stay inside and only shoot what they can
-  reach from inside (they step in first). Once the artifact locks, normal behaviour. Mirror-exact and deterministic,
-  default off (`opts.artifacts` absent → nothing changes).
-- After the fight: per artifact the winner (`won`); `+50` gold to each player of the winning team (each lane's
-  `m.gold[side]`), `summary.artifacts`. The round after: the draft (above) → `m.draft = { round, cards, first, picks }`;
-  a picked tower card sets `m.towers[side].type` in both lanes; an MPB card goes into that team's placement vote.
+- `Duo` rolls at the start of rounds 2 and 8 (`Mpb.rollArtifacts(m, rng)`, seeded from `D.seed` and the round):
+  `m.artifacts = { round, list: [{ id: 0|1, col, row, card: { type: 'tower'|'mpb', id }, won }] }` in both lanes (all
+  four views; not hidden). The spots are point mirrors in no man's land, not flank tiles, ≥ 10 tiles apart
+  (Euclidean); cards: two different ones from `Mpb.cardPool(m)` (all tower types and kinds with `draft !== false`,
+  minus what either team has or has queued). `Mpb.artifactsFor(m)` → `opts.artifacts = [{ x, y, r: 9, cap: 100 }]`.
+- After the fight `Mpb.afterFight` reads `res.artifacts[i].won` (none: nobody won), pays +50 (`Mpb.ARTIFACT.gold`) to
+  each player of the winning team, `summary.artifacts = [{ id, won, card, gold }]`. At the next round's start the deal
+  replaces `m.artifacts` (set to null) with `m.draft`.
+- Engine (group A): `opts.artifacts = [{ x, y, r: 9, cap: 100 }]` → `battle.artifacts()` = `[{ x, y, r, pts: [a, b],
+  rate: [a, b], locked: bool, won: -1|0|1 }]` live (in `m.artifacts.list` order), and `result().artifacts` the same at
+  the end. Units: a body with an unlocked artifact within its awareness (`max(range + sight, minSight)`)
+  soft-prioritises it: it moves into the circle; melee bodies still leave it to attack an enemy they have picked;
+  ranged bodies stay inside and only shoot what they can reach from inside. Once the artifact locks, normal behaviour.
+  Mirror-exact and deterministic, default off (`opts.artifacts` absent → nothing changes). Points per squad come from
+  `b.tier` (`Game.bodiesFor`; a building's walker sets its own).
 - Draw: both boards, 2D and 3D: a glowing orb on its tile, a ring of radius r, and a round meter with a blue (side 0)
   and red (side 1) bar filling from each side; locked: the winner's colour and a lock. The page's tap on an artifact
   shows its card (name + one line).
 
-### The Vault (starting MPB, replaces the treasury in 2v2)
+### The draft (rounds 3 and 9)
 
-- Every team starts with a Vault on the old treasury tile (side 0 col 6 row 15; side 1 col 17 row 2). hp 900, armor 4.
-- Put / take: each player may put in or take out up to **200 a round** (`vaultPut(m, side, n)`, `vaultTake`). Both
-  amounts are counted over the round (no 50 x 50). A round is a **put round** or a **take round** for the whole team,
-  set by its first vault action (`m.vault[side] = { gold, mode: 'put'|'take'|null, moved: [lane0, lane1], round }`).
-  Take-back: Undo all undoes the player's own vault moves.
-- Downside: destroyed in a fight → 80% of its gold is lost (rounded down to 10s), each opponent player +50.
-- Skill **Compound interest** (200, match, permanent): at the start of each round the vault's gold grows 10%
-  (rounded down).
-- Skill **Coin golem** (100 each, once a round, *both* players must click it in the same round; the second click
-  summons): all the vault's gold is spent; a Coin Golem fights next to the vault this round. With g = gold spent:
-  hp = 300 + 3·g, hit = 30 + 0.12·g, aps 0.7, range 3 (melee), splash 1.5, armor 2 + g/250 (max 8), speed 4 (fixed),
-  1 body, tier 3. Skin: bronze g < 400, silver 400-899, gold ≥ 900. (Coordinator's numbers; the Vault group may tune.)
-- Loan: already every player's own (`Game.takeLoan`, every map from round 1); in 2v2 it must keep working with no
-  treasury and no Bank (check, don't rebuild).
+- `m.draft = { round, cards, won, owner: [team of card 0, of card 1] (null while a pick is due), first, how: 'both' |
+  'split' | 'one' | 'none', pick, done }` (`Mpb.dealDraft`, both lanes). `split` / `one`: dealt at once; `both` (one
+  team won both) and `none` (a seeded coin flip): `first` picks with `Game.draftPick(m, side, idx)` (either player;
+  the first pick counts; a bot on that team picks at once, preferring a tower while it has the Outpost, then an MPB it
+  hasn't got); 15 s (`Mpb.DRAFT_MS`, `D.mclock.draft`), then a seeded pick.
+- `Mpb.giveCard(m, team, card)`: a tower card sets `m.towers[team].type` (round 9 or a team that had a type: its tower
+  skills, walls, mage general, tower rounds and mark go, no refund); an MPB card queues its placement vote (or the
+  kind's `acquire`).
+
+### The Vault (`vault` region of src/mpb.js; the reference kind)
+
+- Both teams' Vaults at the old treasury tiles (`Mpb.VAULT_SPOT`: side 0 col 6 row 15, side 1 col 17 row 2), hp 900,
+  armor 4 (`Mpb.VAULT`). `m.vault[side] = { gold, mode, moved: [lane 0's, lane 1's], round, start }`.
+- `Game.vaultPut(m, side, n)` / `vaultTake`: n ≥ 1, at most `VAULT.move` (200) a round per player over all moves; the
+  first move of the round sets put or take for the team (`Mpb.vaultMode`); `Mpb.vaultRoom(m, side, mode)` is the most
+  this player can move now. Undo all takes back the player's own moves (replay).
+- Skills: Compound interest (200, match): +10% (down) at each round start. Coin golem (100, roundPlayer): the second
+  player's click this round spends all the vault's gold, `rec.data.golem = { round, g }`; a take-back of either click
+  puts the gold back. `Mpb.golemUnit(g)`: hp 300 + 3g, hit 30 + 0.12g, aps 0.7, range 3, splash 1.5, armor
+  min(8, 2 + g/250), speed 4, 1 body, tier 3, `mpbSkin` bronze < 400 ≤ silver < 900 ≤ gold. It fights in front of the
+  vault (squad `XSQ`), counts as a unit for winning. Destroyed: 80% of the gold lost (down to 10s), +50 to each
+  opponent player, `summary.mpbNews`.
+- The loan (`Game.takeLoan`) is every player's own and works in 2v2 without a treasury or Bank (tested).
+
+### Adding a kind (checklist for B1-B5)
+
+1. Fill your kind's region in `src/mpb.js` (`// ===== <kind> =====`): numbers, `skills`, `place`, `hooks`. Keep every
+   constant of the kind in its region. Use only hooks; if you need a new one, add the call in the framework section
+   (one line, default: nothing changes) and say so in your report.
+2. Fight effects: `bodies` (structures: `structure: true, lesser: true`; set `mpb: '<kind>'` on every unit so the
+   renderers find its look), `battleOpts` for engine fields (`opts.mpb.<yours>`, default off), `squadMods` /
+   `squadBodies` for squads. Engine changes behind a default that changes nothing; 1v1, the counter table and Balance
+   Lab stay byte-identical (`node tools/tests/fairness.js`, `node tools/counter-table.js`).
+3. After-fight and round effects: `afterFight` (Team HP via `hp`, gold per lane, `Mpb.news`), `roundStart`.
+4. Player actions: skills through `Game.mpbBuy` (+ `bought` / `unbuy` / `canBuy`), anything else through
+   `Game.mpbAct` (`canAct` / `act`); both are already in `Referee.ACTIONS` and `Duo.TEAM_FNS`. Never add a new
+   top-level action unless it can't be one of these.
+5. Hidden info: `hide(s, h, rec)` for whatever the opponents mustn't see while deploying.
+6. Look: `MPB_DRAW.<kind>` in src/render2d.js, `BUILD['mpb:<kind>']` in src/models3d.js (art direction:
+   docs/art-direction.md), the page sheet part `MPB_SHEET.<kind>` in src/site-template.html if the generic sheet
+   isn't enough (a squad to pick, a tile to tap).
+7. Bots: in `Duo.botTurn` (or your kind's `roundStart`) — must never throw with your kind present.
+8. Tests: `tools/tests/mpb-<group>.js` (copy the helpers at the top of `tools/tests/mpb.js`: `match`, `playTo`,
+   `addHut`), plus `node tools/tests/mpb.js`, `node tools/tests/duo.js`.
 
 ## Buildings (Vilhelm's text, with Claude's numbers where he left them open)
 

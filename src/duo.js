@@ -462,6 +462,9 @@
     if (G.needsPack(m, sd)) G.choosePack(m, sd, Math.floor(Math.random() * m.packages[sd].length));
     if (G.needsTowerPick(m, sd)) { const ch = G.towerChoices(m, sd); G.setTowerType(m, sd, ch[Math.floor(Math.random() * ch.length)].id); }
     G.aiDeploy(m, sd);
+    // the Vault: gold the carry cap would take next round goes in instead (a put round only)
+    const spare = Math.min(m.gold[sd] - G.CARRY_CAP, M.vaultRoom(m, sd, 'put'));
+    if (spare > 0) G.vaultPut(m, sd, spare);
     copyTeam(m, D.lanes[1 - own.lane].m, sd);
   }
   function beginRound(D, now) {

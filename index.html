@@ -9250,6 +9250,9 @@ if (typeof module !== 'undefined') module.exports = Game;
     if (G.needsPack(m, sd)) G.choosePack(m, sd, Math.floor(Math.random() * m.packages[sd].length));
     if (G.needsTowerPick(m, sd)) { const ch = G.towerChoices(m, sd); G.setTowerType(m, sd, ch[Math.floor(Math.random() * ch.length)].id); }
     G.aiDeploy(m, sd);
+    // the Vault: gold the carry cap would take next round goes in instead (a put round only)
+    const spare = Math.min(m.gold[sd] - G.CARRY_CAP, M.vaultRoom(m, sd, 'put'));
+    if (spare > 0) G.vaultPut(m, sd, spare);
     copyTeam(m, D.lanes[1 - own.lane].m, sd);
   }
   function beginRound(D, now) {
@@ -11478,6 +11481,7 @@ const Render2D = (cv, view, opts = {}) => {
       for (const sd of [-1, 1]) { ctx.fillStyle = met; ctx.beginPath(); ctx.arc(x + sd * r * 0.82, y + r * 0.1, r * 0.32, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } // fists
       for (let k = 0; k < 4; k++) { ctx.fillStyle = k % 2 ? dark : met; ctx.beginPath(); ctx.ellipse(x, y + r * (0.55 - k * 0.32), r * (0.62 - Math.abs(k - 1.5) * 0.06), r * 0.22, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } // the stacked coins
       ctx.fillStyle = '#FFE9A8'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.arc(x + sd * r * 0.2, y - r * 0.42, Math.max(1, r * 0.08), 0, Math.PI * 2); ctx.fill(); } // eyes
+      ctx.fillStyle = '#2B2F33'; ctx.fillRect(x - r * 0.16, y - r * 0.78, r * 0.32, Math.max(1, r * 0.07)); // the coin slot on its head
       ctx.strokeStyle = c; ctx.lineWidth = Math.max(1.5, r * 0.12); ctx.beginPath(); ctx.arc(x, y, r * 1.08, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     },
@@ -12684,7 +12688,7 @@ Floors.floor = (() => {
   // ----- Report a bug (2026-11-04): a new post in the Discord forum #bug-reports with the game version and match id
   // filled in. The server posts it through a webhook (/account/bug, accounts.js BUG); when that's off or fails, the report
   // is copied and the Discord server opens, so it can be pasted there by hand.
-  const GAME_VERSION = '6 Nov 2026 · a78535f'; // src/build.js: the newest patch notes date and a hash of this page
+  const GAME_VERSION = '6 Nov 2026 · 7d8c170'; // src/build.js: the newest patch notes date and a hash of this page
   const DISCORD_FALLBACK = 'https://discord.gg/TBpDKSBWsY';
   const bug = { draft: '', busy: false };
   // the id the server's match history uses (room.js historyInfo: <room>-<seed>), or one made the same way for other matches
@@ -17645,7 +17649,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // It falls back to the 2D board when it can't start (no WebGL), when the phone drops the WebGL context, and when
   // fights run under 20 fps at low quality (slower fights step the quality down first), with one line on the board.
   const THREE_URL = './vendor/three.module.min.js'; // the artifact build points this at jsDelivr
-  const V3D = '9ef86b91db'; // the 3D code's version (src/build.js puts a hash of it here)
+  const V3D = 'dbb06c4651'; // the 3D code's version (src/build.js puts a hash of it here)
   const B3D_STORE = 'phone-bellum-board';
   const force2d = /[?&]board=2d\b/.test(location.search);
   const force3d = !force2d && (/[?&]board=3d\b/.test(location.search) || window.PB_FORCE3D === true);
@@ -20239,7 +20243,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const h = Mpb.voteHead(m, me);
     if (!h) return '';
     const K = Mpb.kindOf(h.kind), L = duoMyLane(), mine = h.votes[L], theirs = h.votes[1 - L], part = h.part && ((K.place.parts || []).find(p => p.id === h.part) || {}).name;
-    return `<div class="mpb-box"><div><b>Place ${part ? `the ${esc(K.name)}’s ${esc(part)}` : `your team’s ${esc(K.name)}`}</b> · tap a glowing tile. ${mine ? '<span style="color:' + duoRing(duoMySeat()).col + '">Your vote is in.</span> ' : ''}${theirs ? `<span style="color:${duoRing(Duo.mateOf(duoMySeat())).col}">Your teammate voted.</span>` : 'Waiting for your teammate.'} The same tile places it at once; two tiles: one of them when the time runs out. <span class="num" id="mpb-vote-s">${mpbClockAt.vote ? mpbLeft('vote') + ' s' : ''}</span></div></div>`;
+    return `<div class="mpb-box"><div><b>Place ${part ? `the ${esc(K.name.replace(/^The /, ''))}’s ${esc(part)}` : `your team’s ${esc(K.name.replace(/^The /, ''))}`}</b> · tap a glowing tile. ${mine ? '<span style="color:' + duoRing(duoMySeat()).col + '">Your vote is in.</span> ' : ''}${theirs ? `<span style="color:${duoRing(Duo.mateOf(duoMySeat())).col}">Your teammate voted.</span>` : 'Waiting for your teammate.'} The same tile places it at once; two tiles: one of them when the time runs out. <span class="num" id="mpb-vote-s">${mpbClockAt.vote ? mpbLeft('vote') + ' s' : ''}</span></div></div>`;
   }
   function mpbPanel() { return mpbOn() ? mpbDraftHtml() + mpbVoteHtml() : ''; }
   function wireMpbPanel() {
@@ -20342,7 +20346,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const info = K.hooks.info ? K.hooks.info(m, side, rec).filter(Boolean) : [], extra = MPB_SHEET[rec.kind];
     const fell = rec.fell ? `<p class="hint" style="margin:0">Destroyed in round ${rec.fell}’s fight; it stands again in every fight.</p>` : '';
     $('sheet').innerHTML = `
-      <div class="bar"><h3 id="sheet-h">${teamName(side)}’s ${esc(K.name)}</h3><button class="btn small" id="close">Close</button></div>
+      <div class="bar"><h3 id="sheet-h">${teamName(side)}’s ${esc(K.name.replace(/^The /, ''))}</h3><button class="btn small" id="close">Close</button></div>
       <p style="margin:0"><span class="chip" style="border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px;color:${K.color}">${esc(K.kind)}</span> ${K.hp > 0 ? `${K.hp} health · ${K.armor} armor` : 'Terrain'}${rec.round > 1 ? ` · placed in round ${rec.round}` : ''}</p>
       <p class="role" style="margin:0">${esc(K.text)}</p>
       ${K.downside ? `<p style="margin:0"><span style="color:var(--foe)">Downside:</span> ${esc(K.downside)}</p>` : ''}

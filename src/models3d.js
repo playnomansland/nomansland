@@ -685,7 +685,8 @@ const Models3D = (THREE) => {
     P(cyl(0.06, 0.06, 1.6, 5), WOOD, [1.4, 4.1, 1.1]), P(box(0.05, 0.6, 0.9), 'team', [1.4, 4.55, 1.55])];
   // ===== golem (3D) =====
   // The Coin Golem: a hulk of stacked coins (bronze, silver or gold by the gold spent): coin-stack legs and arms, a
-  // barrel chest of big coins, a coin head with glowing eyes, a sash in the team colour; for a body of radius 1
+  // barrel chest of big coins, a coin head with glowing eyes under smug brows and a coin slot on top (a piggy bank's),
+  // a sash in the team colour; for a body of radius 1
   const coinStack = (r, n, [x, y, z], col, edge) => [...Array(n)].map((_, k) => P(cyl(r * (k % 2 ? 0.94 : 1), r * (k % 2 ? 0.94 : 1), 0.13, 10), k % 2 ? edge : col, [x, y + k * 0.13, z]));
   const golem = (col, edge) => () => [
     ...coinStack(0.24, 6, [-0.3, 0.07, 0], col, edge), ...coinStack(0.24, 6, [0.3, 0.07, 0], col, edge),
@@ -694,7 +695,9 @@ const Models3D = (THREE) => {
     ...[-1, 1].flatMap(sd => [...coinStack(0.18, 5, [sd * 0.78, 1.1, 0], col, edge), P(cyl(0.28, 0.28, 0.24, 10), col, [sd * 0.8, 1.0, -0.05])]),
     P(cyl(0.34, 0.34, 0.14, 12), col, [0, 2.1, 0], [Math.PI / 2, 0, 0]),
     P(cyl(0.38, 0.38, 0.08, 12), edge, [0, 2.1, 0.03], [Math.PI / 2, 0, 0]),
-    P(ball(0.06), GLOW, [-0.12, 2.15, -0.08]), P(ball(0.06), GLOW, [0.12, 2.15, -0.08])];
+    P(ball(0.06), GLOW, [-0.12, 2.15, -0.08]), P(ball(0.06), GLOW, [0.12, 2.15, -0.08]),
+    P(box(0.14, 0.035, 0.03), DARK, [-0.12, 2.23, -0.09], [0, 0, -0.35]), P(box(0.14, 0.035, 0.03), DARK, [0.12, 2.23, -0.09], [0, 0, 0.35]), // smug brows: it knows what it is worth
+    P(box(0.3, 0.06, 0.1), DARK, [0, 2.43, 0])]; // a coin slot on its head, like a piggy bank
   BUILD['mpb:golem:bronze'] = golem('#B87333', '#7A4A22');
   BUILD['mpb:golem:silver'] = golem('#C9CED6', '#8A929A');
   BUILD['mpb:golem:gold'] = golem(GOLD, '#9A7418');

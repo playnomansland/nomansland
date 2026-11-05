@@ -7,6 +7,7 @@
 //    the other pair of players in m.team
 //  - seats act on their own part (acked with the server's fingerprint); a teammate sees it (a 'team' message), an
 //    opponent doesn't; a teammate's tile is refused
+//  - the Vault (src/mpb.js): a put is acked in step with the phone; the teammate sees it, the opponent not yet
 //  - all ready: one fight for all four, both lanes before it (duo.pres), which plays back the same in node
 //  - a reload gets the same seat back with its key
 // Run: cd server && node test/duo.test.js
@@ -87,6 +88,20 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 *
         assert.ok(ack.ok, 'place'); assert.strictEqual(ack.h, Ref.sideHash(m, side), 'phone and server in step');
         acted[k] = { spot, round: m.round };
       }
+    }
+    // the Vault (src/mpb.js, 2026-11-06): the host puts 50 in; the phone's copy hashes as the server's; the teammate
+    // sees it, the opponent sees the vault as the round began; every sync carries the vote/draft clock
+    {
+      host.json({ t: 'sync' }); await sleep(500);
+      const hs = [...host.inbox].reverse().find((x) => x.t === 'sync' && x.m), hm = local(hs.m);
+      assert.ok(hs.duo.clock && 'vote' in hs.duo.clock && 'draft' in hs.duo.clock, 'duo.clock');
+      assert.ok(Game.vaultPut(hm, 0, 50), 'the phone may put 50 in');
+      host.json({ t: 'act', seq: 40, fn: 'vaultPut', a: [50] });
+      const va = await waitFor(() => host.inbox.find((x) => x.t === 'ack' && x.seq === 40), 8000);
+      assert.ok(va.ok, 'vaultPut'); assert.strictEqual(va.h, Ref.sideHash(hm, 0), 'phone and server in step after a Vault move');
+      p1.json({ t: 'sync' }); p2.json({ t: 'sync' }); await sleep(600);
+      assert.strictEqual([...p1.inbox].reverse().find((x) => x.t === 'sync').m.vault[0].gold, 50, 'the teammate sees the gold');
+      assert.strictEqual([...p2.inbox].reverse().find((x) => x.t === 'sync').m.vault[0].gold, 0, 'the opponent sees the vault as the round began');
     }
     // a cheat: an action for a lane that isn't yours is just your own side in your own lane; acting on another side is impossible
     host.json({ t: 'act', seq: 50, fn: 'place', a: [0, 0, 0] });

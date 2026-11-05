@@ -20,6 +20,32 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 6 November 2026 – 2v2: the Vault, team buildings and the artifact draft
+
+2v2 is still a developer test.
+
+- **The Vault** stands where the treasury used to be, one per team. Each of you can put up to 200 gold a round into it or take up to 200 out; the first move of the round makes it a put round or a take round for the whole team. Tap the Vault to see what's inside and to move gold.
+- **Compound interest** (200 gold, once a match): the Vault's gold grows 10% at the start of every round.
+- **Coin golem** (100 gold each): when both of you click it in the same round, all the Vault's gold becomes a Coin Golem that fights next to the Vault this round. The more gold, the bigger it is: bronze, silver, and gold from 900.
+- **If the Vault is destroyed** in a fight, 80% of its gold is lost and each opponent gets 50 gold. It stands again in the next fight.
+- **The artifact draft replaces the round 3 tower vote.** The cards of round 2's artifacts are dealt in round 3, round 8's in round 9. Win both and your team picks one first (the other team gets the one left); win one each and each team gets its own; an artifact nobody won goes to the team without a card. If nobody won either, a coin flip says who picks. Either of you can pick; you have 15 seconds.
+- **Your tower is an Outpost until your team gets a tower card.** A tower card in round 9 replaces the tower you have (its skills, walls and mage general go with it).
+- **Team buildings:** a building card opens a placement vote. Tap one of the glowing tiles; your teammate sees your vote in your colour. The same tile places it at once; two different tiles: one of the two after 15 seconds. Buildings go inside your zone (not on its outer edges) and at least 2 tiles away from every other building. Nobody can deploy on a building's tile.
+- **Building sheets:** tap a building to see what it does, its downside, and its skills. Either of you can buy them (whoever buys pays; only your own buys can be taken back). The other team can open the sheet too, but not what you bought this round.
+- The deploy clock waits while the draft or a vote is open.
+- The other buildings are on the board with their names and numbers; their skills and effects come in the next updates.
+- The loan works as before (every player's own).
+
+### To check with Vilhelm
+- **The 15 s of a placement vote** run from when the vote opens, not from the first vote; nobody voting gets the first allowed tile (back of the zone, middle first).
+- **A bot teammate** votes at once and switches to your tile when you vote (so it places at once); in the draft, a team with a bot picks at once (the bot prefers a tower while it has the Outpost, then a building it doesn't have).
+- **Vault moves are counted over the round** per player (four 50s are 200), and a take round can't put; Undo all takes back only your own moves.
+- **Coin golem:** both clicks cost 100 each; the golem counts as a unit for winning the round (it walks and fights); a take-back of either click puts the gold back in the Vault. Gold put in after it was summoned stays in the Vault.
+- **Golem numbers** (coordinator's): 300 + 3 health and 30 + 0.12 hit per gold spent, armor 2 + 1 per 250 gold (at most 8), speed 4.
+- **"+50 per click this round"** skills (Field hospital) go up per player, not per team.
+- **A replaced tower's skills** are lost with no refund (as the design says).
+- **Buildings are seen by the opponents as soon as they are placed**; only this round's skills and Vault moves stay hidden until the fight.
+
 ## 6 November 2026 – 2v2: artifacts in the fight
 
 2v2 is still a developer test.

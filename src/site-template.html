@@ -8918,7 +8918,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const h = Mpb.voteHead(m, me);
     if (!h) return '';
     const K = Mpb.kindOf(h.kind), L = duoMyLane(), mine = h.votes[L], theirs = h.votes[1 - L], part = h.part && ((K.place.parts || []).find(p => p.id === h.part) || {}).name;
-    return `<div class="mpb-box"><div><b>Place ${part ? `the ${esc(K.name)}’s ${esc(part)}` : `your team’s ${esc(K.name)}`}</b> · tap a glowing tile. ${mine ? '<span style="color:' + duoRing(duoMySeat()).col + '">Your vote is in.</span> ' : ''}${theirs ? `<span style="color:${duoRing(Duo.mateOf(duoMySeat())).col}">Your teammate voted.</span>` : 'Waiting for your teammate.'} The same tile places it at once; two tiles: one of them when the time runs out. <span class="num" id="mpb-vote-s">${mpbClockAt.vote ? mpbLeft('vote') + ' s' : ''}</span></div></div>`;
+    return `<div class="mpb-box"><div><b>Place ${part ? `the ${esc(K.name.replace(/^The /, ''))}’s ${esc(part)}` : `your team’s ${esc(K.name.replace(/^The /, ''))}`}</b> · tap a glowing tile. ${mine ? '<span style="color:' + duoRing(duoMySeat()).col + '">Your vote is in.</span> ' : ''}${theirs ? `<span style="color:${duoRing(Duo.mateOf(duoMySeat())).col}">Your teammate voted.</span>` : 'Waiting for your teammate.'} The same tile places it at once; two tiles: one of them when the time runs out. <span class="num" id="mpb-vote-s">${mpbClockAt.vote ? mpbLeft('vote') + ' s' : ''}</span></div></div>`;
   }
   function mpbPanel() { return mpbOn() ? mpbDraftHtml() + mpbVoteHtml() : ''; }
   function wireMpbPanel() {
@@ -9021,7 +9021,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const info = K.hooks.info ? K.hooks.info(m, side, rec).filter(Boolean) : [], extra = MPB_SHEET[rec.kind];
     const fell = rec.fell ? `<p class="hint" style="margin:0">Destroyed in round ${rec.fell}’s fight; it stands again in every fight.</p>` : '';
     $('sheet').innerHTML = `
-      <div class="bar"><h3 id="sheet-h">${teamName(side)}’s ${esc(K.name)}</h3><button class="btn small" id="close">Close</button></div>
+      <div class="bar"><h3 id="sheet-h">${teamName(side)}’s ${esc(K.name.replace(/^The /, ''))}</h3><button class="btn small" id="close">Close</button></div>
       <p style="margin:0"><span class="chip" style="border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px;color:${K.color}">${esc(K.kind)}</span> ${K.hp > 0 ? `${K.hp} health · ${K.armor} armor` : 'Terrain'}${rec.round > 1 ? ` · placed in round ${rec.round}` : ''}</p>
       <p class="role" style="margin:0">${esc(K.text)}</p>
       ${K.downside ? `<p style="margin:0"><span style="color:var(--foe)">Downside:</span> ${esc(K.downside)}</p>` : ''}

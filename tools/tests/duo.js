@@ -127,7 +127,8 @@ function toRound3(seed, bots = [false, false, false, false]) {
     for (let k = 0; k < 4; k++) Duo.next(D, k, D.summary[0].round, T);
   }
   assert.strictEqual(D.lanes[0].m.round, Game.TOWER_PICK_ROUND);
-  Duo.mpbSettle(D, T); // the artifact draft and any placement vote (2026-11-06): settled at once
+  Duo.mpbSettle(D, T); // the artifact draft and any placement vote (2026-11-06): settled at once,
+  D.tlog = [[], []]; D.tbase = [0, 1].map(sd => Duo.teamState(D.lanes[0].m, sd)); // as if dealt as the round began
   return { D, T };
 }
 

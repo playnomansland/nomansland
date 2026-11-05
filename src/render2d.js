@@ -992,6 +992,7 @@ const Render2D = (cv, view, opts = {}) => {
       for (const sd of [-1, 1]) { ctx.fillStyle = met; ctx.beginPath(); ctx.arc(x + sd * r * 0.82, y + r * 0.1, r * 0.32, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } // fists
       for (let k = 0; k < 4; k++) { ctx.fillStyle = k % 2 ? dark : met; ctx.beginPath(); ctx.ellipse(x, y + r * (0.55 - k * 0.32), r * (0.62 - Math.abs(k - 1.5) * 0.06), r * 0.22, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } // the stacked coins
       ctx.fillStyle = '#FFE9A8'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.arc(x + sd * r * 0.2, y - r * 0.42, Math.max(1, r * 0.08), 0, Math.PI * 2); ctx.fill(); } // eyes
+      ctx.fillStyle = '#2B2F33'; ctx.fillRect(x - r * 0.16, y - r * 0.78, r * 0.32, Math.max(1, r * 0.07)); // the coin slot on its head
       ctx.strokeStyle = c; ctx.lineWidth = Math.max(1.5, r * 0.12); ctx.beginPath(); ctx.arc(x, y, r * 1.08, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     },
