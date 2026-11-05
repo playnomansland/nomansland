@@ -45,19 +45,23 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 *
 
     // a developer has every skin, off until worn
     const dev = await call('google', { credential: idToken({ email: 'dev@example.com', email_verified: true }) });
-    assert.deepStrictEqual(dev.player.skins, [{ id: 'brute-champion', worn: false }, { id: 'golem-aquamarine', worn: false }, { id: 'brute-omniper', worn: false }], 'a developer has every skin (all three), off');
+    assert.deepStrictEqual(dev.player.skins, [{ id: 'brute-champion', worn: false }, { id: 'golem-aquamarine', worn: false }, { id: 'brute-omniper', worn: false }, { id: 'firemage-ember', worn: false }], 'a developer has every skin (all four), off');
     const devOn = await call('skin', { skin: 'brute-champion', worn: true }, dev.session);
-    assert.deepStrictEqual(devOn.player.skins, [{ id: 'brute-champion', worn: true }, { id: 'golem-aquamarine', worn: false }, { id: 'brute-omniper', worn: false }], 'and can wear it');
+    assert.deepStrictEqual(devOn.player.skins, [{ id: 'brute-champion', worn: true }, { id: 'golem-aquamarine', worn: false }, { id: 'brute-omniper', worn: false }, { id: 'firemage-ember', worn: false }], 'and can wear it');
     // one Brute skin at a time: wearing Omni-Per takes Champion off, and back
     const gol = await call('skin', { skin: 'golem-aquamarine', worn: true }, dev.session);
-    assert.deepStrictEqual(gol.player.skins.map((k) => k.worn), [true, true, false], 'another unit\'s skin stays on');
+    assert.deepStrictEqual(gol.player.skins.map((k) => k.worn), [true, true, false, false], 'another unit\'s skin stays on');
     const omni = await call('skin', { skin: 'brute-omniper', worn: true }, dev.session);
-    assert.deepStrictEqual(omni.player.skins, [{ id: 'brute-champion', worn: false }, { id: 'golem-aquamarine', worn: true }, { id: 'brute-omniper', worn: true }], 'wearing Omni-Per takes Champion off');
+    assert.deepStrictEqual(omni.player.skins, [{ id: 'brute-champion', worn: false }, { id: 'golem-aquamarine', worn: true }, { id: 'brute-omniper', worn: true }, { id: 'firemage-ember', worn: false }], 'wearing Omni-Per takes Champion off');
     const champ = await call('skin', { skin: 'brute-champion', worn: true }, dev.session);
-    assert.deepStrictEqual(champ.player.skins.map((k) => k.worn), [true, true, false], 'wearing Champion takes Omni-Per off');
+    assert.deepStrictEqual(champ.player.skins.map((k) => k.worn), [true, true, false, false], 'wearing Champion takes Omni-Per off');
     // nobody else has the Omni-Per Brute
     assert.ok(!(await call('me', {}, A.session)).player.skins.some((k) => k.id === 'brute-omniper'), 'a normal account doesn\'t own the Omni-Per Brute');
     assert.strictEqual((await call('skin', { skin: 'brute-omniper', worn: true }, A.session)).status, 400, 'and can\'t wear it');
+    // the Ember Robe Fire Mage: developers only too, and the only Fire Mage skin, so it leaves the Brute's alone
+    const ember = await call('skin', { skin: 'firemage-ember', worn: true }, dev.session);
+    assert.deepStrictEqual(ember.player.skins.map((k) => k.worn), [true, true, false, true], 'wearing Ember Robe takes no other skin off');
+    assert.strictEqual((await call('skin', { skin: 'firemage-ember', worn: true }, A.session)).status, 400, 'a normal account can\'t wear Ember Robe');
 
     // switching off and on
     assert.deepStrictEqual((await call('skin', { skin: 'brute-champion', worn: false }, A.session)).player.skins, [{ id: 'brute-champion', worn: false }], 'off');

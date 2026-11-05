@@ -20,6 +20,13 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 5 November 2026 – New skin (coming later): Ember Robe Fire Mage
+
+- **Ember Robe Fire Mage:** a Fire Mage in a long robe with an ember hem, cuffs and chest stripe, a fire gem on a belt in your team colour, long dark red hair and a flame held in each hand. 3D board only (the 2D board keeps the Fire Mage's symbol). It's a cosmetic skin and the Fire Mage's normal look stays the same.
+- Nobody has it yet: it's saved for later, and how to earn it is still to be decided.
+
+---
+
 ## 5 November 2026 – 2v2: ride your ally's horse
 
 2v2 is still a developer test.

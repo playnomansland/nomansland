@@ -157,7 +157,7 @@ export async function recordGG(env, giver, receiver, match, fights) {
 // Owned = a row with src 'grant' (SKIN_GRANTS) or 'invite' (INVITE: the reward for inviting a friend).
 // One skin per unit at a time: the part of the id before the first '-' names the unit (brute-..., golem-...), and
 // wearing a skin takes off the player's other skins for that unit (Omni-Per Brute, 2026-11-05: a second Brute skin).
-export const SKINS = ['brute-champion', 'golem-aquamarine', 'brute-omniper'];
+export const SKINS = ['brute-champion', 'golem-aquamarine', 'brute-omniper', 'firemage-ember'];
 const skinUnit = (k) => k.split('-')[0];
 export const SKIN_GRANTS = [{ skin: 'brute-champion', tag: 'Gubbolas Cage' }];
 let grantsDone = false;
