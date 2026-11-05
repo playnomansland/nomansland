@@ -8921,7 +8921,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   // the placement vote of the team's first building in the queue
   function mpbVoteHtml() {
-    const h = Mpb.voteHead(m, me);
+    const h = Mpb.voteEntry(m, me, duoMyLane()) || Mpb.voteHead(m, me); // (my own one-player placement first)
     if (!h) return '';
     const K = Mpb.kindOf(h.kind), L = duoMyLane(), mine = h.votes[L], theirs = h.votes[1 - L], part = h.part && ((K.place.parts || []).find(p => p.id === h.part) || {}).name;
     if (h.lane != null) return `<div class="mpb-box"><div><b>${h.lane === L ? `Place your ${esc(K.single || K.name)}` : `Your teammate places their ${esc(K.single || K.name)}`}</b>${h.lane === L ? ' · tap a glowing tile (it goes there at once).' : '.'} <span class="num" id="mpb-vote-s">${mpbClockAt.vote ? mpbLeft('vote') + ' s' : ''}</span></div></div>`; // one player places it alone (Mpb.queue's lane)
@@ -8942,8 +8942,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   // the tiles the team may vote for now (cached: the 3D board redraws the marks every frame)
   function mpbVoteTiles() {
-    const h = Mpb.voteHead(m, me);
-    if (!h || (h.lane != null && h.lane !== duoMyLane())) return []; // (the teammate's own to place)
+    const h = Mpb.voteEntry(m, me, duoMyLane()); // (not the teammate's own to place)
+    if (!h) return [];
     const key =[m.round, h.kind, h.part, Mpb.recs(m, me).length, m.armies[me].length, Game.teamArmy(m, me).length].join('|');
     if (mpbSpotCache.key !== key || now() - mpbSpotCache.at > 400) mpbSpotCache = { key, at: now(), tiles: Mpb.spots(m, me, h.kind, h.part) };
     return mpbSpotCache.tiles;
@@ -8951,7 +8951,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // over the board (both boards, boardMarks): the allowed tiles glow, each player's vote in their colour
   function mpbMarks(at) {
     if (!mpbOn() || phase !== 'deploy' || !at) return '';
-    const h = Mpb.voteHead(m, me);
+    const h = Mpb.voteEntry(m, me, duoMyLane());
     if (!h) return '';
     const pt = (x, y) => at(x, y).map(v => v.toFixed(1)).join(','), d = Game.TILE / 2 - 0.5;
     const sq = (t, cls, st) => { const c = Game.tileToWorld(t.col, t.row); return `<polygon class="${cls}"${st ? ` style="${st}"` : ''} points="${pt(c.x - d, c.y - d)} ${pt(c.x + d, c.y - d)} ${pt(c.x + d, c.y + d)} ${pt(c.x - d, c.y + d)}"/>`; };
@@ -8962,8 +8962,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // a tap on the board: a vote on an allowed tile, else a building's sheet (true: handled)
   function mpbTap(t) {
     if (!mpbOn() || !t) return false;
-    const h = phase === 'deploy' && Mpb.voteHead(m, me);
-    if (h && (h.lane == null || h.lane === duoMyLane()) && Mpb.spotOk(m, me, h.kind, h.part, t.col, t.row)) { if (editable() && Game.mpbVote(m, me, t.col, t.row)) changed(); return true; }
+    const h = phase === 'deploy' && Mpb.voteEntry(m, me, duoMyLane());
+    if (h && Mpb.spotOk(m, me, h.kind, h.part, t.col, t.row)) { if (editable() && Game.mpbVote(m, me, t.col, t.row)) changed(); return true; }
     const x = Mpb.recAt(m, t.col, t.row);
     if (x) { openMpbSheet(x.side, x.rec.key); return true; }
     return false;
@@ -9052,7 +9052,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       return upRow({ name: sk.name, act, text: esc(sk.text || ''), more: esc(mpbPerText(sk) + (state ? '. ' + state : '') + (mine ? '. Whoever buys pays.' : '')) });
     });
     const info = K.hooks.info ? K.hooks.info(m, side, rec).filter(Boolean) : [], extra = MPB_SHEET[rec.kind];
-    const fell = rec.fell ? `<p class="hint" style="margin:0">Destroyed in round ${rec.fell}’s fight; it stands again in every fight.</p>` : '';
+    const fell = rec.fell ? `<p class="hint" style="margin:0">${esc(K.hooks.fellText ? K.hooks.fellText(m, side, rec) : `Destroyed in round ${rec.fell}’s fight; it stands again in every fight.`)}</p>` : ''; // (a kind's own line: hooks.fellText)
     $('sheet').innerHTML = `
       <div class="bar"><h3 id="sheet-h">${teamName(side)}’s ${esc(K.name.replace(/^The /, ''))}</h3><button class="btn small" id="close">Close</button></div>
       <p style="margin:0"><span class="chip" style="border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px;color:var(--gold)"><i class="duo-dot" style="background:${K.color}"></i>${esc(K.kind)}</span> ${K.hp > 0 ? `${K.hp} health · ${K.armor} armor` : 'Terrain'}${rec.round > 1 ? ` · placed in round ${rec.round}` : ''}</p>

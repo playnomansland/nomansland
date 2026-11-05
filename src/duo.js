@@ -336,7 +336,8 @@
     const m = D.lanes[0].m;
     if (!D.mclock) D.mclock = { vote: [null, null], draft: 0 };
     for (const sd of [0, 1]) {
-      const h = M.voteHead(m, sd), key = h ? [M.recs(m, sd).length, h.kind, h.part || '', h.key || ''].join('|') : '';
+      // (a one-player placement at the head keeps its clock while the teammate places theirs: Mpb.voteEntry)
+      const h = M.voteHead(m, sd), key = h ? [h.lane != null ? 'L' + h.lane : M.recs(m, sd).length, h.kind, h.part || '', h.key || ''].join('|') : '';
       if (!key) D.mclock.vote[sd] = null;
       else if (!D.mclock.vote[sd] || D.mclock.vote[sd].key !== key) D.mclock.vote[sd] = { key, until: now + M.VOTE_MS };
     }
@@ -355,11 +356,10 @@
       }
       if (!did) for (const sd of [0, 1]) {
         setTeams(lanes);
-        const head = M.voteHead(lanes[0], sd);
-        if (!head) continue;
+        if (!M.voteHead(lanes[0], sd)) continue;
         for (const L of [0, 1]) {
-          if (!D.bots[seatOf(L, sd)]) continue;
-          if (head.lane != null && head.lane !== L) continue; // a building one player places alone (Mpb.queue's lane)
+          const head = M.voteEntry(lanes[0], sd, L); // (a building one player places alone: only their own, Mpb.queue's lane)
+          if (!D.bots[seatOf(L, sd)] || !head) continue;
           const mate = head.votes[1 - L], human = mate && !D.bots[seatOf(1 - L, sd)] && M.spotOk(lanes[L], sd, head.kind, head.part, mate.col, mate.row) ? mate : null;
           const mine = head.votes[L] && M.spotOk(lanes[L], sd, head.kind, head.part, head.votes[L].col, head.votes[L].row) ? head.votes[L] : null;
           const want = human || mine || M.autoSpot(lanes[L], sd, head.kind, head.part);
@@ -443,16 +443,32 @@
   // after Undo all in one lane: the team's part is the round's start plus every team action the teammate made this
   // round and the system's (votes, placed buildings, the draft), replayed on a copy in order, in both lanes. The
   // tower type stays (only the draft sets it in 2v2).
+  // The player's own building skill clicks (mpbBuy / mpbUndo) are replayed too, in place, and then taken back, latest
+  // first, by the rules of a single take-back (Mpb.canUndo): so a building a click added stays in the list (taken
+  // back), the records keep their keys and the teammate's buys on them still find them. A click that can't be taken
+  // back (a Tree kojja's Nest with the teammate's squad in it) stays bought, and stays paid for by this player.
   function rebuildTeam(D, sd, lane) {
-    D.tlog[sd] = D.tlog[sd].filter(e => e.lane !== lane);
+    setTeams(ms(D)); // this lane's squads as they stand after the undo (a take-back may look at them)
+    const click = (e) => e.lane === lane && (e.fn === 'mpbBuy' || e.fn === 'mpbUndo');
+    const log = D.tlog[sd].filter(e => e.lane !== lane || click(e));
     const O = D.lanes[1 - lane].m, sc = Ref.withUnits(Ref.snapshot(O), O.units, O.matrix);
     if (D.tbase[sd]) putTeamState(sc, sd, D.tbase[sd]);
     sc.gold[sd] = 1e9;
-    for (const e of D.tlog[sd]) {
+    for (const e of log) {
       const sys = e.fn.startsWith('sys:'), fn = sys ? M.SYS[e.fn.slice(4)] : G[e.fn === 'unfortify' ? 'unplaceBwall' : e.fn];
-      sc.duoLane = sys ? e.as : O.duoLane; // who voted (who paid: the teammate)
+      sc.duoLane = sys ? e.as : e.lane === lane ? lane : O.duoLane; // who voted (who paid: the teammate, or this player's own click)
       try { if (typeof fn === 'function') fn(sc, sd, ...e.a); } catch (err) {}
     }
+    sc.duoLane = lane;
+    for (let k = log.length - 1; k >= 0; k--) {
+      const e = log[k];
+      if (e.lane !== lane || e.fn !== 'mpbBuy') continue;
+      try { if (G.mpbUndo(sc, sd, e.a[0], e.a[1])) log.push({ lane, fn: 'mpbUndo', a: [e.a[0], e.a[1]] }); } catch (err) {}
+    }
+    D.tlog[sd] = log;
+    let kept = 0; // what this player's clicks still standing cost (their gold is back at the round's start)
+    for (const rec of M.recs(sc, sd)) for (const id of Object.keys(rec.skills)) { const x = rec.skills[id]; if (x.round === sc.round) for (const c of x.log) if (c.lane === lane) kept += c.cost; }
+    if (kept) D.lanes[lane].m.gold[sd] -= kept;
     const mine = D.lanes[lane].m;
     if (mine.towers && mine.towers[sd] && O.towers && O.towers[sd]) mine.towers[sd].type = O.towers[sd].type;
     for (const m of ms(D)) copyTeam(sc, m, sd);

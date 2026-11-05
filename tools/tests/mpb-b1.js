@@ -6,7 +6,8 @@
 //    one at a time; in the fight one body inside with +3 m and stealth sight, the rest ride in it; out after 10 s
 //    with no enemy in sight, or when the kojja falls), the downside (destroyed: it stands for the opponents the next
 //    round, they may buy Nest on it and put a squad of theirs in it on the other board; then it comes back; squads
-//    on it step out), hidden buys, the page's copy hashing as the server's
+//    on it step out), take-backs (Nest not with a squad in it, Grow not once the new kojja has a buy; Undo all keeps
+//    the keys of the records), hidden buys and placements, the page's copy hashing as the server's
 //  Scorch turrets: the card (each player places their own, alone), the fight unit (one Ember Imp body, Spitfire burn,
 //    instant shots, +10 m, 450 / 2, sees stealth at any distance, a structure), Blaze / Rapid fire / Legs (once per
 //    turret; Legs: a unit that walks and must be killed to win), the downside (destroyed: sits out the next fight,
@@ -129,7 +130,7 @@ check('kojja: Grow once a round for the team, the buyer places it alone, take-ba
   assert.ok(head && head.kind === 'treeKojja' && head.lane === 1, 'a placement only A2 makes');
   sameTeam(D, 0);
   assert.ok(!x.act(0, 'mpbBuy', k1, 'grow').ok, 'once a round for the team');
-  assert.deepStrictEqual(Duo.viewFor(D, 2).m.mpbVote[0][0].votes, [null, null]);
+  assert.strictEqual(Duo.viewFor(D, 2).m.mpbVote[0].length, 0, 'nor the placement it queued');
   assert.ok(!Mpb.recOf(Duo.viewFor(D, 2).m, 0, k1).skills.grow, 'the opponents don\'t see the buy');
   const spots = Mpb.spots(m1, 0, 'treeKojja', null), t = spots[2];
   assert.ok(!x.act(0, 'mpbVote', t.col, t.row).ok, 'A1 can\'t place A2\'s kojja');
@@ -146,6 +147,7 @@ check('kojja: Grow once a round for the team, the buyer places it alone, take-ba
   assert.ok(x.act(1, 'mpbUndo', k1, 'grow').ok);
   assert.strictEqual(m1.gold[0], 5000);
   assert.ok(Mpb.recOf(m0, 0, k2).away && !Game.mpbAt(m0, t.col, t.row), 'the grown kojja is gone, its tile free');
+  assert.ok(!Mpb.recOf(Duo.viewFor(D, 2).m, 0, k2), 'the opponents don\'t see a kojja grown and taken back');
   sameTeam(D, 0);
   // taken back before it was placed: the placement goes too
   assert.ok(x.act(0, 'mpbBuy', k1, 'grow').ok && Mpb.voteHead(m0, 0).lane === 0);
@@ -188,6 +190,74 @@ check('kojja: Nest holds one ranged squad of either player (not a melee one), mo
   assert.ok(x.act(1, 'place', ARCH, t.col, t.row).ok);
   const id = x.m(1).armies[0].find(q => q.col === t.col && q.row === t.row).id;
   assert.ok(x.act(1, 'moveSquad', id, rec.col, rec.row).ok, 'A2 moves their archers in');
+  sameTeam(D, 0);
+});
+
+check('kojja take-backs: not Nest with a squad in it, not Grow once the new kojja has a buy; Undo all keeps those, paid', () => {
+  const x = match(104), { D } = x; rich(D);
+  const k1 = put(D, 0, 'treeKojja'), rec = Mpb.recOf(x.m(0), 0, k1);
+  open(x, 0, ARCH); open(x, 1, ARCH);
+  assert.ok(x.act(1, 'mpbBuy', k1, 'nest').ok, 'A2 buys Nest');
+  assert.ok(x.act(0, 'place', ARCH, rec.col, rec.row).ok, 'A1\'s archers go in');
+  assert.ok(!x.act(1, 'mpbUndo', k1, 'nest').ok, 'A2 can\'t take Nest back with a squad in it');
+  assert.ok(!Mpb.canUndo(W(Duo.viewFor(D, 1).m), 0, k1, 'nest'), 'the page agrees (no Undo button)');
+  const g1 = x.m(0).gold[0];
+  assert.ok(x.act(1, 'undoAll').ok, 'A2\'s Undo all');
+  assert.ok(Mpb.skillN(Mpb.recOf(x.m(0), 0, k1), 'nest') === 1 && Game.garrisonAt(x.m(0), 0, rec.col, rec.row), 'the Nest stays (the squad is in it)');
+  assert.strictEqual(x.m(1).gold[0], 5000 - Mpb.KOJJA.nestCost, 'and stays paid for by A2');
+  assert.strictEqual(x.m(0).gold[0], g1, 'A1\'s gold untouched');
+  sameTeam(D, 0);
+  assert.ok(x.act(1, 'undoAll').ok, 'again: the same');
+  assert.strictEqual(x.m(1).gold[0], 5000 - Mpb.KOJJA.nestCost);
+  sameTeam(D, 0);
+  // A1 takes their squad out: now the Nest can go
+  assert.ok(x.act(0, 'unplaceSquad', x.m(0).armies[0].find(q => q.col === rec.col && q.row === rec.row).id).ok);
+  assert.ok(x.act(1, 'undoAll').ok);
+  assert.ok(!Mpb.skillN(Mpb.recOf(x.m(0), 0, k1), 'nest') && x.m(1).gold[0] === 5000, 'Undo all takes it back now, gold back');
+  assert.ok(x.act(1, 'mpbBuy', k1, 'nest').ok && x.act(1, 'mpbUndo', k1, 'nest').ok && x.m(1).gold[0] === 5000, 'a plain take-back too');
+  sameTeam(D, 0);
+  // Grow: A1 grows a kojja, A2 buys Nest on it: A1 can't take Grow back (A2's 50 would be stuck on a kojja that is gone)
+  assert.ok(x.act(0, 'mpbBuy', k1, 'grow').ok);
+  const t = Mpb.spots(x.m(0), 0, 'treeKojja', null)[0];
+  assert.ok(x.act(0, 'mpbVote', t.col, t.row).ok);
+  const k2 = Mpb.recs(x.m(0), 0).find(r => r.kind === 'treeKojja' && r.data.lane === 0).key;
+  assert.ok(x.act(1, 'mpbBuy', k2, 'nest').ok, 'A2 buys Nest on the new kojja');
+  assert.ok(!x.act(0, 'mpbUndo', k1, 'grow').ok, 'Grow can\'t be taken back now');
+  assert.ok(x.act(0, 'undoAll').ok);
+  assert.ok(!Mpb.recOf(x.m(1), 0, k2).away && Mpb.skillN(Mpb.recOf(x.m(1), 0, k2), 'nest') === 1, 'Undo all: the kojja and A2\'s Nest stay');
+  assert.strictEqual(x.m(0).gold[0], 5000 - Mpb.KOJJA.growCost, 'and A1 still pays for it');
+  assert.ok(x.act(1, 'mpbUndo', k2, 'nest').ok && x.m(1).gold[0] === 5000, 'A2 takes theirs back');
+  assert.ok(x.act(0, 'mpbUndo', k1, 'grow').ok && x.m(0).gold[0] === 5000 && Mpb.recOf(x.m(0), 0, k2).away, 'then Grow goes');
+  sameTeam(D, 0);
+});
+
+check('kojja: Undo all of a Grow keeps the records\' keys (the teammate\'s buys on later buildings stay on them)', () => {
+  const x = match(5), { D } = x;
+  playTo(x, 2);
+  const k1 = put(D, 0, 'treeKojja');
+  playTo(x, 3, () => { for (const R of D.lanes) R.m.artifacts.list.forEach((a, i) => { a.won = 0; a.card = i === 0 ? { type: 'mpb', id: 'scorch' } : { type: 'tower', id: 'keep' }; }); });
+  if (D.phase === 'end') return;
+  rich(D); Duo.setTeams(D.lanes.map(R => R.m));
+  assert.ok(Mpb.draftTurn(x.m(0), 0), 'team A picks');
+  assert.ok(x.act(0, 'mpbBuy', k1, 'grow').ok);
+  const t = Mpb.spots(x.m(0), 0, 'treeKojja', null)[0];
+  assert.ok(x.act(0, 'mpbVote', t.col, t.row).ok, 'A1 grows a kojja');
+  assert.ok(x.act(0, 'draftPick', 0).ok, 'A1 picks the Scorch card');
+  for (const L of [1, 0]) { const s = Mpb.spots(x.m(L), 0, 'scorch', null)[0]; assert.ok(x.act(L, 'mpbVote', s.col, s.row).ok, 'lane ' + L + ' places its turret'); }
+  const keys = (m) => Mpb.recs(m, 0).map(r => r.key + ':' + (r.data.lane == null ? '' : r.data.lane));
+  const before = keys(x.m(1));
+  const a2 = Mpb.recs(x.m(1), 0).find(r => r.kind === 'scorch' && r.data.lane === 1).key;
+  assert.ok(x.act(1, 'mpbBuy', a2, 'blaze').ok, 'A2 buys Blaze on their turret');
+  assert.ok(x.act(0, 'undoAll').ok, 'A1\'s Undo all');
+  const after = Mpb.recs(x.m(1), 0);
+  assert.deepStrictEqual(keys(x.m(1)), before, 'the same records under the same keys');
+  assert.ok(after.find(r => r.kind === 'treeKojja' && r.data.lane === 0).away, 'the grown kojja: taken back');
+  assert.ok(Mpb.skillN(Mpb.recOf(x.m(1), 0, a2), 'blaze') === 1 && Mpb.canUndo(x.m(1), 0, a2, 'blaze'), 'Blaze is still on A2\'s turret, theirs to take back');
+  assert.strictEqual(x.m(0).gold[0], 5000, 'A1 has their 100 back');
+  sameTeam(D, 0);
+  assert.ok(x.act(1, 'undoAll').ok, 'then A2\'s Undo all');
+  assert.deepStrictEqual(keys(x.m(0)), before, 'still the same keys');
+  assert.ok(x.m(1).gold[0] === 5000 && x.m(0).gold[0] === 5000 && !Mpb.skillN(Mpb.recOf(x.m(0), 0, a2), 'blaze'));
   sameTeam(D, 0);
 });
 
@@ -370,7 +440,7 @@ function scorchMatch(seed, bots = [false, false, false, false]) {
   return x;
 }
 
-check('scorch: the card gives each player a turret they place alone (interior, spacing); bots place theirs at once', () => {
+check('scorch: the card gives each player a turret they place alone, in either order (interior, spacing); bots place theirs at once', () => {
   const x = scorchMatch(201), { D } = x, m = x.m(0);
   if (D.phase === 'end') return;
   const q = Mpb.voteQueue(m, 0);
@@ -378,24 +448,29 @@ check('scorch: the card gives each player a turret they place alone (interior, s
   Duo.setTeams(D.lanes.map(R => R.m));
   const s0 = Mpb.spots(m, 0, 'scorch', null);
   for (const t of s0) assert.ok(Mpb.interior(0, t.col, t.row) && Mpb.spaced(m, t.col, t.row));
-  assert.ok(!x.act(1, 'mpbVote', s0[0].col, s0[0].row).ok, 'A2 can\'t place A1\'s');
-  assert.ok(x.act(0, 'mpbVote', s0[0].col, s0[0].row).ok, 'A1 places theirs');
-  const s1 = Mpb.spots(x.m(1), 0, 'scorch', null);
-  assert.ok(!x.act(0, 'mpbVote', s1[0].col, s1[0].row).ok, 'A1 can\'t place A2\'s');
-  assert.ok(x.act(1, 'mpbVote', s1[0].col, s1[0].row).ok, 'A2 places theirs');
+  // A2 places theirs first (nobody waits for the other); then A1
+  const clk = D.mclock.vote[0] && D.mclock.vote[0].until;
+  assert.ok(x.act(1, 'mpbVote', s0[0].col, s0[0].row).ok, 'A2 places theirs without waiting for A1');
+  assert.strictEqual(D.mclock.vote[0].until, clk, 'A1\'s 15 s go on');
+  assert.ok(Mpb.voteEntry(x.m(0), 0, 0) && !Mpb.voteEntry(x.m(1), 0, 1), 'A1\'s still to place, A2 has none left');
+  const s1 = Mpb.spots(x.m(0), 0, 'scorch', null);
+  assert.ok(!x.act(1, 'mpbVote', s1[0].col, s1[0].row).ok, 'A2 can\'t place A1\'s');
+  assert.ok(x.act(0, 'mpbVote', s1[0].col, s1[0].row).ok, 'A1 places theirs');
+  assert.ok(!x.act(0, 'mpbVote', s1[1].col, s1[1].row).ok, 'one each');
   const tur = Mpb.recs(x.m(1), 0).filter(r => r.kind === 'scorch');
-  assert.deepStrictEqual(tur.map(r => r.data.lane), [0, 1], 'one each, whose is kept');
+  assert.deepStrictEqual(tur.map(r => r.data.lane), [1, 0], 'one each, whose is kept');
   assert.ok(Math.max(Math.abs(tur[0].col - tur[1].col), Math.abs(tur[0].row - tur[1].row)) >= Mpb.SPACING, 'spaced from each other');
   sameTeam(D, 0);
   // bots: placed before anyone waits
   const y = scorchMatch(202, [false, true, true, true]);
   if (y.D.phase === 'end') return;
   const h = Mpb.voteHead(y.m(0), 0);
-  assert.ok(h && h.lane === 0, 'the bot (A2) waits for the human\'s own placement first');
+  assert.ok(h && h.lane === 0 && Mpb.voteQueue(y.m(0), 0).length === 1, 'the bot (A2) placed its own at once; the human\'s is left');
+  assert.deepStrictEqual(Mpb.recs(y.m(0), 0).filter(r => r.kind === 'scorch').map(r => r.data.lane), [1]);
   Duo.setTeams(y.D.lanes.map(R => R.m));
   const t0 = Mpb.autoSpot(y.m(0), 0, 'scorch', null);
   assert.ok(y.act(0, 'mpbVote', t0.col, t0.row).ok);
-  assert.strictEqual(Mpb.recs(y.m(0), 0).filter(r => r.kind === 'scorch').length, 2, 'then the bot placed its own at once');
+  assert.strictEqual(Mpb.recs(y.m(0), 0).filter(r => r.kind === 'scorch').length, 2, 'then the human\'s');
   const z = match(203); z.D.tbase[0] = Duo.teamState(z.D.lanes[0].m, 0);
   for (const R of z.D.lanes) Mpb.giveCard(R.m, 0, { type: 'mpb', id: 'scorch' });
   Duo.tick(z.D, z.T); Duo.tick(z.D, z.T + Mpb.VOTE_MS);
