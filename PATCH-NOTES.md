@@ -15,7 +15,15 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 - **Damage types (idea):** physical and magic.
 - **Ranked queue (later):** *Find ranked match* pairs you with someone near your level, once there are enough players (plan in `docs/LOBBY.md`).
 - **Watch a friend's match (design):** from the friends list, straight into a friend's match as a spectator. Plan in `docs/FRIENDS.md`.
+- **Free-for-all (design):** four players on a Fia med knuff board (a centre square and one arm per player), everyone in one battle each round. Plan and open questions in `docs/FFA.md`.
 - **Player profile:** tap any username to see their title, skins, ranked record, recent matches and favourite units, with Add friend and Watch.
+
+---
+
+## 5 November 2026 – Balance: Mammoth and Spiders
+
+- **War Mammoth:** 2650 health (was 2450).
+- **Spiders, Cavestalkers:** besides stealth, now also +25% hit.
 
 ---
 
