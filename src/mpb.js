@@ -1812,6 +1812,10 @@
       if (did) for (const L of lanes.slice(1)) L.mpb[side] = clone(lanes[0].mpb[side]);
     }
   }
+  // Duo.undoAllAllowed: a building whose kind puts its record and the squads right after Undo all (hooks.reconcile: the
+  // School) has free actions that may simply be undone with it (a teammate's enrolment that needed the seat the
+  // presser freed comes out again), so they never stop Undo all
+  const reconciles = (m, side, key) => { const r = recOf(m, side, key), K = r && kindOf(r.kind); return !!(K && K.hooks.reconcile); };
   // tiles a building lights up on the board (the Jail's Skywatch; hooks.lit): [{ col, row }], drawn by both renderers
   const litTiles = (m, side, rec) => { const K = kindOf(rec.kind); return (K && K.hooks.lit && K.hooks.lit(m, side, rec)) || []; };
   // the start of a round (Duo.beginRound): this round's skill logs start empty, then the kinds' roundStart
@@ -1939,7 +1943,7 @@
     voteQueue, voteHead, voteEntry, queue, placeHead, placeEntry, mpbVote, voteResult,
     skillCost, whyNot, canBuy, mpbBuy, canUndo, undoAllOk, mpbUndo, mpbAct, seenTaken,
     vaultOf, vaultRec, vaultMode, vaultMoved, vaultRoom, canVault, vaultPut, vaultTake, golemOf, golemUnit, golemSkin,
-    hide, unitOf, squadOf, extraOf, indexOf, isSquad, bodies, link, holds, battleOpts, squadMods, squadBodies, news, afterFight, roundStart, teamHeal, litTiles, reconcile,
+    hide, unitOf, squadOf, extraOf, indexOf, isSquad, bodies, link, holds, battleOpts, squadMods, squadBodies, news, afterFight, roundStart, teamHeal, litTiles, reconcile, reconciles,
     FH, OAK, oakMossTiles, oakEntUnit,
     JAIL, jailWhy, jailable, jailSeen, homeTile, SCHOOL, pupilOf, pupilSq, levelXp, learnable, schoolWhy,
     cardPool, cardName, cardText, rollArtifacts, artifactsFor,

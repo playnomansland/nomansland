@@ -490,8 +490,8 @@
     if (!log.some(e => e.lane === own.lane)) return M.undoAllOk(m, sd, null);
     const all = replayTeam(D, sd, 1 - own.lane, log), without = undoReplay(D, sd, own.lane); // (as rebuildTeam would leave it)
     // what is left of the teammate's: a buy they took back again, an act they did again later (moved the same tile
-    // again) counts for nothing
-    const net = new Set(mate.filter(e => e.lane >= 0 && CHECKED.has(e.fn))), same = (a, b) => a.lane === b.lane && a.a[0] === b.a[0] && a.a[1] === b.a[1];
+    // again) counts for nothing, nor does a free act Mpb.reconcile puts right (the School's enrolment)
+    const net = new Set(mate.filter(e => e.lane >= 0 && CHECKED.has(e.fn) && !(e.fn === 'mpbAct' && M.reconciles(m, sd, e.a[0])))), same = (a, b) => a.lane === b.lane && a.a[0] === b.a[0] && a.a[1] === b.a[1];
     mate.forEach((e, i) => {
       if (e.fn === 'mpbUndo') { const b = mate.slice(0, i).reverse().find(x => x.fn === 'mpbBuy' && net.has(x) && same(x, e)); if (b) { net.delete(b); net.delete(e); } }
       if (e.fn === 'mpbAct') for (const x of mate.slice(0, i)) if (x.fn === 'mpbAct' && same(x, e)) net.delete(x);
