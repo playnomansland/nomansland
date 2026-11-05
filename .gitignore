@@ -17,3 +17,5 @@ tools/exploit/runs/**/*.json
 tools/exploit/runs/**/*.jsonl
 tools/exploit/runs/**/*.log
 .claude/worktrees/
+# screenshots written by tools/tests/deploy3d.js
+/deploy3d-*.png
