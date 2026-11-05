@@ -1165,11 +1165,12 @@ const Engine = (() => {
       if (obj.won < 0 && lead >= 0 && obj.hold >= obj.secs - 1e-9) obj.won = lead;
     }
     // ----- 2v2 Jail and School (opts.mpb, src/mpb.js; set only by src/duo.js, off by default) -----
-    // opts.mpb.discover = [{ x, y, r, side }] (the Jail's Skywatch): a stealthed body of the other side standing in the
-    // square |dx|, |dy| <= r round (x, y) is seen (not hidden) while it is there. opts.mpb.watchKills (the School): a
+    // opts.mpb.discover = [{ x, y, r, side, squad }] (the Jail's Skywatch): while a living body of fight squad `squad`
+    // of `side` stands (no squad: always), a stealthed body of the other side standing in the square |dx|, |dy| <= r
+    // round (x, y) is seen (not hidden) while it is there. opts.mpb.watchKills (the School): a
     // body with watchKill notes who cut it down (b.killedBy = { side, squad }), and result().killedBy lists them.
     const discover = opts.mpb && Array.isArray(opts.mpb.discover) && opts.mpb.discover.length ? opts.mpb.discover : null;
-    const discovered = (b) => discover.some(d => d.side !== b.side && Math.abs(b.x - d.x) <= d.r && Math.abs(b.y - d.y) <= d.r);
+    const discovered = (b, lit) => lit.some(d => d.side !== b.side && Math.abs(b.x - d.x) <= d.r && Math.abs(b.y - d.y) <= d.r);
     const watchKills = !!(opts.mpb && opts.mpb.watchKills);
     // ----- 2v2 artifacts (opts.artifacts = [{ x, y, r, cap }] in board metres, r and cap default ARTIFACT; set only by
     // src/duo.js, off by default: without it nothing here runs) -----
@@ -2425,13 +2426,14 @@ const Engine = (() => {
         for (const tl of tiles) if (b.alive && b.x >= tl.x0 && b.x < tl.x1 && b.y >= tl.y0 && b.y < tl.y1) onTile(b, tl);
       }
       // stealth: hidden until it attacks, and again after STEALTH_BACK s without attacking (roster rules can turn either off)
+      const lit = discover ? discover.filter(d => d.squad == null || all.some(a => a.alive && a.side === d.side && a.squad === d.squad)) : null; // 2v2 Jail: the Skywatches still standing
       for (const b of all) {
         if (!b.alive || !b.u.stealth) continue;
         if (!stealthOn) b.hidden = false;
         // "without attacking" counts from when it could have attacked again: a slow shooter (a Sniper reloads for 4 s or
         // more) no longer hides between its own shots, which made it impossible to hit (fixed 2026-11-03)
         else if (!b.hidden && stealthBack && t - b.lastAtk >= Math.max(STEALTH_BACK, 1 / Math.max(0.01, apsOf(b) * atkMul(b)) + STEALTH_GRACE) - 1e-9) b.hidden = true;
-        if (discover && b.hidden && !b.u.aloft && discovered(b)) b.hidden = false; // 2v2 Jail: Skywatch sees it while it stands in its light
+        if (lit && lit.length && b.hidden && !b.u.aloft && discovered(b, lit)) b.hidden = false; // 2v2 Jail: Skywatch sees it while it stands in its light
       }
       // a body with a start delay (deployed on a flank) can't move or attack until it runs out
       for (const b of all) if (b.delay > 0) b.delay = Math.max(0, b.delay - dt);

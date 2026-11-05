@@ -236,7 +236,8 @@ check('jail: Skywatch (the lit tiles; stealthed enemies in its light are seen, a
   Duo.settle(lanes);
   const opts = Mpb.battleOpts(lanes[0], { mpb: {} });
   const w = Game.tileToWorld(rec.col, rec.row);
-  assert.deepStrictEqual(opts.mpb.discover, [{ x: w.x, y: w.y, r: 3.5 * Game.TILE, side: 0 }], 'opts.mpb.discover');
+  const jk = Mpb.recs(lanes[0], 0).findIndex(r => r.key === key);
+  assert.deepStrictEqual(opts.mpb.discover, [{ x: w.x, y: w.y, r: 3.5 * Game.TILE, side: 0, squad: Mpb.squadOf(jk) }], 'opts.mpb.discover (while the jail\'s own body stands)');
   // the Rogue walks into the light: seen; out of it: hidden again (it hasn't attacked)
   const run = (withJail) => {
     if (!withJail) for (const R of D.lanes) Mpb.recOf(R.m, 0, key).data.down = R.m.round; // (as the round after it fell)
@@ -254,6 +255,15 @@ check('jail: Skywatch (the lit tiles; stealthed enemies in its light are seen, a
   assert.deepStrictEqual(a.seen, [true, true], 'with Skywatch: seen in its light');
   assert.deepStrictEqual(b.seen, [false, false], 'without: still hidden there');
   assert.ok(a.inside && a.later.every(Boolean), 'out of the light it hides again');
+  // the jail falls in the fight: its light goes out with it (the Engine looks for its body every tick)
+  {
+    const bt = Duo.battle(lanes), rb = bodiesOf(bt, 1, 0, rog.id), jb = bt.bodies.filter(z => z.side === 0 && z.squad === Mpb.squadOf(jk));
+    assert.ok(jb.length === 1 && rb.every(z => z.hidden));
+    jb[0].alive = false; jb[0].hp = 0;
+    for (const z of rb) { z.x = w.x + 6; z.y = w.y + 3; z.delay = 99; }
+    bt.step(); bt.step();
+    assert.deepStrictEqual(rb.map(z => z.hidden), [true, true], 'a fallen jail sees nothing');
+  }
 });
 
 check('jail: guards hold their posts until an enemy is in their awareness (4 Keep guards)', tough(() => {
@@ -552,7 +562,8 @@ check('the page\'s copy hashes as the server\'s after every Jail and School acti
   pageTry(x, 0, 'mpbAct', sk, 'learn', k);
   pageTry(x, 0, 'mpbAct', sk, 'leave'); // learning: refused
   pageTry(x, 0, 'mpbAct', sk, 'unlearn');
-  pageTry(x, 0, 'mpbAct', sk, 'leave', 6, 13);
+  pageTry(x, 0, 'mpbAct', sk, 'leave', 6, 13); // put in this round: only taken back onto its own tile (refused on both)
+  assert.ok(pageTry(x, 0, 'mpbAct', sk, 'leave').ok, 'taken back');
   pageTry(x, 1, 'mpbAct', sk, 'enroll', a2.id);
   pageTry(x, 0, 'mpbBuy', sk, 'double');
   for (let s = 0; s < 4; s++) { const sd = Duo.SEATS[s].side; assert.strictEqual(Ref.sideHash(Duo.viewFor(D, s).m, sd), Ref.sideHash(D.lanes[Duo.SEATS[s].lane].m, sd), 'seat ' + s + ' in step'); }
@@ -582,6 +593,123 @@ check('the page\'s copy hashes as the server\'s after every Jail and School acti
   assert.ok(!x.m(0).armies[0].find(s => s.id === a3.id).school && !x.m(1).armies[0].find(s => s.id === a2.id).school);
   sameTeam(D, 0);
 }));
+
+// =====================================================================
+// Review fixes (7 Nov)
+// =====================================================================
+check('school: put in and taken out the same round is a take-back onto its own tile (no free move, nothing to see)', tough(() => {
+  const x = match(131), { D } = x;
+  next(x); // (round 2)
+  const key = addKind(D, 0, 'school');
+  rich(D);
+  const br = addSq(D, 0, 0, 'Brute', 5, 12), rg = addSq(D, 0, 0, 'Rogue', 9, 12), at = { col: br.col, row: br.row };
+  const sq = () => x.m(0).armies[0].find(s => s.id === br.id);
+  assert.ok(x.act(0, 'moveSquad', rg.id, 9, 13).ok, 'the round\'s paid move, on the Rogue');
+  const g = x.m(0).gold[0];
+  assert.ok(pageTry(x, 0, 'mpbAct', key, 'enroll', br.id).ok);
+  assert.ok(!pageTry(x, 0, 'mpbAct', key, 'leave', 15, 15).ok, 'not onto another tile');
+  assert.ok(!Mpb.schoolWhy(x.m(0), 0, recOf(x, 0, key), 'leave', [at.col, at.row]), 'onto its own tile: yes');
+  assert.ok(pageTry(x, 0, 'mpbAct', key, 'leave').ok, 'taken back');
+  assert.deepStrictEqual([sq().col, sq().row, !!sq().school, x.m(0).gold[0]], [at.col, at.row, false, g], 'on its own tile, free');
+  assert.ok(!Game.canMove(x.m(0), 0, sq()), 'still no second move this round');
+  assert.deepStrictEqual(recOf(x, 0, key).data.was || [], [], 'nothing for the opponents to replay');
+  const v = Duo.viewFor(D, 2).m.armies[0].find(s => s.id === br.id);
+  assert.deepStrictEqual([v.col, v.row, !!v.school], [at.col, at.row, false], 'the opponents see it where it stood');
+  // its tile taken meanwhile (a new squad of theirs): it stays in this round
+  assert.ok(pageTry(x, 0, 'mpbAct', key, 'enroll', br.id).ok);
+  for (const R of D.lanes) for (const k of [UI('Rogue')]) { R.m.unlocks = R.m.unlocks || [{}, {}]; R.m.unlocks[0][k] = 1; }
+  assert.ok(x.act(0, 'place', UI('Rogue'), at.col, at.row).ok, 'a new Rogue on its tile');
+  assert.ok(!pageTry(x, 0, 'mpbAct', key, 'leave').ok, 'no take-back onto a taken tile');
+  // from the next round: out onto any free tile of the zone, as before
+  playTo(x, 3);
+  assert.ok(pageTry(x, 0, 'mpbAct', key, 'leave', 15, 13).ok && sq().col === 15 && sq().row === 13, 'a later round: onto a tile tapped');
+  const v3 = Duo.viewFor(D, 2).m.armies[0].find(s => s.id === br.id);
+  assert.ok(v3.school && v3.col === recOf(x, 0, key).col, 'hidden: the opponents still see it inside');
+  sameTeam(D, 0);
+}));
+
+check('school: a learnt skill keeps the either-or rule (the other one can\'t be bought meanwhile; checked again when learnt)', tough(() => {
+  const x = match(132), { D } = x;
+  next(x);
+  const key = addKind(D, 0, 'school');
+  rich(D);
+  const ui = units.findIndex((u, i) => Engine.SLOTS.some(k => Game.skillOr(x.m(0), i, k).length) && !u.building && !Game.isCarrier(x.m(0), i));
+  assert.ok(ui >= 0, 'a unit with an either-or pair');
+  const k = Engine.SLOTS.find(j => Game.skillOr(x.m(0), ui, j).length && Game.skillDef(x.m(0), ui, j) && !Game.isAwaken(x.m(0), ui, j) && !Game.isEvolve(x.m(0), ui, j));
+  const other = Game.skillOr(x.m(0), ui, k)[0];
+  const a1 = addSq(D, 0, 0, units[ui].name, 5, 12); addSq(D, 0, 0, units[ui].name, 9, 12);
+  assert.ok(x.act(0, 'mpbAct', key, 'enroll', a1.id).ok && x.act(0, 'mpbAct', key, 'learn', k).ok, 'learning skill ' + k);
+  assert.ok(!Game.canBuySkill(x.m(0), 0, ui, other), 'its either-or partner can\'t be bought while it is learnt');
+  assert.ok(!pageTry(x, 0, 'buySkill', ui, other).ok, '(refused on the page and the server)');
+  assert.ok(Game.canBuySkill(x.m(1), 0, ui, other) || !x.m(1).armies[0].some(s => s.unit === ui), '(the teammate\'s skills are their own)');
+  next(x);
+  assert.ok(!pageTry(x, 0, 'buySkill', ui, other).ok, 'nor the next round');
+  // checked again when it is learnt: the partner given some other way meanwhile, the learn is dropped
+  for (const R of [D.lanes[0]]) { const t = R.m.tech[0][ui] || (R.m.tech[0][ui] = Engine.SLOTS.map(() => 0)); t[other] = 2; }
+  next(x);
+  assert.ok(!Game.hasSkill(x.m(0), 0, ui, k) && Game.hasSkill(x.m(0), 0, ui, other), 'never both of an either-or pair');
+  assert.strictEqual(recOf(x, 0, key).data.pupil.learn, null, 'the learn is over');
+}));
+
+check('jail on a squad its owner puts in their School this round: allowed alike on the page and the server, gold back', tough(() => {
+  const x = match(133), { D } = x;
+  next(x);
+  const jk = addKind(D, 0, 'jail'), sk = addKind(D, 1, 'school');
+  rich(D);
+  const b1 = addSq(D, 0, 1, 'Brute', 9, 3), b2 = addSq(D, 1, 1, 'Rogue', 13, 3);
+  assert.ok(x.act(2, 'mpbAct', sk, 'enroll', b1.id).ok, 'B1 puts its Brute in (hidden)');
+  assert.ok(pageTry(x, 0, 'mpbBuy', jk, 'jail', 0, b1.id).ok, 'A1 may jail it (it looks like any squad): the page as the server');
+  { // after the fight (its buildings' part, on copies): it sat in the School, so not jailed, and A1 gets the 100 back
+    const lanes = D.lanes.map(R => W(Ref.snapshot(R.m))), round = lanes[0].round, g = lanes[0].gold[0];
+    Mpb.afterFight(lanes, { squads: {} }, [{ round }, { round }], [100, 100]);
+    const q = lanes[0].armies[1].find(s => s.id === b1.id);
+    assert.ok(!q.jailed && q.school, 'it sat in the School: not jailed');
+    assert.strictEqual(lanes[0].gold[0] - g, 100, 'the 100 back');
+    assert.deepStrictEqual(Mpb.recOf(lanes[0], 0, jk).data.cells, []);
+  }
+  playTo(x, 3);
+  assert.ok(!x.m(0).armies[1].find(s => s.id === b1.id).jailed && recOf(x, 0, jk).data.cells.length === 0, '(the same in the real round)');
+  // it comes out this round (in since an earlier round): the jailer still sees it inside, so refused on both
+  assert.ok(x.act(2, 'mpbAct', sk, 'leave').ok);
+  assert.ok(!pageTry(x, 0, 'mpbBuy', jk, 'jail', 0, b1.id).ok, 'a squad that left this round: refused on the page and the server');
+  assert.ok(pageTry(x, 1, 'mpbBuy', jk, 'jail', 1, b2.id).ok);
+}));
+
+check('jailed and put in its School the same round, the School falls: the same outcome whichever side owns which', () => {
+  const out = [0, 1].map(schoolSide => {
+    const jailSide = 1 - schoolSide, x = match(134), { D } = x;
+    next(x);
+    const jk = addKind(D, jailSide, 'jail'), sk = addKind(D, schoolSide, 'school');
+    rich(D);
+    const sq = addSq(D, 0, schoolSide, 'Brute', 9, Game.zoneRows(schoolSide)[2]);
+    assert.ok(x.act(Duo.seatOf(0, jailSide), 'mpbBuy', jk, 'jail', 0, sq.id).ok && x.act(Duo.seatOf(0, schoolSide), 'mpbAct', sk, 'enroll', sq.id).ok);
+    const lanes = D.lanes.map(R => R.m), round = lanes[0].round, g0 = lanes[0].gold[jailSide];
+    const k = Mpb.recs(lanes[0], schoolSide).findIndex(r => r.key === sk);
+    Mpb.afterFight(lanes, { squads: { [schoolSide + ':' + Mpb.squadOf(k)]: { side: schoolSide, squad: Mpb.squadOf(k), total: 1, alive: 0 } }, killedBy: [] }, [{ round }, { round }], [100, 100]);
+    const q = lanes[0].armies[schoolSide].find(s => s.id === sq.id);
+    return [!!q.jailed, !!q.school, lanes[0].gold[jailSide] - g0, Mpb.recOf(lanes[0], jailSide, jk).data.cells.length];
+  });
+  assert.deepStrictEqual(out[0], out[1], 'mirror: ' + JSON.stringify(out));
+  assert.deepStrictEqual(out[0], [false, false, 100, 0], 'not jailed, out of the School, the jailer\'s 100 back');
+});
+
+check('jail falls in the fight it jails in: that squad goes free with no ban (no refund: it sat the fight out); a sold one: gold back', () => {
+  const x = match(135), { D } = x;
+  next(x);
+  const jk = addKind(D, 0, 'jail');
+  rich(D);
+  const br = addSq(D, 0, 1, 'Brute', 9, 3), rg = addSq(D, 1, 1, 'Rogue', 13, 3);
+  assert.ok(x.act(0, 'mpbBuy', jk, 'jail', 0, br.id).ok && x.act(1, 'mpbBuy', jk, 'jail', 1, rg.id).ok);
+  assert.ok(x.act(3, 'sell', rg.id).ok, 'B2 sells the Rogue (it doesn\'t know)');
+  const lanes = D.lanes.map(R => R.m), round = lanes[0].round, g = lanes.map(m => m.gold[0]);
+  const k = Mpb.recs(lanes[0], 0).findIndex(r => r.key === jk), sums = [{ round }, { round }];
+  Mpb.afterFight(lanes, { squads: { ['0:' + Mpb.squadOf(k)]: { side: 0, squad: Mpb.squadOf(k), total: 1, alive: 0 } } }, sums, [100, 100]);
+  const rec = Mpb.recOf(lanes[0], 0, jk), q = lanes[0].armies[1].find(s => s.id === br.id);
+  assert.ok(!q.jailed && q.col === 9 && q.row === 3, 'the Brute is free on its tile');
+  assert.deepStrictEqual(rec.data.banned, [], 'no unit type banned');
+  assert.deepStrictEqual([lanes[0].gold[0] - g[0], lanes[1].gold[0] - g[1]], [0, 100], 'A1 keeps nothing back (its Brute sat out), A2 gets the 100 back (sold)');
+  assert.ok(sums[0].mpbNews[0].some(n => n.kind === 'jail' && n.spared === 1 && n.freed === 0 && /not taken/.test(n.text)), 'the news says so');
+});
 
 check('a full bot 2v2, rounds 1 to 10, with a Jail and a School on both teams: no exception, in step, playback', () => {
   let jailed = 0, schooled = 0, learnt = 0;

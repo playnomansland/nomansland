@@ -1461,6 +1461,10 @@ const Game = (() => {
   // ...and make skills either-or: skillOr = [[1, 2], ...] = a player can own only one skill of each group
   const skillOr = (m, ui, k) => { const g = m.units[ui] && Array.isArray(m.units[ui].skillOr) ? m.units[ui].skillOr : []; return [...new Set(g.filter(x => Array.isArray(x) && x.includes(k)).flat())].filter(j => j !== k && skillDef(m, ui, j)); };
   const skillOrTaken = (m, side, ui, k) => skillOr(m, ui, k).filter(j => hasSkill(m, side, ui, j));
+  // 2v2 School (src/mpb.js): the skill slots of unit ui this player's squad is learning in their team's School (only a
+  // 2v2 lane has m.mpb); the other skill of an either-or pair can't be bought meanwhile
+  const schoolLearning = (m, side, ui) => !m.mpb ? [] : (m.mpb[side] || []).map(r => r.kind === 'school' && r.data && r.data.pupil)
+    .filter(p => p && p.learn && p.ui === ui && p.lane === (m.duoLane === 1 ? 1 : 0)).map(p => p.learn.k);
   function canBuySkill(m, side, ui, k) {
     const d = skillDef(m, ui, k);
     if (!d || hasSkill(m, side, ui, k)) return false;
@@ -1470,6 +1474,7 @@ const Game = (() => {
     if (!m.armies[side].some(s => s.unit === ui)) return false; // needs a squad of that type on the board
     if (skillNeedsMissing(m, side, ui, k).length) return false;
     if (skillOrTaken(m, side, ui, k).length) return false; // either-or: it has the other one
+    if (m.mpb && schoolLearning(m, side, ui).some(j => skillOr(m, ui, k).includes(j))) return false; // ...or learns it (2v2 School)
     return m.gold[side] >= skillCost(m, ui, k, side);
   }
   function buySkill(m, side, ui, k) {

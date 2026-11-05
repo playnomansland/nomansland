@@ -209,6 +209,29 @@
     if (lane === 1 - L) return G.teamSeen(m, foe).find(q => q.id === id + LANE_OFF) || null;
     return null;
   }
+  // an enemy squad held in a building as its opponents see it while deploying (Referee.hide): in a jail, or in its
+  // School since an earlier round. One that went into the School this round still stands on its tile for them (it can be
+  // jailed: the jailer gets the gold back after the fight), one that came out this round is still inside. The same on
+  // the page (the hidden view) and the server (the real state), so a refused jailing tells the jailer nothing.
+  function heldSeen(m, foe, lane, q) {
+    if (q.jailed) return true;
+    if (recs(m, foe).some(r => r.kind === 'school' && ((r.data && r.data.was) || []).some(w => w.round === m.round && w.pupil.round < m.round && w.pupil.lane === lane && w.pupil.id === q.id))) return true;
+    return !!q.school && q.school.round < m.round;
+  }
+  // this round's jailing of squad (lane, id) of side sd is called off (the squad sat this fight out in its School, which
+  // fell, so the School's afterFight puts it back first): the cell goes, its jailer gets the gold back. The Jail's own
+  // afterFight does the same for a squad still in its School, so the outcome doesn't depend on which side's buildings
+  // run first.
+  function jailCallOff(lanes, sd, lane, id, round) {
+    for (const r of recs(lanes[0], 1 - sd)) {
+      if (r.kind !== 'jail' || !r.data || !r.data.cells) continue;
+      r.data.cells = r.data.cells.filter(c => {
+        if (!(c.lane === lane && c.id === id && c.round === round)) return true;
+        if (lanes[c.by]) lanes[c.by].gold[1 - sd] += JAIL.cost;
+        return false;
+      });
+    }
+  }
   // why this player may not jail the squad (lane, id) now (null: they may); no squad given: whether they may jail at all
   function jailWhy(m, side, rec, lane, id) {
     if (!jailUp(m, rec)) return 'down';
@@ -218,7 +241,7 @@
     if (lane === undefined && id === undefined) return null;
     if (!Number.isInteger(lane) || !Number.isInteger(id)) return 'pick';
     const q = jailSeen(m, side, lane, id), u = q && m.units[q.unit];
-    if (!q || !u || u.building || q.round >= m.round || G.mpbHeld(q) || G.isRider(q)) return 'squad';
+    if (!q || !u || u.building || q.round >= m.round || heldSeen(m, 1 - side, lane, q) || G.isRider(q)) return 'squad';
     if ((rec.data.banned || []).includes(q.unit)) return 'banned';
     if (recs(m, side).some(r => jailCells(r).some(c => c.lane === lane && c.id === id))) return 'squad';
     return null;
@@ -301,7 +324,8 @@
       battleOpts(m, side, rec, opts) {
         if (!jailUp(m, rec)) return;
         const w = G.tileToWorld(rec.col, rec.row);
-        opts.mpb.discover = (opts.mpb.discover || []).concat([{ x: w.x, y: w.y, r: (JAIL.light + 0.5) * G.TILE, side }]);
+        // (only while the jail's own body stands: squad, the Engine looks for it every tick)
+        opts.mpb.discover = (opts.mpb.discover || []).concat([{ x: w.x, y: w.y, r: (JAIL.light + 0.5) * G.TILE, side, squad: squadOf(recs(m, side).indexOf(rec)) }]);
       },
       // Skywatch's light: every tile within JAIL.light of it (none the round after it fell)
       lit(m, side, rec) {
@@ -314,11 +338,18 @@
       afterFight(lanes, side, rec, res, sums, round) {
         const foe = 1 - side, cells = jailCells(rec);
         if (rec.fell === round) { // destroyed: everyone in it goes free, their unit types for good; nothing next round
+          // A squad jailed this round (not locked up yet) goes free with no ban: it sat this fight out, which is what the
+          // gold bought; one sold or sitting in its School this fight was never held: its jailer gets the gold back
           const banned = new Set(rec.data.banned || []);
-          let n = 0;
-          for (const c of cells) { const q = laneSquad(lanes, c.lane, foe, c.id); if (q && q.jailed) { jailFree(lanes, foe, q); n++; } banned.add(c.ui); }
+          let n = 0, spared = 0;
+          for (const c of cells) {
+            const q = laneSquad(lanes, c.lane, foe, c.id);
+            if (q && q.jailed) { jailFree(lanes, foe, q); n++; banned.add(c.ui); }
+            else if (c.round === round && (!q || q.school)) { if (lanes[c.by]) lanes[c.by].gold[side] += JAIL.cost; }
+            else if (c.round === round) spared++;
+          }
           rec.data.cells = []; rec.data.banned = [...banned].sort((a, b) => a - b); rec.data.down = round + 1;
-          news(sums, side, { kind: 'jail', freed: n, text: `Team ${TEAM_LETTER[side]}’s Jail was destroyed${n ? `: ${n} jailed squad${n > 1 ? 's go' : ' goes'} free (${n > 1 ? 'their unit types' : 'its unit type'} can’t be jailed again)` : ''}. It does nothing next round.` });
+          news(sums, side, { kind: 'jail', freed: n, spared, text: `Team ${TEAM_LETTER[side]}’s Jail was destroyed${n ? `: ${n} jailed squad${n > 1 ? 's go' : ' goes'} free (${n > 1 ? 'their unit types' : 'its unit type'} can’t be jailed again)` : ''}${spared ? `${n ? ';' : ':'} the squad it was to lock up this round is not taken` : ''}. It does nothing next round.` });
           return;
         }
         // locked up now; a squad sold (or put in its School) before it could be gives its jailer the gold back; one sold
@@ -389,6 +420,8 @@
     try { for (const k of E.SLOTS) if (G.skillDef(m, sq.unit, k) && G.canBuySkill(m, side, sq.unit, k) && !G.isBuildingSkill(m, sq.unit, k)) out.push(k); } finally { m.gold[side] = g; }
     return out;
   }
+  // the tile a squad put in the School this round came from is still free (a squad of theirs may have been placed there)
+  const backFree = (m, side, sq) => G.blockOf(m, sq.unit, sq.school.col, sq.school.row).every(([c, r]) => !G.occupied(m, side, c, r) && !G.enemyHolds(m, side, c, r));
   // why this player may not do `action` on the school now (null: they may). Actions (Game.mpbAct): 'enroll' id (a squad
   // of theirs), 'leave' [col, row] (their squad inside comes out, there or on the nearest free tile), 'learn' k,
   // 'unlearn' (a skill started this round)
@@ -408,6 +441,8 @@
     if (action === 'leave') {
       if (p.learn) return 'learning';
       if (args.length && !(args.length === 2 && Number.isInteger(args[0]) && Number.isInteger(args[1]))) return 'tile';
+      // put in this round: taking it out only takes the enrolment back, onto the tile it came from (no free move)
+      if (p.round === m.round) return (args.length && (args[0] !== sq.school.col || args[1] !== sq.school.row)) || !backFree(m, side, sq) ? 'tile' : null;
       const t = homeTile([m], side, sq, args.length ? { col: args[0], row: args[1] } : { col: sq.school.col, row: sq.school.row });
       if (!t || (args.length && (t.col !== args[0] || t.row !== args[1]))) return 'tile';
       return null;
@@ -437,10 +472,10 @@
         }
         const p = pupilOf(rec), sq = pupilSq(m, side, rec);
         if (action === 'leave') {
-          if (!rec.data.was) rec.data.was = [];
-          rec.data.was.push({ round: m.round, pupil: clone(p), school: clone(p.sq || sq.school) });
+          const back = p.round === m.round; // the enrolment taken back: onto its own tile, nothing for the opponents to see
+          if (!back) { if (!rec.data.was) rec.data.was = []; rec.data.was.push({ round: m.round, pupil: clone(p), school: clone(p.sq || sq.school) }); }
           if (sq.school) {
-            const t = homeTile([m], side, sq, args.length ? { col: args[0], row: args[1] } : { col: sq.school.col, row: sq.school.row });
+            const t = back ? { col: sq.school.col, row: sq.school.row } : homeTile([m], side, sq, args.length ? { col: args[0], row: args[1] } : { col: sq.school.col, row: sq.school.row });
             delete sq.school; sq.col = t.col; sq.row = t.row;
           }
           rec.data.pupil = null;
@@ -480,7 +515,9 @@
         if (!sq) { rec.data.pupil = null; return; }
         const round = lanes[0].round;
         if (p.learn && round >= p.learn.round + learnRounds(rec)) { // learnt: the skill is its unit type's, as if bought last round
-          if (!G.hasSkill(m, side, sq.unit, p.learn.k)) {
+          // ...if it still may be (a skill it needs taken back meanwhile: not learnt; the other one of an either-or pair
+          // can't be bought meanwhile, Game.canBuySkill's schoolLearning)
+          if (!G.hasSkill(m, side, sq.unit, p.learn.k) && !G.skillNeedsMissing(m, side, sq.unit, p.learn.k).length && !G.skillOrTaken(m, side, sq.unit, p.learn.k).length) {
             if (!m.tech) m.tech = [{}, {}];
             const t = m.tech[side][sq.unit] || (m.tech[side][sq.unit] = E.SLOTS.map(() => 0));
             t[p.learn.k] = Math.max(1, round - 1);
@@ -499,7 +536,8 @@
         }
         const p = pupilOf(rec), sq = p && laneSquad(lanes, p.lane, side, p.id);
         let out = null;
-        if (sq && sq.school) { // out it comes, as it went in
+        if (sq && sq.school) { // out it comes, as it went in (a jailing of it this round is called off first)
+          jailCallOff(lanes, side, p.lane, sq.id, round);
           const s = sq.school;
           sq.xp = s.xp; sq.level = s.level;
           delete sq.school;

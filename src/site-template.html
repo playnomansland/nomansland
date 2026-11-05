@@ -9023,7 +9023,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         let pick = '';
         if (mine && phase === 'deploy') {
           const why = Mpb.jailWhy(m, me, rec), list = why ? [] : Mpb.jailable(m, me, rec);
-          if (why === 'you') pick = '<p class="hint" style="margin:0">Your cell is taken: it frees up when the jail is destroyed (or they sell the squad).</p>';
+          if (why === 'you') pick = '<p class="hint" style="margin:0">Your cell is taken: it frees up when the jail is destroyed (or after the fight of the round they sell the squad in).</p>';
           else if (why === 'full') pick = '<p class="hint" style="margin:0">Both cells are taken.</p>';
           else if (why === 'down') pick = '<p class="hint" style="margin:0">It was destroyed last fight: no jailing this round.</p>';
           else if (!list.length) pick = '<p class="hint" style="margin:0">No enemy squad from an earlier round to jail.</p>';
@@ -9068,8 +9068,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
           out.push(`<div class="xrow" style="gap:6px;align-items:center"><span style="color:${u.color}">${Shapes.svg(u.shape, 18)}</span><span><b>${esc(u.name)}</b> (${whose}) · level ${(mine ? sq.level : Game.seenLevel(m, sq)) + 1}${need ? ` · XP ${Math.round(sq.xp)}/${need}` : ''} · inside since round ${p.round}</span><button class="btn small" id="school-sheet">Sheet</button></div>`);
           out.push(`<p class="hint" style="margin:0">Study: +${Mpb.levelXp(m, sq) * (Mpb.skillN(rec, 'double') ? 2 : 1)} XP at the start of next round.${sk ? ` Learning <b>${esc(sk.name)}</b>: ready in round ${ready}.` : ''}</p>`);
           if (own && phase === 'deploy') {
-            const ks = !p.learn ? Mpb.learnable(m, me, sq) : [], leave = !Mpb.schoolWhy(m, me, rec, 'leave', []);
-            out.push(`<div class="btnrow" style="flex-wrap:wrap"><button class="btn small" id="school-out" ${live && leave ? '' : 'disabled'}>Take out · free</button><button class="btn small" id="school-out-tap" ${live && leave ? '' : 'disabled'}>Take out onto a tile</button>${p.learn && p.learn.round === m.round ? `<button class="btn small" id="school-unlearn" ${live ? '' : 'disabled'}>Stop learning</button>` : ''}</div>`);
+            const ks = !p.learn ? Mpb.learnable(m, me, sq) : [], leave = !Mpb.schoolWhy(m, me, rec, 'leave', []), back = p.round === m.round; // put in this round: only back onto its own tile
+            out.push(`<div class="btnrow" style="flex-wrap:wrap"><button class="btn small" id="school-out" ${live && leave ? '' : 'disabled'}>${back ? 'Take back (onto its tile)' : 'Take out · free'}</button>${back ? '' : `<button class="btn small" id="school-out-tap" ${live && leave ? '' : 'disabled'}>Take out onto a tile</button>`}${p.learn && p.learn.round === m.round ? `<button class="btn small" id="school-unlearn" ${live ? '' : 'disabled'}>Stop learning</button>` : ''}</div>`);
             if (p.learn) out.push('<p class="hint" style="margin:0">It can’t leave while it learns.</p>');
             else if (ks.length) out.push(`<p class="hint" style="margin:0">Learn a skill of its unit, free (ready ${Mpb.skillN(rec, 'fast') ? Mpb.SCHOOL.fastLearn : Mpb.SCHOOL.learn} round${Mpb.skillN(rec, 'fast') ? '' : 's'} later):</p><div class="btnrow" style="flex-wrap:wrap">${ks.map(k => `<button class="btn small" data-school-learn="${k}" ${live ? '' : 'disabled'}>${esc(u.skillDefs[k].name)}</button>`).join('')}</div>`);
           }
