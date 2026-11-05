@@ -146,6 +146,56 @@ const Models3D = (THREE) => {
       P(cyl(0.06, 0.06, 2.1, 5), WOOD, [0.55, 1.75, 0.05], [0.25, 0, -0.35]),
       P(box(0.42, 0.62, 0.42), IRON, [0.92, 2.72, 0.3], [0.25, 0, -0.35]),
       P(box(0.46, 0.12, 0.46), GOLD, [0.92, 2.72, 0.3], [0.25, 0, -0.35])],
+    // the Brute's Omni-Per skin (2026-11-05, Shapes.SKINS): a chrome war machine. Polished silver plating all over, a
+    // helmet with one glowing teal visor slit, a teal core in the chest, a big hydraulic power fist on the right arm
+    // (pistons along the forearm), two exhaust stacks on the back and team-colour stripes on the shoulder plates. Its
+    // colours are its own (no unit tint); the Brute's size and stance, so it still reads as a Brute.
+    'brute:omniper': () => {
+      const CHROME = '#E4E9EE', SILVER = '#9FA9B4', STEEL = '#5C646E', TEAL = '#3FF2DE';
+      return [
+        // legs: armoured shins, knee caps and heavy feet
+        ...[-1, 1].flatMap(sd => [
+          P(box(0.38, 0.72, 0.38), SILVER, [sd * 0.3, 0.36, 0]),
+          P(box(0.42, 0.18, 0.12), CHROME, [sd * 0.3, 0.55, -0.22]),
+          P(box(0.44, 0.14, 0.56), STEEL, [sd * 0.3, 0.07, -0.06])]),
+        // the body: a plated chest, a steel waist and a glowing core in a steel ring
+        P(box(1.25, 1.0, 0.8), SILVER, [0, 1.22, 0]),
+        P(box(0.98, 0.72, 0.12), CHROME, [0, 1.32, -0.42]),
+        P(new THREE.TorusGeometry(0.2, 0.06, 4, 8), STEEL, [0, 1.34, -0.5]),
+        P(ball(0.16), TEAL, [0, 1.34, -0.52]),
+        P(box(1.32, 0.2, 0.86), STEEL, [0, 0.76, 0]),
+        ...[-0.3, 0, 0.3].map(x => P(box(0.18, 0.1, 0.04), CHROME, [x, 0.76, -0.44])), // waist rivets
+        // the helmet on a steel neck: a chrome dome, a dark face plate with one teal visor slit, a crest
+        P(cyl(0.18, 0.2, 0.2, 8), STEEL, [0, 1.8, -0.06]),
+        P(cyl(0.27, 0.31, 0.5, 8), CHROME, [0, 2.06, -0.06]),
+        P(cyl(0.05, 0.27, 0.12, 8), CHROME, [0, 2.37, -0.06]),
+        P(box(0.44, 0.2, 0.06), DARK, [0, 2.04, -0.36]),
+        P(box(0.36, 0.06, 0.04), TEAL, [0, 2.05, -0.4]),
+        P(box(0.07, 0.12, 0.56), STEEL, [0, 2.4, -0.06]),
+        // shoulder plates with team-colour stripes
+        ...[-1, 1].flatMap(sd => [
+          P(box(0.52, 0.3, 0.66), CHROME, [sd * 0.74, 1.74, 0]),
+          P(box(0.54, 0.06, 0.68), 'team', [sd * 0.74, 1.8, 0]),
+          P(box(0.54, 0.06, 0.68), 'team', [sd * 0.74, 1.67, 0])]),
+        // the left arm: plated, a steel hand
+        P(cyl(0.18, 0.16, 0.6), SILVER, [-0.8, 1.35, -0.05], [0.2, 0, 0.2]),
+        P(cyl(0.17, 0.15, 0.5), CHROME, [-0.86, 0.9, -0.15], [0.35, 0, 0.15]),
+        P(box(0.26, 0.26, 0.26), STEEL, [-0.9, 0.6, -0.25]),
+        // the right arm: the hydraulic power fist held forward, pistons along the forearm, teal lights on the knuckles
+        P(cyl(0.2, 0.18, 0.5), SILVER, [0.82, 1.4, -0.05], [0.2, 0, -0.2]),
+        P(box(0.46, 0.62, 0.46), CHROME, [0.9, 1.06, -0.3], [0.7, 0, 0]),
+        ...[-1, 1].flatMap(sd => [
+          P(cyl(0.06, 0.06, 0.6, 6), STEEL, [0.9 + sd * 0.29, 1.1, -0.26], [0.7, 0, 0]),
+          P(cyl(0.035, 0.035, 0.42, 5), CHROME, [0.9 + sd * 0.29, 0.84, -0.5], [0.7, 0, 0])]),
+        P(box(0.7, 0.56, 0.62), SILVER, [0.92, 0.74, -0.66]),
+        P(box(0.72, 0.18, 0.12), STEEL, [0.92, 0.82, -1.0]),
+        ...[-0.22, 0, 0.22].map(x => P(box(0.12, 0.06, 0.04), TEAL, [0.92 + x, 0.82, -1.07])),
+        // the back: a steel pack and two small exhaust stacks
+        P(box(0.8, 0.6, 0.24), STEEL, [0, 1.42, 0.5]),
+        ...[-1, 1].flatMap(sd => [
+          P(cyl(0.1, 0.12, 0.6, 8), CHROME, [sd * 0.24, 1.92, 0.56]),
+          P(cyl(0.12, 0.12, 0.08, 8), STEEL, [sd * 0.24, 2.24, 0.56])])];
+    },
     // a winged imp or wisp, hovering
     flier: () => [
       P(ball(0.45), 'tint', [0, 1.3, 0]),

@@ -20,6 +20,29 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 5 November 2026 – Music anywhere, chat typing fix, Omni-Per Brute
+
+### Music anywhere
+- A **music button** (a note) sits next to the Settings cog in a match, top right in the waiting room, the draft and the tournament screens, and next to Sort on the Rooms list. It opens the playlist with the full player: play / pause, back, next, shuffle, repeat and the song list. It hides during the fight itself.
+- **Pick any song in a match** and it plays through deploy *and* battle instead of the map's music, carrying on into the next songs of the list (with your shuffle and repeat). **Map music** at the top of the list goes back to the map's music. Every new match starts on the map's music again.
+- Outside a match the menu player works as before. Music Off in Settings still silences everything, and Play turns it back on.
+
+### Chat typing fix
+- Typing in chat (or any text box: messages, bug report, username, match code) no longer turns the 3D camera or triggers other keys. A Q held down stops turning when you click into the chat line.
+- **On PC** the chat button is always in the top left corner of the screen, in every phase of an online match, and the chat opens right under it. The names and health bars move over to make room.
+
+### New skin: Omni-Per Brute
+- A chrome war machine with a power fist: polished silver plating, a helmet with one glowing teal visor slit, a hydraulic power fist with pistons, a glowing core in the chest, exhaust stacks on the back and stripes in your team colour on the shoulders. 3D board only (the 2D board keeps the Brute's square).
+- Nobody has it yet: how to earn it is still to be decided.
+- You can wear one Brute skin at a time: wearing one takes the other off.
+
+### To check with Vilhelm
+- My music keeps playing on the match-over screen too (it isn't cut off as the match ends); leaving the match goes back to the menu music, and the next match starts on the map's music.
+- In a match, Pause in the player pauses the match's music (yours or the map's) until you press Play, for that match only.
+- The song list in a match has every song (the map songs and the not-yet-assigned ones too); the menu list is unchanged.
+
+---
+
 ## 5 November 2026 – 2v2: see whose unit is whose
 
 - **Tap any unit to see its sheet**, in every phase: yours, your teammate's and the opponents'. The sheet says whose it is: **Yours**, **Name's (teammate)** or **Name's (opponent)**. A teammate's sheet is complete (stats, level, XP, skills, awakening, direction) but read only. The opponents' sheets hide this round's buys, as in 1v1. In a fight, the card of a tapped unit says whose it is too.

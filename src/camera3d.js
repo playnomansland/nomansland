@@ -277,13 +277,19 @@ const Camera3D = (THREE, camera, el, opts) => {
   }, { passive: false });
 
   // ---------- keys: Q / E rotate, Escape goes back to the strategic view ----------
+  // Keys typed into a text field (the chat line, a DM...) are text, not camera keys (the page's typingIn, 2026-11-05),
+  // and focus moving into one, or away from the window, lets go of any key held, so a held Q doesn't keep turning.
   const keys = new Set();
-  const keyDown = (e) => { woke(); keys.add(e.key.toLowerCase()); if (e.key === 'Escape') goStrategic(); };
+  const typing = (el) => (typeof window.typingIn === 'function' ? window.typingIn(el) : !!el && el.nodeType === 1 && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable));
+  const keyDown = (e) => { if (typing(e.target)) return; woke(); keys.add(e.key.toLowerCase()); if (e.key === 'Escape') goStrategic(); };
   const keyUp = (e) => keys.delete(e.key.toLowerCase());
+  const letGo = (e) => { if (e.type === 'blur' || typing(e.target)) keys.clear(); };
   window.addEventListener('keydown', keyDown);
   window.addEventListener('keyup', keyUp);
+  window.addEventListener('focusin', letGo);
+  window.addEventListener('blur', letGo);
   // the page is done with this camera: let go of the window's keys (the element's listeners go with the element)
-  function dispose() { window.removeEventListener('click', swallowClick, true); window.removeEventListener('keydown', keyDown); window.removeEventListener('keyup', keyUp); keys.clear(); }
+  function dispose() { window.removeEventListener('click', swallowClick, true); window.removeEventListener('keydown', keyDown); window.removeEventListener('keyup', keyUp); window.removeEventListener('focusin', letGo); window.removeEventListener('blur', letGo); keys.clear(); }
 
   function update(dt) {
     if (settle) {
@@ -315,5 +321,5 @@ const Camera3D = (THREE, camera, el, opts) => {
 
   // moving on its own (gliding to a level, a gesture under way, a rotate key held), so the page should keep drawing
   const busy = () => !!settle || !!two || !!rotDrag || keys.has('q') || keys.has('e') || foc.k !== focT.k;
-  return { update, resize, groundAt, goStrategic, setLevel, strategic, handsOn, level, busy, dispose, zoom: () => z, LEVELS: MAX + 1, focus };
+  return { update, resize, groundAt, goStrategic, setLevel, strategic, handsOn, level, busy, dispose, zoom: () => z, yaw: () => yaw, LEVELS: MAX + 1, focus };
 };

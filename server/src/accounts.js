@@ -155,7 +155,10 @@ export async function recordGG(env, giver, receiver, match, fights) {
 // every skin (off until they wear it). Owned skins are worn by default; POST /account/skin { skin, worn } switches one.
 // A match's Room puts the worn skins of each side in its players list (sessionPlayer), so the other phone draws them.
 // Owned = a row with src 'grant' (SKIN_GRANTS) or 'invite' (INVITE: the reward for inviting a friend).
-export const SKINS = ['brute-champion', 'golem-aquamarine'];
+// One skin per unit at a time: the part of the id before the first '-' names the unit (brute-..., golem-...), and
+// wearing a skin takes off the player's other skins for that unit (Omni-Per Brute, 2026-11-05: a second Brute skin).
+export const SKINS = ['brute-champion', 'golem-aquamarine', 'brute-omniper'];
+const skinUnit = (k) => k.split('-')[0];
 export const SKIN_GRANTS = [{ skin: 'brute-champion', tag: 'Gubbolas Cage' }];
 let grantsDone = false;
 export async function grantSkins(env, now = Date.now()) {
@@ -179,7 +182,8 @@ export async function grantSkins(env, now = Date.now()) {
 async function skinsOf(db, id, dev) {
   const rows = (await db.prepare('SELECT skin, src, worn FROM skins WHERE player = ?').bind(id).all()).results;
   return SKINS.filter((k) => dev || rows.some((r) => r.skin === k && r.src !== 'dev'))
-    .map((k) => { const r = rows.find((x) => x.skin === k); return { id: k, worn: r ? !!r.worn : !dev }; });
+    .map((k) => { const r = rows.find((x) => x.skin === k); return { id: k, worn: r ? !!r.worn : !dev }; })
+    .map((k, i, all) => (k.worn && all.slice(0, i).some((x) => x.worn && skinUnit(x.id) === skinUnit(k.id)) ? { ...k, worn: false } : k)); // one per unit
 }
 const wornSkins = async (db, id, dev) => (await skinsOf(db, id, dev)).filter((k) => k.worn).map((k) => k.id);
 
@@ -955,8 +959,11 @@ export async function handleAccount(request, env, cors) {
     }
     if (route === 'skin') {
       const k = typeof body.skin === 'string' ? body.skin : '', p = await db.prepare('SELECT dev FROM players WHERE id = ?').bind(me.player).first();
-      if (!(await skinsOf(db, me.player, !!(p && p.dev))).some((x) => x.id === k)) return json({ error: 'not your skin' }, 400, cors);
-      await db.prepare(`INSERT INTO skins (player, skin, src, worn, created) VALUES (?1, ?2, 'dev', ?3, ?4) ON CONFLICT (player, skin) DO UPDATE SET worn = ?3`).bind(me.player, k, body.worn ? 1 : 0, now).run();
+      const own = await skinsOf(db, me.player, !!(p && p.dev));
+      if (!own.some((x) => x.id === k)) return json({ error: 'not your skin' }, 400, cors);
+      const off = body.worn ? own.filter((x) => x.id !== k && skinUnit(x.id) === skinUnit(k)) : [];
+      await db.batch([db.prepare(`INSERT INTO skins (player, skin, src, worn, created) VALUES (?1, ?2, 'dev', ?3, ?4) ON CONFLICT (player, skin) DO UPDATE SET worn = ?3`).bind(me.player, k, body.worn ? 1 : 0, now),
+        ...off.map((x) => db.prepare(`INSERT INTO skins (player, skin, src, worn, created) VALUES (?1, ?2, 'dev', 0, ?3) ON CONFLICT (player, skin) DO UPDATE SET worn = 0`).bind(me.player, x.id, now))]); // the unit's other skins come off
       return json({ player: await playerOut(db, me.player) }, 200, cors);
     }
     if (route === 'ranked') {

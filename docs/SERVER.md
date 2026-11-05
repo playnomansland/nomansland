@@ -106,8 +106,12 @@ Built 2026-11-02 (`server/src/accounts.js`, routes in `server/src/index.js`):
 - SKIN_GRANTS gives a skin to a username (first: Champion Brute to "Gubbolas Cage"). grantSkins runs on every POST /account/me and in the hourly cron: the oldest live account with that tag (any case) gets it for good and config 'grant:<skin>:<tag>' marks it done, so renaming keeps it and taking the name later gives nothing. Until such an account exists it keeps trying.
 - Player objects carry skins [{ id, worn }]. POST /account/skin { skin, worn } (owned skins only, 400 'not your skin'). sessionPlayer returns the worn ids, and a match Room puts them in players[side].skins, so the other phone and spectators draw them. Tournament matches and 2v2 show no skins yet; vs AI and phone-to-phone matches show your own.
 - Page: Shapes.useSkins([side 0 ids, side 1 ids]) in render() (syncSkins: own side from the account, the opponent's from net.players); render3d swaps in the skin's model. Profile has a Skins row (On / Off); the menu shows a "new skin" popup once per phone (pb-skins-seen; not for developers).
-- Tests: server/test/skins.test.js (in npm test), tools/tests/skins-ui.js (browser, own accounts server on 8789; PB_BOARD=3d for 3D, which is slow headless and can time out on the first click).
+- Tests: server/test/skins.test.js (in npm test), tools/tests/skins-ui.js (browser, own accounts server on 8789; PB_BOARD=3d for 3D, which is slow headless and can time out on the first click; it also checks the 3D board draws the worn skin's model via board3d.kinds()).
 - Second skin (2026-11-03): 'golem-aquamarine' (Aquamarine Ether Golem: sea-green crystal, crystal spires, silver bands, white core; model 'golem:aquamarine'), limited: only from inviting a friend (below). Owned = any skins row whose src isn't 'dev' ('grant' or 'invite').
+
+- Third skin (2026-11-05): 'brute-omniper' (Omni-Per Brute: chrome plating, a teal visor slit, a hydraulic power fist, a teal core, exhaust stacks, team-colour shoulder stripes; model 'brute:omniper'). Nobody owns it but developers (no SKIN_GRANTS line) until Vilhelm decides how it's earned.
+- One skin per unit at a time: the part of a skin id before the first '-' names its unit (brute-..., golem-...). POST /account/skin { worn: true } takes the player's other skins for that unit off (rows with worn 0), and skinsOf shows only the first worn one per unit as worn (two granted skins for one unit). The page's Shapes.useSkins already draws only the first per unit.
+- A skin's picture: `node tools/skin-pic.js <id>` renders its model (headless Chromium, vendor/three, the 3D board's lights) into img/skins/<id>.png (192x192, transparent).
 
 ## Invite a friend (2026-11-03)
 

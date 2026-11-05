@@ -234,6 +234,8 @@ const Shapes = (() => {
     'brute-champion': { unit: 'Brute', name: 'Champion', text: 'A crowned Brute in gold armour with a great hammer and a cape.', model: 'brute:champion', pic: 'img/skins/brute-champion.png' },
     // limited: only for inviting a friend (server accounts.js INVITE)
     'golem-aquamarine': { unit: 'Ether Golem', name: 'Aquamarine', text: 'An Ether Golem cut from sea-green crystal, with crystal spires and a white-hot core.', model: 'golem:aquamarine', pic: 'img/skins/golem-aquamarine.png', limited: true },
+    // 2026-11-05: nobody has it yet but developers; Vilhelm decides how it's earned. One Brute skin is worn at a time.
+    'brute-omniper': { unit: 'Brute', name: 'Omni-Per', text: 'A chrome war machine with a power fist.', model: 'brute:omniper', pic: 'img/skins/brute-omniper.png' },
   };
   let worn = [{}, {}]; // per side: unit name -> skin
   function useSkins(lists) {

@@ -738,6 +738,7 @@ html.pc .corner button span { display: inline; }
 /* the online lobby (2026-11-04, docs/LOBBY.md): PLAY → Online · Rooms */
 .home .online-btn { width: 100%; }
 .lobby-top { width: 100%; max-width: 640px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; }
+.lobby-top .lob-tr { display: flex; gap: 6px; }
 .lobby-top h2 { text-align: center; font: 700 22px var(--font-display); letter-spacing: 0.08em; text-transform: uppercase; color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45); }
 .lobby-mid { width: 100%; max-width: 640px; display: grid; gap: 10px; align-content: start; min-width: 0; }
 .lob-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -763,6 +764,12 @@ html.pc .corner button span { display: inline; }
 /* chat and emotes in server matches */
 .talk-fab { position: absolute; left: 8px; bottom: 8px; z-index: 6; width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--line); background: rgba(13, 19, 21, 0.85); color: #fff; display: grid; place-items: center; cursor: pointer; }
 .talk-fab svg { width: 20px; height: 20px; }
+/* the music button (2026-11-05): beside the Settings cog in a match (not in battle), top right on the screens before one */
+.music-fab { position: fixed; right: 12px; top: calc(12px + env(safe-area-inset-top, 0px)); z-index: 30; width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--line); background: rgba(13, 19, 21, 0.85); color: #fff; display: grid; place-items: center; cursor: pointer; }
+/* PC (2026-11-05): one talk button in the top left corner of the screen in every phase of a server match, the wheel under it */
+html.pc .talk-fab { position: fixed; left: 12px; top: 12px; bottom: auto; z-index: 45; }
+html.pc .talk-wheel { left: 12px; top: 62px; bottom: auto; transform: none; }
+html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the names and health bars start right of it */
 .talk-fab .dot, .cog.talk .dot { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; background: var(--foe); color: #fff; font: 700 10px/16px system-ui, sans-serif; font-style: normal; }
 .cog.talk { position: relative; }
 .chat-tick { position: fixed; left: 50%; transform: translateX(-50%); top: calc(70px + env(safe-area-inset-top, 0px)); z-index: 40; display: grid; gap: 4px; justify-items: center; width: max-content; max-width: min(92vw, 460px); pointer-events: none; }
@@ -876,7 +883,7 @@ html.pc .corner button span { display: inline; }
 <div class="app">
   <div class="hud" aria-label="Match status">
     <div class="side you"><div class="lbl"><span id="you-name">You</span><span class="streak" id="streak-you" hidden></span><span class="num" id="hp-you">50</span></div><div class="hp"><i id="hpbar-you" style="width:100%"></i></div></div>
-    <div class="round"><span class="series-chip" id="series-chip" hidden></span><b class="num" id="round">1</b><div class="round-sub"><span id="phase">Deploy</span><button class="cog" id="stats" aria-label="Damage last round" aria-expanded="false"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4 5h9v3H4zM4 10.5h15v3H4zM4 16h6v3H4z"/></svg></button><button class="cog" id="cog" aria-label="Settings"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.4-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.7a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.4 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.7h4l.4-2.7a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button></div></div>
+    <div class="round"><span class="series-chip" id="series-chip" hidden></span><b class="num" id="round">1</b><div class="round-sub"><span id="phase">Deploy</span><button class="cog" id="stats" aria-label="Damage last round" aria-expanded="false"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4 5h9v3H4zM4 10.5h15v3H4zM4 16h6v3H4z"/></svg></button><button class="cog" id="cog" aria-label="Settings"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.4-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.7a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.4 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.7h4l.4-2.7a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button><button class="cog" id="music-btn" aria-label="Music"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M9 3.5v10.6A3.5 3.5 0 1 0 11 17V8.2l8-1.9v5.8A3.5 3.5 0 1 0 21 15V2z"/></svg></button></div></div>
     <div class="side foe"><div class="lbl"><span id="foe-name">Enemy</span><span class="streak" id="streak-foe" hidden></span><span class="num" id="hp-foe">50</span></div><div class="hp"><i id="hpbar-foe" style="width:100%"></i></div></div>
   </div>
   <div class="net" id="net" hidden aria-live="polite"><i></i><span id="net-text"></span></div>
@@ -903,6 +910,7 @@ html.pc .corner button span { display: inline; }
 <div class="home" id="home" hidden><canvas class="home-bg" id="home-bg" aria-hidden="true"></canvas><div class="home-wiz" id="home-wiz" hidden aria-hidden="true"><canvas id="home-wiz-cv"></canvas><div class="baba">BABABABABA</div></div><div class="home-in" id="home-in"></div></div>
 
 <div class="dd" id="stats-dd" hidden role="dialog" aria-label="Damage last round"></div>
+<button class="music-fab" id="music-fab" hidden aria-label="Music"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M9 3.5v10.6A3.5 3.5 0 1 0 11 17V8.2l8-1.9v5.8A3.5 3.5 0 1 0 21 15V2z"/></svg></button>
 <div class="chat-tick" id="chat-tick" hidden aria-live="polite"></div><div class="talk-wheel" id="talk-wheel" hidden role="dialog" aria-label="Emotes and chat"></div><div class="np-menu" id="np-menu" hidden role="menu"></div><div class="emote-layer" id="emote-layer" aria-hidden="true"></div>
 <div class="sheet-back" id="sheet-back" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-h"></div></div>
 
@@ -1144,6 +1152,8 @@ const Shapes = (() => {
     'brute-champion': { unit: 'Brute', name: 'Champion', text: 'A crowned Brute in gold armour with a great hammer and a cape.', model: 'brute:champion', pic: 'img/skins/brute-champion.png' },
     // limited: only for inviting a friend (server accounts.js INVITE)
     'golem-aquamarine': { unit: 'Ether Golem', name: 'Aquamarine', text: 'An Ether Golem cut from sea-green crystal, with crystal spires and a white-hot core.', model: 'golem:aquamarine', pic: 'img/skins/golem-aquamarine.png', limited: true },
+    // 2026-11-05: nobody has it yet but developers; Vilhelm decides how it's earned. One Brute skin is worn at a time.
+    'brute-omniper': { unit: 'Brute', name: 'Omni-Per', text: 'A chrome war machine with a power fist.', model: 'brute:omniper', pic: 'img/skins/brute-omniper.png' },
   };
   let worn = [{}, {}]; // per side: unit name -> skin
   function useSkins(lists) {
@@ -10641,6 +10651,10 @@ Floors.floor = (() => {
   const tag = Shapes.tag;
   const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const $ = (id) => document.getElementById(id);
+  // typing (2026-11-05): a key typed into a text field (the chat line, a DM, the bug report, the username or code box)
+  // is only text: every page-wide key handler (and the 3D camera's Q/E, camera3d.js) asks this first and ignores it
+  const typingIn = (el) => !!el && el.nodeType === 1 && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
+  window.typingIn = typingIn;
   const css = Art.css;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const now = () => Date.now();
@@ -10830,17 +10844,33 @@ Floors.floor = (() => {
   }
   const menuSongs = () => PLAYLISTS.menu; // every menu song; a picked one plays now and the list goes on from it
   let menuPaused = false; // the menu player's Pause (this visit only; the sheet's Music Off is the lasting switch)
-  const music = { menu: playlist(menuSongs(), !!snd.shuffle), deploy: playlist(PLAYLISTS.deploy), battle: playlist(PLAYLISTS.battle) };
+  // "My music" in a match (2026-11-05, Vilhelm: any song, even in battle; the map's combo stays the default): a song
+  // picked from the player in a match plays (and its list carries on, with Shuffle / Repeat) through deploy, battle and
+  // the results instead of the map's music, until the player picks Map music or the match is left; every new match
+  // starts on the map's music. mine.key: the match it was picked in (matchKey); paused: the player's Pause in a match.
+  const ALL_SONGS = [...PLAYLISTS.menu, ...Object.keys(SONGS).filter(id => !PLAYLISTS.menu.includes(id) && !SONGS[id].start)]; // every song once (not the battle cut of one)
+  const music = { menu: playlist(menuSongs(), !!snd.shuffle), mine: playlist(ALL_SONGS, !!snd.shuffle), deploy: playlist(PLAYLISTS.deploy), battle: playlist(PLAYLISTS.battle) };
   for (const id in MUSIC_COMBOS) for (const k in MUSIC_COMBOS[id]) music[k + '-' + id] = playlist(MUSIC_COMBOS[id][k]);
-  music.menu.setRepeat(!!snd.repeat);
+  music.menu.setRepeat(!!snd.repeat); music.mine.setRepeat(!!snd.repeat);
   if (snd.song && PLAYLISTS.menu.includes(snd.song)) music.menu.play(snd.song); // the song picked last time starts the list
+  let mine = { key: '', on: false, paused: false };
+  const musicInMatch = () => !!m && (phase === 'deploy' || phase === 'battle' || phase === 'result' || phase === 'end');
+  const matchKey = () => (m && musicInMatch() ? `${mode}:${m.seed}:${(net && net.code) || ''}` : '');
+  // the map's player for this phase (its look's combo, or the standard one), '' when the map has no music now
+  function comboKey() {
+    const combo = m && m.map ? LOOK_MUSIC[Game.lookOf(m)] : null, own = (combo && MUSIC_COMBOS[combo]) || {};
+    const pick = (k) => own[k] ? k + '-' + combo : k;
+    return phase === 'deploy' ? pick('deploy') : (phase === 'battle' || phase === 'result') ? pick('battle') : '';
+  }
+  // the playlist the player shows and works: the menu's outside a match; in one, my music or the map's
+  const ctlPl = () => !musicInMatch() ? music.menu : mine.on || !comboKey() ? music.mine : music[comboKey()];
   function syncMusic() {
     const on = musicUnlocked && musicLevel() > 0;
+    if (mine.key !== matchKey()) mine = { key: matchKey(), on: false, paused: false }; // a new match (or none): the map's music
     music.menu.set(on && !menuPaused && (phase === 'start' || phase === 'lobby' || phase === 'draft'));
-    const combo = m && m.map ? LOOK_MUSIC[Game.lookOf(m)] : null, own = (combo && MUSIC_COMBOS[combo]) || {};
-    const pick = (k) => own[k] ? k + '-' + combo : k; // this look's player for that phase, or the standard one
-    const cur = phase === 'deploy' ? pick('deploy') : (phase === 'battle' || phase === 'result') ? pick('battle') : '';
-    for (const k in music) if (k !== 'menu') music[k].set(on && k === cur);
+    music.mine.set(on && musicInMatch() && mine.on && !mine.paused);
+    const cur = musicInMatch() && !mine.on && !mine.paused ? comboKey() : '';
+    for (const k in music) if (k !== 'menu' && k !== 'mine') music[k].set(on && k === cur);
   }
   // phones only allow sound after the player touches the page
   // (iPhones only count the end of a touch, so every tap retries until the sound is running)
@@ -10884,58 +10914,84 @@ Floors.floor = (() => {
     repeat: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M4 11V9a3 3 0 0 1 3-3h12M16 3l3 3-3 3M20 13v2a3 3 0 0 1-3 3H5M8 21l-3-3 3-3"/><text x="12" y="14.5" font-size="7" font-weight="700" text-anchor="middle" fill="currentColor" font-family="sans-serif">1</text></svg>',
     back: icon(`<g transform="translate(48 0) scale(-1 1)"><g transform="translate(0 6) scale(0.75)"><path d="${ICON_PLAY}"/></g><rect x="34" y="6" width="9" height="36" rx="3"/></g>`),
   };
-  const menuPlaying = () => musicOn() && !menuPaused;
+  // playing: outside a match the menu's player, unpaused; in one, the player not paused and something to play
+  const NOTE_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M9 3.5v10.6A3.5 3.5 0 1 0 11 17V8.2l8-1.9v5.8A3.5 3.5 0 1 0 21 15V2z"/></svg>';
+  const menuPlaying = () => musicOn() && (musicInMatch() ? !mine.paused && (mine.on || !!comboKey()) : !menuPaused);
+  const mapMusic = () => musicInMatch() && !mine.on; // the map's music is what the player shows
+  const nowLabel = () => mapMusic() ? 'Map music' : 'Now playing';
   const playerHtml = () => `<div class="mplayer" role="group" aria-label="Music player">
-      <button class="mp-now" id="mp-now" aria-label="Now playing: open the playlist"><span class="mp-label">Now playing</span>
-      <span id="mp-title">${esc(songName(music.menu.song()))}</span></button>
+      <button class="mp-now" id="mp-now" aria-label="Now playing: open the playlist"><span class="mp-label" id="mp-label">${nowLabel()}</span>
+      <span id="mp-title">${esc(songName(ctlPl().song()))}</span></button>
       <span class="mp-row">
-        <button class="mp-btn mp-mode" id="mp-shuffle" aria-label="Shuffle" aria-pressed="${music.menu.shuffle}" title="Shuffle">${ICONS.shuffle}</button>
+        <button class="mp-btn mp-mode" id="mp-shuffle" aria-label="Shuffle" aria-pressed="${!!snd.shuffle}" title="Shuffle">${ICONS.shuffle}</button>
         <button class="mp-btn" id="mp-back" aria-label="Back">${ICONS.back}</button>
         <button class="mp-btn mp-main" id="mp-play" aria-label="${menuPlaying() ? 'Pause' : 'Play'}">${menuPlaying() ? ICONS.pause : ICONS.play}</button>
         <button class="mp-btn" id="mp-next" aria-label="Next">${ICONS.next}</button>
-        <button class="mp-btn mp-mode" id="mp-repeat" aria-label="Repeat this song" aria-pressed="${music.menu.repeat}" title="Repeat this song">${ICONS.repeat}</button>
+        <button class="mp-btn mp-mode" id="mp-repeat" aria-label="Repeat this song" aria-pressed="${!!snd.repeat}" title="Repeat this song">${ICONS.repeat}</button>
       </span>
     </div>`;
   function showPlayer() {
     const t = $('mp-title'), pb = $('mp-play');
-    if (t) t.textContent = songName(music.menu.song());
+    if (t) t.textContent = songName(ctlPl().song());
+    if ($('mp-label')) $('mp-label').textContent = nowLabel();
     if (pb) { pb.innerHTML = menuPlaying() ? ICONS.pause : ICONS.play; pb.setAttribute('aria-label', menuPlaying() ? 'Pause' : 'Play'); }
-    if ($('mp-shuffle')) $('mp-shuffle').setAttribute('aria-pressed', String(music.menu.shuffle));
-    if ($('mp-repeat')) $('mp-repeat').setAttribute('aria-pressed', String(music.menu.repeat));
-    document.querySelectorAll('[data-song]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.song === music.menu.song())));
+    if ($('mp-shuffle')) $('mp-shuffle').setAttribute('aria-pressed', String(!!snd.shuffle));
+    if ($('mp-repeat')) $('mp-repeat').setAttribute('aria-pressed', String(!!snd.repeat));
+    const on = (id) => id === '' ? mapMusic() : musicInMatch() ? mine.on && music.mine.song() === id : music.menu.song() === id;
+    document.querySelectorAll('[data-song]').forEach(x => x.setAttribute('aria-pressed', String(on(x.dataset.song))));
   }
-  music.menu.onChange = showPlayer;
+  for (const k in music) music[k].onChange = showPlayer;
+  if (qs.has('test')) window.__music = () => ({ playing: Object.keys(music).filter(k => music[k].playing), song: ctlPl().song(), mine: { ...mine }, combo: comboKey(), menuPaused }); // UI tests
+  // Play from a tap: music on (iPhones start sound only inside a tap), the player unpaused
+  function musicGo(pl) {
+    if (!musicOn()) setMusic(true); else { wakeAudio(true); syncMusic(); pl.wake(); }
+  }
   function wirePlayer() {
     if (!$('mp-play')) return;
     $('mp-play').addEventListener('click', () => {
-      if (menuPlaying()) menuPaused = true;
-      else { menuPaused = false; if (!musicOn()) setMusic(true); else { wakeAudio(true); music.menu.wake(); } }
+      if (musicInMatch()) {
+        if (menuPlaying()) mine.paused = true;
+        else { mine.paused = false; if (!comboKey()) mine.on = true; musicGo(ctlPl()); } // nothing of the map's plays now (match over): my music
+      } else if (menuPlaying()) menuPaused = true;
+      else { menuPaused = false; musicGo(music.menu); }
       syncMusic(); showPlayer();
     });
     // a picked menu song plays on its own: Next goes back to all the menu songs
-    $('mp-next').addEventListener('click', () => { music.menu.next(); showPlayer(); });
-    $('mp-shuffle').addEventListener('click', () => { music.menu.shuffle = snd.shuffle = !music.menu.shuffle; saveSound(); showPlayer(); });
-    $('mp-repeat').addEventListener('click', () => { music.menu.setRepeat(!music.menu.repeat); snd.repeat = music.menu.repeat; saveSound(); showPlayer(); });
+    $('mp-next').addEventListener('click', () => { ctlPl().next(); showPlayer(); });
+    $('mp-shuffle').addEventListener('click', () => { music.menu.shuffle = music.mine.shuffle = snd.shuffle = !snd.shuffle; saveSound(); showPlayer(); });
+    $('mp-repeat').addEventListener('click', () => { snd.repeat = !snd.repeat; music.menu.setRepeat(snd.repeat); music.mine.setRepeat(snd.repeat); saveSound(); showPlayer(); });
     $('mp-now').addEventListener('click', openPlaylist);
-    $('mp-back').addEventListener('click', () => { music.menu.back(); showPlayer(); });
+    $('mp-back').addEventListener('click', () => { ctlPl().back(); showPlayer(); });
   }
 
-  // a song picked from a list: it plays now (music on, the player unpaused) and the list goes on from it
+  // a song picked from a list: it plays now (music on, the player unpaused) and the list goes on from it. In a match:
+  // my music ('' = Map music: back to the map's)
   function playSong(id) {
+    if (musicInMatch()) {
+      mine.paused = false; mine.on = !!id;
+      if (id) music.mine.play(id);
+      musicGo(ctlPl()); syncMusic(); showPlayer();
+      return;
+    }
     music.menu.play(id); snd.song = id; saveSound();
     menuPaused = false;
-    if (!musicOn()) setMusic(true); else { wakeAudio(true); music.menu.wake(); syncMusic(); }
+    musicGo(music.menu);
     showPlayer();
   }
-  const songList = () => `<div class="songs" role="group" aria-label="Menu music">
+  const songList = () => musicInMatch() ? `<div class="songs" role="group" aria-label="Music">
+      <button data-song="" class="map-song" aria-pressed="${mapMusic()}">Map music (default)</button>
+      ${ALL_SONGS.map(id => `<button data-song="${id}" aria-pressed="${mine.on && music.mine.song() === id}">${esc(songName(id))}</button>`).join('')}
+    </div>` : `<div class="songs" role="group" aria-label="Menu music">
       ${music.menu.list().map(id => `<button data-song="${id}" aria-pressed="${music.menu.song() === id}">${esc(songName(id))}</button>`).join('')}
     </div>`;
+  const songHint = () => musicInMatch() ? 'Tap a song to play it through deploy and battle instead of the map’s music, until you tap Map music or leave the match. The list carries on from it.'
+    : `Tap a song to play it. The list carries on from there${snd.shuffle ? ' (in shuffled order while Shuffle is on)' : ''}.`;
   const wireSongList = () => $('sheet').querySelectorAll('[data-song]').forEach(b => b.addEventListener('click', () => playSong(b.dataset.song)));
   // Now playing (tap): the playlist, with the player on top
   function openPlaylist() {
     $('sheet').innerHTML = `<div class="bar"><h3 id="sheet-h">Playlist</h3><button class="btn small" id="close">Close</button></div>
       ${playerHtml().replace('id="mp-now"', 'id="mp-now" disabled')}
-      <p class="hint" style="margin:0">Tap a song to play it. The list carries on from there${music.menu.shuffle ? ' (in shuffled order while Shuffle is on)' : ''}.</p>
+      <p class="hint" style="margin:0">${songHint()}</p>
       ${songList()}`;
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', closeSheet);
@@ -11034,7 +11090,7 @@ Floors.floor = (() => {
   // ----- Report a bug (2026-11-04): a new post in the Discord forum #bug-reports with the game version and match id
   // filled in. The server posts it through a webhook (/account/bug, accounts.js BUG); when that's off or fails, the report
   // is copied and the Discord server opens, so it can be pasted there by hand.
-  const GAME_VERSION = '5 Nov 2026 · da42c29'; // src/build.js: the newest patch notes date and a hash of this page
+  const GAME_VERSION = '5 Nov 2026 · 76f90d5'; // src/build.js: the newest patch notes date and a hash of this page
   const DISCORD_FALLBACK = 'https://discord.gg/TBpDKSBWsY';
   const bug = { draft: '', busy: false };
   // the id the server's match history uses (room.js historyInfo: <room>-<seed>), or one made the same way for other matches
@@ -11193,7 +11249,7 @@ Floors.floor = (() => {
         </div>
       </div>` : ''}
       <div class="bar"><span class="hint">Something broken?</span><button class="btn small" id="bug-open">Report a bug</button></div>
-      <span class="hint">Menu music: tap a song to play it, the list carries on from there</span>
+      <span class="hint">${musicInMatch() ? 'Music: tap a song to play it instead of the map’s, Map music goes back' : 'Menu music: tap a song to play it, the list carries on from there'}</span>
       ${songList()}
       `;
     $('sheet-back').hidden = false;
@@ -11228,7 +11284,7 @@ Floors.floor = (() => {
     }));
     wireSongList();
     $('sheet').querySelectorAll('[data-mute]').forEach(b => b.addEventListener('click', () => {
-      setMusic(b.dataset.mute === '0'); if (musicOn()) menuPaused = false; showPlayer();
+      setMusic(b.dataset.mute === '0'); if (musicOn()) { menuPaused = false; mine.paused = false; syncMusic(); } showPlayer();
       $('vol').value = snd.vol; $('vol-n').textContent = snd.vol; showOn();
     }));
     if ($('to-menu')) $('to-menu').addEventListener('click', askForfeit);
@@ -11741,6 +11797,7 @@ Floors.floor = (() => {
     if ($('foe-name').innerHTML !== fh) $('foe-name').innerHTML = fh;
     if ($('you-name').innerHTML !== yh) $('you-name').innerHTML = yh;
     document.querySelector('.hud').hidden = phase === 'start' || phase === 'lobby' || phase === 'draft'; // no match yet: nothing to show
+    syncMusicBtn();
     if ((mode !== 'tutorial' && !(tutHint && phase === 'deploy')) || phase === 'battle') coach(null); // the fight speaks for itself
     syncPick(); syncMusic();
     if (typeof talk === 'object' && talk) talkSync(); // chat and emotes (server matches)
@@ -12602,6 +12659,15 @@ Floors.floor = (() => {
     $('home').hidden = !on;
     if (on) paintHomeBg();
     homeWiz(on && WIZ_PC && home.screen !== 'welcome' && home.screen !== 'signup' && home.screen !== 'login' && home.screen !== 'lobby');
+    syncMusicBtn();
+  }
+  // the music button: the HUD's beside the cog in a match (hidden in battle), the round one top right on the screens
+  // before one (waiting room, draft, tournament); the main menu has the player and the Rooms list its own beside Sort.
+  // Each opens the playlist sheet.
+  function syncMusicBtn() {
+    const hud = !document.querySelector('.hud').hidden, menu = !$('home').hidden; // the Rooms list has its own, beside Sort
+    $('music-btn').hidden = !hud || phase === 'battle';
+    $('music-fab').hidden = hud || menu || phase === 'battle';
   }
   // the Flame Wizard on the main menu: the 3D model as a still picture and its fire cone, frozen; a tap on him (or the text)
   // plays the blast for 1 second (WIZ_PLAY_MS): the cone flickers, sparks fly and BABABABABA shakes, then it freezes again
@@ -15803,7 +15869,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // It falls back to the 2D board when it can't start (no WebGL), when the phone drops the WebGL context, and when
   // fights run under 20 fps at low quality (slower fights step the quality down first), with one line on the board.
   const THREE_URL = './vendor/three.module.min.js'; // the artifact build points this at jsDelivr
-  const V3D = '885381039b'; // the 3D code's version (src/build.js puts a hash of it here)
+  const V3D = '615a8563f9'; // the 3D code's version (src/build.js puts a hash of it here)
   const B3D_STORE = 'phone-bellum-board';
   const force2d = /[?&]board=2d\b/.test(location.search);
   const force3d = !force2d && (/[?&]board=3d\b/.test(location.search) || window.PB_FORCE3D === true);
@@ -16285,7 +16351,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     document.addEventListener('pointerup', end);
     document.addEventListener('pointercancel', end);
     document.addEventListener('contextmenu', (e) => { if (e.target.closest && e.target.closest('.up')) e.preventDefault(); }); // a long press on a phone
-    document.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('up')) { e.preventDefault(); toggle(e.target); } });
+    document.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && !typingIn(e.target) && e.target.classList && e.target.classList.contains('up')) { e.preventDefault(); toggle(e.target); } });
   }
   // the bank tower's loan: take one this round (yours), or whether they took one (theirs, once the fight is on)
   function loanBlock(side, tt) {
@@ -16740,6 +16806,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   $('sheet-back').addEventListener('click', (e) => { if (e.target.id === 'sheet-back') closeSheet(true); });
   $('cog').addEventListener('click', openSoundSheet);
+  for (const id of ['music-btn', 'music-fab']) $(id).addEventListener('click', (e) => { e.stopPropagation(); openPlaylist(); });
   $('foe-name').addEventListener('click', () => { if (talkOn() && mode === 'net') return; const p = foePlayer(); if (p && p.tag && !net.duo) frPlayerMenu({ tag: p.tag, title: p.title }); }); // friends: Add friend / Message (with chat on, from the chat's name menu)
   // ---------- damage stats: a dropdown under the HUD with what each unit dealt in the last fight, as a share of its team's total ----------
   const statsShow = { ally: true, foe: false }; // which teams to list (ticked boxes), for the rest of the visit
@@ -16824,7 +16891,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   $('stats').addEventListener('click', (e) => { e.stopPropagation(); openStats($('stats-dd').hidden); });
   document.addEventListener('click', (e) => { if (!$('stats-dd').hidden && !$('stats-dd').contains(e.target)) openStats(false); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSheet(true); openStats(false); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !typingIn(e.target)) { closeSheet(true); openStats(false); } });
 
   // =====================================================================
   // Live matches: PeerJS (WebRTC). The host runs the match and decides results;
@@ -17764,7 +17831,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     el.innerHTML = `<div class="lobby-top">
         <button class="btn small" id="lob-back">Back</button>
         <h2>Rooms</h2>
-        <button class="btn small" id="lob-sort" aria-label="Sort the rooms">Sort: ${esc(sortLabel())}</button>
+        <span class="lob-tr"><button class="btn small" id="lob-sort" aria-label="Sort the rooms">Sort: ${esc(sortLabel())}</button><button class="btn small" id="lob-music" aria-label="Music">${NOTE_SVG}</button></span>
       </div>
       <div class="lobby-mid">
         <div class="lob-acts"><button class="hbtn gold" id="lob-quick">Quick play</button><button class="hbtn" id="lob-create">Create room</button></div>
@@ -17773,6 +17840,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         <ul class="lob-list" id="lob-list"></ul>
       </div><div></div>`;
     $('lob-back').addEventListener('click', () => { lobbyClose(); home.screen = 'menu'; drawHome(); });
+    $('lob-music').addEventListener('click', openPlaylist);
     $('lob-sort').addEventListener('click', openSortSheet);
     $('lob-create').addEventListener('click', openCreateSheet);
     $('lob-quick').addEventListener('click', () => {
@@ -17917,11 +17985,14 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     clearTimeout(talk.tickTimer);
     if (talk.tick.length) talk.tickTimer = setTimeout(tickDraw, Math.max(200, Math.min(...talk.tick.map(x => x.until)) - now));
   }
-  // the talk button: in the deploy tray (#talk-btn) or on the board (#talk-fab)
-  var talkBtn = () => talkOn() ? `<button class="cog talk" id="talk-btn" aria-label="Chat and emotes">${TALK_SVG}${talk.unread ? `<i class="dot">${Math.min(9, talk.unread)}</i>` : ''}</button>` : '';
+  // the talk button: in the deploy tray (#talk-btn) or on the board (#talk-fab); on a PC always #talk-fab, fixed in the
+  // top left corner of the screen (CSS html.pc .talk-fab), and no tray copy
+  var talkBtn = () => talkOn() && !pcLayout() ? `<button class="cog talk" id="talk-btn" aria-label="Chat and emotes">${TALK_SVG}${talk.unread ? `<i class="dot">${Math.min(9, talk.unread)}</i>` : ''}</button>` : '';
   var TALK_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-8l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2m3 5.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3"/></svg>';
   function talkSync() {
-    const on = talkOn(), fab = $('talk-fab'), inTray = $('talk-btn');
+    const on = talkOn(), fab = $('talk-fab');
+    let inTray = $('talk-btn');
+    if (inTray && pcLayout()) { inTray.remove(); inTray = null; }
     fab.hidden = !on || !!inTray;
     if (on) fab.innerHTML = TALK_SVG + (talk.unread ? `<i class="dot">${Math.min(9, talk.unread)}</i>` : '');
     if (inTray) { if (!on) inTray.remove(); else inTray.innerHTML = TALK_SVG + (talk.unread ? `<i class="dot">${Math.min(9, talk.unread)}</i>` : ''); }

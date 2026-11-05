@@ -985,5 +985,6 @@ const Render3D = (THREE, el, view, opts = {}) => {
     renderer.forceContextLoss();
   }
   return { size: sizeTo, draw, tileAt, thumb: (match) => floor2d.thumb(match), camera: cam, info: () => renderer.info.render,
-    still: () => !cam.busy(), quality, pixelRatio: () => renderer.getPixelRatio(), dispose, drawn, screenAt, pickAt, scenery };
+    still: () => !cam.busy(), kinds: () => [...new Set(Object.keys(groups).filter(k => used.has(groups[k])).map(k => k.split('#')[0]))], // the models drawn in the last frame (UI tests)
+    quality, pixelRatio: () => renderer.getPixelRatio(), dispose, drawn, screenAt, pickAt, scenery };
 };
