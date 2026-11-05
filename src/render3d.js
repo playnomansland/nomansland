@@ -482,6 +482,17 @@ const Render3D = (THREE, el, view, opts = {}) => {
       const [wx, wz] = world(f, pt.x, pt.y);
       scene_(() => { disc(wx, wz, 2.4, color('#5A0F18'), 0.7, 0.2); for (let k = 0; k < 3; k++) arc(wx, wz, (2.4 - k * 0.6) * (1 + 0.08 * Math.sin(clock * 5 + k * 2)), color(k % 2 ? '#FFB347' : '#FF5A2D'), 0.9, 1, 0.18, 10); });
     }
+    // 2v2: the portal where a tower fell (to the other team's tower), and a flash at both ends when a body goes through
+    for (const pt of bt.gates ? bt.gates() : []) {
+      const [wx, wz] = world(f, pt.x, pt.y), team = teamColor(pt.side, me);
+      scene_(() => { disc(wx, wz, 2.6, color('#3C2896'), 0.75, 0.2); for (let k = 0; k < 3; k++) arc(wx, wz, (2.6 - k * 0.6) * (1 + 0.08 * Math.sin(clock * 3 + k * 2)), k % 2 ? color('#B9A8FF') : team, 0.9, 1, 0.18, 10); });
+    }
+    for (const fx of bt.gateFx ? bt.gateFx() : []) {
+      const age = bt.time() - fx.t;
+      if (age < 0 || age > 0.6) continue;
+      const [wx, wz] = world(f, fx.x, fx.y);
+      scene_(() => { arc(wx, wz, 0.8 + age * 4, color('#B9A8FF'), 1 - age / 0.6, 1, 0.2, 10); });
+    }
     // Grasping roots: a root from each Ent to the enemy it drags
     for (const b of bt.bodies) {
       const v2 = b.rootTgt;

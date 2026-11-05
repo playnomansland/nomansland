@@ -1458,6 +1458,14 @@ const Engine = (() => {
     const ck = (b) => { if (!lanesOn) return b.side; if (b.lane == null) b.lane = b.x > 0 ? 1 : 0; return b.side + 2 * b.lane; };
     const downNow = [];          // sides whose tower fell this tick: crippled from the next one
     const towerDown = g.towerDown || TOWER_DOWN;
+    // 2v2 tower portal (opts.portal = { towers: [side 0's tower body, side 1's] }, set only by src/duo.js): when a
+    // side's tower falls, a portal opens on its spot for the side that took it (gates[side], from the next tick on,
+    // like the tower-down penalty). Each body of that side that walks heads for it unless an enemy is within its
+    // awareness, and one that reaches it (GATE_R) comes out in front of its own tower's spot; once per body per fight.
+    const portalOn = !!(opts.portal && opts.portal.towers);
+    const homes = portalOn ? [0, 1].map(s => { const tb = opts.portal.towers[s]; return tb ? { body: tb, x: tb.x, y: tb.y } : null; }) : [null, null];
+    const gates = [null, null], gatesNow = [], gateFx = []; // gateFx: { x, y, side, t } a body went in or came out
+    const GATE_R = 1;
     // a body died: a fallen tower cripples its side; a body with deathBlast explodes (deathBlast % of its max health)
     const fell = (v) => {
       // a tower with teleport (Teleport mage general): instead of falling it jumps to u.teleport { x, y } with 1 health, once, and its side isn't crippled
@@ -1470,6 +1478,7 @@ const Engine = (() => {
       // a lesser building (Factions devtest) doesn't cripple its side. The penalty starts with the next tick, so the
       // other side's bodies still to act this tick don't get the better of it (see the end of step)
       if (v.u.structure && !v.u.lesser) downNow.push(ck(v));
+      if (portalOn) for (const s of [0, 1]) if (homes[s] && homes[s].body === v) gatesNow.push(1 - s); // the portal opens on its spot (the side's own, not where a Teleport tower jumped to)
       // a water elemental leaves a pool where it falls (like the Water Mage's Pool shaper pools: it hurts enemies,
       // heals and speeds up allies for the rest of the fight), its hit x pct % a second
       if (v.u.deathPool && v.u.deathPool.r > 0) { const dp = v.u.deathPool; pools.push({ x: v.x, y: v.y, r: dp.r, side: v.side, owner: v, amt: v.u.hit * dp.pct / 100, speed: dp.speed, secs: dp.secs }); }
@@ -2914,6 +2923,28 @@ const Engine = (() => {
       b.forgeT = b.forgeFull = sp.forge;
     }
 
+    // 2v2 tower portal: b steps into its side's portal and comes out in front of its own tower's spot, on the first
+    // formation spot no ally stands on (the same spots for both sides, mirrored front to back), and fights on from there
+    const GATE_SPOTS = [[0, 2], [1, 2], [-1, 2], [2, 2], [-2, 2], [0, 3], [1, 3], [-1, 3], [2, 3], [-2, 3], [0, 4], [1, 4], [-1, 4], [2, 4], [-2, 4]];
+    function throughGate(b) {
+      const h = homes[b.side], p = gates[b.side], fwd = b.side === 0 ? 1 : -1, sp = g.spacing || 3.5;
+      if (!h) return;
+      let at = null;
+      for (const [ox, oy] of GATE_SPOTS) {
+        let x = h.x + ox * sp, y = h.y + oy * fwd * sp;
+        if (g.bounds) { x = Math.max(g.bounds.x0, Math.min(g.bounds.x1, x)); y = Math.max(g.bounds.y0, Math.min(g.bounds.y1, y)); }
+        if (!at) at = [x, y];
+        if (!sides[b.side].some(a => a !== b && a.alive && hyp(a.x - x, a.y - y) < sp * 0.7)) { at = [x, y]; break; }
+      }
+      gateFx.push({ x: p.x, y: p.y, side: b.side, t });
+      b.x = at[0]; b.y = at[1]; b.ported = true;
+      b.engaged = false; b.intent = null; b.guide = null; b.guideT = null; b.spreadTo = null; b.hx = 0; b.hy = fwd;
+      if (b.u.windUp > 0) { b.setUp = false; if (b.windTarget) { b.windTarget = null; stats[b.side].windLost++; } }
+      if (terBlock && !b.u.aloft) keepOut(b);
+      gateFx.push({ x: b.x, y: b.y, side: b.side, t });
+      invalidateTargetIndex();
+    }
+
     function step() {
       if (over) return false;
       if (t >= g.timeCap || !aliveCount(A) || !aliveCount(B)) { over = true; return false; }
@@ -3073,6 +3104,23 @@ const Engine = (() => {
           }
         }
         const rg = b.u.hover > 0 ? Math.min(R(b), b.u.hover) : R(b); // hover: an airship flies in closer than its range
+        // 2v2 tower portal (see gates): its side has one and it hasn't been through yet: it walks to it unless an enemy
+        // is within its awareness (then it fights as usual, and heads back to the portal once none is)
+        if (gates[b.side] && !b.ported && b.u.speed > 0 && !b.u.structure && !b.u.drop && !(b.u.hover > 0) && !(near && !unseen && nd <= Math.max(rg + sight, minSight))) {
+          const p = gates[b.side], gx = p.x - b.x, gy = p.y - b.y, gd = hyp(gx, gy);
+          if (gd <= GATE_R) { throughGate(b); continue; }
+          const step = spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1) * dt;
+          const [ux, uy] = steer(b, p.x, p.y, gx / gd, gy / gd);
+          if (b.hx === undefined) { b.hx = ux; b.hy = uy; }
+          const k = Math.min(1, TURN * dt);
+          let hx = b.hx + (ux - b.hx) * k, hy = b.hy + (uy - b.hy) * k, hl = hyp(hx, hy);
+          if (hl < 1e-6) { hx = ux; hy = uy; hl = 1; }
+          b.hx = hx / hl; b.hy = hy / hl;
+          const mv = Math.min(step, gd);
+          b.x += b.hx * mv; b.y += b.hy * mv; b.moved += mv;
+          if (b.u.windUp > 0 && mv > 0) { b.setUp = false; if (b.windTarget) { b.windTarget = null; stats[b.side].windLost++; } }
+          continue;
+        }
         // an arrow drawn by the player: b.guide = [{ x, y }, ...] (the Factions devtest's paths, and a melee squad's
         // direction arrow: game.js AIM, with b.guideT its time to get there). The body walks the points in turn, sight
         // and awareness off, standing to fight only enemies already in its own range, then fights as usual from the last point on.
@@ -3642,6 +3690,8 @@ const Engine = (() => {
       }
       for (const sd of downNow) cripple[sd] = towerDown.secs;
       downNow.length = 0;
+      for (const s of gatesNow) if (!gates[s]) { const h = homes[1 - s]; gates[s] = { x: h.x, y: h.y, side: s, t: t + dt }; }
+      gatesNow.length = 0;
       t += dt;
       return true;
     }
@@ -3695,7 +3745,7 @@ const Engine = (() => {
       };
     }
 
-    return { step, frame, result, bodies: all, neutrals, mines: () => mines, pools: () => pools, portals: () => portals.filter(p => t >= p.t0 && t < p.t0 + p.secs), isOver: () => over, time: () => t, lastShots: () => shots, projectiles: () => projectiles, crippled: (side, lane) => cripple[side + 2 * (lane | 0)], charm: (side, squad) => (charm[side] && charm[side][squad]) || 0,
+    return { step, frame, result, bodies: all, neutrals, mines: () => mines, pools: () => pools, portals: () => portals.filter(p => t >= p.t0 && t < p.t0 + p.secs), isOver: () => over, time: () => t, lastShots: () => shots, projectiles: () => projectiles, crippled: (side, lane) => cripple[side + 2 * (lane | 0)], gates: () => gates.filter(Boolean), gateFx: () => gateFx, charm: (side, squad) => (charm[side] && charm[side][squad]) || 0,
       objective: () => obj && { n: obj.n.slice(), lead: obj.lead, hold: obj.hold, secs: obj.secs, won: obj.won } };
   }
 

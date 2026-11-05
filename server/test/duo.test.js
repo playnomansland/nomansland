@@ -16,7 +16,7 @@ const Game = require('../../src/game.js');
 const Engine = require('../../src/engine.js');
 const Ref = require('../../src/referee.js');
 const Duo = require('../../src/duo.js');
-const { units, matrix } = require('../src/prepare-units.cjs')(Engine, require('../../src/demo-units.json'));
+const { units, matrix } = require('../src/prepare-units.cjs')(Engine, Duo.unitSet(require('../../src/demo-units.json'), require('../../src/faction-units.json'))); // the 2v2 units (server/src/units.js duoUnits)
 
 const copy = (o) => JSON.parse(JSON.stringify(o));
 const local = (view) => Ref.withUnits(copy(view), units, matrix);

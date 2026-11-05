@@ -922,6 +922,8 @@ html.pc .corner button span { display: inline; }
 
   // ---------- unit sets: built-in, or loaded from Counter Lab ----------
   const BUILTIN = { units: DATA.units, matrix: DATA.matrix, skills: DATA.skills || [] };
+  let DUO_SET = null; // a 2v2 match's units: the built-in ones plus three Mechite units (src/duo.js unitSet; the server's are the same)
+  const duoSet = () => DUO_SET || (DUO_SET = Duo.unitSet(BUILTIN, FDATA));
   const STORE = 'phonebellum.units.v1';
   const MATRIX_SETTINGS = { budget: 2, distance: 42, spacing: 3.5, minDmgPct: 15, timeCap: 60, dt: 0.05, sight: Game.SETTINGS.sight, minSight: Game.SETTINGS.minSight, drift: Game.SETTINGS.drift, flameReach: Game.SETTINGS.flameReach }; // distance = gap between the front rows on the board
   const LEVERS = ['cost', 'bodies', 'hp', 'hit', 'aps', 'range', 'speed', 'splash'];
@@ -7679,11 +7681,12 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   const playLink = () => { const u = new URL(shareLink()); u.searchParams.delete('join'); u.searchParams.set('play', net.code); return u.toString(); };
   function srvSave() { try { if (mode === 'net' && net.key && !net.tourCode) localStorage.setItem(NET_STORE, JSON.stringify({ code: net.code, key: net.key, side: me, ts: now(), ...(net.duo ? { duo: true } : {}) })); } catch (e) {} }
   function srvForget() { try { localStorage.removeItem(NET_STORE); } catch (e) {} }
-  // the built-in units for a server match (the server only plays those); the player's own come back after it
+  // the built-in units for a server match (the server only plays those; a 2v2 match: the 2v2 set); the player's own come back after it
   function srvUnits() {
     restoreSet();
     if (customSet && !standardSet) standardSet = { set: rawSet, custom: customSet };
-    useSet(BUILTIN, false);
+    if (net.duo && !standardSet) standardSet = { set: rawSet, custom: customSet }; // the 2v2 set never stays after the match
+    useSet(net.duo ? duoSet() : BUILTIN, false);
   }
   // a friend's match: this phone makes it (side 0) and picks the settings in the lobby
   function srvHost(o = {}) {

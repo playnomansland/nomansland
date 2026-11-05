@@ -87,6 +87,36 @@
     for (const sd of [0, 1]) copyTeam(lanes[0], lanes[1], sd);
   }
 
+  // ----- the 2v2 units: the built-in units plus three Mechite units -----
+  // 1v1, ranked and tournaments stay on the built-in units; a 2v2 match (page: useSet, server: server/src/units.js
+  // duoUnits) is played with this set, prepared the same way on both, so the referee and every phone agree. The
+  // Mechites come from the Factions data (src/faction-units.json, F) without their faction (no faction trait, open to
+  // everyone as any unit): Rollers, Cog Builder (with its Factory) and Mechite Guards. The Altar of Build stays out.
+  const MECHITES = ['Rollers', 'Cog Builder', 'Mechite Guards'];
+  const DUO_BUILDINGS = ['factory'];
+  // base: { units, matrix, skills } (src/demo-units.json); F: { units, matrix, skills, buildings }. Returns a set
+  // { units, matrix, skills } and makes sure Game knows the Factory (Game.setBuildings; the page has it already, the
+  // server and node tests get it here).
+  function unitSet(base, F) {
+    const add = MECHITES.map(n => F.units.find(u => u.name === n)).filter(Boolean);
+    const units = base.units.concat(add.map(u => { const { faction, ...rest } = u; return rest; }));
+    const n0 = base.units.length, fi = (name) => F.units.findIndex(u => u.name === name);
+    // the counter table (the AI's guide): the built-in part as it is; with a Mechite unit, the Factions table's value
+    // where it has the other unit too (Goblin Swarm, Brute, Ent...), else 0 (not measured)
+    const cell = (i, j) => {
+      if (i < n0 && j < n0) return base.matrix[i][j];
+      if (i === j) return 0;
+      const a = fi(units[i].name), b = fi(units[j].name);
+      return a >= 0 && b >= 0 && F.matrix[a] && isFinite(+F.matrix[a][b]) ? +F.matrix[a][b] : 0;
+    };
+    const matrix = units.map((_, i) => units.map((__, j) => cell(i, j)));
+    const have = new Set((base.skills || []).map(s => s.id)), want = new Set(add.flatMap(u => u.skills || []).filter(Boolean));
+    const skills = (base.skills || []).concat((F.skills || []).filter(s => want.has(s.id) && !have.has(s.id)));
+    const missing = (F.buildings || []).filter(b => DUO_BUILDINGS.includes(b.id) && !G.buildingInfo(b.id));
+    if (missing.length) G.setBuildings(G.BUILDINGS().concat(missing));
+    return { units, matrix, skills };
+  }
+
   // the team's tower, its guards and airship, its treasury and its walls: lane 0's stand in the fight, lane 1's don't
   const teamBody = (sq) => sq === -2 || sq === -3 || sq === -4 || sq === G.TREASURY_SQ || (sq <= G.BWALL_SQ && sq > G.BWALL_SQ - 100);
 
@@ -112,7 +142,9 @@
     });
     G.useGrid(MAP);
     const ch = charm.map(c => Object.keys(c).length ? c : null);
-    return E.createBattle(A, B, s0.g, { tiles: s0.opts.tiles || [], strikes: s0.opts.strikes || [], neutrals: s0.opts.neutrals || [], charm: ch, terrain: s0.opts.terrain || null, objective: null, record: opts.record !== false });
+    // portal: where a team's tower falls, a portal to the other team's tower opens (Engine opts.portal; 2v2 only)
+    const portal = { towers: [0, 1].map(sd => host[sd][-2] || null) };
+    return E.createBattle(A, B, s0.g, { tiles: s0.opts.tiles || [], strikes: s0.opts.strikes || [], neutrals: s0.opts.neutrals || [], charm: ch, terrain: s0.opts.terrain || null, objective: null, record: opts.record !== false, portal });
   }
 
   // lane L's share of a fight's result, in that lane's own squad ids (as Game.resolve wants it). The winner and
@@ -436,7 +468,7 @@
 
   const api = {
     V, MAP, OFF, HP, PINGS, EMOTES, EMOTE_TEXT, SEATS, SEAT_NAMES, seatOf, mateOf, remap, unmap, laneOfId, move, teamOf, setTeam, setTeams,
-    TEAM_FIELDS, TEAM_FNS, copyTeam, teamBody, settle, battle, laneResult, fight, view,
+    MECHITES, unitSet, TEAM_FIELDS, TEAM_FNS, copyTeam, teamBody, settle, battle, laneResult, fight, view,
     create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, viewFor, clock, canAct, save, load, humans, settleVote, voteOpen,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

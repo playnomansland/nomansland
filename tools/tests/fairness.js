@@ -89,6 +89,31 @@ const SPOTS = [[0, 9], [3, 15], [-12, 21], [9, 27]];
   console.log('ok  simultaneous hits trade evenly: Snipers, rams, arrows, Obelisks');
 }
 
+// 2v2 tower portal (Engine opts.portal, src/duo.js): each side's squads start beside the other side's tower, both
+// towers fall on the same tick, both portals open and the squads go home through them and fight on: an exact mirror,
+// with as many bodies through on each side
+{
+  const TOWER = E.withTraits({ name: 'Tower', cost: 1, bodies: 1, hp: 300, hit: 5, aps: 1, range: 6, speed: 0, splash: 0, structure: true });
+  let n = 0;
+  for (const [x0, names] of [[0, ['Brute', 'Goblin Swarm']], [9, ['Skeleton Archers', 'Ember Imps']], [-12, ['War Mammoth', 'Rogue']]]) {
+    const A = [], B = [];
+    const t0 = E.buildSquad(TOWER, 0, x0 + 6, -40, 900, 6, 0)[0], t1 = E.buildSquad(TOWER, 1, x0 + 6, 40, 900, 6, 0)[0];
+    A.push(t0); B.push(t1);
+    names.forEach((nm, k) => {
+      A.push(...E.buildSquad(base(nm), 0, x0 + k * 6, 33, k + 1, 6, A.length));
+      B.push(...E.buildSquad(base(nm), 1, x0 + k * 6, -33, k + 1, 6, B.length));
+    });
+    const bt = E.createBattle(A, B, G, { portal: { towers: [t0, t1] } });
+    while (bt.step()) {}
+    const r = bt.result(), through = [0, 1].map(s => bt.bodies.filter(b => b.side === s && b.ported).length);
+    assert.ok(!t0.alive && !t1.alive && bt.gates().length === 2, `${names}: both towers fell, both portals open`);
+    assert.ok(through[0] > 0 && through[0] === through[1], `${names}: as many through on each side (${through})`);
+    assert.ok(isMirror(r), `${names}: a mirror (winner ${r.winner}, ${r.frac.map(f => f.toFixed(3))})`);
+    n++;
+  }
+  console.log(`ok  ${n} mirrored 2v2 tower falls with the portal: all exact mirrors`);
+}
+
 // whole game fights on the standard map: random armies from every unit, side 1's the mirror of side 0's
 {
   const units = roster.units.map(u => ({ ...u, cost: u.cost / 100, skillDefs: E.SLOTS.map(k => (u.skills || [])[k] ? skill(u.skills[k]) : null) }));

@@ -20,6 +20,32 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 5 November 2026 – 2v2: tower portal and Mechites
+
+2v2 is still a developer test.
+
+### Tower portal
+- **Take the other team's tower and a portal opens where it stood.** It leads straight back to your own tower. "It's just a transporter."
+- Every unit of your team (yours and your teammate's) heads for the portal, unless an enemy is close enough to see. Then it fights first and goes back to the portal afterwards. A unit that steps in comes out in front of your own tower and fights on from there.
+- Buildings, towers, the tower's airship and units that never move don't use it. Units riding inside another unit go through with it, and a charge is finished first.
+- Each unit goes through once per fight.
+- 1v1 and ranked are unchanged.
+
+### Mechites in 2v2
+- **Rollers, Cog Builder and Mechite Guards** are in the 2v2 shop, by tier, and can come in packages like any other unit. The Altar of Build is not.
+- The Cog Builder's **Factory** works as in the Factions test: buy it, then builders build it, then buy a construct each round. Its tile is your team's: your teammate can't place anything on it either.
+- The AI players in 2v2 buy them too, Factory included.
+- 1v1, ranked and tournaments keep the usual units.
+
+### To check with Vilhelm
+- **Once per fight:** each unit can use the portal only once per fight, so it can't loop home → portal → home.
+- **When both towers fall,** each team gets its own portal at the other team's tower spot.
+- **Awareness:** "an enemy in awareness range" uses each unit's own sight (its range + the sight distance, at least the minimum sight).
+- **Exit spot:** units come out two to four tiles in front of their own tower, spread out so they don't stack. If your own tower has fallen too, they still come out there.
+- **Mechites in 2v2 have no faction bonus** (they're plain units there, open to everyone). Their AI ratings against the built-in units come from the Factions table where it has both units, otherwise "even".
+
+---
+
 ## 5 November 2026 – Balance: Mammoth and Spiders
 
 - **War Mammoth:** 2650 health (was 2450).

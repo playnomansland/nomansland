@@ -21,6 +21,8 @@ const strip = (u) => { const o = JSON.parse(JSON.stringify(u)); for (const k of 
 const sets = {
   'built-in': require('../../src/demo-units.json'),
   'default roster': require('../../src/default-roster.json'),
+  // 2v2: the built-in units plus three Mechite units (src/duo.js unitSet; server/src/units.js duoUnits)
+  '2v2': require('../../src/duo.js').unitSet(require('../../src/demo-units.json'), require('../../src/faction-units.json')),
 };
 // and a set with names and skill names that need cleaning
 const odd = JSON.parse(JSON.stringify(sets['built-in']));

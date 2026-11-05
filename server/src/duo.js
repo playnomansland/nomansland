@@ -28,7 +28,7 @@ import Ref from '../../src/referee.js';
 import Duo from '../../src/duo.js';
 import { LIMITS, LOBBY, CHAT, json, readMessage, secret, ipHash } from './limits.js';
 import { Chat } from './chat.js';
-import { builtin } from './units.js';
+import { duoUnits } from './units.js';
 import { sessionPlayer, lobbyDuo } from './accounts.js';
 
 const KEEP_MS = 24 * 3600 * 1000;
@@ -44,7 +44,7 @@ export class DuoRoom extends DurableObject {
     this.listed = null;
     ctx.blockConcurrencyWhile(async () => {
       await this.chat.load();
-      const { units, matrix } = builtin();
+      const { units, matrix } = duoUnits();
       this.meta = (await ctx.storage.get('meta')) || null; // { code, seats: [{ key, tag, title } | null x4], host: seat }
       this.D = Duo.load(await ctx.storage.get('D'), units, matrix);
     });
@@ -163,7 +163,7 @@ export class DuoRoom extends DurableObject {
     if (d.t === 'hello') return this.hello(ws, a, d);
     if (a.role !== 'p') return;
     const seat = a.seat, D = this.D, now = Date.now(), host = seat === this.meta.host;
-    const { units, matrix } = builtin();
+    const { units, matrix } = duoUnits();
     const inLobby = !D || !D.lanes[0] || D.phase === 'lobby';
     switch (d.t) {
       case 'sync': return this.send(ws, this.syncMsg(ws));

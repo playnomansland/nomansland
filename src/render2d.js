@@ -1064,6 +1064,21 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.strokeStyle = '#FF6A3D'; ctx.lineWidth = 2;
       for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.ellipse(PX(pt.x), PY(pt.y), pr * (1 - k * 0.25), pr * 0.7 * (1 - k * 0.25), 0, a0 + k * 2, a0 + k * 2 + 3.6); ctx.stroke(); }
     }
+    // 2v2: the portal where a tower fell (it takes the team that took it to its own tower), and a flash at both ends
+    // when a body goes through (src/duo.js, Engine opts.portal)
+    for (const pt of bt.gates ? bt.gates() : []) {
+      const pr = tilePx() * 0.55, a0 = bt.time() * 3, x = PX(pt.x), y = PY(pt.y);
+      ctx.fillStyle = 'rgba(60,40,150,0.5)'; ctx.beginPath(); ctx.ellipse(x, y, pr, pr * 0.75, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = teamCol(pt.side); ctx.lineWidth = 2;
+      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.ellipse(x, y, pr * (1 - k * 0.25), pr * 0.75 * (1 - k * 0.25), 0, a0 + k * 2, a0 + k * 2 + 3.6); ctx.stroke(); }
+    }
+    for (const fx of bt.gateFx ? bt.gateFx() : []) {
+      const age = bt.time() - fx.t;
+      if (age < 0 || age > 0.6) continue;
+      ctx.strokeStyle = '#B9A8FF'; ctx.globalAlpha = 1 - age / 0.6; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(PX(fx.x), PY(fx.y), tilePx() * (0.2 + age), 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     // Grasping roots: a gnarled line from each Ent to the enemy it drags
     for (const b of bt.bodies) {
       const v = b.rootTgt;
