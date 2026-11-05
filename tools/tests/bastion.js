@@ -113,4 +113,17 @@ const add = (m, sd, name, col, row) => { const sq = { id: m.nextId[sd]++, unit: 
   assert.strictEqual(hit.holdT, 0, 'it left its post');
   assert.strictEqual(hit.avenge.u.name, 'Sniper', 'and goes for the Sniper');
 }
+// Defensive walls are free since 2026-11-06 (were 250), still once a match; the AI takes them at once
+{
+  const m = at3('bastion');
+  assert.strictEqual(Game.TOWER_TYPES.find(t => t.id === 'bastion').skill2.cost, 0);
+  m.gold[0] = 0;
+  assert.strictEqual(Game.towerSkill2Cost(m, 0), 0, 'free');
+  assert.ok(Game.buyTowerSkill2(m, 0) && m.gold[0] === 0, 'bought with no gold');
+  assert.ok(!Game.buyTowerSkill2(m, 0) && !Game.canBuyTowerSkill2(m, 0), 'once a match');
+  assert.ok(Game.undoTowerSkill2(m, 0) && m.gold[0] === 0, 'taken back: nothing to refund');
+  const ai = at3('bastion');
+  Game.aiDeploy(ai, 0);
+  assert.ok(Game.towerSkill2Of(ai, 0), 'the AI buys it');
+}
 console.log('bastion ok');
