@@ -231,6 +231,7 @@
     for (const m of lanes) delete m.team;
     const pres = lanes.map(m => Ref.snapshot(m));
     const bt = battle(lanes, { record: false });
+    for (const m of lanes) delete m.fhSeed; // in pres only (the page plays the fight from them), not in the state after it
     while (bt.step()) {}
     const res = bt.result();
     const lost = [0, 0], dmg = [0, 0], towerHp = [0, 0];
@@ -240,6 +241,7 @@
       for (const sd of [0, 1]) { lost[sd] += BIG - m.hp[sd]; dmg[sd] += sm.dmg[sd] || 0; towerHp[sd] += (sm.towerHp && sm.towerHp[sd]) || 0; }
       return sm;
     });
+    M.teamHeal(lanes, hp, summaries[0].round, summaries); // Team HP the buildings add before the fight's damage (the Oak's Heal)
     for (const sd of [0, 1]) hp[sd] = Math.max(0, hp[sd] - lost[sd]);
     // the buildings: fell, their afterFight (Team HP, gold, next-round effects), the artifacts' winners; lane 0's team
     // state goes to lane 1
@@ -465,8 +467,10 @@
     setTeam(ms(D), own.lane);
     if (G.needsPack(m, sd)) G.choosePack(m, sd, Math.floor(Math.random() * m.packages[sd].length));
     if (G.needsTowerPick(m, sd)) { const ch = G.towerChoices(m, sd); G.setTowerType(m, sd, ch[Math.floor(Math.random() * ch.length)].id); }
-    M.bots(m, sd, M.rng((D.seed + m.round * 3571 + seat * 131) >>> 0)); // the team's buildings' skills now and then (src/mpb.js hooks.bot)
+    const r = M.rng((D.seed + m.round * 3571 + seat * 131) >>> 0);
+    M.bots(m, sd, r); // the team's buildings' skills now and then (src/mpb.js hooks.bot, before the squads)
     G.aiDeploy(m, sd);
+    M.botsAfter(m, sd, r); // and those on its squads (hooks.botAfter)
     // the Vault: gold the carry cap would take next round goes in instead (a put round only)
     const spare = Math.min(m.gold[sd] - G.CARRY_CAP, M.vaultRoom(m, sd, 'put'));
     if (spare > 0) G.vaultPut(m, sd, spare);
@@ -567,6 +571,7 @@
     for (let k = 0; k < 4; k++) if (D.bots[k]) { setTeam(ms(D), SEATS[k].lane); G.aiLevel(laneOf(D, k).m, SEATS[k].side); }
     for (const m of ms(D)) G.settleTowerPicks(m);
     mpbSettle(D, now); // a draft pick or a placement vote still open: settled now
+    for (const m of ms(D)) m.fhSeed = M.rng((D.seed + m.round * 4111 + 17) >>> 0)() * 4294967296 >>> 0; // Field hospital's Field dressing picks (src/mpb.js): out of the views until the fight
     const f = fight(ms(D), D.hp);
     setTeams(ms(D));
     D.fights++;

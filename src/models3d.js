@@ -703,9 +703,38 @@ const Models3D = (THREE) => {
   BUILD['mpb:golem:gold'] = golem(GOLD, '#9A7418');
   // ===== treeKojja (3D) =====
   // ===== fieldHospital (3D) =====
+  // The Field hospital: a canvas ridge tent (the kind's colour, 'tint') on a ground sheet, its front (-z, toward its
+  // own side) with the flaps tied open round a dark doorway and a white disc with a soft green cross over it, hems
+  // and a pennant in the team colour, a supply crate by the door and its world detail: bandages drying on a line
+  const fhCross = (x, y, z, k = 1) => [P(box(0.16 * k, 0.56 * k, 0.06), '#6FB07E', [x, y, z]), P(box(0.56 * k, 0.16 * k, 0.06), '#6FB07E', [x, y, z])];
+  BUILD['mpb:fieldHospital'] = () => [
+    P(box(4.3, 0.1, 4.4), '#B9AE8E', [0, 0.05, 0]),
+    P(cyl(1.95, 1.95, 3.7, 3), 'tint', [0, 1.0, 0], [-Math.PI / 2, 0, 0]), // the tent: a three-sided prism lying along z, its ridge up
+    P(cyl(0.85, 0.85, 0.06, 3), '#4A4236', [0, 0.45, -1.86], [-Math.PI / 2, 0, 0]), // the doorway
+    ...[-1, 1].map(sd => P(box(0.5, 1.2, 0.06), '#DCD3BC', [sd * 0.62, 0.6, -1.9], [0, sd * 0.5, sd * -0.35])), // the flaps, tied back
+    P(cyl(0.36, 0.36, 0.05, 12), '#FAF7EE', [0, 1.95, -1.88], [Math.PI / 2, 0, 0]), ...fhCross(0, 1.95, -1.92, 0.9),
+    ...[-1, 1].map(sd => P(box(0.1, 0.22, 3.75), 'team', [sd * 1.62, 0.16, 0])), // the hems
+    P(cyl(0.05, 0.05, 1.3, 5), WOOD, [0, 3.45, 1.5]), P(box(0.05, 0.42, 0.75), 'team', [0, 3.85, 1.9]), // the ridge pole and its pennant
+    P(box(0.75, 0.6, 0.75), WOOD, [1.85, 0.32, -1.35]), ...fhCross(1.85, 0.36, -1.75, 0.6), // a supply crate
+    ...[-1, 1].map(sd => P(cyl(0.05, 0.05, 1.6, 5), WOOD, [-2.2, 0.8, sd * 1.25])), P(box(0.03, 0.03, 2.5), '#8E8670', [-2.2, 1.5, 0]), // the washing line
+    ...[-0.7, 0, 0.7].map((z, k) => P(box(0.04, 0.55 - k * 0.08, 0.22), '#FAF7EE', [-2.2, 1.2 + k * 0.04, z]))]; // and the bandages on it
   // ===== coalMine (3D) =====
   // ===== scorch (3D) =====
   // ===== oak (3D) =====
+  // The Oak: an old broad tree: a thick gnarled trunk (the kind's colour, 'tint') on spreading roots, a ribbon in the
+  // team colour round it, a calm sleeping face on its front (-z: shut eyes, a small smile), crooked boughs under a
+  // wide lumpy crown of three dusty greens with acorns, and its world detail: a rope swing from the low bough
+  const OAK_LEAF = ['#66864A', '#7A9856', '#93AE66'];
+  BUILD['mpb:oak'] = () => [
+    P(cyl(0.75, 1.05, 3.4, 8), 'tint', [0, 1.7, 0]),
+    ...[0, 1, 2, 3, 4].map(k => { const a = k * Math.PI * 2 / 5 + 0.3; return P(box(0.45, 0.4, 1.5), '#5E4329', [Math.sin(a) * 1.05, 0.2, Math.cos(a) * 1.05], [0, a, 0]); }), // roots
+    P(new THREE.TorusGeometry(0.86, 0.1, 4, 14), 'team', [0, 1.05, 0], [Math.PI / 2, 0, 0]), // the ribbon
+    ...[-1, 1].map(sd => P(box(0.26, 0.05, 0.05), '#3A2616', [sd * 0.24, 2.15, -0.8], [0, 0, sd * 0.25])), P(box(0.3, 0.05, 0.05), '#3A2616', [0, 1.85, -0.82]), // shut eyes, a small smile
+    ...[[-1, 3.0, 0.9], [1, 3.2, -0.8], [-0.4, 3.5, -1.1]].map(([sd, y, a]) => P(cyl(0.18, 0.28, 1.7, 6), '#6A4C2C', [sd * 0.8, y, 0], [0, a, sd * 0.9])), // boughs
+    ...[[0, 4.9, 0, 1.75, 1], [-1.45, 4.2, 0.3, 1.35, 0], [1.45, 4.35, -0.25, 1.3, 0], [0.35, 5.75, 0.55, 1.15, 2], [-0.65, 5.3, -0.95, 1.05, 2], [0.9, 4.0, 1.0, 1.0, 1]]
+      .map(([x, y, z, r, c]) => P(ball(r), OAK_LEAF[c], [x, y, z])), // the crown
+    ...[[-1.9, 3.7, -0.5], [1.7, 3.6, -0.9], [0.2, 4.0, -1.7], [-0.9, 5.6, -1.4]].map(p => P(ball(0.13), '#8C6239', p)), // acorns
+    ...[-1, 1].map(sd => P(box(0.03, 2.1, 0.03), '#B79A6E', [-1.75 + sd * 0.28, 2.35, -0.7])), P(box(0.75, 0.08, 0.3), WOOD, [-1.75, 1.3, -0.7])]; // the swing
   // ===== factory (3D) =====
   // The 2v2 team Factory: the Cog Builder's brick workshop (factory() above, in the kind's colour) with a band in the team
   // colour round the eaves and a tall flagpole at its left front corner flying a big swallow-tailed team banner with a

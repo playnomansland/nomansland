@@ -151,9 +151,78 @@
     text: 'Shoots like the Outpost, 20 m range, sees stealth in range.', downside: 'Destroyed: the next round it works for the opponents.', skills: [], hooks: {} });
 
   // ===== fieldHospital =====
+  // A canvas field tent (group B2). Squads of either teammate deployed on its tile's 8 neighbours (Chebyshev 1) get
+  // +FH.hp % health and FH.regen % of their health a second in the fight (squadMods). A round the team wins with the
+  // hospital standing: +FH.win Team HP (never above the team's starting health, TEAM_HP_CAP); destroyed: −FH.lose.
+  // Field dressing (50, +50 for each of your clicks this round): each click gives a random allied squad (either
+  // player's, picked when the fight starts: Engine opts.mpb.fieldHospital.dress, seeded from the match) +FH.dress %
+  // health for this fight. Second wind (100, once a round for the team): the chosen allied squad (args: its lane and
+  // its id in that lane) comes back whole, once, on the tile in front of the hospital the first time it is wiped out
+  // (bodies marked b.fhRevive; the Engine brings them back). rec.data.wind = { round, lane, id }.
+  const FH = { hp: 20, regen: 2, win: 5, lose: 15, dress: 25, range: 1 };
+  const TEAM_HP_CAP = 2 * G.START_HP; // a team's starting health (Duo.HP): Team HP heals never go above it (also the Oak's)
+  const fhNear = (rec, sq) => Math.max(Math.abs(sq.col - rec.col), Math.abs(sq.row - rec.row)) <= FH.range;
+  const fhClicks = (m, rec, id) => { const e = rec.skills[id]; return e && e.round === m.round ? e.log.length : 0; };
+  const fhWind = (m, rec) => { const w = rec.data.wind; return w && w.round === m.round && fhClicks(m, rec, 'wind') > 0 ? w : null; };
+  const fhFront = (rec, side) => ({ col: rec.col, row: rec.row + (side === 0 ? -1 : 1) }); // where Second wind brings a squad back (toward the enemy)
+  const fhTeam = (side) => side === 0 ? 'Team A' : 'Team B';
+  const fhTarget = (args) => (args[0] === 0 || args[0] === 1) && Number.isInteger(args[1]) && args[1] >= 0;
   def({ id: 'fieldHospital', name: 'Field hospital', short: 'fh', kind: 'support', hp: 600, armor: 2, color: '#E8E2D0',
-    text: 'Squads deployed within 1 tile: +20% health and 2%/s regen in the fight. Each round won with it standing: +5 Team HP. Can’t shoot.',
-    downside: 'Destroyed: −15 Team HP.', skills: [], hooks: {} });
+    text: `Squads deployed within 1 tile: +${FH.hp}% health and ${FH.regen}% health a second in the fight. Each round your team wins with it standing: +${FH.win} Team HP. Can’t shoot.`,
+    downside: `Destroyed: −${FH.lose} Team HP.`,
+    skills: [
+      { id: 'dress', name: 'Field dressing', cost: 50, costStep: 50, per: 'free', text: `A random allied squad (yours or your teammate’s) gets +${FH.dress}% health for this round’s fight. Click as often as you like.` },
+      { id: 'wind', name: 'Second wind', cost: 100, per: 'round', pick: true, text: 'Pick an allied squad: the first time it is wiped out in this round’s fight, it comes back whole on the tile in front of the hospital.' },
+    ],
+    hooks: {
+      canBuy: (m, side, rec, sk, args) => sk.id !== 'wind' || fhTarget(args), // the squad: (lane, id); a squad that is gone by the fight just doesn't come back
+      bought(m, side, rec, sk, args) { if (sk.id === 'wind') rec.data.wind = { round: m.round, lane: args[0], id: args[1] }; },
+      unbuy(m, side, rec, sk) { if (sk.id === 'wind') rec.data.wind = null; },
+      // pick another squad for this round's Second wind (either of you)
+      canAct: (m, side, rec, action, args) => action === 'wind' && !!fhWind(m, rec) && fhTarget(args),
+      act(m, side, rec, action, args) { rec.data.wind = { round: m.round, lane: args[0], id: args[1] }; return true; },
+      squadMods(m, side, rec, sq, u) {
+        if (!fhNear(rec, sq) || G.isRider(sq)) return u;
+        return { ...u, hp: u.hp * (1 + FH.hp / 100), regen: (u.regen || 0) + FH.regen };
+      },
+      squadBodies(m, side, rec, sq, list) {
+        const w = fhWind(m, rec);
+        if (!w || w.lane !== laneOf(m) || w.id !== sq.id) return;
+        const at = G.tileToWorld(fhFront(rec, side).col, fhFront(rec, side).row);
+        for (const b of list) b.fhRevive = { x: at.x, y: at.y };
+      },
+      // Field dressing: one seeded number a click (the Engine picks the squad from all the side's squads in the fight)
+      battleOpts(m, side, rec, opts) {
+        const o = opts.mpb.fieldHospital || (opts.mpb.fieldHospital = { dress: [[], []], pct: FH.dress });
+        // seeded from m.fhSeed (Duo.runFight sets it from the duo's seed, which no seat's view holds, just before the
+        // fight, so nobody can work the picks out while deploying; the fight's snapshots carry it), else the match's seed
+        const n = fhClicks(m, rec, 'dress'), r = rng(((m.fhSeed != null ? m.fhSeed : m.seed) >>> 0) + m.round * 7919 + 4111 >>> 0); // the same numbers for both sides: a mirror is a mirror
+        for (let k = 0; k < n; k++) o.dress[side].push(r());
+      },
+      afterFight(lanes, side, rec, res, sums, round, hp) {
+        if (rec.fell === round) {
+          hp[side] = Math.max(0, hp[side] - FH.lose);
+          news(sums, side, { kind: 'fieldHospital', lost: FH.lose, text: `${fhTeam(side)}’s Field hospital was destroyed: −${FH.lose} Team HP.` });
+        } else if (res.winner === side && hp[side] > 0) {
+          const was = hp[side];
+          hp[side] = Math.min(Math.max(was, TEAM_HP_CAP), was + FH.win);
+          if (hp[side] > was) news(sums, side, { kind: 'fieldHospital', healed: hp[side] - was, text: `${fhTeam(side)}’s Field hospital: +${hp[side] - was} Team HP for the round won.` });
+        }
+      },
+      hide(s, h, rec) { if (rec.data.wind && rec.data.wind.round === s.round) rec.data.wind = null; },
+      info(m, side, rec) {
+        const w = fhWind(m, rec), d = fhClicks(m, rec, 'dress');
+        return [d ? `Field dressing this round: ${d}×` : '', w ? `Second wind this round: squad ${w.id} of ${w.lane === laneOf(m) ? 'yours' : 'your teammate’s'}` : ''];
+      },
+      // a bot (Duo.botTurn): Field dressing now and then, Second wind on its dearest squad when it is rich
+      botAfter(m, side, rec) {
+        const r = rng(((m.seed >>> 0) + m.round * 131 + laneOf(m) * 17 + 5) >>> 0);
+        if (m.gold[side] >= 250 && r() < 0.4) mpbBuy(m, side, rec.key, 'dress');
+        const best = m.armies[side].filter(q => !G.isRider(q)).sort((a, b) => (b.cost || 0) - (a.cost || 0) || a.id - b.id)[0];
+        if (best && m.gold[side] >= 300 && r() < 0.3) mpbBuy(m, side, rec.key, 'wind', laneOf(m), best.id);
+      },
+    },
+  });
 
   // ===== coalMine =====
   def({ id: 'coalMine', name: 'Coal mine', short: 'cm', kind: 'technical', hp: 700, armor: 4, color: '#4A4440',
@@ -167,8 +236,91 @@
     downside: 'A turret destroyed doesn’t fight the next round.', place: { where: 'own', spacing: true }, skills: [], hooks: {} });
 
   // ===== oak =====
+  // An old oak (group B2). Restoration: while it stands in a fight, every heal and regen on its team's bodies is
+  // ×(1 + OAK.restore %) (Engine opts.mpb.oak; the Oak's body carries b.oakRestore), ×(1 + OAK.boosted %) the round
+  // Double restoration was bought. Heal (50, once a round each): +OAK.heal Team HP, added before the round's fight
+  // takes its damage (hooks.teamHp), never above the team's starting health. Sticky moss (200, once a match): every
+  // tile within OAK.moss of the Oak is moss (mud tiles in opts.tiles): the opponents' bodies on it move OAK.slow %
+  // slower (the strongest slow counts; Berserkers can't be slowed). Downside: the round after it was destroyed, a
+  // 1-body level 3 Ent with all its skills fights for the opponents, in front of their tower (hooks.foeBodies).
+  const OAK = { restore: 25, boosted: 50, heal: 5, moss: 3, slow: 30, ent: 'Ent', entLevel: 2, entJ: 9 }; // entLevel 2: the third level ("level 3")
+  const oakClicks = (m, rec, id) => { const e = rec.skills[id]; return e && e.round === m.round ? e.log.length : 0; };
+  const oakRestore = (m, rec) => 1 + (oakClicks(m, rec, 'boost') > 0 ? OAK.boosted : OAK.restore) / 100;
+  const oakEntDue = (m, rec) => rec.fell > 0 && m.round === rec.fell + 1;
+  // the moss: the tiles within OAK.moss of the Oak (on the board, its own tile too), once Sticky moss is bought
+  function oakMossTiles(m, rec) {
+    if (skillN(rec, 'moss') <= 0) return [];
+    const { COLS, ROWS } = grid(m), out = [];
+    for (let dr = -OAK.moss; dr <= OAK.moss; dr++) for (let dc = -OAK.moss; dc <= OAK.moss; dc++) {
+      const col = rec.col + dc, row = rec.row + dr;
+      if (col >= 0 && col < COLS && row >= 0 && row < ROWS) out.push({ col, row });
+    }
+    return out;
+  }
+  // the Ent the opponents get: one body, level 3, every skill of the unit (null when the roster has no Ent)
+  function oakEntUnit(m) {
+    const ui = (m.units || []).findIndex(u => u && u.name === OAK.ent);
+    if (ui < 0) return null;
+    const base = { ...m.units[ui], bodies: 1 }, defs = E.SLOTS.map(k => G.skillDef(m, ui, k)).filter(Boolean);
+    return { ui, u: { ...(defs.length ? E.applySkills(base, defs, m.units) : E.withTraits(base)), bodies: 1 } };
+  }
   def({ id: 'oak', name: 'The Oak', short: 'oak', kind: 'support', hp: 1200, armor: 3, color: '#7A5A36',
-    text: 'Restoration: all healing and regen of the team +25%.', downside: 'The round after it was destroyed, a level 3 Ent with all its skills fights for the opponents.', skills: [], hooks: {} });
+    text: `Restoration: while it stands in a fight, all healing and regeneration of your team is +${OAK.restore}% as effective. Can’t shoot.`,
+    downside: 'The round after it was destroyed, a level 3 Ent with all its skills fights for the opponents.',
+    skills: [
+      { id: 'heal', name: 'Heal', cost: 50, per: 'roundPlayer', text: `+${OAK.heal} Team HP (before this round’s fight; never above your starting health).` },
+      { id: 'boost', name: 'Double restoration', cost: 100, per: 'round', text: `Restoration is +${OAK.boosted}% instead of +${OAK.restore}% in this round’s fight.` },
+      { id: 'moss', name: 'Sticky moss', cost: 200, per: 'match', text: `For good: moss on every tile within ${OAK.moss} tiles of the Oak. Enemies on it move ${OAK.slow}% slower (Berserkers can’t be slowed).` },
+    ],
+    hooks: {
+      bodies(m, side, rec, ctx) {
+        const out = ctx.main();
+        for (const b of out) b.oakRestore = oakRestore(m, rec);
+        return out;
+      },
+      battleOpts(m, side, rec, opts) {
+        opts.mpb.oak = true; // Restoration (the Engine reads b.oakRestore of a standing Oak)
+        const moss = oakMossTiles(m, rec);
+        if (!moss.length) return;
+        const h = G.TILE / 2;
+        opts.tiles = (opts.tiles || []).concat(moss.map(t => { const w = G.tileToWorld(t.col, t.row); return { x0: w.x - h, x1: w.x + h, y0: w.y - h, y1: w.y + h, type: 'mud', side, slow: OAK.slow, oak: true }; }));
+      },
+      // Heal: +OAK.heal Team HP a click this round, before the fight's damage (Duo.fight -> Mpb.teamHeal)
+      teamHp(lanes, side, rec, hp, round, sums) {
+        const e = rec.skills.heal, n = e && e.round === round ? e.log.length : 0;
+        if (!(n > 0 && hp[side] > 0)) return;
+        const was = hp[side];
+        hp[side] = Math.min(Math.max(was, TEAM_HP_CAP), was + OAK.heal * n);
+        if (sums && hp[side] > was) news(sums, side, { kind: 'oak', healed: hp[side] - was, text: `${side === 0 ? 'Team A' : 'Team B'}’s Oak: +${hp[side] - was} Team HP.` });
+      },
+      // the downside: the round after the Oak fell, an Ent for the opponents (side: the team it fights for)
+      foeBodies(m, side, rec, ctx) {
+        if (!oakEntDue(m, rec)) return [];
+        const e = oakEntUnit(m), t = (m.towers && m.towers[side]) || G.towerSpot(m, side);
+        if (!e || !t) return [];
+        const w = G.tileToWorld(t.col, t.row + (side === 0 ? -1 : 1));
+        const out = E.buildSquad(e.u, side, w.x, w.y, ctx.xsq(OAK.entJ), G.TILE, ctx.idx, OAK.entLevel);
+        const tier = G.tierOf(m.units, e.ui);
+        for (const b of out) b.tier = tier;
+        return out;
+      },
+      afterFight(lanes, side, rec, res, sums, round) {
+        if (rec.fell === round) news(sums, side, { kind: 'oak', ent: true, text: `${side === 0 ? 'Team A' : 'Team B'}’s Oak was destroyed: next round a level 3 Ent fights for ${side === 0 ? 'Team B' : 'Team A'}.` });
+      },
+      info(m, side, rec) {
+        const k = Math.round((oakRestore(m, rec) - 1) * 100), h = oakClicks(m, rec, 'heal');
+        return [`Restoration +${k}%${k !== OAK.restore ? ' this round' : ''}`, h ? `+${h * OAK.heal} Team HP before this round’s fight` : '',
+          skillN(rec, 'moss') > 0 ? `Sticky moss within ${OAK.moss} tiles` : '', oakEntDue(m, rec) ? 'Destroyed last round: an Ent fights for the opponents this round' : ''];
+      },
+      // a bot (Duo.botTurn): Heal when the team is hurt, the moss once it is rich, Double restoration now and then
+      botAfter(m, side, rec) {
+        const r = rng(((m.seed >>> 0) + m.round * 137 + laneOf(m) * 19 + 7) >>> 0), hp = (m.hp && m.hp[side]) || 0;
+        if (hp > 0 && hp <= TEAM_HP_CAP - 40 && m.gold[side] >= 150 && r() < 0.6) mpbBuy(m, side, rec.key, 'heal');
+        if (m.gold[side] >= 300 && r() < 0.5) mpbBuy(m, side, rec.key, 'moss');
+        if (m.gold[side] >= 300 && r() < 0.25) mpbBuy(m, side, rec.key, 'boost');
+      },
+    },
+  });
 
   // ===== factory =====
   // The Cog Builder's Factory (Game BUILDINGS 'factory', src/faction-units.json) as a team building: standing at once
@@ -636,6 +788,12 @@
         main: () => { if (!(K.hp > 0)) return []; const w = G.tileToWorld(rec.col, rec.row); return E.buildSquad(unitOf(m, side, rec), side, w.x, w.y, squadOf(k), G.TILE, idx); } };
       out.push(...(K.hooks.bodies ? K.hooks.bodies(m, side, rec, ctx) : ctx.main()));
     });
+    // bodies the other team's buildings give this side (hooks.foeBodies; the Oak's downside: an Ent): squad ids
+    // xsq(j) of that building's index k (j chosen by the kind so it never meets this side's own)
+    recs(m, 1 - side).forEach((rec, k) => {
+      const K = kindOf(rec.kind);
+      if (K && K.hooks.foeBodies) out.push(...K.hooks.foeBodies(m, side, rec, { k, xsq: (j) => extraOf(k, j), idx: idx0 + 400 + k * 20 }));
+    });
     return out;
   }
   // the Engine options the buildings add (opts.mpb: fields the kinds fill; opts as a whole for tiles and the like).
@@ -658,8 +816,15 @@
   // asks unitOff: such a unit (u.mpbUnit = the kind) is off for a team without a building of that kind (group B5)
   const extraUnits = (units) => Object.values(KINDS).flatMap(K => (K.extraUnits ? K.extraUnits(units) : []));
   const unitOff = (m, side, ui) => { const u = m && m.units && m.units[ui]; return !!(u && u.mpbUnit) && !(side != null && recs(m, side).some(r => r.kind === u.mpbUnit)); };
-  // the bots' turn (Duo.botTurn, before its squads): each building's hooks.bot(m, side, rec, r), r a seeded 0..1 source
-  function bots(m, side, r) { if (!on(m)) return; for (const rec of recs(m, side).slice()) { const K = kindOf(rec.kind); if (K && K.hooks.bot) K.hooks.bot(m, side, rec, r); } }
+  // A bot's turn (Duo.botTurn, in the bot's lane m; r: a seeded 0..1 source): each building's hooks.bot(m, side, rec, r)
+  // before its squads (Game.aiDeploy), then hooks.botAfter(m, side, rec, r) after them (a skill on a squad it just
+  // placed). Never throws: a kind's bot slip leaves the turn as it is.
+  function botsBy(hook, m, side, r) {
+    if (!on(m)) return;
+    for (const rec of recs(m, side).slice()) { const K = kindOf(rec.kind); if (K && K.hooks[hook]) { try { K.hooks[hook](m, side, rec, r); } catch (e) {} } }
+  }
+  const bots = (m, side, r) => botsBy('bot', m, side, r);
+  const botsAfter = (m, side, r) => botsBy('botAfter', m, side, r);
   // a line for the results screen: summaries[L].mpbNews[side] gets { kind, ... } (the page words it)
   function news(sums, side, item) { for (const s of sums) { if (!s.mpbNews) s.mpbNews = [[], []]; s.mpbNews[side].push(item); } }
   // After the fight (Duo.fight, both lanes resolved): fell, the kinds' afterFight, the artifacts' winners and gold.
@@ -682,6 +847,13 @@
       for (const a of A.list) if (a.won >= 0) for (const L of lanes) L.gold[a.won] += ARTIFACT.gold;
       for (const L of lanes.slice(1)) L.artifacts = clone(A);
     }
+  }
+  // Team HP changes bought for round `round`'s fight (hooks.teamHp: the Oak's Heal), before the fight's damage comes
+  // off (Duo.fight; the lanes may be in the next round already). hp: the shared Team HP [team A, team B], changed.
+  function teamHeal(lanes, hp, round, sums) {
+    const m = lanes[0];
+    if (!on(m)) return;
+    for (const side of [0, 1]) for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.teamHp) K.hooks.teamHp(lanes, side, rec, hp, round, sums); }
   }
   // the start of a round (Duo.beginRound): this round's skill logs start empty, then the kinds' roundStart
   function roundStart(lanes) {
@@ -807,10 +979,10 @@
     voteQueue, voteHead, queue, placeHead, mpbVote, voteResult,
     skillCost, whyNot, canBuy, mpbBuy, canUndo, mpbUndo, mpbAct,
     vaultOf, vaultRec, vaultMode, vaultMoved, vaultRoom, canVault, vaultPut, vaultTake, golemOf, golemUnit, golemSkin,
-    hide, unitOf, squadOf, extraOf, indexOf, isSquad, bodies, battleOpts, squadMods, squadBodies, news, afterFight, roundStart,
+    hide, unitOf, squadOf, extraOf, indexOf, isSquad, bodies, battleOpts, squadMods, squadBodies, news, afterFight, roundStart, teamHeal, FH, OAK, oakMossTiles, oakEntUnit,
     cardPool, cardName, cardText, rollArtifacts, artifactsFor,
     dealDraft, draftOpen, draftTurn, giveCard, applyDraft, draftPick, botPick, rng, laneOf, on,
-    extraUnits, unitOff, bots,
+    extraUnits, unitOff, bots, botsAfter,
     // the Factory and the Shadow Den (group B5)
     FAC, facNow, facResting, DEN, LANE_OFF, denOf, denUnit, handsIdx, isHands, denResting, shadowBonus, sabotaged, sabNow, sabLive, watching, deployCut, impTargets, impFind, impNow,
   };
