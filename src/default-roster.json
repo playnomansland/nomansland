@@ -2386,10 +2386,12 @@
       "stealth": true,
       "dash": 10,
       "bldgPct": 50,
-      "bleedHit": 2,
+      "bleedHit": 3,
+      "anywhere": true,
+      "noBldg": true,
       "trait": {
         "name": "Stealthed",
-        "text": "Hidden until it attacks. Hides again 1.5 s after it stops attacking."
+        "text": "Hidden until it attacks. Hides again 1.5 s after it stops attacking. Place it on any free tile, even in enemy land, but not next to a building."
       },
       "trait2": {
         "name": "Shadow dash",
@@ -2397,11 +2399,11 @@
       },
       "trait3": {
         "name": "Bloodrush",
-        "text": "Hits add 2 bleed."
+        "text": "Hits add 3 bleed."
       },
       "trait4": {
         "name": "Light blade",
-        "text": "−50% damage to buildings."
+        "text": "−50% damage to buildings. Ignores buildings while any unit is left to hit."
       },
       "skills": [
         "silentBlade",

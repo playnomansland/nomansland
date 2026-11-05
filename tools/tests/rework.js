@@ -30,7 +30,7 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
   const gb = withSkills('Goblin Swarm', ['aaargh', 'tacticalness']); assert.ok(near(gb.speed, 8.3) && near(gb.aps, 1.5) && gb.bodies === 15 && gb.spread);
   const ws = withSkills('Wisps', ['sightweavers', 'shadowborn']); assert.ok(ws.range === 21 && ws.shrinkM === 2 && ws.stealth && ws.firstHit === 25);
   const im = withSkills('Ember Imps', ['hellfiend']).portal.unit;
-  assert.ok(im.name === 'Hellfiend' && im.hp === 2200 && im.hit === 196 && im.speed === 4.5 && im.flame === 90, 'Hellfiend: a level 2 Brute');
+  assert.ok(im.name === 'Hellfiend' && near(im.hp, 2200 * 0.7) && near(im.hit, 196 * 0.7) && im.speed === 3.15 && im.flame === 90, 'Hellfiend: a level 2 Brute, -30% (the roster\'s hp/hit/aps -30, speed 3.15)');
   assert.ok(withSkills('Brute', ['tuffSkin']).bonusArmor === 4 && withSkills('Brute', ['bullhead']).bonusArmor === 4);
 }
 // burn: half the hit at once, half over 3 s (50%, 33%, 17% of it); a new burn adds to it and starts again
@@ -69,7 +69,7 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
   assert.ok(!v.alive, 'one blow kills');
   assert.ok(!a.u.killStack && !(a.kills > 0), 'no kill stacks any more (Bloodrush is bleed now)');
   const a2 = body(unit('Assassin'), 0, 0, -1.5), tw = body(dummy(2000, { structure: true }), 1, 0, 0);
-  const bt2 = E.createBattle([a2], [tw, body(dummy(10), 1, 40, 40, 19)], G); // a structure alone isn't an army: someone far off
+  const bt2 = E.createBattle([a2], [tw, body(dummy(10, { stealth: true }), 1, 40, 40, 19)], G); // a structure alone isn't an army: someone far off (hidden, so the building is all it can pick: it ignores buildings otherwise)
   for (let k = 0; k < 100 && tw.hp === 2000; k++) bt2.step();
   assert.ok(near(2000 - tw.hp, 250), `half damage to a building (${2000 - tw.hp})`);
   // Silent blade: still hidden after the first strike, seen after the second
@@ -80,24 +80,25 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
   for (let k = 0; k < 100 && big.hp > 4000; k++) bt3.step();
   assert.ok(!s.hidden, 'the second gives it away');
 }
-// Bloodrush: every hit it lands gives the target 2 stacks of bleed (Death Flurry: every blow)
+// Bloodrush: every hit it lands gives the target 3 stacks of bleed (2 until 2026-11-06; Death Flurry: every blow), up to BLEED.max
 {
-  assert.strictEqual(unit('Assassin').bleedHit, 2);
-  assert.ok(/2 bleed/.test(unit('Assassin').trait3.text) && unit('Assassin').trait3.name === 'Bloodrush');
+  assert.strictEqual(unit('Assassin').bleedHit, 3);
+  assert.ok(/3 bleed/.test(unit('Assassin').trait3.text) && unit('Assassin').trait3.name === 'Bloodrush');
+  const MAX = E.BLEED.max;
   const a = body({ ...unit('Assassin'), aps: 1 }, 0, 0, -1.5), v = body(dummy(1e5), 1, 0, 0); // quicker, so the bleed is still on at the next hit
   const bt = E.createBattle([a], [v], G);
   for (let k = 0; k < 100 && v.hp === v.u.hp; k++) bt.step();
-  assert.ok(v.bleed && v.bleed.n === 2 && v.bleed.src === a, `2 stacks from one hit (${v.bleed && v.bleed.n})`);
-  for (let k = 0; k < 200 && v.bleed && v.bleed.n === 2; k++) bt.step();
-  assert.ok(v.bleed && v.bleed.n === 4, 'two hits: 4 stacks');
+  assert.ok(v.bleed && v.bleed.n === Math.min(MAX, 3) && v.bleed.src === a, `3 stacks from one hit (${v.bleed && v.bleed.n})`);
+  for (let k = 0; k < 200 && v.bleed && v.bleed.n === 3; k++) bt.step();
+  assert.ok(v.bleed && v.bleed.n === Math.min(MAX, 6), `two hits: 6 stacks, capped at ${MAX}`);
   const f = body(withSkills('Assassin', ['deathFlurry']), 0, 0, -1.5), w = body(dummy(1e5), 1, 0, 0);
   const bt2 = E.createBattle([f], [w], G);
   for (let k = 0; k < 100 && w.hp === w.u.hp; k++) bt2.step();
-  assert.strictEqual(w.bleed.n, 2, 'the first blow: 2 stacks');
+  assert.strictEqual(w.bleed.n, Math.min(MAX, 3), 'the first blow: 3 stacks');
   steps(bt2, 0.5);
-  assert.strictEqual(w.bleed.n, 4, 'the second blow: 4');
+  assert.strictEqual(w.bleed.n, Math.min(MAX, 6), 'the second blow: 6, capped');
   steps(bt2, 0.5);
-  assert.strictEqual(w.bleed.n, 5, 'the third: capped at 5');
+  assert.strictEqual(w.bleed.n, MAX, 'the third: capped');
 }
 // Death Flurry and Shadow hunter ignore the enemy tower: they go for units, and only hit the tower when nothing else
 // is left that they could pick (here: a Sniper safe inside it), so a fight can't stall
@@ -117,13 +118,18 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
     steps(bt2, 6);
     assert.ok(tw2.hp < 3000, `${ids}: with nothing else to pick it hits the tower (${3000 - tw2.hp})`);
   }
-  // a plain Assassin still goes for the nearest, the tower too; lesser structures (treasury, watchtowers) aren't ignored
+  // since 2026-11-06 a plain Assassin ignores every building too (noBldg, built in): the tower and lesser structures
+  // (treasury, watchtowers); noTower alone (the skills, on another unit) still only skips the tower
   const p = body(unit('Assassin'), 0, 0, -1.5), tw = tower(), far = body(dummy(1e5), 1, 0, 25, 91);
-  const bt = E.createBattle([p], [tw, far], G); steps(bt, 4);
-  assert.ok(tw.hp < 3000, 'without the skills it hits the tower in its way');
-  const q = body(withSkills('Assassin', ['deathFlurry']), 0, 0, -1.5), tr = body(dummy(3000, { structure: true, lesser: true }), 1, 0, 0, 93), far2 = body(dummy(1e5), 1, 0, 25, 94);
-  const bt3 = E.createBattle([q], [tr, far2], G); steps(bt3, 4);
-  assert.ok(tr.hp < 3000, 'a treasury is not the tower');
+  assert.ok(p.u.noBldg, 'built in');
+  const bt = E.createBattle([p], [tw, far], G); steps(bt, 8);
+  assert.ok(tw.hp === 3000 && far.hp < far.u.hp, `without the skills it walks past the tower too (${3000 - tw.hp})`);
+  const q = body(unit('Assassin'), 0, 0, -1.5), tr = body(dummy(3000, { structure: true, lesser: true }), 1, 0, 0, 93), far2 = body(dummy(1e5), 1, 0, 25, 94);
+  const bt3 = E.createBattle([q], [tr, far2], G); steps(bt3, 8);
+  assert.ok(tr.hp === 3000 && far2.hp < far2.u.hp, 'and past a treasury');
+  const q2 = body({ ...withSkills('Assassin', ['deathFlurry']), noBldg: false }, 0, 0, -1.5), tr2 = body(dummy(3000, { structure: true, lesser: true }), 1, 0, 0, 93), far3 = body(dummy(1e5), 1, 0, 25, 94);
+  const bt5 = E.createBattle([q2], [tr2, far3], G); steps(bt5, 4);
+  assert.ok(tr2.hp < 3000, 'noTower alone: a treasury is not the tower');
   // Death Flurry never leaps to the tower: a kill leaps it to the unit beyond
   const c = body(withSkills('Assassin', ['deathFlurry']), 0, 0, -1.5);
   const v1 = body(dummy(150), 1, 0, 0, 95), tw3 = body(dummy(3000, { structure: true }), 1, 3, 0, 96), v2 = body(dummy(1000), 1, 8, 0, 97);
@@ -136,8 +142,8 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
   const a = body(withSkills('Assassin', ['deathFlurry']), 0, 0, -1.5);
   const v1 = body(dummy(150), 1, 0, 0, 11), v2 = body(dummy(1000), 1, 7, 0, 12);
   const bt = E.createBattle([a], [v1, v2], G);
-  steps(bt, 2);
-  assert.ok(!v1.alive && 1000 - v2.hp >= 400 - 1e-6 && 1000 - v2.hp < 450 && v2.bleed && v2.bleed.n === 4, `the 2nd and 3rd blows on the next target, and their bleed (${1000 - v2.hp})`);
+  steps(bt, 2); // (400 from the blows; the rest is bleed: 3 stacks a blow since 2026-11-06, so more of it than the 50 it was)
+  assert.ok(!v1.alive && 1000 - v2.hp >= 400 - 1e-6 && 1000 - v2.hp < 550 && v2.bleed && v2.bleed.n === E.BLEED.max, `the 2nd and 3rd blows on the next target, and their bleed (${1000 - v2.hp})`);
   assert.ok(Math.hypot(a.x - v2.x, a.y - v2.y) < 2, 'it leapt there');
 }
 // Shadow hunter: a lone target over one in a crowd
@@ -196,17 +202,18 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
   const hf = () => bt.bodies.filter(b => b.u.name === 'Hellfiend');
   bt.step(); assert.strictEqual(bt.portals().length, 1);
   assert.strictEqual(hf().length, 0, 'no hellfiend while the imps summon');
-  steps(bt, 2.5);
+  const secs = skill('hellfiend').params.secs; // (4 s in the roster now)
+  steps(bt, secs - 0.5);
   assert.ok(imps.every((b, i) => b.alive && Math.abs(b.y - y0[i]) < 0.5 && !(b.lastAtk > 0)), 'the imps hold still while they summon');
   steps(bt, 0.6);
-  assert.strictEqual(bt.portals().length, 0, 'the portal closes after 3 s');
+  assert.strictEqual(bt.portals().length, 0, `the portal closes after ${secs} s`);
   assert.ok(imps.every(b => !b.alive && b.sacrificed), 'the imps are sacrificed');
-  assert.ok(hf().length === 1 && hf()[0].u.hp === 4400 && hf()[0].credit === imps[0] && hf()[0].alive, 'one level 2 hellfiend for a level 2 squad');
+  assert.ok(hf().length === 1 && near(hf()[0].u.hp, 2 * u.portal.unit.hp) && hf()[0].credit === imps[0] && hf()[0].alive, 'one level 2 hellfiend for a level 2 squad');
   // a squad that falls before the summon is done brings nothing
   const imps2 = E.buildSquad(u, 0, 0, -10, 1, 6, 0, 0);
   const bt2 = E.createBattle(imps2, [body(dummy(1e6), 1, 0, 30)], G);
   bt2.step(); for (const b of imps2) { b.hp = 0; b.alive = false; }
-  steps(bt2, 3.5); assert.ok(!bt2.bodies.some(b => b.u.name === 'Hellfiend'), 'no hellfiend once the imps fell');
+  steps(bt2, secs + 0.5); assert.ok(!bt2.bodies.some(b => b.u.name === 'Hellfiend'), 'no hellfiend once the imps fell');
 }
 // either-or, Awaken: needs skill 2 or 3, always 300 gold, doesn't make the others dearer
 // (Overwatch left the Sniper on 2026-11-03 for Hunter but stays in the skill library: this block gives it back to test it)

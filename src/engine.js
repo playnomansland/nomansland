@@ -35,6 +35,9 @@ const Engine = (() => {
   // lesser one: not the treasury, a watchtower, a wall or a building) while any other enemy can be picked: it goes for
   // units. With nothing else left to pick (only bodies it can't reach, like a Sniper safe in that tower or stealthed
   // units) it attacks the tower after all, so a fight never stalls on it.
+  // noBldg (the Assassin's own, since 2026-11-06): the same for every structure (the tower, the treasury, watchtowers,
+  // walls, buildings: anything with u.structure) while any enemy that isn't one can be picked. An enemy wall between it
+  // and the unit it walks to, within its reach, may still be hit (see validTargets), so a wall in its way can't freeze it.
   // bleedHit (the Assassin's Bloodrush): every hit it lands gives the target that many stacks of bleed (see BLEED).
   // burn (% of each hit): that share of a hit becomes burn instead of landing at once. A burning body takes, once a
   // second, BURN.share[k] of what is left to burn (half, then two thirds, then the rest: 50%, 33%, 17%); a new burn adds
@@ -1343,21 +1346,25 @@ const Engine = (() => {
     // the side's tower (not a lesser structure: treasury, watchtower, wall, building)
     const isTower = (f) => !!f.u.structure && !f.u.lesser;
     // noTower: whether side s has any body an enemy could pick other than its tower (worked out once a tick)
-    const othersAt = [-1, -1], othersUp = [false, false];
-    function othersThan(s) {
-      if (othersAt[s] !== tick) {
-        othersAt[s] = tick; othersUp[s] = false;
-        for (const f of sides[s]) if (f.alive && !f.hidden && !f.turning && !f.u.aloft && !sheltered(f) && !isTower(f)) { othersUp[s] = true; break; }
+    // (bldg: other than any structure, for noBldg; cached apart, at k = s + 2)
+    const othersAt = [-1, -1, -1, -1], othersUp = [false, false, false, false];
+    function othersThan(s, bldg) {
+      const k = bldg ? s + 2 : s;
+      if (othersAt[k] !== tick) {
+        othersAt[k] = tick; othersUp[k] = false;
+        for (const f of sides[s]) if (f.alive && !f.hidden && !f.turning && !f.u.aloft && !sheltered(f) && !(bldg ? f.u.structure : isTower(f))) { othersUp[k] = true; break; }
       }
-      return othersUp[s];
+      return othersUp[k];
     }
+    // b leaves f alone for now: the tower (noTower) or any structure (noBldg) while something else can be picked
+    const ignores = (b, f) => b.u.noBldg ? !!f.u.structure && othersThan(f.side, true) : !!b.u.noTower && isTower(f) && othersThan(f.side);
     // a target b may pick: not hidden, not sheltered, a lone one while it hunts, and not the tower for a body that
-    // ignores it (noTower) while anything else is left to pick
+    // ignores it (noTower), nor any structure for one that ignores buildings (noBldg), while anything else is left to pick
     // seesHidden: b can pick f although f is stealthed: Overwatch (u.trueSight) within b's range, or a Sniper
     // (b.sniperMark, set by the game) looking for the squad its side's Sniper tower marked (f.marked), or a Hunter (b.u.hunter)
     // looking for a squad its side's Hunters marked (f.prey, set by the game)
     const seesHidden = (b, f) => f.u.stealth && !f.u.aloft && ((f.marked && b.sniperMark > 0) || (f.prey && b.u.hunter) || (b.u.trueSight && gap(f, b) <= b.u.range + 1e-9));
-    const pickable = (b, f) => f.alive && (!f.hidden || seesHidden(b, f)) && !sheltered(f) && !(b.hunt && !isLone(f)) && !(b.u.noTower && isTower(f) && othersThan(f.side));
+    const pickable = (b, f) => f.alive && (!f.hidden || seesHidden(b, f)) && !sheltered(f) && !(b.hunt && !isLone(f)) && !ignores(b, f);
     // damage that skips armor and ward (poison)
     function direct(owner, v, amount) {
       if (v.turning || v.u.aloft || sheltered(v)) return;
@@ -1762,7 +1769,7 @@ const Engine = (() => {
 
     // Fast paths (opts.targetingMode === 'indexed'): spatial grids that must give exactly the reference results.
     // tools/tests/targeting-determinism.js and tools/tests/fast-paths.js compare them with the full scans.
-    // Bodies whose own unit ignores the tower (u.noTower) always take the full scan: pickable's othersThan caches
+    // Bodies whose own unit ignores the tower or buildings (u.noTower, u.noBldg) always take the full scan: pickable's othersThan caches
     // its answer at its first call each tick, so skipping a call could change when that happens.
     const fastPaths = opts.targetingMode === 'indexed';
     const cellKey = (cx, cy) => (cx + 32768) * 65536 + (cy + 32768);
@@ -1903,7 +1910,7 @@ const Engine = (() => {
       const callerCounters = counters && counters.byCaller && (counters.byCaller[caller] || (counters.byCaller[caller] = { calls: 0, bodiesScanned: 0, candidates: 0 }));
       if (counters) counters.validTargetsCalls++;
       if (callerCounters) callerCounters.calls++;
-      const foes = fastPaths && !b.u.noTower
+      const foes = fastPaths && !b.u.noTower && !b.u.noBldg
         ? indexedTargets(1 - b.side, b.x, b.y, reachOf(b))
         : sides[1 - b.side];
       for (const f of foes) {
@@ -1916,6 +1923,11 @@ const Engine = (() => {
           if (callerCounters) callerCounters.candidates++;
           valid.push([b.u.healthiest ? (f.u.structure ? 1e9 : 0) - poolHp(f) : d, f]); // healthiest: most health first, units before structures
         }
+      }
+      // noBldg: an enemy wall in its reach that stands between it and the unit it walks to may be hit after all
+      if (b.u.noBldg && !valid.length && barriers.length && b.near && b.near.alive && !b.near.u.structure) {
+        const w = wallBetween(b, b.near);
+        if (w && gap(w, b) <= reachTo(reachOf(b), b, w) + 0.01) valid.push([gap(w, b), w]);
       }
       valid.sort((p, q) => b.u.backline ? q[0] - p[0] : p[0] - q[0]);
       const targets = valid.map(v => v[1]);
@@ -2514,7 +2526,7 @@ const Engine = (() => {
         // the nearest enemy it can see; with none in sight (walls in the way), the nearest it can't (unseen): it walks
         // on round to it but doesn't stop, engage or build for it until it sees it
         let near = null, nd = Infinity, hid = null, hd = Infinity;
-        if (fastPaths && !b.u.noTower && nearestSeen(b)) { near = nearFound; nd = nearDist; }
+        if (fastPaths && !b.u.noTower && !b.u.noBldg && nearestSeen(b)) { near = nearFound; nd = nearDist; }
         else for (const f of foes) {
           if (!pickable(b, f)) continue;
           const d = gap(f, b);
