@@ -751,6 +751,26 @@ const Engine = (() => {
 
   // A steppable battle between two lists of bodies (side 0 and side 1)
   function createBattle(A, B, g, opts = {}) {
+    // 2v2 Coal mine (src/mpb.js coalMine; only a 2v2 fight's bodies carry mineTo, so off by default): a squad deployed
+    // round a mine's entrance has mineTo = { x, y (the middle of its tile at the exit), dx, dy (from its own tile to
+    // there), h (half a tile), t (travel s), rise (s it then stands, as a flank squad), boost: { speed %, armor, secs }
+    // | null }. A squad whose exit tile an enemy squad's body starts on doesn't go in. The others go down as the fight
+    // starts: they stand at the exit already, but can't be seen, hit or pushed for t s (mineT: see sheltered), then
+    // stand still rise s more (delay), then fight; with a boost they are faster and tougher for secs s from coming out.
+    const mineOn = A.some(b => b.mineTo) || B.some(b => b.mineTo), mineFx = [];
+    if (mineOn) {
+      const held = (side, mt) => (side === 0 ? B : A).some(f => f.squad >= 0 && !f.u.structure && Math.abs(f.x - mt.x) <= mt.h && Math.abs(f.y - mt.y) <= mt.h);
+      const stay = new Set();
+      for (const b of A.concat(B)) if (b.mineTo && (b.inside || b.boarded || held(b.side, b.mineTo))) stay.add(b.side + ':' + b.squad);
+      for (const b of A.concat(B)) {
+        if (!b.mineTo) continue;
+        if (stay.has(b.side + ':' + b.squad)) { b.mineTo = null; continue; }
+        b.x += b.mineTo.dx; b.y += b.mineTo.dy; b.mineT = b.mineTo.t;
+        b.delay = Math.max(b.delay || 0, b.mineTo.t + b.mineTo.rise);
+        if (b.spreadTo) { b.spreadTo.x += b.mineTo.dx; b.spreadTo.y += b.mineTo.dy; }
+        if (b.guide) b.guide = b.guide.map(p => ({ ...p, x: p.x + b.mineTo.dx, y: p.y + b.mineTo.dy })); // its direction arrow, from the exit
+      }
+    }
     // linked squads and squads with a healbot: their bodies, in squads of u.bodies (a Counter Lab army puts all its
     // squads under one id; a game squad has exactly u.bodies of them)
     const groups = [];
@@ -771,6 +791,7 @@ const Engine = (() => {
       if (!e) continue;
       const hb = newBody(leveled(e.unit, lead.level), lead.side, lead.x, lead.y - (lead.side === 0 ? 1 : -1) * 2.5, escortIdx++, -1);
       hb.follow = grp; hb.healPct = e.pct; hb.credit = lead;
+      if (lead.mineT > 0) { hb.mineT = lead.mineT; hb.delay = lead.delay; } // (2v2 Coal mine: it comes through with its squad)
       (lead.side === 0 ? A : B).push(hb);
     }
     // a portal in front of each squad that summons (Ember Imps' Hellfiend): the squad holds still (channel) for the
@@ -798,6 +819,7 @@ const Engine = (() => {
       const e = newBody(leveled({ ...el.unit, speed: b.u.speed }, b.level), b.side, x, y, i, -1);
       e.credit = b;
       if (b.delay) e.delay = b.delay;
+      if (b.mineT > 0) e.mineT = b.mineT; // (2v2 Coal mine: it comes through with its summoner)
       if (b.march) e.march = b.march.slice();
       list.push(e);
     }
@@ -988,7 +1010,12 @@ const Engine = (() => {
     // the cell a board point is in (-1 off the grid)
     const cellOf = (x, y) => { const c = Math.floor((x - ter.x0) / TC), r = Math.floor((ter.y1 - y) / TC); return c < 0 || r < 0 || c >= ter.cols || r >= ter.rows ? -1 : r * ter.cols + c; };
     const cellX = (i) => ter.x0 + (i % ter.cols + 0.5) * TC, cellY = (i) => ter.y1 - (Math.floor(i / ter.cols) + 0.5) * TC;
-    const blocked = (i) => i >= 0 && ter.block[i] === 1;
+    // 2v2 Magic lake (src/mpb.js magicLake; opts.mpb.lakeWalk = [[cell, ...] side 0 may walk on, [...] side 1], set
+    // only by a 2v2 fight: off by default): those water cells are open ground for that side's bodies (Waterspirits).
+    // walkSide is the side of the body being steered or kept out of the water (steer, keepOut, artSpot set it).
+    const lakeWalk = ter && opts.mpb && opts.mpb.lakeWalk ? opts.mpb.lakeWalk.map(l => new Set(l || [])) : null;
+    let walkSide = 0;
+    const blocked = lakeWalk ? (i) => i >= 0 && ter.block[i] === 1 && !lakeWalk[walkSide].has(i) : (i) => i >= 0 && ter.block[i] === 1;
     // Height: a body on higher ground than its target gets HEIGHT.range m more range and HEIGHT.dmg % more damage per
     // level of difference (from +2 down to -2: 4 levels, 4x); shooting uphill takes as much off (range never below 1 m,
     // or its own range if shorter).
@@ -1037,8 +1064,9 @@ const Engine = (() => {
       return j;
     }
     // how far every cell is from a goal cell on foot (Dijkstra; whole numbers, so the same on every device), kept per goal
-    function flowTo(goal) {
-      let f = terCache.flows.get(goal);
+    function flowTo(goal0) {
+      const goal = goal0, fk = lakeWalk ? goal0 * 2 + walkSide : goal0; // (a 2v2 Magic lake: each side walks its own ways)
+      let f = terCache.flows.get(fk);
       if (f) return f;
       if (terCache.flows.size >= NAV.keep) terCache.flows.clear();
       f = new Int32Array(ter.cols * ter.rows).fill(NAV_INF);
@@ -1066,7 +1094,7 @@ const Engine = (() => {
         if (d > f[i]) continue;
         for (const s of STEPS) { const j = stepTo(i, s); if (j >= 0 && d + s[2] < f[j]) { f[j] = d + s[2]; push([f[j], j]); } }
       }
-      terCache.flows.set(goal, f);
+      terCache.flows.set(fk, f);
       return f;
     }
     // Which way a body walking toward (gx, gy) goes, given the way it wants to go (wx, wy): straight on while nothing
@@ -1075,6 +1103,7 @@ const Engine = (() => {
     // opening instead of walking into the wall. The way is worked out again every NAV.every s, or when the goal moves on.
     function steer(b, gx, gy, wx, wy) {
       if (!terBlock || b.u.aloft) return [wx, wy];
+      if (lakeWalk) walkSide = b.side;
       const look = Math.min(NAV.look, hyp(gx - b.x, gy - b.y));
       if (clearWalk(b.x, b.y, b.x + wx * look, b.y + wy * look)) { b.nav = null; return [wx, wy]; }
       const goal = walkCell(gx, gy), start = cellOf(b.x, b.y);
@@ -1100,6 +1129,7 @@ const Engine = (() => {
     }
     // a body standing in a blocked cell (pushed there, or walked round a corner) is put back out at the nearest open edge
     function keepOut(b) {
+      if (lakeWalk) walkSide = b.side;
       const i = cellOf(b.x, b.y);
       if (i < 0) return;
       const c0 = i % ter.cols, r0 = Math.floor(i / ter.cols);
@@ -1175,7 +1205,7 @@ const Engine = (() => {
     // and the points freeze. A fight that ends first: more points wins (equal: -1), see result().
     // Bodies soft-prioritise an unlocked artifact within their awareness (artifactMove, in the movement below).
     const arts = opts.artifacts && opts.artifacts.length ? opts.artifacts.map(a => ({ x: +a.x, y: +a.y, r: a.r > 0 ? +a.r : ARTIFACT.r, cap: a.cap > 0 ? +a.cap : ARTIFACT.cap, pts: [0, 0], rate: [0, 0], locked: false, won: -1 })) : null;
-    const holds = (b) => b.alive && !b.boarded && !b.turning && !(b.inside && b.inside.alive) && !b.u.structure && !b.u.building && !(b.u.barrier > 0) && b.u.kind !== 'watchtower' && !b.u.aloft && !b.u.noCount;
+    const holds = (b) => b.alive && !b.boarded && !b.turning && !(b.inside && b.inside.alive) && !(b.mineT > 0) && !b.u.structure && !b.u.building && !(b.u.barrier > 0) && b.u.kind !== 'watchtower' && !b.u.aloft && !b.u.noCount;
     const holdKey = (b) => b.credit ? 'c' + b.credit.side + ':' + b.credit.squad : 's' + b.squad;
     const holdTier = (b) => !b.credit && b.tier >= 1 ? Math.min(4, Math.floor(b.tier)) : 1;
     function artifactStep() {
@@ -1197,6 +1227,7 @@ const Engine = (() => {
     function artSpot(b, a) {
       if (b.artSpot && b.artSpot.a === a) return b.artSpot;
       if (b.artK == null) b.artK = sides[b.side].indexOf(b);
+      if (lakeWalk) walkSide = b.side;
       const fwd = b.side === 1 ? -1 : 1;
       let at = { a, x: a.x, y: a.y };
       for (let j = 0; j < 12; j++) {
@@ -1246,7 +1277,9 @@ const Engine = (() => {
     // move speed: a pool's speed boost adds to it while it lasts
     // ...and kill stacks (Rampager, the Assassin) add to it
     // ...and Berserkers' roars speed it up by a share
-    const spd = (b) => ((b.poolFastT > 0 ? b.u.speed + b.poolFast : b.u.speed) + (b.kills > 0 ? b.kills * b.u.killStack.speed : 0)) * (b.roarSpd > 0 ? 1 + b.roarSpd / 100 : 1);
+    const spd0 = (b) => ((b.poolFastT > 0 ? b.u.speed + b.poolFast : b.u.speed) + (b.kills > 0 ? b.kills * b.u.killStack.speed : 0)) * (b.roarSpd > 0 ? 1 + b.roarSpd / 100 : 1);
+    // ...and a 2v2 Coal mine's boost, for a while after coming out (mineFast s left; see mineOn)
+    const spd = (b) => b.mineFast > 0 ? spd0(b) * (1 + b.mineTo.boost.speed / 100) : spd0(b);
     // How far an attack reaches. Flame cones can reach further than where the unit stops (g.flameReach x range),
     // so a flamer keeps burning the enemies behind the first one without walking up to each.
     const reachOf = (b) => b.u.flame > 0 && g.flameReach > 1 ? R(b) * g.flameReach : R(b);
@@ -1320,7 +1353,7 @@ const Engine = (() => {
       if (opts.record) shots.push([x.x, x.y, b.x, b.y, b.side, 0, 0, 0, 0, 1, 0, 0, 0, 3]); // [13] 3: eaten
     }
     // Overwatch: a body sitting in a structure that still stands can't be hit or targeted
-    const sheltered = (f) => !!(f.inside && f.inside.alive);
+    const sheltered = (f) => !!(f.inside && f.inside.alive) || f.mineT > 0; // (or down a 2v2 Coal mine, see mineOn)
     // Shadow hunter: an enemy body that shares its spot with no other body of its side (not a structure)
     function isLone(f) {
       if (f.u.structure || f.u.aloft) return false;
@@ -1432,6 +1465,7 @@ const Engine = (() => {
       // burn hurts the caster's enemies, mend heals the caster's units, mud slows the caster's enemies
       if (tl.type === 'burn') { if (b.side !== tl.side) neutralDamage(b, tl.dps * dt); return; }
       if (tl.type === 'mend') { if (b.side === tl.side) heal(b, tl.dps * healMul * dt); return; }
+      if (tl.type === 'mpbLake') { if (b.side === tl.side) heal(b, b.u.hp * tl.pct / 100 * healMul * dt); return; } // 2v2 Magic lake: Waterspirits' regen (tl.pct % of max health a second)
       if (tl.type === 'mud') {
         if (b.side === tl.side || b.u.unstoppable) return;
         if (!(b.slowT > 0)) { b.slowMove = 0; b.slowAtk = 0; }
@@ -2420,6 +2454,20 @@ const Engine = (() => {
       }
       // a body with a start delay (deployed on a flank) can't move or attack until it runs out
       for (const b of all) if (b.delay > 0) b.delay = Math.max(0, b.delay - dt);
+      // 2v2 Coal mine (mineOn): bodies down the mine come out when their travel time is up (mineFx: { x, y, side, t }
+      // for the boards); with the boost, faster and tougher for its secs
+      if (mineOn) for (const b of all) {
+        if (b.mineT > 0) {
+          b.mineT = Math.max(0, b.mineT - dt);
+          if (b.mineT > 0) continue;
+          if (b.mineTo && !mineFx.some(e => e.squad === b.squad && e.side === b.side)) mineFx.push({ x: b.x, y: b.y, side: b.side, squad: b.squad, t });
+          const bo = b.mineTo && b.mineTo.boost;
+          if (bo && b.alive) { b.mineFast = bo.secs; b.u = { ...b.u, bonusArmor: (b.u.bonusArmor || 0) + bo.armor }; }
+        } else if (b.mineFast > 0) {
+          b.mineFast = Math.max(0, b.mineFast - dt);
+          if (!(b.mineFast > 0)) b.u = { ...b.u, bonusArmor: (b.u.bonusArmor || 0) - b.mineTo.boost.armor };
+        }
+      }
       // home ground (band = { y0, y1, armor, hpPct, on }): extra armor and health while the body stands between
       // y0 and y1 (its own zone); it loses both when it walks out, and gets them back if it returns
       for (const b of all) {
@@ -3206,7 +3254,7 @@ const Engine = (() => {
       };
     }
 
-    return { step, frame, result, bodies: all, neutrals, mines: () => mines, pools: () => pools, portals: () => portals.filter(p => t >= p.t0 && t < p.t0 + p.secs), drops: () => drops.filter(d => !d.done).map(d => ({ side: d.side, t: d.t, r: d.r, spots: d.spots, left: Math.max(0, d.t - t) })), isOver: () => over, time: () => t, lastShots: () => shots, projectiles: () => projectiles, crippled: (side, lane) => cripple[side + 2 * (lane | 0)], gates: () => gates.filter(Boolean), gateFx: () => gateFx, charm: (side, squad) => (charm[side] && charm[side][squad]) || 0,
+    return { step, frame, result, bodies: all, neutrals, mines: () => mines, pools: () => pools, portals: () => portals.filter(p => t >= p.t0 && t < p.t0 + p.secs), drops: () => drops.filter(d => !d.done).map(d => ({ side: d.side, t: d.t, r: d.r, spots: d.spots, left: Math.max(0, d.t - t) })), isOver: () => over, time: () => t, lastShots: () => shots, projectiles: () => projectiles, crippled: (side, lane) => cripple[side + 2 * (lane | 0)], gates: () => gates.filter(Boolean), gateFx: () => gateFx, mineFx: () => mineFx, charm: (side, squad) => (charm[side] && charm[side][squad]) || 0,
       objective: () => obj && { n: obj.n.slice(), lead: obj.lead, hold: obj.hold, secs: obj.secs, won: obj.won },
       artifacts: () => artifactsNow(false) }; // 2v2 artifacts as they stand ([] without opts.artifacts)
   }

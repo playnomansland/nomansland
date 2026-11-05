@@ -635,7 +635,8 @@ const Game = (() => {
     return { ch: t.tiles[row][col], shape: (t.shape && t.shape[row][col]) || '.', h: CHH[t.height[row][col]] || 0 };
   }
   // nothing can be placed on a wall or water tile (an edge wall leaves its tile free)
-  const terrainBlocks = (m, col, row) => { const t = terrainTile(m, col, row); return (t.ch === '#' || t.ch === '~') && !EDGE_FORMS.includes(t.shape); };
+  // (2v2: a Magic lake's water too, src/mpb.js Mpb.terrainAt)
+  const terrainBlocks = (m, col, row) => { const t = terrainTile(m, col, row); return ((t.ch === '#' || t.ch === '~') && !EDGE_FORMS.includes(t.shape)) || (!!MPB && !!m && !!m.mpb && MPB.terrainAt(m, col, row)); };
   // The map objective (a map's `objective` = { secs, gold }: the Bridge): its zone is the raised ground (every walkable
   // tile above level 0). In a fight, the side with more units standing on it for secs s in a row wins it (Engine's
   // objective), once a fight, and gets gold more in the next round (resolve).

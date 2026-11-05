@@ -8926,9 +8926,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const K = Mpb.kindOf(h.kind), L = duoMyLane(), mine = h.votes[L], theirs = h.votes[1 - L], part = h.part && ((K.place.parts || []).find(p => p.id === h.part) || {}).name;
     return `<div class="mpb-box"><div><b>Place ${part ? `the ${esc(K.name.replace(/^The /, ''))}’s ${esc(part)}` : `your team’s ${esc(K.name.replace(/^The /, ''))}`}</b> · tap a glowing tile. ${mine ? '<span style="color:' + duoRing(duoMySeat()).col + '">Your vote is in.</span> ' : ''}${theirs ? `<span style="color:${duoRing(Duo.mateOf(duoMySeat())).col}">Your teammate voted.</span>` : 'Waiting for your teammate.'} The same tile places it at once; two tiles: one of them when the time runs out. <span class="num" id="mpb-vote-s">${mpbClockAt.vote ? mpbLeft('vote') + ' s' : ''}</span></div></div>`;
   }
-  function mpbPanel() { return mpbOn() ? mpbDraftHtml() + mpbVoteHtml() : ''; }
+  // (a kind's own lines in the panel: MPB_SHEET[kind].panel() and wirePanel(root), e.g. the Magic lake's tiles to put down)
+  function mpbPanel() { return mpbOn() ? mpbDraftHtml() + mpbVoteHtml() + Object.values(MPB_SHEET).map(x => x.panel ? x.panel() : '').join('') : ''; }
   function wireMpbPanel() {
     $('panel').querySelectorAll('[data-mpb-draft]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.draftPick(m, me, +b.dataset.mpbDraft)) { mpbNotice(); changed(); } }));
+    if (mpbOn()) for (const x of Object.values(MPB_SHEET)) if (x.wirePanel) x.wirePanel($('panel'));
   }
   // a line in the status bar once the draft is dealt (who got what)
   function mpbNotice() {
@@ -8948,19 +8950,22 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     return mpbSpotCache.tiles;
   }
   // over the board (both boards, boardMarks): the allowed tiles glow, each player's vote in their colour
+  // (and a kind's own tiles to tap: MPB_SHEET[kind].marks(sq), e.g. where the Coal mine's exit may move)
   function mpbMarks(at) {
     if (!mpbOn() || phase !== 'deploy' || !at) return '';
-    const h = Mpb.voteHead(m, me);
-    if (!h) return '';
     const pt = (x, y) => at(x, y).map(v => v.toFixed(1)).join(','), d = Game.TILE / 2 - 0.5;
     const sq = (t, cls, st) => { const c = Game.tileToWorld(t.col, t.row); return `<polygon class="${cls}"${st ? ` style="${st}"` : ''} points="${pt(c.x - d, c.y - d)} ${pt(c.x + d, c.y - d)} ${pt(c.x + d, c.y + d)} ${pt(c.x - d, c.y + d)}"/>`; };
-    let html = mpbVoteTiles().map(t => sq(t, 'mpb-ok')).join('');
+    const own = Object.values(MPB_SHEET).map(x => x.marks ? x.marks(sq) : '').join('');
+    const h = Mpb.voteHead(m, me);
+    if (!h) return own;
+    let html = own + mpbVoteTiles().map(t => sq(t, 'mpb-ok')).join('');
     for (const L of [0, 1]) { const v = h.votes[L]; if (v) html += sq(v, 'mpb-vote', `stroke:${duoRing(Duo.seatOf(L, me)).col}`); }
     return html;
   }
   // a tap on the board: a vote on an allowed tile, else a building's sheet (true: handled)
   function mpbTap(t) {
     if (!mpbOn() || !t) return false;
+    if (phase === 'deploy') for (const x of Object.values(MPB_SHEET)) if (x.tap && x.tap(t)) return true; // a kind's own tile to tap (MPB_SHEET[kind].tap)
     const h = phase === 'deploy' && Mpb.voteHead(m, me);
     if (h && Mpb.spotOk(m, me, h.kind, h.part, t.col, t.row)) { if (editable() && Game.mpbVote(m, me, t.col, t.row)) changed(); return true; }
     const x = Mpb.recAt(m, t.col, t.row);
@@ -8999,10 +9004,74 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     // ===== treeKojja (page) =====
     // ===== fieldHospital (page) =====
     // ===== coalMine (page) =====
+    // where the exit is, and Dig a new exit's move: a button, then the glowing tiles it may move to (tap one)
+    coalMine: {
+      pick: null, // the mine (key) whose exit is being moved
+      cache: { key: '', at: 0, tiles: [] },
+      rec() { const r = this.pick && mpbOn() && phase === 'deploy' && editable() ? Mpb.recOf(m, me, this.pick) : null; return r && Mpb.kindOf('coalMine').canMoveExit(m, me, r) ? r : null; },
+      spots(r) {
+        const key = [m.round, r.key, JSON.stringify(r.parts), Mpb.recs(m, me).length, m.armies[me].length, Game.teamArmy(m, me).length].join('|');
+        if (this.cache.key !== key || now() - this.cache.at > 400) this.cache = { key, at: now(), tiles: Mpb.kindOf('coalMine').exitSpots(m, me, r) };
+        return this.cache.tiles;
+      },
+      panel() { return this.rec() ? `<div class="mpb-box"><div><b>Coal mine</b> · tap a glowing tile for the new exit (no man’s land, or a flank tile of their half). <button class="btn small" id="cm-cancel">Cancel</button></div></div>` : ''; },
+      wirePanel(root) { const b = root.querySelector('#cm-cancel'); if (b) b.addEventListener('click', () => { this.pick = null; panelDeploy(); render(); }); },
+      marks(sq) { const r = this.rec(); return r ? this.spots(r).map(t => sq(t, 'mpb-ok')).join('') : ''; },
+      tap(t) {
+        const r = this.rec();
+        if (!r || !Mpb.kindOf('coalMine').exitMoveOk(m, me, r, t.col, t.row)) return false;
+        if (Game.mpbAct(m, me, r.key, 'exit', t.col, t.row)) { this.pick = null; changed(); }
+        return true;
+      },
+      html(side, rec, live) {
+        const K = Mpb.kindOf('coalMine'), info = K.hooks.info(m, side, rec);
+        const btn = side === me && live && K.canMoveExit(m, me, rec) ? `<button class="btn small either" id="cm-move">Move the exit</button>` : '';
+        return `<p style="margin:0">${info.map(esc).join(' · ')}</p>${btn ? `<p style="margin:0">${btn} <span class="hint">then tap a glowing tile</span></p>` : ''}`;
+      },
+      wire(root, side, rec) { const b = root.querySelector('#cm-move'); if (b) b.addEventListener('click', () => { this.pick = rec.key; closeSheet(); panelDeploy(); render(); }); },
+    },
     // ===== scorch (page) =====
     // ===== oak (page) =====
     // ===== factory (page) =====
     // ===== magicLake (page) =====
+    // each player's own water tiles: the panel asks for the ones still to put down (tap a glowing tile), and a tile put
+    // down this round can be moved from its sheet the same way
+    magicLake: {
+      pick: null, // the key of your tile being moved
+      cache: { key: '', at: 0, tiles: [] },
+      todo() { return mpbOn() && phase === 'deploy' && editable() ? Mpb.kindOf('magicLake').lakeTodo(m, me, duoMyLane()) : []; },
+      rec() {
+        const t = this.todo();
+        if (t.length) return t[0];
+        const r = this.pick && mpbOn() && phase === 'deploy' && editable() ? Mpb.recOf(m, me, this.pick) : null;
+        return r && r.data.lane === duoMyLane() && r.round === m.round ? r : null;
+      },
+      spots(r) {
+        const key = [m.round, r.key, r.col, r.row, Mpb.recs(m, me).concat(Mpb.recs(m, 1 - me)).map(x => x.col + ',' + x.row).join(';'), m.armies[me].length, Game.teamArmy(m, me).length, m.armies[1 - me].length].join('|');
+        if (this.cache.key !== key || now() - this.cache.at > 400) this.cache = { key, at: now(), tiles: Mpb.kindOf('magicLake').lakeSpots(m, me, r) };
+        return this.cache.tiles;
+      },
+      panel() {
+        const n = this.todo().length;
+        if (n) return `<div class="mpb-box"><div><b>Magic lake</b> · tap a glowing tile to put down your water (${n} left). Water never shuts a tile or a way off.</div></div>`;
+        return this.rec() ? `<div class="mpb-box"><div><b>Magic lake</b> · tap a glowing tile to move your water there. <button class="btn small" id="ml-cancel">Cancel</button></div></div>` : '';
+      },
+      wirePanel(root) { const b = root.querySelector('#ml-cancel'); if (b) b.addEventListener('click', () => { this.pick = null; panelDeploy(); render(); }); },
+      marks(sq) { const r = this.rec(); return r ? this.spots(r).map(t => sq(t, 'mpb-ok')).join('') : ''; },
+      tap(t) {
+        const r = this.rec();
+        if (!r || !Mpb.kindOf('magicLake').lakeOk(m, me, r, t.col, t.row)) return false;
+        if (Game.mpbAct(m, me, r.key, 'place', t.col, t.row)) { this.pick = null; changed(); }
+        return true;
+      },
+      html(side, rec, live) {
+        const K = Mpb.kindOf('magicLake'), info = K.hooks.info(m, side, rec), mine = side === me && rec.data.lane === duoMyLane();
+        const whose = side !== me ? '' : mine ? 'Your water' : 'Your teammate’s water';
+        const btn = mine && live && rec.col >= 0 && rec.round === m.round ? `<button class="btn small either" id="ml-move">Move it</button> <span class="hint">(this round only) then tap a glowing tile</span>` : '';
+        return `<p style="margin:0">${[whose].concat(info).filter(Boolean).map(esc).join(' · ')}</p>${btn ? `<p style="margin:0">${btn}</p>` : ''}`;
+      },
+      wire(root, side, rec) { const b = root.querySelector('#ml-move'); if (b) b.addEventListener('click', () => { this.pick = rec.key; closeSheet(); panelDeploy(); render(); }); },
+    },
     // ===== jail (page) =====
     // ===== school (page) =====
     // ===== shadowDen (page) =====

@@ -116,6 +116,7 @@
     });
     for (const sd of [0, 1]) copyTeam(lanes[0], lanes[1], sd);
     lanes.forEach(m => { G.ensureBwalls(m, 0); G.ensureBwalls(m, 1); });
+    M.settle(lanes); // the 2v2 buildings: what nobody settled (a Magic lake tile nobody put down)
     for (const sd of [0, 1]) copyTeam(lanes[0], lanes[1], sd);
   }
 
@@ -463,6 +464,7 @@
     if (G.needsPack(m, sd)) G.choosePack(m, sd, Math.floor(Math.random() * m.packages[sd].length));
     if (G.needsTowerPick(m, sd)) { const ch = G.towerChoices(m, sd); G.setTowerType(m, sd, ch[Math.floor(Math.random() * ch.length)].id); }
     G.aiDeploy(m, sd);
+    M.botTurn(m, sd); // the 2v2 buildings' own bot moves (hooks.bot)
     // the Vault: gold the carry cap would take next round goes in instead (a put round only)
     const spare = Math.min(m.gold[sd] - G.CARRY_CAP, M.vaultRoom(m, sd, 'put'));
     if (spare > 0) G.vaultPut(m, sd, spare);
