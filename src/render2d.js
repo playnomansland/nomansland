@@ -978,7 +978,70 @@ const Render2D = (cv, view, opts = {}) => {
     // ===== factory (2D) =====
     // ===== magicLake (2D) =====
     // ===== jail (2D) =====
+    // a stern grey stone lock-up: a heavy plinth, a barred window with the jailed squads' shapes peering out between the
+    // bars, a team band, a squat lamp turret on top (Skywatch) with its amber lantern, and a ring of keys by the door.
+    // In a fight its light lies soft on every tile it watches (deploying: drawMpbs' lit tiles)
+    jail(x, y, t, side, o) {
+      const s = t * 0.8, c = teamCol(side), w = s * 0.84, h = s * 0.6, x0 = x - w / 2, y0 = y - h * 0.4, lw = Math.max(1, s * 0.03);
+      const rec = mpbRecAt('jail', side, x, y, t), up = !rec || Mpb.litTiles(m, side, rec).length > 0;
+      if (o.hpr != null && rec && up) { // the Skywatch light in a fight
+        const L = Mpb.JAIL.light, g = ctx.createRadialGradient(x, y, t * 0.5, x, y, t * (L + 0.6));
+        g.addColorStop(0, 'rgba(255,226,160,0.20)'); g.addColorStop(1, 'rgba(255,226,160,0.05)');
+        ctx.fillStyle = g; ctx.fillRect(x - t * (L + 0.5), y - t * (L + 0.5), t * (2 * L + 1), t * (2 * L + 1));
+      }
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y + h * 0.66, w * 0.62, s * 0.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#4E4A45'; ctx.fillRect(x0 - s * 0.05, y0 + h * 0.9, w + s * 0.1, h * 0.18); // plinth
+      ctx.fillStyle = '#7C7F86'; ctx.strokeStyle = '#3A3C41'; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.rect(x0, y0, w, h * 0.92); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#686B72'; ctx.lineWidth = 1; // stone courses
+      for (const fy of [0.3, 0.56]) { ctx.beginPath(); ctx.moveTo(x0, y0 + h * fy); ctx.lineTo(x0 + w, y0 + h * fy); ctx.stroke(); }
+      ctx.fillStyle = c; ctx.fillRect(x0, y0 - h * 0.02, w, h * 0.1); // the team's band along the roof edge
+      for (let k = 0; k < 4; k++) { ctx.fillStyle = '#6A6D74'; ctx.fillRect(x0 + k * w / 3.5, y0 - h * 0.16, w / 7, h * 0.14); } // crenels
+      const wx0 = x - w * 0.36, wy0 = y0 + h * 0.2, ww = w * 0.5, wh = h * 0.5; // the barred window
+      ctx.fillStyle = '#1F2023'; ctx.fillRect(wx0, wy0, ww, wh);
+      const cells = rec ? ((rec.data && rec.data.cells) || []) : [];
+      cells.slice(0, 2).forEach((cl, k) => { const u = units[cl.ui]; if (!u) return; ctx.fillStyle = u.color; Shapes.draw(ctx, u.shape, wx0 + ww * (0.28 + k * 0.44), wy0 + wh * 0.55, Math.min(ww * 0.2, wh * 0.36), 1); });
+      ctx.strokeStyle = '#B8BCC2'; ctx.lineWidth = Math.max(1, s * 0.035);
+      for (let k = 1; k < 5; k++) { ctx.beginPath(); ctx.moveTo(wx0 + ww * k / 5, wy0); ctx.lineTo(wx0 + ww * k / 5, wy0 + wh); ctx.stroke(); }
+      ctx.strokeRect(wx0, wy0, ww, wh);
+      ctx.fillStyle = '#3A3C41'; ctx.fillRect(x + w * 0.2, y0 + h * 0.36, w * 0.22, h * 0.56); // the iron door
+      ctx.strokeStyle = '#C9A24A'; ctx.lineWidth = Math.max(1, s * 0.025); // keys on a ring by the door
+      ctx.beginPath(); ctx.arc(x + w * 0.31, y0 + h * 0.24, s * 0.05, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + w * 0.31, y0 + h * 0.3); ctx.lineTo(x + w * 0.3, y0 + h * 0.44); ctx.stroke();
+      ctx.fillStyle = '#5A5D63'; ctx.fillRect(x - s * 0.09, y0 - h * 0.46, s * 0.18, h * 0.32); // the lamp turret
+      ctx.fillStyle = up ? '#FFE2A0' : '#6E6A64'; ctx.beginPath(); ctx.arc(x, y0 - h * 0.5, s * 0.1, 0, Math.PI * 2); ctx.fill(); // its lantern (dark the round after it fell)
+      if (up) { ctx.globalAlpha = 0.35; ctx.fillStyle = '#FFE2A0'; ctx.beginPath(); ctx.arc(x, y0 - h * 0.5, s * 0.2, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
+    },
     // ===== school (2D) =====
+    // a little brick-red schoolhouse: a pitched slate roof, a bell turret with its brass bell, a team band under the eaves,
+    // a chalkboard door and a round window where the squad inside looks out; an apple on the step
+    school(x, y, t, side, o) {
+      const s = t * 0.8, c = teamCol(side), w = s * 0.78, h = s * 0.5, x0 = x - w / 2, y0 = y - h * 0.18, lw = Math.max(1, s * 0.03);
+      const rec = mpbRecAt('school', side, x, y, t), p = rec && rec.data ? rec.data.pupil : null;
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y + h * 0.9, w * 0.62, s * 0.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#A8443A'; ctx.strokeStyle = '#5E241E'; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#8E3830'; ctx.lineWidth = 1; // brick courses
+      for (const fy of [0.33, 0.66]) { ctx.beginPath(); ctx.moveTo(x0, y0 + h * fy); ctx.lineTo(x0 + w, y0 + h * fy); ctx.stroke(); }
+      ctx.fillStyle = c; ctx.fillRect(x0 - s * 0.02, y0 - h * 0.08, w + s * 0.04, h * 0.12); // the team's band under the eaves
+      ctx.fillStyle = '#56606A'; ctx.strokeStyle = '#2E3439'; ctx.lineWidth = lw; // the slate roof
+      ctx.beginPath(); ctx.moveTo(x0 - s * 0.08, y0 - h * 0.06); ctx.lineTo(x, y0 - h * 0.86); ctx.lineTo(x0 + w + s * 0.08, y0 - h * 0.06); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#EDE3CC'; ctx.fillRect(x - s * 0.07, y0 - h * 1.12, s * 0.14, h * 0.32); // the bell turret
+      ctx.fillStyle = '#56606A'; ctx.beginPath(); ctx.moveTo(x - s * 0.1, y0 - h * 1.1); ctx.lineTo(x, y0 - h * 1.36); ctx.lineTo(x + s * 0.1, y0 - h * 1.1); ctx.closePath(); ctx.fill();
+      const sw = Math.sin((o.time || 0) * 2.2) * s * 0.012; // the bell swings a little
+      ctx.fillStyle = '#C9A24A'; ctx.beginPath(); ctx.arc(x + sw, y0 - h * 0.92, s * 0.045, Math.PI, 0); ctx.lineTo(x + sw + s * 0.055, y0 - h * 0.86); ctx.lineTo(x + sw - s * 0.055, y0 - h * 0.86); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#2F4A3A'; ctx.strokeStyle = '#7A5A36'; ctx.lineWidth = Math.max(1, s * 0.025); // the chalkboard door
+      ctx.fillRect(x + w * 0.08, y0 + h * 0.36, w * 0.28, h * 0.64); ctx.strokeRect(x + w * 0.08, y0 + h * 0.36, w * 0.28, h * 0.64);
+      ctx.strokeStyle = '#EDE3CC'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w * 0.13, y0 + h * 0.55); ctx.lineTo(x + w * 0.3, y0 + h * 0.5); ctx.stroke(); // a chalk line
+      const rx = x - w * 0.22, ry = y0 + h * 0.48, rr = Math.min(w * 0.17, h * 0.32); // the round window
+      ctx.fillStyle = p ? '#FFE9A8' : '#2B2F33'; ctx.strokeStyle = '#EDE3CC'; ctx.lineWidth = Math.max(1, s * 0.03);
+      ctx.beginPath(); ctx.arc(rx, ry, rr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      const u = p && units[p.ui];
+      if (u) { ctx.fillStyle = u.color; Shapes.draw(ctx, u.shape, rx, ry, rr * 0.62, 1); }
+      if (p && p.learn) { ctx.fillStyle = '#FFE9A8'; ctx.font = `600 ${Math.max(7, Math.round(t * 0.2))}px "IBM Plex Mono", monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✎', x + w * 0.22, y0 + h * 0.18); } // learning a skill
+      ctx.fillStyle = '#C4473A'; ctx.beginPath(); ctx.arc(x + w * 0.45, y0 + h * 0.98, s * 0.045, 0, Math.PI * 2); ctx.fill(); // an apple on the step
+      ctx.fillStyle = '#5E8C3A'; ctx.fillRect(x + w * 0.45, y0 + h * 0.98 - s * 0.075, s * 0.015, s * 0.035);
+    },
     // ===== shadowDen (2D) =====
   };
   const MPB_BODY = {
@@ -1012,10 +1075,18 @@ const Render2D = (cv, view, opts = {}) => {
     if (o.hpr != null) { ctx.strokeStyle = teamCol(side); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, t * 0.52, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, o.hpr)); ctx.stroke(); }
     if (o.fresh) { ctx.strokeStyle = teamCol(side); ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.strokeRect(x - t / 2 + 1.5, y - t / 2 + 1.5, t - 3, t - 3); ctx.setLineDash([]); }
   }
+  // the building of kind drawn at screen (x, y) (MPB_DRAW looks up its record by where it is drawn), or null
+  function mpbRecAt(kind, side, x, y, t) {
+    if (typeof Mpb === 'undefined' || !Mpb.on(m)) return null;
+    return Mpb.recs(m, side).find(r => r.kind === kind && Math.abs((scol(r.col) + 0.5) * t - x) < 1 && Math.abs((srow(r.row) + 0.5) * t - y) < 1) || null;
+  }
   // both teams' buildings on the board while deploying (and after a fight)
   function drawMpbs() {
     if (typeof Mpb === 'undefined' || !Mpb.on(m)) return;
     const t = tilePx();
+    // tiles a building lights up (Mpb.litTiles: the Jail's Skywatch), soft, under the buildings
+    ctx.fillStyle = 'rgba(255,226,160,0.16)';
+    for (const side of [me, foe()]) for (const rec of Mpb.recs(m, side)) for (const tl of Mpb.litTiles(m, side, rec)) ctx.fillRect(scol(tl.col) * t + 1, srow(tl.row) * t + 1, t - 2, t - 2);
     for (const side of [me, foe()]) for (const rec of Mpb.recs(m, side)) for (const tl of Mpb.tilesOf(rec)) {
       drawMpb(rec.kind, (scol(tl.col) + 0.5) * t, (srow(tl.row) + 0.5) * t, t, side, { part: tl.part || null, fresh: phase === 'deploy' && rec.round === m.round && rec.round > 1, time: performance.now() / 1000 });
     }
@@ -1095,6 +1166,7 @@ const Render2D = (cv, view, opts = {}) => {
     // a squad they moved this round still shows on its old tile
     // and one they sold this round still shows until the fight
     for (const sq of phase === 'deploy' ? Game.foeSeen(m, foe()) : m.armies[foe()].filter(q => !Game.hiddenFromFoe(m, q))) {
+      if (Game.mpbHeld(sq)) continue; // 2v2: in a Jail or a School (that building shows it)
       const p = phase === 'deploy' ? Game.seenAt(m, sq) : sq;
       const look = Game.shownUnit(m, me, foe(), sq.unit); // a disguised unit shows as what it pretends to be
       drawSquad(phase === 'deploy' ? { ...sq, unit: look, col: p.col, row: p.row, level: Game.seenLevel(m, sq) } : { ...sq, unit: look }, foe(), false); // a level-up bought this round stays hidden
@@ -1113,7 +1185,7 @@ const Render2D = (cv, view, opts = {}) => {
         ctx.strokeStyle = css('--muted'); ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
         ctx.strokeRect(scol(sq.from.col) * t + 4, srow(sq.from.row) * t + 4, t - 8, t - 8); ctx.setLineDash([]);
       }
-      if (Game.isRider(sq)) continue; // drawn as a badge on its carrier
+      if (Game.isRider(sq) || Game.mpbHeld(sq)) continue; // drawn as a badge on its carrier (2v2: in a Jail or a School, on that building)
       const at = drag && drag.moved && drag.id === sq.id ? { ...sq, col: drag.over.col, row: drag.over.row } : sq;
       drawSquad(at, me, (sq.round === m.round || sq.movedRound === m.round) && phase === 'deploy');
       riderBadge(at, Game.riderOf(m, me, sq));
@@ -1123,7 +1195,7 @@ const Render2D = (cv, view, opts = {}) => {
       }
     }
     // 2v2: the other pair of players on this board (m.team): your teammate's squads, and the other opponent's as you may see them
-    for (const side of [me, foe()]) for (const sq of Game.teamArmy(m, side)) if (!Game.isRider(sq)) { drawSquad(sq, side, false, true); if (side === me) riderBadge(sq, Game.riderOf(m, me, sq)); }
+    for (const side of [me, foe()]) for (const sq of Game.teamArmy(m, side)) if (!Game.isRider(sq) && !Game.mpbHeld(sq)) { drawSquad(sq, side, false, true); if (side === me) riderBadge(sq, Game.riderOf(m, me, sq)); }
     for (const side of [me, foe()]) if (towerVisible(side) && Game.towerUp(m, side)) drawTowerTile(side);
     if (Game.isDev(m)) drawLessers();
     if (Game.treasuryOn(m)) drawTreasuries();

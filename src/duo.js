@@ -454,6 +454,7 @@
     const mine = D.lanes[lane].m;
     if (mine.towers && mine.towers[sd] && O.towers && O.towers[sd]) mine.towers[sd].type = O.towers[sd].type;
     for (const m of ms(D)) copyTeam(sc, m, sd);
+    M.reconcile(ms(D)); // a building's record and the lanes' squads agree again (the School)
   }
 
   // a bot's turn at the start of a round: package, tower pick and squads (it levels up when the fight begins)
@@ -462,6 +463,7 @@
     setTeam(ms(D), own.lane);
     if (G.needsPack(m, sd)) G.choosePack(m, sd, Math.floor(Math.random() * m.packages[sd].length));
     if (G.needsTowerPick(m, sd)) { const ch = G.towerChoices(m, sd); G.setTowerType(m, sd, ch[Math.floor(Math.random() * ch.length)].id); }
+    M.botTurn(m, sd); // the team's buildings' skills (src/mpb.js hooks.bot)
     G.aiDeploy(m, sd);
     // the Vault: gold the carry cap would take next round goes in instead (a put round only)
     const spare = Math.min(m.gold[sd] - G.CARRY_CAP, M.vaultRoom(m, sd, 'put'));

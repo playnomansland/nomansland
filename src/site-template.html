@@ -6997,7 +6997,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const zoeNote = zq && phase === 'deploy' && Game.onBuffTile(m, owner, zq.col, zq.row) ? `<p class="hint" style="margin:0;color:var(--gold)">★ On a buff tile. ${esc(zoeText(owner))}</p>` : '';
     $('sheet').innerHTML = `
       <div class="bar"><h3 id="sheet-h"><span style="color:${p.u.color}">${Shapes.svg(p.u.shape, 18)}</span> ${esc(p.u.name)}</h3><button class="btn small" id="close">Close</button></div>
-      ${ownerLine(who)}${sq && m && owner === me && !ro ? duoRideNote(sq) : ''}${ro && sq.aim && Game.canAim(m, me, sq) ? `<p class="hint" style="margin:0"><b style="color:${who ? who.ring.col : 'var(--you)'}">Direction:</b> an arrow ${Math.round(Math.hypot(sq.aim.dc, sq.aim.dr) * 10) / 10} tiles long (dashed on the board). It walks it first, then fights as usual.</p>` : ''}${zoeNote}${p.html}`;
+      ${ownerLine(who)}${sq && m && owner === me && !ro ? duoRideNote(sq) : ''}${sq && duoOn() && Game.mpbHeld(sq) ? mpbHeldNote(sq) : ''}${ro && sq.aim && Game.canAim(m, me, sq) ? `<p class="hint" style="margin:0"><b style="color:${who ? who.ring.col : 'var(--you)'}">Direction:</b> an arrow ${Math.round(Math.hypot(sq.aim.dc, sq.aim.dr) * 10) / 10} tiles long (dashed on the board). It walks it first, then fights as usual.</p>` : ''}${zoeNote}${p.html}`;
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', closeSheet);
     if (!ro) bindPane($('sheet'), i, sq, side, () => openSheet(i, sq, side, opt));
@@ -8958,9 +8958,15 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     for (const L of [0, 1]) { const v = h.votes[L]; if (v) html += sq(v, 'mpb-vote', `stroke:${duoRing(Duo.seatOf(L, me)).col}`); }
     return html;
   }
+  // a kind's pick on the board (its sheet's "tap one on the board": the Jail's squad, the School's squad or tile):
+  // (t) => true when the tap was its (then nothing else happens)
+  var mpbPicking = null;
+  // a line on a squad's sheet while it sits in a building (Game.mpbHeld: the Jail, the School; MPB_SHEET[kind].held)
+  function mpbHeldNote(sq) { const k = sq && (sq.jailed ? 'jail' : sq.school ? 'school' : ''), x = k && MPB_SHEET[k]; return x && x.held ? x.held(sq) : ''; }
   // a tap on the board: a vote on an allowed tile, else a building's sheet (true: handled)
   function mpbTap(t) {
     if (!mpbOn() || !t) return false;
+    if (mpbPicking) { const f = mpbPicking; mpbPicking = null; if (phase === 'deploy' && f(t)) return true; }
     const h = phase === 'deploy' && Mpb.voteHead(m, me);
     if (h && Mpb.spotOk(m, me, h.kind, h.part, t.col, t.row)) { if (editable() && Game.mpbVote(m, me, t.col, t.row)) changed(); return true; }
     const x = Mpb.recAt(m, t.col, t.row);
@@ -9004,7 +9010,99 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     // ===== factory (page) =====
     // ===== magicLake (page) =====
     // ===== jail (page) =====
+    // who sits in it (each opens its sheet), Skywatch, and for its team the squads they may jail (a list, or a tap on the
+    // board); the generic row's Buy button gives way to the list
+    jail: {
+      html(side, rec, live) {
+        const mine = side === me, L = duoMyLane(), cells = (rec.data && rec.data.cells) || [], up = Mpb.litTiles(m, side, rec).length > 0;
+        const sqOf = (c) => c.lane === L ? m.armies[1 - side].find(q => q.id === c.id) : Game.teamArmy(m, 1 - side).find(q => q.id === c.id + Game.TEAM_ID);
+        const rows = cells.map(c => {
+          const q = sqOf(c), nm = esc((units[c.ui] || {}).name || '?'), who = mine ? (c.by === L ? 'jailed by you' : 'jailed by your teammate') : c.lane === L ? 'your squad' : 'your teammate’s squad';
+          return `<div class="xrow" style="gap:6px;align-items:center"><span style="color:${(units[c.ui] || {}).color}">${Shapes.svg((units[c.ui] || {}).shape, 16)}</span><span><b>${nm}</b>${q ? ` · level ${(Game.seenLevel(m, q) || 0) + 1}` : ''} · ${who}${c.round === m.round ? ' this round' : ` in round ${c.round}`}</span>${q ? `<button class="btn small" data-jail-sheet="${c.lane}:${c.id}">Sheet</button>` : ''}</div>`;
+        });
+        let pick = '';
+        if (mine && phase === 'deploy') {
+          const why = Mpb.jailWhy(m, me, rec), list = why ? [] : Mpb.jailable(m, me, rec);
+          if (why === 'you') pick = '<p class="hint" style="margin:0">Your cell is taken: it frees up when the jail is destroyed (or they sell the squad).</p>';
+          else if (why === 'full') pick = '<p class="hint" style="margin:0">Both cells are taken.</p>';
+          else if (why === 'down') pick = '<p class="hint" style="margin:0">It was destroyed last fight: no jailing this round.</p>';
+          else if (!list.length) pick = '<p class="hint" style="margin:0">No enemy squad from an earlier round to jail.</p>';
+          else pick = `<p class="hint" style="margin:0">Jail an enemy squad (${Mpb.JAIL.cost} gold; they find out at the fight):</p><div class="btnrow" style="flex-wrap:wrap">${list.slice(0, 16).map(x => `<button class="btn small" data-jail="${x.lane}:${x.id}" ${live && m.gold[me] >= Mpb.JAIL.cost ? '' : 'disabled'}><span style="color:${units[x.sq.unit].color}">${Shapes.svg(units[x.sq.unit].shape, 14)}</span> ${esc(units[x.sq.unit].name)} ${(Game.seenLevel(m, x.sq) || 0) + 1}</button>`).join('')}<button class="btn small" id="jail-pick" ${live ? '' : 'disabled'}>Tap one on the board</button></div>`;
+        }
+        const ban = (rec.data.banned || []).map(i => esc((units[i] || {}).name || '?'));
+        return `<p style="margin:0"><b>Skywatch</b> ${up ? `lights the tiles within ${Mpb.JAIL.light} of it: the enemy’s stealthed units there are seen.` : 'is off this round (destroyed last fight).'}</p>
+          <p style="margin:0">Cells: ${cells.length}/${Mpb.JAIL.cells}${Mpb.skillN(rec, 'guards') ? ` · ${Mpb.JAIL.guards} guards` : ''}</p>${rows.join('')}${ban.length ? `<p class="hint" style="margin:0">Can’t be jailed again: ${ban.join(', ')}.</p>` : ''}${pick}`;
+      },
+      wire(root, side, rec, again) {
+        const b = root.querySelector('[data-mpb-buy="jail"]');
+        if (b) b.outerHTML = '<span class="hint">Pick a squad above</span>';
+        root.querySelectorAll('[data-jail]').forEach(x => x.addEventListener('click', () => { const [ln, id] = x.dataset.jail.split(':').map(Number); if (editable() && Game.mpbBuy(m, me, rec.key, 'jail', ln, id)) { changed(); again(); } }));
+        root.querySelectorAll('[data-jail-sheet]').forEach(x => x.addEventListener('click', () => {
+          const [ln, id] = x.dataset.jailSheet.split(':').map(Number), L = duoMyLane(), sd = 1 - side;
+          const q = ln === L ? m.armies[sd].find(s => s.id === id) : Game.teamArmy(m, sd).find(s => s.id === id + Game.TEAM_ID);
+          if (q) openSheet(q.unit, q, sd, sd === me ? (ln === L ? undefined : { ro: true }) : ln === L ? undefined : { other: true });
+        }));
+        if ($('jail-pick')) $('jail-pick').addEventListener('click', () => {
+          closeSheet(); duoToastSay('Tap the enemy squad to jail', 3000);
+          mpbPicking = (t) => { // the enemy squad on that tile, as you see it
+            const hit = Mpb.jailable(m, me, rec).find(x => { const p = Game.seenAt(m, x.sq); return Game.blockOf(m, x.sq.unit, p.col, p.row).some(([c, r]) => c === t.col && r === t.row); });
+            if (hit && editable() && Game.mpbBuy(m, me, rec.key, 'jail', hit.lane, hit.id)) changed(); else render();
+            return true;
+          };
+        });
+      },
+      held: (sq) => `<p class="hint" style="margin:0;color:var(--foe)"><b>In the enemy’s Jail</b> since round ${sq.jailed.round}: it takes no part in any fight until the Jail is destroyed. You can still sell it.</p>`,
+    },
     // ===== school (page) =====
+    // the squad inside (its sheet, as a horse's rider: read only for anyone but its player), Study and the skill being
+    // learnt; for its player Take out (the nearest free tile, or one they tap) and Learn; when it is empty, your squads
+    // to put in (a list, or a tap on the board)
+    school: {
+      html(side, rec, live) {
+        const mine = side === me, L = duoMyLane(), p = rec.data && rec.data.pupil, sq = p && Mpb.pupilSq(m, side, rec);
+        const out = [];
+        if (p && sq) {
+          const u = units[sq.unit], need = sq.level < Engine.MAX_LEVEL ? Game.xpNeeded(u, sq.level) : 0, own = mine && p.lane === L;
+          const whose = !mine ? 'theirs' : own ? 'yours' : 'your teammate’s';
+          const sk = p.learn ? (u.skillDefs || [])[p.learn.k] : null, ready = p.learn ? p.learn.round + (Mpb.skillN(rec, 'fast') ? Mpb.SCHOOL.fastLearn : Mpb.SCHOOL.learn) : 0;
+          out.push(`<div class="xrow" style="gap:6px;align-items:center"><span style="color:${u.color}">${Shapes.svg(u.shape, 18)}</span><span><b>${esc(u.name)}</b> (${whose}) · level ${(mine ? sq.level : Game.seenLevel(m, sq)) + 1}${need ? ` · XP ${Math.round(sq.xp)}/${need}` : ''} · inside since round ${p.round}</span><button class="btn small" id="school-sheet">Sheet</button></div>`);
+          out.push(`<p class="hint" style="margin:0">Study: +${Mpb.levelXp(m, sq) * (Mpb.skillN(rec, 'double') ? 2 : 1)} XP at the start of next round.${sk ? ` Learning <b>${esc(sk.name)}</b>: ready in round ${ready}.` : ''}</p>`);
+          if (own && phase === 'deploy') {
+            const ks = !p.learn ? Mpb.learnable(m, me, sq) : [], leave = !Mpb.schoolWhy(m, me, rec, 'leave', []);
+            out.push(`<div class="btnrow" style="flex-wrap:wrap"><button class="btn small" id="school-out" ${live && leave ? '' : 'disabled'}>Take out · free</button><button class="btn small" id="school-out-tap" ${live && leave ? '' : 'disabled'}>Take out onto a tile</button>${p.learn && p.learn.round === m.round ? `<button class="btn small" id="school-unlearn" ${live ? '' : 'disabled'}>Stop learning</button>` : ''}</div>`);
+            if (p.learn) out.push('<p class="hint" style="margin:0">It can’t leave while it learns.</p>');
+            else if (ks.length) out.push(`<p class="hint" style="margin:0">Learn a skill of its unit, free (ready ${Mpb.skillN(rec, 'fast') ? Mpb.SCHOOL.fastLearn : Mpb.SCHOOL.learn} round${Mpb.skillN(rec, 'fast') ? '' : 's'} later):</p><div class="btnrow" style="flex-wrap:wrap">${ks.map(k => `<button class="btn small" data-school-learn="${k}" ${live ? '' : 'disabled'}>${esc(u.skillDefs[k].name)}</button>`).join('')}</div>`);
+          }
+        } else {
+          out.push('<p style="margin:0">Empty.</p>');
+          if (mine && phase === 'deploy') {
+            const ok = m.armies[me].filter(q => !Mpb.schoolWhy(m, me, rec, 'enroll', [q.id]));
+            out.push(ok.length ? `<p class="hint" style="margin:0">Put one of your squads in (it doesn’t fight; you can’t place another of its unit while it is inside):</p><div class="btnrow" style="flex-wrap:wrap">${ok.slice(0, 16).map(q => `<button class="btn small" data-school-in="${q.id}" ${live ? '' : 'disabled'}><span style="color:${units[q.unit].color}">${Shapes.svg(units[q.unit].shape, 14)}</span> ${esc(units[q.unit].name)} ${q.level + 1}</button>`).join('')}<button class="btn small" id="school-pick" ${live ? '' : 'disabled'}>Tap one on the board</button></div>` : '<p class="hint" style="margin:0">None of your squads can go in now (not a rider, a carrier with a rider, or one moved this round).</p>');
+          }
+        }
+        return out.join('');
+      },
+      wire(root, side, rec, again) {
+        const act = (...a) => { if (editable() && Game.mpbAct(m, me, rec.key, ...a)) { changed(); again(); } };
+        root.querySelectorAll('[data-school-in]').forEach(x => x.addEventListener('click', () => act('enroll', +x.dataset.schoolIn)));
+        root.querySelectorAll('[data-school-learn]').forEach(x => x.addEventListener('click', () => act('learn', +x.dataset.schoolLearn)));
+        if ($('school-out')) $('school-out').addEventListener('click', () => act('leave'));
+        if ($('school-unlearn')) $('school-unlearn').addEventListener('click', () => act('unlearn'));
+        if ($('school-sheet')) $('school-sheet').addEventListener('click', () => {
+          const sq = Mpb.pupilSq(m, side, rec), other = sq && sq.id >= Game.TEAM_ID;
+          if (sq) openSheet(sq.unit, sq, side, side === me ? (other ? { ro: true } : undefined) : other ? { other: true } : undefined);
+        });
+        if ($('school-out-tap')) $('school-out-tap').addEventListener('click', () => {
+          closeSheet(); duoToastSay('Tap a free tile of your zone', 3000);
+          mpbPicking = (t) => { if (editable() && Game.mpbAct(m, me, rec.key, 'leave', t.col, t.row)) changed(); else render(); return true; };
+        });
+        if ($('school-pick')) $('school-pick').addEventListener('click', () => {
+          closeSheet(); duoToastSay('Tap one of your squads to put it in the School', 3000);
+          mpbPicking = (t) => { const q = Game.squadAt(m, me, t.col, t.row); if (q && editable() && Game.mpbAct(m, me, rec.key, 'enroll', q.id)) changed(); else render(); return true; };
+        });
+      },
+      held: (sq) => `<p class="hint" style="margin:0;color:var(--gold)"><b>In your team’s School</b> since round ${sq.school.round}: it doesn’t fight, and no new squad of this unit can be placed while it is inside. Open the School to take it out or learn a skill.</p>`,
+    },
     // ===== shadowDen (page) =====
   };
   // a building's sheet: both teammates buy its skills (whoever buys pays; only your own buy can be taken back), the
