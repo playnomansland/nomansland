@@ -210,6 +210,12 @@ html.pc .panel > .bar:last-child { margin: -6px -12px -12px; padding: 6px 12px 1
 .up.open .up-more { display: block; }
 .up.held { background: color-mix(in srgb, var(--ink) 8%, transparent); }
 .up:focus-visible { outline: 2px solid var(--you); outline-offset: -2px; }
+/* "You are marked" / "Marked by you" in a squad's sheet: an .up row in a small box, foe-coloured (gold when it's your mark) */
+.up.marked { border: 1px solid var(--foe); border-radius: 8px; margin: 0; padding: 4px 8px 6px; background: color-mix(in srgb, var(--foe) 8%, transparent); }
+.up.marked.mine { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 8%, transparent); }
+.up.marked .up-h { min-height: 24px; }
+.up.marked .up-h > b { color: var(--foe); font-size: 13.5px; }
+.up.marked.mine .up-h > b { color: var(--gold); }
 .up-k { font-size: 11px; color: var(--muted); font-weight: 400; letter-spacing: 0; text-transform: none; }
 /* either-or upgrades: boxed together with an OR between them (owning one rules out the others) */
 /* a fight: the card of the body tapped (inspectCard), live while it fights */
@@ -6865,6 +6871,29 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     bindShroom(c.col, c.row, reopen);
     $('close').focus();
   }
+  // "You are marked" (your squad, marked by the opponent) or "Marked by you" (theirs): one box per mark on the squad,
+  // Mark Bounty and each Hunter's mark, only as far as the viewer may know them (a mark placed this round stays hidden
+  // from its target until the fight: Game.markShown / preyShown). Held, the box reads out the rules
+  function markedBlock(sq, owner) {
+    if (!sq || !m || !m.armies || owner == null || owner < 0) return '';
+    const by = 1 - owner, mine = by === me, deploying = phase === 'deploy', they = mine ? 'your' : 'their', They = mine ? 'Your' : 'Their';
+    const title = mine ? 'Marked by you' : 'You are marked', cls = `up marked${mine ? ' mine' : ''}`;
+    const box = (kind, text, more) => upRow({ name: title, act: `<span class="up-k">${kind}</span>`, text, more }).replace('class="up"', `class="${cls}" data-mark="${kind === 'Mark Bounty' ? 'bounty' : 'prey'}"`);
+    const out = [];
+    const k = Game.markOf(m, by);
+    if (k && k.squad === sq.id && Game.markOn(m, by) && Game.markShown(m, me, deploying, by)) {
+      const M = Game.MARK;
+      out.push(box('Mark Bounty', `${They} units deal +${M.hit}% damage to this squad and see it through stealth.`,
+        `Placed by ${they} Sniper tower’s Mark Bounty. Lasts the rest of the match. ${mine ? 'You get' : 'They get'} +${M.bounty} gold each fight ${they} units take its last body. ${mine ? 'If they sell the squad, you can place it again for free.' : 'Selling the squad lets them place it again for free.'}`));
+    }
+    const hunters = (m.armies[by] || []).filter(h => Game.isHunter(m, h) && Game.preyShown(m, me, deploying, by, h) === sq.id);
+    if (hunters.length) {
+      const h = hunters[0], name = (units[h.unit] || {}).name || 'Sniper', hu = Game.unitFor(m, by, h.unit, h), dmg = hu && hu.hunter && hu.hunter.dmg > 0 ? hu.hunter.dmg : 100;
+      out.push(box(`Hunter ${name}${hunters.length > 1 ? ' ×' + hunters.length : ''}`, `${They} Hunter ${name}s go for this squad first and deal +${Math.round(dmg)}% damage to it.`,
+        `Placed by ${they} awakened Hunter ${name}. In the fight, ${they} Hunters shoot a marked body in their reach before anything else and see it through stealth. The mark can be moved to another squad each round${mine ? '; they see a move at the next fight' : '; a move shows at the next fight'}. It’s gone if the squad is sold.`));
+    }
+    return out.length ? `<div class="marked-boxes" style="display:grid;gap:6px">${out.join('')}</div>` : '';
+  }
   // the body of a unit's sheet (everything under the title). Buttons carry data-act, bound by bindPane.
   // compact: for the side-by-side sheet (no shroom block; the tile's is shown once above)
   function sheetPane(i, sq, side, compact) {
@@ -6957,6 +6986,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       <p class="role" style="margin:0">${ROLES[u.name] && !customSet ? ROLES[u.name] : customSet ? `From a Counter Lab roster · ${Game.unitCostOf(base)} gold` : ''}</p>
       ${[u.trait, u.trait2, u.trait3, u.trait4].filter(x => x && x.name).map(x => `<p style="margin:0"><b style="color:var(--gold)">Trait: ${esc(x.name)}</b>${x.text ? ` · ${esc(x.text)}` : ''}</p>`).join('')}
       ${lvl}
+      ${markedBlock(sq, owner)}
       ${sq && m && side === me && phase === 'deploy' && sq.aim && Game.canAim(m, me, sq) ? `<p class="hint" style="margin:0"><b style="color:var(--you)">Direction:</b> walks its arrow first, ignoring enemies except ones in reach, then fights as usual.</p>` : ''}
       ${sq && m && side === me && phase === 'deploy' && !Game.isRider(sq) && !units[i].building && !(sq.aim && Game.canAim(m, me, sq)) ? (() => { const w = intentWords(intentFor({ id: sq.id }, true)); return w ? `<p class="hint" style="margin:0"><b style="color:var(--you)">Intent:</b> ${w}</p>` : ''; })() : ''}
       ${sq && m && !compact ? (() => { const q = side === me ? sq : Game.seenAt(m, sq); return shroomBlock(q.col, q.row); })() : ''}
@@ -7108,7 +7138,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   try { statsTeam = sessionStorage.getItem(STATS_TEAM_STORE) === '1'; } catch (e) {}
   var duoStats = null; // { round, rows: [side] -> [{ seat (null: the team's tower), key, name?, dealt }] }
   // the fight's damage by player and unit type: each lane's share of the result (Duo.laneResult, the lane's own ids)
-  // keyed as Game.resolve's dealtBy; the team's tower, guards and airship (lane 0's bodies) go to the team
+  // keyed as Game.resolve's dealtBy; the team's tower, guards and paratroopers (lane 0's bodies) go to the team
   function duoStatsKeep(res) {
     const rows = [[], []];
     for (const L of [0, 1]) {
@@ -7119,7 +7149,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
           const q = r.squads[k];
           if (q.side !== sd || q.squad === Game.TREASURY_SQ) continue;
           const sq = q.squad >= 0 && lm.armies[sd].find(x => x.id === q.squad), team = q.squad === -2 || q.squad === -3 || q.squad === -4;
-          const key = sq ? 'u' + sq.unit : q.squad === -2 ? 'tower' : q.squad === -3 ? 'guards' : q.squad === -4 ? 'airship' : 'spawn';
+          const key = sq ? 'u' + sq.unit : q.squad === -2 ? 'tower' : q.squad === -3 ? 'guards' : q.squad === -4 ? 'para' : 'spawn';
           if (!sq && !(q.dealt > 0)) continue;
           const id = (team ? 't:' : Duo.seatOf(L, sd) + ':') + key;
           if (!by[id]) by[id] = { seat: team ? null : Duo.seatOf(L, sd), key, dealt: 0, ...(key === 'tower' ? { name: Game.towerType(lm, sd).name } : {}) };
@@ -7131,7 +7161,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     duoStats = { round: duoFight[0].round, rows };
   }
   const STAT_EXTRA = { // what isn't a squad: [label, shape, colour]
-    tower: ['Tower', 'square', '#C9B79C'], guards: ['Guards', 'diamond', '#E2D3A6'], airship: ['Airship', 'ring', '#B9C7D6'], spawn: ['Spawned in the fight', 'triangle', '#9AA5A8'],
+    tower: ['Tower', 'square', '#C9B79C'], guards: ['Guards', 'diamond', '#E2D3A6'], para: ['Paratroopers', 'diamond', '#E2D3A6'], airship: ['Airship (old)', 'ring', '#B9C7D6'], // fights saved before 2026-11-05 spawn: ['Spawned in the fight', 'triangle', '#9AA5A8'],
     snowgre: ['Snowgres', 'square', '#DDEEFF'], yot: ['Yot-Yot’s imps', 'imp', '#FFA94D'], won: ['Won over (Charisma)', 'circle', CHARM_COL],
   };
   function statsHtml() {

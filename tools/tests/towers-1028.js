@@ -1,5 +1,5 @@
-// Headless check of the 2026-10-28 tower changes: Keep (Muster, Brute guards 400), Sniper tower (Mark Bounty, airship
-// 400 shooting like a level 3 Sniper), Bastion (Fortify, Vault), and Overwatch seeing stealthed units.
+// Headless check of the 2026-10-28 tower changes: Keep (Muster, Brute guards 400), Sniper tower (Mark Bounty, Drop
+// paratroopers 400, since 2026-11-05), Bastion (Fortify, Vault), and Overwatch seeing stealthed units.
 // Run from the repo root: node tools/tests/towers-1028.js
 const assert = require('assert');
 const Game = require('../../src/game.js');
@@ -29,31 +29,54 @@ m = mk('keep'); m.towers[1].type = null; m.extraDeploys[1] = 0; m.gold[1] = 2000
 assert.ok(Game.buyDeploy(m, 1) && m.gold[1] === 2000 - Game.CONFIG.extraDeployCost);
 assert.ok(Game.setTowerType(m, 1, 'keep') && m.extraDeploys[1] === 0 && m.gold[1] === 2000 && Game.deploysAllowed(m, 1) === base + 1);
 
-// Sniper tower: airship 400, shooting like a level 2 Sniper, dropping 3 paratroopers once, into the enemy's zone
+// Sniper tower: Drop paratroopers 400 (it was Deploy airship): 3 paratroopers at 3 s in a triangle in front of the enemy
+// tower, each hitting every enemy within 3 m as it lands; nothing before 3 s; Snipers and the tower no longer get +30
 assert.strictEqual(T.find(t => t.id === 'sniper').skill2.cost, 400);
+assert.strictEqual(T.find(t => t.id === 'sniper').skill2.name, 'Drop paratroopers');
+assert.ok(!Game.AIRSHIP, 'the airship is gone');
 m = mk('sniper');
+const snq = sq(m, 0, 'Sniper', 5, 13, 1), hitNo = Game.bodiesFor(m, 0).find(x => x.squad === snq.id).u.hit, towerNo = Game.bodiesFor(m, 0).find(x => x.squad === -2).u.hit;
 Game.buyTowerSkill2(m, 0);
-let b = Game.bodiesFor(m, 0).find(x => x.squad === -4);
-const sn = units[ui('Sniper')];
-assert.ok(b && Math.abs(b.u.hit - sn.hit * 2) < 1e-9 && b.u.aps === sn.aps && b.u.range === sn.range, 'airship: a level 2 Sniper\'s attack');
-assert.ok(!b.u.spawn && b.u.drop && b.u.drop.count === 3, 'airship: one drop of 3, no spawning');
+assert.strictEqual(Game.bodiesFor(m, 0).find(x => x.squad === snq.id).u.hit, hitNo, 'Snipers: no +30 hit any more');
+assert.strictEqual(Game.bodiesFor(m, 0).find(x => x.squad === -2).u.hit, towerNo, 'the tower: no +30 hit any more');
+assert.ok(!Game.bodiesFor(m, 0).some(x => x.squad === -4), 'no airship body');
+const wisps = units[ui('Wisps')], sn = units[ui('Sniper')];
 for (const side of [0, 1]) {
   const ma = mk('sniper'); ma.towers[1].type = 'sniper'; Game.buyTowerSkill2(ma, side);
-  sq(ma, 1 - side, 'Brute', 5, side === 0 ? 2 : 13, 1); // a target deep in the enemy's zone
-  sq(ma, side, 'Brute', 5, side === 0 ? 13 : 2, 1);
-  const sa = Game.startBattle(ma), drops = [];
-  let air = null, kids = 0;
-  for (let k = 0; k < 3000 && sa.step(); k++) {
-    const bs = sa.bodies;
-    air = air || bs.find(x => x.squad === -4 && x.side === side);
-    const n = bs.filter(x => x.side === side && x.u.name === 'Paratrooper').length;
-    if (n > kids) { drops.push({ n: n - kids, y: air.y }); kids = n; }
+  const et = Game.tileToWorld(ma.towers[1 - side].col, ma.towers[1 - side].row);
+  const pd = Game.bodiesFor(ma, side).find(x => x.squad === -2).paraDrop;
+  assert.ok(pd && pd.t === 3 && pd.spots.length === 3 && pd.r === 3, 'side ' + side + ': a drop of 3 at 3 s');
+  assert.ok(pd.unit.hit === wisps.hit && pd.unit.hp === wisps.hp && pd.unit.projSpeed === 0 && pd.unit.bodies === 1, 'side ' + side + ': a Wisp with instant shots');
+  for (const s of pd.spots) {
+    const d = Math.hypot(s.x - et.x, s.y - et.y);
+    assert.ok(d > 2.5 && d < 8, 'side ' + side + ': lands near the enemy tower, clear of it (' + d.toFixed(2) + ' m)');
+    assert.ok(side === 0 ? s.y < et.y : s.y > et.y, 'side ' + side + ': in front of the enemy tower, toward the middle');
   }
-  assert.strictEqual(drops.length, 1, 'side ' + side + ': one drop a fight');
-  assert.strictEqual(drops[0].n, 3, 'side ' + side + ': 3 paratroopers at once');
-  const edge = Game.bodiesFor(ma, side).find(x => x.squad === -4).u.drop.y;
-  assert.ok(side === 0 ? drops[0].y >= edge - 1e-9 : drops[0].y <= edge + 1e-9, 'side ' + side + ': dropped inside enemy territory');
+  // an enemy squad standing on the landing spot, far from everything else
+  const tc = ma.towers[1 - side], tgt = sq(ma, 1 - side, 'Brute', tc.col, tc.row + (side === 0 ? -1 : 1), 1);
+  sq(ma, side, 'Brute', 5, side === 0 ? 13 : 2, 1);
+  const sa = Game.startBattle(ma);
+  const tb = () => sa.bodies.filter(x => x.squad === tgt.id && x.side === 1 - side);
+  const hp0 = tb().reduce((a, x) => a + x.hp, 0);
+  let landedAt = null, hpBefore = null;
+  for (let k = 0; k < 3000 && sa.step(); k++) {
+    const n = sa.bodies.filter(x => x.side === side && x.u.name === 'Paratrooper').length;
+    if (landedAt == null && n) { landedAt = sa.time(); assert.strictEqual(n, 3, 'side ' + side + ': 3 paratroopers at once'); break; }
+    if (sa.time() < 2.9) { assert.ok(sa.drops().length === 1 && sa.drops()[0].side === side, 'side ' + side + ': the landing spots show until the drop'); hpBefore = tb().reduce((a, x) => a + x.hp, 0); }
+  }
+  assert.ok(landedAt != null && landedAt >= 3 - 1e-6 && landedAt < 3.2, 'side ' + side + ': landed at 3 s (' + landedAt + ')');
+  assert.ok(!sa.drops().length, 'side ' + side + ': no marker after landing');
+  const hp1 = tb().reduce((a, x) => a + x.hp, 0);
+  assert.ok(hp1 < hpBefore - 1, 'side ' + side + ': the landing hit the squad under it (' + hpBefore.toFixed(0) + ' -> ' + hp1.toFixed(0) + ', from ' + hp0.toFixed(0) + ')');
+  assert.ok(sa.bodies.filter(x => x.side === side && x.u.name === 'Paratrooper').every(x => x.squad === -4), 'side ' + side + ': squad -4 (damage stats: paratroopers)');
 }
+// the same drop for both sides, mirrored: same x, y reflected
+{
+  const ma = mk('sniper'); ma.towers[1].type = 'sniper'; Game.buyTowerSkill2(ma, 0); Game.buyTowerSkill2(ma, 1);
+  const a = Game.paraDropOf(ma, 0).spots, b = Game.paraDropOf(ma, 1).spots, t0 = Game.tileToWorld(ma.towers[0].col, ma.towers[0].row), t1 = Game.tileToWorld(ma.towers[1].col, ma.towers[1].row);
+  if (Math.abs(t0.x - t1.x) < 1e-9 && Math.abs(t0.y + t1.y) < 1e-9) a.forEach((s, i) => assert.ok(Math.abs(s.x - b[i].x) < 1e-9 && Math.abs(s.y + b[i].y) < 1e-9, 'spot ' + i + ' mirrored'));
+}
+console.log('ok  Sniper tower: Drop paratroopers');
 
 // Mark Bounty: 50 once, only an enemy squad from an earlier round, can't be moved, free again once the squad is sold
 m = mk('sniper');

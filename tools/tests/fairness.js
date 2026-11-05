@@ -143,4 +143,36 @@ const SPOTS = [[0, 9], [3, 15], [-12, 21], [9, 27]];
   assert.ok(Math.abs(host - guest) <= 5, `the rest don't lean to one side (host ${host}, guest ${guest})`);
   console.log(`ok  ${N} mirrored game fights: ${exact} exact mirrors, host ${host}, guest ${guest}`);
 }
+// the sniper tower's paratroopers (both sides bought them): mirrored armies around the towers, where they land
+{
+  const units = roster.units.map(u => ({ ...u, cost: u.cost / 100, skillDefs: E.SLOTS.map(k => (u.skills || [])[k] ? skill(u.skills[k]) : null) }));
+  const pick = units.map((u, i) => i).filter(i => !units[i].building && !units[i].idle);
+  let seed = 777;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return seed / 4294967296; };
+  const N = 40;
+  let host = 0, guest = 0, exact = 0, landed = 0;
+  for (let n = 0; n < N; n++) {
+    const m = Game.createMatch(units, null, 2000 + n, 'standard');
+    m.round = Game.TOWER_PICK_ROUND; m.towers[0].type = m.towers[1].type = 'sniper'; m.gold = [5000, 5000];
+    m.packages = [[], []]; m.pack = [null, null]; m.chars = [null, null];
+    assert.ok(Game.buyTowerSkill2(m, 0) && Game.buyTowerSkill2(m, 1), 'paratroopers bought');
+    const tc = m.towers[0], army = [], used = new Set([tc.col + ',' + tc.row]), k = 1 + Math.floor(rnd() * 4);
+    for (let j = 0; j < k; j++) {
+      let col, row;
+      do { col = Math.max(0, Math.min(Game.COLS - 1, tc.col - 2 + Math.floor(rnd() * 5))); row = Game.ROWS - 1 - Math.floor(rnd() * 4); } while (used.has(col + ',' + row));
+      used.add(col + ',' + row);
+      army.push({ id: j + 1, unit: pick[Math.floor(rnd() * pick.length)], col, row, round: 1, xp: 0, level: Math.floor(rnd() * 2), cost: 1 });
+    }
+    m.armies = [army, army.map(s => ({ ...s, row: Game.ROWS - 1 - s.row }))];
+    const bt = Game.startBattle(m);
+    while (bt.step()) {}
+    const r = bt.result();
+    if (bt.bodies.some(b => b.u.name === 'Paratrooper')) landed++;
+    if (isMirror(r)) exact++; else if (r.winner === 0) host++; else if (r.winner === 1) guest++;
+  }
+  assert.ok(landed >= N * 0.9, `paratroopers landed in ${landed} of ${N} fights`);
+  assert.ok(exact >= N * 0.9, `paratrooper fights: ${exact} of ${N} exact mirrors`);
+  assert.ok(Math.abs(host - guest) <= 3, `paratrooper fights don't lean to one side (host ${host}, guest ${guest})`);
+  console.log(`ok  ${N} mirrored fights with paratroopers: ${exact} exact mirrors, host ${host}, guest ${guest}`);
+}
 console.log('fairness ok');

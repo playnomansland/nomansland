@@ -122,7 +122,7 @@
     return { units, matrix, skills };
   }
 
-  // the team's tower, its guards and airship, its treasury and its walls: lane 0's stand in the fight, lane 1's don't
+  // the team's tower (and the paratroopers it drops), its guards, its treasury and its walls: lane 0's stand in the fight, lane 1's don't
   const teamBody = (sq) => sq === -2 || sq === -3 || sq === -4 || sq === G.TREASURY_SQ || (sq <= G.BWALL_SQ && sq > G.BWALL_SQ - 100);
 
   // The fight of two lanes (matches with units, as they stand when it begins): a steppable Engine battle on the one

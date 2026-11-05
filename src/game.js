@@ -51,7 +51,7 @@ const Game = (() => {
       muster: { name: 'Muster', text: '1 extra deployment every round, for free.' } }, // see musterOn
     { id: 'sniper', name: 'Sniper tower', text: 'Slow, huge range, double damage. Can’t hit within 1 tile.', unit: { ...TOWER, name: 'Sniper Tower', kind: 'sniper', hp: 500, hit: 60, aps: 0.4, range: 32, minRange: TILE, color: '#B9C7D6' },
       skill: { name: 'Eagle eye', text: 'All your units: +1.5 m range, +5% attack speed. Snipers and the tower get double.' },
-      skill2: { name: 'Deploy airship', cost: 400, text: 'An untouchable airship shoots like a level 2 Sniper and drops 3 paratroopers once each fight as it flies into enemy territory. Snipers and tower: +30 hit.' },
+      skill2: { name: 'Drop paratroopers', cost: 400, text: '3 seconds into each fight, 3 paratroopers drop into the enemy base and hit everything they land on.' }, // see PARA
       mark: { name: 'Mark Bounty', cost: 50, text: 'Mark one enemy squad for the rest of the match. All your units deal it +15% damage and see it through stealth; +100 gold each fight your units take its last body. The mark can’t be moved; if they sell the squad, place it again for free.' } }, // see MARK
     { id: 'bastion', name: 'Bastion', text: `Tough. Burns all enemies within ${MOAT.range} m.`,
       unit: { ...TOWER, name: 'Bastion', kind: 'bastion', hp: 1000, hit: MOAT.hit, aps: MOAT.aps, range: MOAT.range, moat: { ...MOAT }, idle: true, color: '#B79C8A' }, // idle: the moat is its only attack
@@ -232,10 +232,11 @@ const Game = (() => {
   const bwallUnit = (edge) => { const across = edge === 'e' || edge === 'w';
     return E.withTraits({ name: 'Wall', cost: 0, bodies: 1, hp: BWALL.hp, hit: 0, aps: 1, range: 0, speed: 0, splash: 0, shape: 'square', color: '#9C8F7A', structure: true, lesser: true, idle: true, kind: 'wall',
       barrier: across ? BWALL.thick / 2 : TILE / 2, barrierY: across ? TILE / 2 : BWALL.thick / 2, defense: 'armor', defVal: BWALL.armor, level: 0 }); };
-  // Deploy airship (sniper tower): squad id -4, can't be hit (Engine: aloft), stops hover m short of its target;
-  // drops `drop` paratroopers at once, once a fight, as it flies into the enemy's deployment zone; +sniperHit damage per
-  // hit for the tower, the airship and Snipers
-  const AIRSHIP = { speed: 3, hover: 14, drop: 3, sniperHit: 30, level: 1 }; // level: it shoots like a Sniper at this level (1 = level 2)
+  // Drop paratroopers (sniper tower's second skill, since 2026-11-05; it was Deploy airship): at fight time `at` s,
+  // `count` paratroopers (the roster's Wisps as they are, one body each, instant shots) land in a small triangle
+  // `ahead` m in front of the enemy tower (toward the middle), each hitting every enemy within `radius` m of where it
+  // lands for its own hit. Squad id -4. See Engine: paraDrop
+  const PARA = { at: 3, count: 3, ahead: TILE, spread: 1.4, radius: 3, color: '#E2D3A6' };
   const INVEST = { gold: 800 }; // Major investment (bank): paid back at the start of the next round
   // Mage tower: each round its owner may call one mage general, who swaps the tower's attack for that round's fight
   // only, and/or the teleport general (extra: bought once, on top of any general, for the rest of the match).
@@ -1852,7 +1853,7 @@ const Game = (() => {
     const out = [];
     let idx = 0;
     // tower skills in force: Eagle eye (sniper tower), Home ground (bastion: a band across this side's zone)
-    const eagle = towerSkillOn(m, side, 'sniper'), airship = towerSkill2On(m, side, 'sniper');
+    const eagle = towerSkillOn(m, side, 'sniper');
     const home = towerSkillOn(m, side, 'bastion') ? (() => {
       const ys = zoneRows(side).map(r => tileToWorld(0, r).y);
       return { y0: Math.min(...ys) - TILE / 2, y1: Math.max(...ys) + TILE / 2, armor: TOWER_SKILL.homeArmor, hpPct: TOWER_SKILL.homeHp, on: false };
@@ -1891,7 +1892,6 @@ const Game = (() => {
       if (markOn(m, side)) for (const x of b) x.sniperMark = MARK.hit; // Mark Bounty: all its units hunt the mark (since 2026-11-03; Snipers only before)
       if (markOn(m, 1 - side) && markOf(m, 1 - side).squad === sq.id) for (const x of b) x.marked = true;
       if (preyOn(m, side, sq.id)) for (const x of b) x.prey = true; // a Hunter's mark (the Sniper's Awaken skill)
-      if (airship && u.name === 'Sniper') { const su = { ...b[0].u, hit: b[0].u.hit + AIRSHIP.sniperHit }; for (const x of b) x.u = su; } // flat, after levels
       if (home) for (const x of b) x.band = { ...home };
       if (zoe) for (const x of b) x.zoe = true; // for the rising-stars effect
       if (purple) for (const x of b) x.shroom = true; // for the drifting spores effect
@@ -1951,21 +1951,8 @@ const Game = (() => {
         gb.forEach((x, k) => { const [px, py] = posts[k % posts.length]; x.x = w.x + px * off; x.y = w.y + py * off; x.holdT = TOWER_SKILL.guardHold; x.guard = true; });
         idx += gb.length; out.push(...gb);
       }
-      // Deploy airship (sniper tower's second skill): flies from the tower, shoots like it, drops guards as paratroopers
-      if (airship) {
-        const { skills, skillDefs, skillsOn, skillsInnate, skillMods, ...plain } = (m.units || []).find(x => x && x.name === 'Wisps') || GUARD;
-        const para = E.withTraits({ ...plain, name: 'Paratrooper', level: 0, bodies: 1, shape: 'diamond', color: '#E2D3A6' });
-        const sn = (m.units || []).find(x => x && x.name === 'Sniper'), sl = sn ? E.leveled(E.withTraits({ ...sn, level: 0 }), AIRSHIP.level) : null;
-        const shot = sl ? { hit: sl.hit, aps: sl.aps, range: sl.range, splash: 0, projSpeed: sl.projSpeed || 0, spinUp: 0, spinHit: 0 } : {}; // a level 2 Sniper's attack
-        // the edge of the enemy's zone: side 0 flies up (toward row 0) past the edge of row ZONE - 1, side 1 down past row ROWS - ZONE
-        const edge = tileToWorld(0, side === 0 ? ZONE - 1 : ROWS - ZONE).y + (side === 0 ? -1 : 1) * TILE / 2;
-        const { spawn, ...tower } = tu;
-        const au = E.withTraits({ ...tower, ...shot, name: 'Airship', kind: 'airship', structure: false, aloft: true, hp: 1, speed: AIRSHIP.speed, hover: AIRSHIP.hover,
-          drop: { unit: para, count: AIRSHIP.drop, y: edge, dir: side === 0 ? 1 : -1 } });
-        const aw = tileToWorld(t.col, side === 0 ? ROWS - ZONE - 1 : ZONE); // it takes off from the front row of its side's half of no man's land
-        const ab = E.buildSquad(au, side, aw.x, aw.y, -4, TILE, idx);
-        idx += ab.length; out.push(...ab);
-      }
+      // Drop paratroopers (sniper tower's second skill): the tower brings them; they land at PARA.at (see paraDropOf)
+      if (towerSkill2On(m, side, 'sniper')) tb[0].paraDrop = paraDropOf(m, side);
     }
     // devtest: lesser buildings and walls (spells) stand on their tiles; squad ids LESSER_SQ - key, WALL_SQ - cast index
     if (isDev(m)) {
@@ -2026,6 +2013,21 @@ const Game = (() => {
     return out;
   }
 
+  // the paratroopers' drop for side (Engine: paraDrop): the roster's Wisps as they are (no skills, no levels), instant
+  // shots, landing in a triangle in front of the enemy tower (its tile, standing or not; with none, the mirror of this
+  // side's own tower). The spots go left, right, then the one nearest the middle, the same for both sides (mirrored)
+  function paraUnit(m) {
+    const { skills, skillDefs, skillsOn, skillsInnate, skillMods, ...plain } = (m.units || []).find(x => x && x.name === 'Wisps') || GUARD;
+    return E.leveled(E.withTraits({ ...plain, name: 'Paratrooper', level: 0, bodies: 1, projSpeed: 0, shape: 'diamond', color: PARA.color }), 0);
+  }
+  function paraDropOf(m, side) {
+    const et = m.towers && m.towers[1 - side], ot = m.towers && m.towers[side];
+    const w = et ? tileToWorld(et.col, et.row) : ot ? tileToWorld(ot.col, ROWS - 1 - ot.row) : tileToWorld(Math.floor(COLS / 2), side === 0 ? 0 : ROWS - 1);
+    const fwd = side === 0 ? -1 : 1, cy = w.y + fwd * PARA.ahead, d = PARA.spread; // the enemy's front: toward this side
+    const spots = [{ x: w.x - d, y: cy - fwd * d * 0.5 }, { x: w.x + d, y: cy - fwd * d * 0.5 }, { x: w.x, y: cy + fwd * d }].slice(0, PARA.count);
+    return { t: PARA.at, unit: paraUnit(m), spots, r: PARA.radius, squad: -4 };
+  }
+
   // a side's tower as it fights (bodiesFor): its mage general, the slime skills, its tower skills, Core Awoken
   function fightTowerUnit(m, side, fx) {
     const tt = towerType(m, side);
@@ -2034,7 +2036,6 @@ const Game = (() => {
     if (towerSkillOn(m, side, 'bastion')) tu = { ...tu, shield: (tu.shield || 0) + BWALL.shield };
     if (towerSkill2On(m, side, 'bastion')) tu = { ...tu, bonusArmor: (tu.bonusArmor || 0) + BWALL.towerArmor };
     if (towerSkillOn(m, side, 'sniper')) tu = { ...tu, range: tu.range + TOWER_SKILL.eagleRange * eagleBy('tower'), aps: tu.aps * (1 + TOWER_SKILL.eagleAps * eagleBy('tower') / 100) }; // Eagle eye
-    if (towerSkill2On(m, side, 'sniper')) tu = { ...tu, hit: tu.hit + AIRSHIP.sniperHit };
     if ((fx || buildingEffects(m, side)).awake && tt.awake) tu = { ...tu, ...tt.awake, idle: false, awake: true }; // Core Awoken: the Mecha Tower drives
     return tu;
   }
@@ -2363,7 +2364,7 @@ const Game = (() => {
       }
     }
     // damage each side dealt in the fight, by unit type ('u' + unit index) and by what isn't a squad: 'tower' (with its
-    // name, as it was in this fight), 'guards', 'airship', 'snowgre', 'yot' (Yot-Yot's imps), 'won' (bodies won over
+    // name, as it was in this fight), 'guards', 'para' (paratroopers), 'snowgre', 'yot' (Yot-Yot's imps), 'won' (bodies won over
     // by a Gentleman) and 'spawn' (anything spawned in the fight). For the damage stats dropdown.
     const dealtBy = [0, 1].map(sd => {
       const by = {};
@@ -2371,7 +2372,7 @@ const Game = (() => {
         const q = res.squads[k];
         if (q.side !== sd) continue;
         const sq = q.squad >= 0 && m.armies[sd].find(x => x.id === q.squad);
-        const key = sq ? 'u' + sq.unit : q.squad === -2 ? 'tower' : q.squad === -3 ? 'guards' : q.squad === -4 ? 'airship' : q.squad === YOT_SQUAD ? 'yot'
+        const key = sq ? 'u' + sq.unit : q.squad === -2 ? 'tower' : q.squad === -3 ? 'guards' : q.squad === -4 ? 'para' : q.squad === YOT_SQUAD ? 'yot'
           : q.squad === E.CONVERT_SQUAD ? 'won' : q.squad <= -10 && q.squad > YOT_SQUAD ? 'snowgre'
           : q.squad <= BUILDING_SQUAD && buildingsOf(m, sd)[BUILDING_SQUAD - q.squad] ? 'b:' + buildingsOf(m, sd)[BUILDING_SQUAD - q.squad].id : q.squad < 0 ? 'spawn' : null;
         if (!key || (!sq && !(q.dealt > 0))) continue; // squads always show; the rest only if they dealt damage
@@ -3271,7 +3272,7 @@ const Game = (() => {
     canBuyBuilding, buyBuilding, buildingSkills, buildingSkillInfo, bskillOf, bskillCost, canBuyBuildingSkill, buyBuildingSkill, undoBuildingSkill,
     buildingXpNeeded, buildingLevelCost, buildingReady, levelBuilding, undoLevelBuilding, constructBuff, buildingBodies, canBuySkill, buySkill, undoSkill, sellValue, sell,
     isRider, freeOut, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
-    TOWER, TOWER_TYPES, OUTPOST, TOWER_PICK_ROUND, towerType, towerChoices, needsTowerPick, setTowerType, settleTowerPicks, TOWER_SKILL, towerSkillOf, towerSkillVisible, towerPicked, canBuyTowerSkill, buyTowerSkill, undoTowerSkill, towerSkillCost, towerSkill2Of, towerSkill2Visible, towerSkill2Cost, canBuyTowerSkill2, buyTowerSkill2, undoTowerSkill2, towerSkill2On, AIRSHIP, MOAT, BWALL, BWALL_SQ, EDGES, bwallsOf, bwallOn, edgeOf, bwallWorld, bwallsLeft, bwallShown, bwallSpotOk, placeBwall, unplaceBwall, ensureBwalls, bwallUnit, INVEST, MAGE_GENERALS, mageGenPrice, MAGE, mageGenInfo, mageGenOf, mageTpOf, mageTpRound, mageTpNew, isExtraGen, mageGenCost, canBuyMageGen, buyMageGen, undoMageGen, mageTowerUnit, generalUnit, LOAN, loanNow, investNow, bankBusy, investNow, bankBusy, canTakeLoan, takeLoan, undoLoan, towerRounds, troundInfo, troundOn, troundCost, canBuyTround, buyTround, undoTround, SLIME_UNITS, slimeTowerUnit, slimeSkillDefs, TOWER_MID, towerColOk, towerAt, needsTower, placeTower, ensureTower,
+    TOWER, TOWER_TYPES, OUTPOST, TOWER_PICK_ROUND, towerType, towerChoices, needsTowerPick, setTowerType, settleTowerPicks, TOWER_SKILL, towerSkillOf, towerSkillVisible, towerPicked, canBuyTowerSkill, buyTowerSkill, undoTowerSkill, towerSkillCost, towerSkill2Of, towerSkill2Visible, towerSkill2Cost, canBuyTowerSkill2, buyTowerSkill2, undoTowerSkill2, towerSkill2On, PARA, paraDropOf, MOAT, BWALL, BWALL_SQ, EDGES, bwallsOf, bwallOn, edgeOf, bwallWorld, bwallsLeft, bwallShown, bwallSpotOk, placeBwall, unplaceBwall, ensureBwalls, bwallUnit, INVEST, MAGE_GENERALS, mageGenPrice, MAGE, mageGenInfo, mageGenOf, mageTpOf, mageTpRound, mageTpNew, isExtraGen, mageGenCost, canBuyMageGen, buyMageGen, undoMageGen, mageTowerUnit, generalUnit, LOAN, loanNow, investNow, bankBusy, investNow, bankBusy, canTakeLoan, takeLoan, undoLoan, towerRounds, troundInfo, troundOn, troundCost, canBuyTround, buyTround, undoTround, SLIME_UNITS, slimeTowerUnit, slimeSkillDefs, TOWER_MID, towerColOk, towerAt, needsTower, placeTower, ensureTower,
     FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, isOff, enemyHolds, inNoMans, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
     STANDARD_PACK, ICE, ALTAR, GOLEM, isIce, hailRound, altarRound, stormShift, stormRows, hailTiles, altarCost, altarRefund, altarCount, pushRoom, altarBought, addAltar, buyAltar, undoAltar, snowgres, snowgreUnit,
     MAPS, SKINS, MAP_LOOK, lookOf, EDITOR_MAPS, TERRAIN, objectiveOf, objectiveTiles, SHAPE_PATH, terrainTile, terrainBlocks, terrainOf, groundHeight, ELF_TOWER, SHROOM, SHROOM_SPLIT, shroomAt, shroomTileAt, shroomRemoval, SHROOM_REMOVE, shroomCost, removeShroom, undoRemoveShroom, mapOf, elfSpot, rollMap, BRIBE_COST, bribeList, bribeGold, bribeCount, bribeNow, bribeCost, bribeRefund, ELF_POWER, elfPowered, elfUnit, ELF_OWN, elfOwnCost, elfOwnOf, elfOwnAt, elfOwnUnlocked, elfOwnOffered, canBuyElfOwn, elfOwnSpotOk, buyElfOwn, undoElfOwn, bribeLeader, canBribe, bribe, undoBribe,

@@ -1,7 +1,7 @@
 // ===== Low-poly unit models for the 3D board =====
 // Models3D(THREE) -> { kindOf(u), parts(kind), height(kind) }.
 // kindOf picks a figure from a unit's stats (rosters are custom, so names can't be relied on): towers (one per tower
-// type), the elf spire, airships (aloft), the horse and spider shapes, fliers, then archers / casters for ranged
+// type), the elf spire, the drone (aloft), the horse and spider shapes, fliers, then archers / casters for ranged
 // units and goblins / brutes / soldiers for melee ones. The default roster's tier 4 units, the wizards and a few more
 // (Ent, Rogue, Shiv, Assassin, Obelisk, Sniper, Slimeshots, Skeleton Archers, the Hellfiend) have their own models, by name (NAMED); a custom unit with one of
 // those names gets that model too. A faction's tower (Factions mode) is one tower model in the faction's colour. height(kind): the top of the model, for markers above it.
@@ -219,12 +219,6 @@ const Models3D = (THREE) => {
       ...[-0.55, -0.2, 0.15, 0.5].flatMap((z) => [-1, 1].flatMap((sd) => [
         P(box(0.7, 0.08, 0.08), DARK, [sd * 0.5, 0.82, z - 0.1], [0, sd * z * 0.6, sd * 0.6]),
         P(box(0.08, 0.75, 0.08), DARK, [sd * 0.95, 0.42, z - 0.1], [0, 0, sd * 0.25])]))],
-    // the sniper tower's airship: a blimp in the team colour (drawn see-through), fins and a gondola
-    airship: () => [
-      P(ball(1), 'team', [0, 1.4, 0], [0, 0, 0], [0.75, 0.75, 1.9]),
-      P(cone(0.5, 0.9, 3), 'team', [0, 1.4, 1.75], [-Math.PI / 2, 0, 0], [1, 1, 0.2]),
-      P(cone(0.5, 0.9, 3), 'team', [0, 1.4, 1.75], [-Math.PI / 2, 0, Math.PI / 2], [1, 1, 0.2]),
-      P(box(0.45, 0.3, 0.9), DARK, [0, 0.55, 0])],
     // ---------- units of the default roster with their own models (NAMED) ----------
     // Ent: a walking tree, root legs, a band in the team colour, a crown of leaves in the unit's colour, leafy hands
     ent: () => [
@@ -693,7 +687,7 @@ const Models3D = (THREE) => {
     if (u.structure && (u.kind === 'lesser' || u.kind === 'wall' || u.kind === 'treasury' || u.kind === 'watchtower')) return u.kind;
     if (u.building) { const k = 'building:' + u.building; return u.awake && BUILD[k + ':awake'] ? k + ':awake' : BUILD[k] ? k : 'building'; } // Core Awoken: its walking version
     if (u.structure) { const k = TOWERS[u.kind] ? 'tower:' + u.kind : /^f-/.test(u.kind || '') ? 'tower:faction' : 'tower:keep'; return u.awake && BUILD[k + ':awake'] ? k + ':awake' : k; } // Core Awoken: the Mecha Tower on wheels
-    if (u.aloft) return u.kind === 'drone' ? 'drone' : 'airship';
+    if (u.aloft) return 'drone';
     if (u.mech) return 'leafmech'; // the Leafblade suit
     if (NAMED[u.name]) { const k = NAMED[u.name]; return u.awake && BUILD[k + ':awake'] ? k + ':awake' : u.eye && BUILD[k + ':eye'] ? k + ':eye' : u.unfolded && BUILD[k + ':unfolded'] ? k + ':unfolded' : k; } // Core Awoken, Unfold: their own versions
     if (u.shape === 'horse') return 'horse';

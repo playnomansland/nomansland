@@ -798,7 +798,7 @@ const Engine = (() => {
     }
     const all = A.concat(B);
     const sides = [A, B];
-    const counts = (b) => !(b.u.structure || b.u.aloft || b.u.noCount); // what makes up a side's army (towers, airships and constructs don't)
+    const counts = (b) => !(b.u.structure || b.u.aloft || b.u.noCount); // what makes up a side's army (towers, drones and constructs don't)
     const stats = [
       { dealt: 0, wasted: 0, blocked: 0, missed: 0, windLost: 0, winds: 0, totalHp: A.reduce((s, b) => s + (counts(b) ? b.u.hp : 0), 0) },
       { dealt: 0, wasted: 0, blocked: 0, missed: 0, windLost: 0, winds: 0, totalHp: B.reduce((s, b) => s + (counts(b) ? b.u.hp : 0), 0) },
@@ -938,6 +938,11 @@ const Engine = (() => {
     // timed strikes (Factions devtest spells): { t, x, y, r, dmg, side }: at fight time t, dmg to every enemy of side
     // within r metres of (x, y), armor counting. Each fires once.
     const strikes = (opts.strikes || []).map(s => ({ ...s, done: false }));
+    // timed drops (the sniper tower's paratroopers): a body with paraDrop { t, unit, spots: [{ x, y }], r, squad } brings
+    // one body of unit (leveled) onto each spot at fight time t, in the spots' order; each hits every enemy within r m of
+    // where it lands for its own hit (through hurt: armor, ward, dodges count). The drop belongs to the fight, not to the
+    // body that brought it: it comes even if that body has fallen.
+    const drops = all.filter(b => b.paraDrop).map(b => ({ ...b.paraDrop, side: b.side, done: false }));
     let projectiles = [];
     let t = 0, shots = [], over = false, tick = 0;
     const dist = (a, b) => hyp(a.x - b.x, a.y - b.y);
@@ -1142,7 +1147,7 @@ const Engine = (() => {
       return false;
     }
     // A map objective (opts.objective = { rects: [{ x0, x1, y0, y1 }], secs }, the Bridge): the side with more of its
-    // units standing in the zone (not structures, airships or constructs) holds it; holding it secs s in a row wins it,
+    // units standing in the zone (not structures, drones or constructs) holds it; holding it secs s in a row wins it,
     // once a fight (result().objective: the side, or -1). objective() tells the boards how it stands.
     const obj = opts.objective && opts.objective.rects && opts.objective.rects.length ? { ...opts.objective, n: [0, 0], lead: -1, hold: 0, won: -1 } : null;
     const inZone = (b) => obj.rects.some(r => b.x >= r.x0 && b.x <= r.x1 && b.y >= r.y0 && b.y <= r.y1);
@@ -1368,12 +1373,12 @@ const Engine = (() => {
         b.slowMove = Math.max(b.slowMove, tl.slowMove); b.slowAtk = Math.max(b.slowAtk, tl.slowAtk); b.slowT = Math.max(b.slowT, tl.slowDur);
       }
     }
-    // structures (towers) and airships don't count: a side is beaten when its units are gone
+    // structures (towers) and drones don't count: a side is beaten when its units are gone
     const aliveCount = (arr) => { let c = 0; for (const b of arr) if (b.alive && counts(b)) c++; return c; };
 
     function hurt(owner, v, hit, fromX, fromY) {
       if (v.turning) return; // being won over: nothing hurts it until it has switched sides
-      if (v.u.aloft) return; // an airship can't be shot down
+      if (v.u.aloft) return; // a flier (the Mecha Tower's drone) can't be shot down
       if (sheltered(v)) return; // Overwatch: safe inside its building
       const st = stats[owner.side];
       // Wind walk: the 1st, (every+1)th, ... attack aimed at it misses, and it dashes away to one side (see u.windWalk)
@@ -1938,7 +1943,7 @@ const Engine = (() => {
       const charged = canCharge && b.u.charge > 1 && b.moved >= CHARGE_RUN && !(t < (b.chargeAt || 0));
       b.moved = 0;
       if (charged && b.u.chargeCd > 0) b.chargeAt = t + b.u.chargeCd;
-      // attacking gives a stealth unit away (it hides again after STEALTH_BACK s without attacking); an airship stays out of
+      // attacking gives a stealth unit away (it hides again after STEALTH_BACK s without attacking); a flier stays out of
       // reach; Silent blade's first attack doesn't. During the tick's attacks the enemy sees it from the next tick (healsLand)
       if (b.hidden && !b.u.aloft && !b.quiet) { if (healLater) hitsLater.push(() => { b.hidden = false; }); else b.hidden = false; }
       b.lastAtk = t; b.revealed = true; // a disguised body (b.mask) shows what it is from its first attack
@@ -2417,11 +2422,6 @@ const Engine = (() => {
         if (b.u.ram) { ram(b, foes); continue; }
         if (b.u.roll > 0) { roll(b, foes); continue; }
         if (b.follow) { escortMove(b); continue; }
-        if (b.u.drop && !b.dropped) { // a drop not yet made (the airship): it flies straight on into the enemy's territory first
-          const dy = b.u.drop.y - b.y, mv = Math.min(Math.abs(dy), spd(b) * moveMul(b) * dt);
-          b.hx = 0; b.hy = Math.sign(dy) || b.u.drop.dir; b.y += b.hy * mv; b.moved += mv;
-          continue;
-        }
         if (b.spreadTo) { // Spread: run out to its own spot first
           const sx = b.spreadTo.x - b.x, sy = b.spreadTo.y - b.y, sd = hyp(sx, sy);
           const mv = Math.min(sd, spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * dt);
@@ -2462,10 +2462,10 @@ const Engine = (() => {
             continue;
           }
         }
-        const rg = b.u.hover > 0 ? Math.min(R(b), b.u.hover) : R(b); // hover: an airship flies in closer than its range
+        const rg = R(b);
         // 2v2 tower portal (see gates): its side has one and it hasn't been through yet: it walks to it unless an enemy
         // is within its awareness (then it fights as usual, and heads back to the portal once none is)
-        if (gates[b.side] && !b.ported && b.u.speed > 0 && !b.u.structure && !b.u.drop && !(b.u.hover > 0) && !(near && !unseen && nd <= Math.max(rg + sight, minSight))) {
+        if (gates[b.side] && !b.ported && b.u.speed > 0 && !b.u.structure && !(near && !unseen && nd <= Math.max(rg + sight, minSight))) {
           const p = gates[b.side], gx = p.x - b.x, gy = p.y - b.y, gd = hyp(gx, gy);
           if (gd <= GATE_R) { throughGate(b); continue; }
           const step = spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1) * dt;
@@ -2652,6 +2652,27 @@ const Engine = (() => {
           neutralDamage(f, dmg);
         }
       }
+      // paratroopers land: both sides' bodies first, then their landing hits, the sides taking turns (see first)
+      if (drops.length) {
+        const landed = [];
+        for (const sd of [first, 1 - first]) for (const d of drops) {
+          if (d.done || d.side !== sd || t + 1e-9 < d.t) continue;
+          d.done = true;
+          for (const s of d.spots) {
+            const kid = newBody(d.unit, d.side, s.x, s.y, spawnNo[d.side]++, d.squad == null ? -1 : d.squad);
+            all.push(kid); sides[d.side].push(kid);
+            if (terBlock && !kid.u.aloft) keepOut(kid); // not dropped in the water
+            if (counts(kid)) stats[d.side].totalHp += kid.u.hp;
+            landed.push([kid, d.r]);
+          }
+        }
+        for (const [kid, r] of landed) {
+          if (opts.record) shots.push([kid.x, kid.y, kid.x, kid.y, kid.side, r, 1, 0, 0]);
+          if (!(r > 0) || !(kid.u.hit > 0)) continue;
+          for (const f of sides[1 - kid.side].slice()) if (f.alive && hyp(f.x - kid.x, f.y - kid.y) <= r) hurt(kid, f, kid.u.hit, kid.x, kid.y);
+        }
+        if (landed.length) invalidateTargetIndex();
+      }
       // pools: enemies standing in one take its damage, allies heal and speed up (one pool of each side at a time each)
       if (pools.length) {
         const done = [new Set(), new Set()];
@@ -2782,19 +2803,6 @@ const Engine = (() => {
               if (terBlock && !kid.u.aloft) keepOut(kid); // not dropped in the water
               stats[b.side].totalHp += kid.u.hp;
             }
-          }
-        }
-        // a drop (the sniper tower's airship): count bodies of drop.unit, once a fight, the moment it crosses the line
-        // y = drop.y going the way of drop.dir (+1: up, -1: down) into the enemy's territory
-        if (b.u.drop && !b.dropped && (b.y - b.u.drop.y) * b.u.drop.dir >= 0) {
-          b.dropped = true;
-          const fwd = b.side === 0 ? 1 : -1;
-          for (let k = 0; k < b.u.drop.count; k++) {
-            const [ox, oy] = SPAWN_SPOTS[k % SPAWN_SPOTS.length];
-            const kid = newBody(b.u.drop.unit, b.side, b.x + ox * g.spacing * 0.7, b.y + oy * fwd * g.spacing * 0.7, spawnNo[b.side]++, -1);
-            all.push(kid); sides[b.side].push(kid);
-            if (terBlock && !kid.u.aloft) keepOut(kid); // not dropped in the water
-            stats[b.side].totalHp += kid.u.hp;
           }
         }
       }
@@ -3104,7 +3112,7 @@ const Engine = (() => {
       };
     }
 
-    return { step, frame, result, bodies: all, neutrals, mines: () => mines, pools: () => pools, portals: () => portals.filter(p => t >= p.t0 && t < p.t0 + p.secs), isOver: () => over, time: () => t, lastShots: () => shots, projectiles: () => projectiles, crippled: (side, lane) => cripple[side + 2 * (lane | 0)], gates: () => gates.filter(Boolean), gateFx: () => gateFx, charm: (side, squad) => (charm[side] && charm[side][squad]) || 0,
+    return { step, frame, result, bodies: all, neutrals, mines: () => mines, pools: () => pools, portals: () => portals.filter(p => t >= p.t0 && t < p.t0 + p.secs), drops: () => drops.filter(d => !d.done).map(d => ({ side: d.side, t: d.t, r: d.r, spots: d.spots, left: Math.max(0, d.t - t) })), isOver: () => over, time: () => t, lastShots: () => shots, projectiles: () => projectiles, crippled: (side, lane) => cripple[side + 2 * (lane | 0)], gates: () => gates.filter(Boolean), gateFx: () => gateFx, charm: (side, squad) => (charm[side] && charm[side][squad]) || 0,
       objective: () => obj && { n: obj.n.slice(), lead: obj.lead, hold: obj.hold, secs: obj.secs, won: obj.won } };
   }
 

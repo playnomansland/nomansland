@@ -732,18 +732,6 @@ const Render2D = (cv, view, opts = {}) => {
     ctx.beginPath(); ctx.rect(x - s / 2, y - s * 0.12, s, s * 0.12); ctx.rect(x - s * 0.3, y - s * 0.75, s * 0.6, s * 0.65); ctx.fill(); ctx.stroke();
     ctx.fillStyle = CHARM_COL; ctx.fillRect(x - s * 0.3, y - s * 0.3, s * 0.6, s * 0.12);
   }
-  // the sniper tower's airship: a see-through blimp in the team colour, nose toward where it flies (t: tile size in px)
-  function drawAirship(b, t) {
-    const x = PX(b.x), y = PY(b.y), c = teamCol(b.side), L = t * 0.42, H = t * 0.17;
-    const ang = Math.atan2(-(b.hy == null ? (b.side === 0 ? 1 : -1) : b.hy) * flip(), (b.hx || 0) * flip());
-    ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.globalAlpha = 0.45;
-    ctx.fillStyle = c; ctx.strokeStyle = c; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(-L * 0.8, 0); ctx.lineTo(-L * 1.1, -H * 0.9); ctx.lineTo(-L * 1.1, H * 0.9); ctx.closePath(); ctx.fill(); // tail fins
-    ctx.beginPath(); ctx.ellipse(0, 0, L, H, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 0.8; ctx.stroke();
-    ctx.fillStyle = '#1B2326'; ctx.fillRect(-L * 0.25, H * 0.75, L * 0.5, H * 0.45); // gondola
-    ctx.restore(); ctx.globalAlpha = 1;
-  }
   // the Mecha Tower's drone: a little quadcopter in the team colour, rotors spinning (t: tile size in px)
   function drawDrone(b, t) {
     const x = PX(b.x), y = PY(b.y), c = teamCol(b.side), s = t * 0.16, spin = (bt ? bt.time() : 0) * 30;
@@ -1091,6 +1079,19 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.beginPath(); ctx.arc(PX(fx.x), PY(fx.y), tilePx() * (0.2 + age), 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     }
+    // Drop paratroopers (sniper tower): until they land, a shadow on each landing spot that darkens as they come,
+    // inside a dashed ring in the dropping side's colour as wide as the landing hit
+    for (const d of bt.drops ? bt.drops() : []) {
+      const k = d.t > 0 ? 1 - d.left / d.t : 1;
+      for (const s of d.spots) {
+        const x = PX(s.x), y = PY(s.y);
+        ctx.fillStyle = '#000'; ctx.globalAlpha = 0.12 + 0.3 * k;
+        ctx.beginPath(); ctx.ellipse(x, y, Math.max(2, d.r * S * (0.3 + 0.35 * k)), Math.max(1.5, d.r * S * (0.22 + 0.26 * k)), 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = teamCol(d.side); ctx.globalAlpha = 0.5 + 0.4 * k; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.arc(x, y, d.r * S, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      }
+      ctx.globalAlpha = 1;
+    }
     // Grasping roots: a gnarled line from each Ent to the enemy it drags
     for (const b of bt.bodies) {
       const v = b.rootTgt;
@@ -1239,7 +1240,7 @@ const Render2D = (cv, view, opts = {}) => {
         ctx.globalAlpha = 1;
       }
     }
-    for (const b of bt.bodies) if (b.alive && b.u.aloft) (b.u.kind === 'drone' ? drawDrone : drawAirship)(b, tilePx()); // airships and drones fly over everything
+    for (const b of bt.bodies) if (b.alive && b.u.aloft) drawDrone(b, tilePx()); // drones fly over everything
     for (const e of fx) {
       const a = 1 - e.age / e.life;
       if (e.kind === 'heal') {

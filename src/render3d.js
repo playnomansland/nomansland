@@ -169,7 +169,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
   const tintMat = new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.75, metalness: 0.05 });
   const teamMat = new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.6, metalness: 0.1 });
   const fixedMat = new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.7, metalness: 0.1, vertexColors: true });
-  // see-through looks, the whole body in the team colour: stealthed (yours, the enemy's), waiting to flank, airships
+  // see-through looks, the whole body in the team colour: stealthed (yours, the enemy's), waiting to flank, fliers
   const seeThrough = (opacity) => new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.5, transparent: true, opacity, depthWrite: false });
   const LOOKS = { ghost: seeThrough(0.45), ghostFoe: seeThrough(0.22), glass: seeThrough(0.55) };
   const flatMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, depthWrite: false });
@@ -494,6 +494,15 @@ const Render3D = (THREE, el, view, opts = {}) => {
       const [wx, wz] = world(f, fx.x, fx.y);
       scene_(() => { arc(wx, wz, 0.8 + age * 4, color('#B9A8FF'), 1 - age / 0.6, 1, 0.2, 10); });
     }
+    // Drop paratroopers (sniper tower): until they land, a shadow on each landing spot that darkens as they come,
+    // ringed in the dropping side's colour as wide as the landing hit
+    for (const d of bt.drops ? bt.drops() : []) {
+      const k = d.t > 0 ? 1 - d.left / d.t : 1, team = teamColor(d.side, me);
+      for (const s of d.spots) {
+        const [wx, wz] = world(f, s.x, s.y);
+        scene_(() => { disc(wx, wz, d.r * (0.35 + 0.4 * k), color('#000000'), 0.15 + 0.35 * k); arc(wx, wz, d.r, team, 0.55 + 0.35 * k, 1, 0.1, 12); });
+      }
+    }
     // Grasping roots: a root from each Ent to the enemy it drags
     for (const b of bt.bodies) {
       const v2 = b.rootTgt;
@@ -741,7 +750,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
         const fixed = (s.u.structure || s.u.building) && !s.u.awake;
         const r = s.u.structure || s.u.building ? (s.scale || 1) : size(s.u) * MODEL_SCALE, sc = r * (s.look === 'ghost' || s.look === 'ghostFoe' ? 0.85 : 1);
         const hx = s.hx || 0, hy = s.hy == null ? (s.side === 1 ? -1 : 1) : s.hy;
-        const lift = (s.u.aloft ? (s.u.kind === 'drone' ? 4 : 6) + Math.sin(clock * 1.5 + (s.phase || 0)) * 0.3 : 0) + (s.raise || 0); // a drone flies lower than an airship; a squad in a building stands on it
+        const lift = (s.u.aloft ? 4 + Math.sin(clock * 1.5 + (s.phase || 0)) * 0.3 : 0) + (s.raise || 0); // a drone flies; a squad in a building stands on it
         // Mechites glide (smooth); a roller rolls instead of bobbing
         const bob = s.moving && !s.u.smooth && !rollAt ? Math.abs(Math.sin(clock * 9 + s.phase)) * 0.12 * r * s.moving : 0;
         const [wx, wz] = world(f, s.x, s.y);

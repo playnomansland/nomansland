@@ -20,6 +20,29 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 5 November 2026 – Sniper tower: paratroopers, and marked squads say so
+
+### Sniper tower: paratroopers
+- **Drop paratroopers** replaces Deploy airship (still 400 gold, the tower's second skill). **3 seconds into each fight, 3 paratroopers drop into the enemy base**, just in front of their tower, and hit every enemy within 3 m as they land. Then they fight on.
+- A paratrooper is a Wisp (as your Wisps are, without skills or levels) whose shots land instantly.
+- Until they land, both boards show **where they'll come down**: a shadow growing in a ring on each spot.
+- The airship is gone, and with it the **+30 hit for Snipers and the tower** that came with it.
+- In 2v2 the team's tower drops them once, at the other team's tower.
+- An old match with the airship plays on with paratroopers.
+
+### Marked squads say so
+- A squad of yours the opponent has marked now has a **"You are marked"** box in its sheet: one line on what the mark does; **press and hold** it for the rules. Mark Bounty and a Hunter's mark each get their own box.
+- A squad of theirs that you marked says **"Marked by you"**, in gold.
+- A mark placed this round stays hidden from its target until the fight, as before.
+
+### To check with Vilhelm
+- Drop paratroopers keeps the airship's price, 400 gold.
+- The +30 hit for Snipers and the tower is removed along with the airship (it came with that skill).
+- Landing spots: a triangle about one tile in front of the enemy tower, toward the middle; the landing hit (the Wisp's hit, 3 m) doesn't reach the tower itself.
+- The bot never bought the second tower skill and still doesn't; the Claude opponent sees the new name and text.
+
+---
+
 ## 5 November 2026 – Music anywhere, chat typing fix, Omni-Per Brute
 
 ### Music anywhere
