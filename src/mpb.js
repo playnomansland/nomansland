@@ -20,6 +20,8 @@
 
   const SQ = -700, XSQ = -800;                 // fight squad ids: MPB k of a side is SQ - k; extra bodies XSQ - 10k - j
   const VOTE_MS = 15000, DRAFT_MS = 15000;     // a placement vote, a draft pick
+  // = Duo.OFF (Game.TEAM_ID): lane 1's squad ids in a fight, and the other lane's in a lane's m.team, are moved by this
+  const LANE_OFF = G.TEAM_ID || 1000000;
   const SPACING = 3;                           // Chebyshev distance from every other building tile ("2 tiles around")
   const ARTIFACT = { rounds: [2, 8], r: 9, cap: 100, gold: 50, apart: 10 };
   const DRAFT_ROUNDS = [3, 9];                 // the cards of round 2's artifacts are dealt in round 3, round 8's in 9
@@ -641,13 +643,410 @@
   });
 
   // ===== jail =====
-  def({ id: 'jail', name: 'Jail', short: 'j', kind: 'defensive', hp: 1500, armor: 8, color: '#5E6168',
-    text: 'Skywatch: stealthed enemies within 3 tiles are revealed.', downside: 'Destroyed: no jail next round, jailed squads go free, and their unit types can’t be jailed again this match.', skills: [], hooks: {} });
+  // A strong technical building (docs/MPB-2V2.md, Vilhelm 6 Nov; group B4). Skywatch (free, always on): the other
+  // team's stealthed bodies standing within JAIL.light tiles of it (a 7 x 7 square of tiles) are seen in the fight
+  // (Engine opts.mpb.discover); the lit tiles are drawn on both boards (hooks.lit). Jail a squad (JAIL.cost, once per
+  // player while the jail has room: JAIL.cells cells, one per player): an enemy squad from an earlier round (one the
+  // buyer can see, in either enemy lane) takes no part in any fight until the jail falls. A carrier jailed leaves its
+  // rider behind (it steps out on the tile). Jail guards (JAIL.guardsCost, once a match): JAIL.guards Keep guards round
+  // the jail in every fight, holding their posts until an enemy comes into their awareness (Engine b.holdSee).
+  // Destroyed: the squads in it go free (back to their own zone), their unit types can never be jailed again this
+  // match, and the next round the jail does nothing (no jailing, no Skywatch, no guards).
+  // rec.data = { cells: [{ by (the buyer's lane), lane, id (the squad: its lane and its id there), ui, round }],
+  //   banned: [unit indices], down: the round it does nothing in (0: none) }
+  // A jailed squad (in its own lane, from the fight on): sq.jailed = { side (the jail's), key, round, col, row (where it
+  // stood) }; it stands on the jail's tile (Game.mpbHeld: it can't move or carry anyone; its player may sell it, which
+  // frees its cell). In the round it is jailed only the jail's team knows (hide); it sits that round's fight out already.
+  const JAIL = { hp: 1500, armor: 8, cells: 2, cost: 100, guardsCost: 150, guards: 4, light: 3, guardPost: 0.75 };
+  const JAIL_GUARD = { name: 'Wisps', cost: 1, bodies: 2, hp: 65, hit: 75, aps: 0.7, range: 19, speed: 4, splash: 0, projSpeed: 20 }; // as Game's Keep guards when the roster has no Wisps
+  const TEAM_LETTER = ['A', 'B'];
+  const jailCells = (rec) => (rec && rec.data && rec.data.cells) || [];
+  const jailUp = (m, rec) => !(rec.data && rec.data.down && rec.data.down === m.round);
+  // squad id of lane `lane` (lanes: the two matches)
+  const laneSquad = (lanes, lane, side, id) => (lanes[lane] && lanes[lane].armies[side].find(q => q.id === id)) || null;
+  // an enemy squad as this player sees it while deploying: their own lane's opponent's, or the other lane's (m.team)
+  function jailSeen(m, side, lane, id) {
+    const foe = 1 - side, L = laneOf(m);
+    if (lane === L) return G.foeSeen(m, foe).find(q => q.id === id) || null;
+    if (lane === 1 - L) return G.teamSeen(m, foe).find(q => q.id === id + LANE_OFF) || null;
+    return null;
+  }
+  // an enemy squad held in a building as its opponents see it while deploying (Referee.hide): in a jail, or in its
+  // School since an earlier round. One that went into the School this round still stands on its tile for them (it can be
+  // jailed: the jailer gets the gold back after the fight), one that came out this round is still inside. The same on
+  // the page (the hidden view) and the server (the real state), so a refused jailing tells the jailer nothing.
+  function heldSeen(m, foe, lane, q) {
+    if (q.jailed) return true;
+    if (recs(m, foe).some(r => r.kind === 'school' && ((r.data && r.data.was) || []).some(w => w.round === m.round && w.pupil.round < m.round && w.pupil.lane === lane && w.pupil.id === q.id))) return true;
+    return !!q.school && q.school.round < m.round;
+  }
+  // this round's jailing of squad (lane, id) of side sd is called off (the squad sat this fight out in its School, which
+  // fell, so the School's afterFight puts it back first): the cell goes, its jailer gets the gold back. The Jail's own
+  // afterFight does the same for a squad still in its School, so the outcome doesn't depend on which side's buildings
+  // run first.
+  function jailCallOff(lanes, sd, lane, id, round) {
+    for (const r of recs(lanes[0], 1 - sd)) {
+      if (r.kind !== 'jail' || !r.data || !r.data.cells) continue;
+      r.data.cells = r.data.cells.filter(c => {
+        if (!(c.lane === lane && c.id === id && c.round === round)) return true;
+        if (lanes[c.by]) lanes[c.by].gold[1 - sd] += JAIL.cost;
+        return false;
+      });
+    }
+  }
+  // why this player may not jail the squad (lane, id) now (null: they may); no squad given: whether they may jail at all
+  function jailWhy(m, side, rec, lane, id) {
+    if (!jailUp(m, rec)) return 'down';
+    const cells = jailCells(rec), L = laneOf(m);
+    if (cells.some(c => c.by === L)) return 'you';
+    if (cells.length >= JAIL.cells) return 'full';
+    if (lane === undefined && id === undefined) return null;
+    if (!Number.isInteger(lane) || !Number.isInteger(id)) return 'pick';
+    const q = jailSeen(m, side, lane, id), u = q && m.units[q.unit];
+    if (!q || !u || u.building || q.round >= m.round || heldSeen(m, 1 - side, lane, q) || G.isRider(q)) return 'squad';
+    if ((rec.data.banned || []).includes(q.unit)) return 'banned';
+    if (recs(m, side).some(r => jailCells(r).some(c => c.lane === lane && c.id === id))) return 'squad';
+    return null;
+  }
+  // the enemy squads this player may jail now: [{ lane, id, sq }]
+  function jailable(m, side, rec) {
+    if (jailWhy(m, side, rec)) return [];
+    const L = laneOf(m), out = [];
+    for (const q of G.foeSeen(m, 1 - side)) if (!jailWhy(m, side, rec, L, q.id)) out.push({ lane: L, id: q.id, sq: q });
+    for (const q of G.teamSeen(m, 1 - side)) if (q.id >= LANE_OFF && !jailWhy(m, side, rec, 1 - L, q.id - LANE_OFF)) out.push({ lane: 1 - L, id: q.id - LANE_OFF, sq: q });
+    return out;
+  }
+  // a tile of side's zone for a squad coming back onto the board (out of the Jail or the School): `want` if it is free,
+  // else the free tile nearest it. lanes: the matches whose squads may be in the way (both after a fight; the one lane
+  // while deploying, whose m.team has the other's)
+  function homeTile(lanes, side, sq, want) {
+    const m = lanes[0], { COLS, ROWS } = grid(m), ui = sq.unit;
+    const free = (c, r) => G.blockOf(m, ui, c, r).every(([cc, rr]) => cc >= 0 && cc < COLS && rr >= 0 && rr < ROWS && G.inZone(side, rr) && !G.reserved(side, cc, rr) && !G.terrainBlocks(m, cc, rr)
+      && !lanes.some(L => G.occupied(L, side, cc, rr) || G.enemyHolds(L, side, cc, rr)));
+    if (want && Number.isInteger(want.col) && Number.isInteger(want.row) && free(want.col, want.row)) return { col: want.col, row: want.row };
+    const all = [];
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (G.inZone(side, r) && free(c, r)) all.push({ col: c, row: r });
+    const w = want || { col: (COLS - 1) / 2, row: G.zoneRows(side)[0] };
+    const d = (a) => Math.max(Math.abs(a.col - w.col), Math.abs(a.row - w.row)), e = (a) => Math.hypot(a.col - w.col, a.row - w.row);
+    all.sort((a, b) => d(a) - d(b) || e(a) - e(b) || a.row - b.row || a.col - b.col);
+    return all[0] || null;
+  }
+  // after the fight it was jailed in: its riders step out (either lane: a teammate's squad may ride in it), it goes onto
+  // the jail's tile
+  function jailLock(lanes, lane, foe, q, side, rec, round) {
+    lanes.forEach((L, k) => { for (const r of L.armies[foe]) if (r.in != null && (r.in >= LANE_OFF ? 1 - k === lane && r.in - LANE_OFF === q.id : k === lane && r.in === q.id)) delete r.in; });
+    delete q.in; delete q.aim;
+    q.jailed = { side, key: rec.key, round, col: q.col, row: q.row };
+    q.col = rec.col; q.row = rec.row;
+  }
+  function jailFree(lanes, foe, q) {
+    const j = q.jailed;
+    delete q.jailed;
+    const t = homeTile(lanes, foe, q, { col: j.col, row: j.row }) || { col: j.col, row: j.row };
+    q.col = t.col; q.row = t.row;
+  }
+  def({ id: 'jail', name: 'Jail', short: 'j', kind: 'technical', hp: JAIL.hp, armor: JAIL.armor, color: '#5E6168',
+    text: `Skywatch: the enemy’s stealthed units within ${JAIL.light} tiles of it are seen (its light on the board). It has ${JAIL.cells} cells, one for each of you: a jailed enemy squad takes no part in any fight until the jail is destroyed.`,
+    downside: 'Destroyed: the jailed squads go free and their unit types can’t be jailed again this match; the next round the jail does nothing (no jailing, no Skywatch, no guards).',
+    skills: [
+      { id: 'jail', name: 'Jail a squad', cost: JAIL.cost, per: 'free', text: 'Pick an enemy squad from an earlier round: it is locked up from this round’s fight on, until the jail is destroyed (they find out at the fight). Each of you can keep one squad in it. A carrier leaves its rider behind.' },
+      { id: 'guards', name: 'Jail guards', cost: JAIL.guardsCost, per: 'match', text: `${JAIL.guards} Keep guards stand round the jail in every fight. They hold their posts until an enemy comes into their awareness.` },
+    ],
+    hooks: {
+      canBuy: (m, side, rec, sk, args) => sk.id !== 'jail' || (args.length === 2 && !jailWhy(m, side, rec, args[0], args[1])),
+      bought(m, side, rec, sk, args, lane) {
+        if (sk.id !== 'jail') return;
+        const [ln, id] = args, q = jailSeen(m, side, ln, id);
+        if (!rec.data.cells) rec.data.cells = [];
+        rec.data.cells.push({ by: lane, lane: ln, id, ui: q.unit, round: m.round });
+      },
+      unbuy(m, side, rec, sk, lane) {
+        if (sk.id !== 'jail') return;
+        const cells = jailCells(rec), k = cells.map(c => c.by === lane && c.round === m.round).lastIndexOf(true);
+        if (k >= 0) cells.splice(k, 1);
+      },
+      // the squads in it sit the fight out (an enemy squad: Mpb.squadBodies' pass over the other side's buildings)
+      foeSquadBodies(m, side, rec, sq, list) {
+        const L = laneOf(m);
+        if (jailCells(rec).some(c => c.lane === L && c.id === sq.id)) list.length = 0;
+      },
+      bodies(m, side, rec, ctx) {
+        const out = ctx.main();
+        if (!skillN(rec, 'guards') || !jailUp(m, rec) || !out.length) return out;
+        const src = (m.units || []).find(x => x && x.name === 'Wisps') || JAIL_GUARD;
+        const { skills, skillDefs, skillsOn, skillsInnate, skillMods, ...plain } = src;
+        const gu = E.withTraits({ ...plain, name: 'Jail Guard', level: 0, bodies: JAIL.guards, shape: 'diamond', color: '#E2D3A6' });
+        const w = G.tileToWorld(rec.col, rec.row), fwd = side === 0 ? 1 : -1, off = G.TILE * JAIL.guardPost;
+        const gb = E.buildSquad(gu, side, w.x, w.y, ctx.xsq(0), G.TILE, ctx.idx + 1);
+        const posts = [[0, fwd], [-1, 0], [1, 0], [0, -fwd]]; // front, the two sides, behind
+        gb.forEach((x, k) => { const [px, py] = posts[k % posts.length]; x.x = w.x + px * off; x.y = w.y + py * off; x.holdT = 1e9; x.holdSee = true; x.guard = true; });
+        out.push(...gb);
+        return out;
+      },
+      battleOpts(m, side, rec, opts) {
+        if (!jailUp(m, rec)) return;
+        const w = G.tileToWorld(rec.col, rec.row);
+        // (only while the jail's own body stands: squad, the Engine looks for it every tick)
+        opts.mpb.discover = (opts.mpb.discover || []).concat([{ x: w.x, y: w.y, r: (JAIL.light + 0.5) * G.TILE, side, squad: squadOf(recs(m, side).indexOf(rec)) }]);
+      },
+      // Skywatch's light: every tile within JAIL.light of it (none the round after it fell)
+      lit(m, side, rec) {
+        if (!jailUp(m, rec)) return [];
+        grid(m);
+        const out = [];
+        for (let r = rec.row - JAIL.light; r <= rec.row + JAIL.light; r++) for (let c = rec.col - JAIL.light; c <= rec.col + JAIL.light; c++) if (inBoard(c, r) && !(c === rec.col && r === rec.row)) out.push({ col: c, row: r });
+        return out;
+      },
+      afterFight(lanes, side, rec, res, sums, round) {
+        const foe = 1 - side, cells = jailCells(rec);
+        if (rec.fell === round) { // destroyed: everyone in it goes free, their unit types for good; nothing next round
+          // A squad jailed this round (not locked up yet) goes free with no ban: it sat this fight out, which is what the
+          // gold bought; one sold or sitting in its School this fight was never held: its jailer gets the gold back
+          const banned = new Set(rec.data.banned || []);
+          let n = 0, spared = 0;
+          for (const c of cells) {
+            const q = laneSquad(lanes, c.lane, foe, c.id);
+            if (q && q.jailed) { jailFree(lanes, foe, q); n++; banned.add(c.ui); }
+            else if (c.round === round && (!q || q.school)) { if (lanes[c.by]) lanes[c.by].gold[side] += JAIL.cost; }
+            else if (c.round === round) spared++;
+          }
+          rec.data.cells = []; rec.data.banned = [...banned].sort((a, b) => a - b); rec.data.down = round + 1;
+          news(sums, side, { kind: 'jail', freed: n, spared, text: `Team ${TEAM_LETTER[side]}’s Jail was destroyed${n ? `: ${n} jailed squad${n > 1 ? 's go' : ' goes'} free (${n > 1 ? 'their unit types' : 'its unit type'} can’t be jailed again)` : ''}${spared ? `${n ? ';' : ':'} the squad it was to lock up this round is not taken` : ''}. It does nothing next round.` });
+          return;
+        }
+        // locked up now; a squad sold (or put in its School) before it could be gives its jailer the gold back; one sold
+        // later frees its cell
+        rec.data.cells = cells.filter(c => {
+          const q = laneSquad(lanes, c.lane, foe, c.id);
+          if (!q || (q.school && !q.jailed)) { if (c.round === round && lanes[c.by]) lanes[c.by].gold[side] += JAIL.cost; return false; }
+          if (!q.jailed) { jailLock(lanes, c.lane, foe, q, side, rec, round); news(sums, side, { kind: 'jail', jailed: q.unit, text: `Team ${TEAM_LETTER[side]}’s Jail locked up a ${(lanes[c.lane].units[q.unit] || {}).name || 'squad'}.` }); }
+          return true;
+        });
+      },
+      // the opponents don't see this round's jailing until the fight
+      hide(s, h, rec) { if (rec.data.cells) rec.data.cells = rec.data.cells.filter(c => c.round !== s.round); },
+      info(m, side, rec) {
+        const cells = jailCells(rec);
+        return [`Skywatch${jailUp(m, rec) ? '' : ' off this round'}`, `${cells.length}/${JAIL.cells} cells taken`, (rec.data.banned || []).length ? `can’t jail again: ${rec.data.banned.map(i => (m.units[i] || {}).name).join(', ')}` : ''].filter(Boolean);
+      },
+      // a bot: now and then the costliest enemy squad it can see; the guards when it has gold to spare
+      bot(m, side, rec) {
+        const r = rng(((m.seed || 0) + m.round * 7121 + side * 89 + laneOf(m) * 13) >>> 0);
+        const list = jailable(m, side, rec);
+        if (list.length && m.gold[side] >= JAIL.cost + 100 && r() < 0.5) {
+          const worth = (q) => G.unitCostOf(m.units[q.unit]) * (1 + (q.level || 0));
+          const best = list.slice().sort((a, b) => worth(b.sq) - worth(a.sq) || a.lane - b.lane || a.id - b.id)[0];
+          mpbBuy(m, side, rec.key, 'jail', best.lane, best.id);
+        }
+        if (canBuy(m, side, rec.key, 'guards') && m.gold[side] >= JAIL.guardsCost + 150 && r() < 0.4) mpbBuy(m, side, rec.key, 'guards');
+      },
+    },
+  });
 
   // ===== school =====
-  def({ id: 'school', name: 'School', short: 'sch', kind: 'support', hp: 700, armor: 2, color: '#A8443A',
-    text: 'Holds 1 allied squad, which doesn’t fight. Free Study: +1 level’s XP each round.',
-    downside: 'Destroyed: the bodies that destroyed it get half a level of XP; the squad inside loses what it gained inside.', skills: [], hooks: {} });
+  // A support building (docs/MPB-2V2.md, Vilhelm 6 Nov; group B4). Either player may put one of their own squads in it
+  // while it is empty: the squad leaves the board (it stands on the school's tile, Game.mpbHeld), doesn't fight, and its
+  // player can't place another squad of that unit type while it is inside (Game.schoolLock). Study (free): at the start
+  // of every round it gets a level's worth of XP (levelling up still costs gold as usual); Double study (once a match):
+  // twice that. Learn (free): a skill of its unit type, learnt SCHOOL.learn rounds later (Quick learning, once a match:
+  // SCHOOL.fastLearn); it can't leave meanwhile. Its player takes it out (free) onto a tile they tap or the nearest free
+  // one. Destroyed: the squad that cut it down gets half a level's XP (Engine opts.mpb.watchKills); the squad inside
+  // comes out with the XP and level it went in with (a skill being learnt is lost).
+  // rec.data = { pupil: { lane, id, ui, round (went in), learn: { k (skill slot), round } | null, sq (its sq.school) } |
+  //   null, was: [this round's departures, for the opponents' view] }; the squad (in its own lane): sq.school = { key,
+  //   round, col, row (where it stood), xp, level (as it went in) }. Undo all replays the teammate's school actions on
+  //   their lane as it stands (Duo.rebuildTeam), so enroll and leave also work where the squad already went in or out.
+  const SCHOOL = { hp: 700, armor: 2, learn: 2, fastLearn: 1, doubleCost: 200, fastCost: 300, destroyXp: 0.5 };
+  const pupilOf = (rec) => (rec && rec.data && rec.data.pupil) || null;
+  // the squad in it as lane m sees it (its own lane: m.armies; the other lane: m.team, its id moved)
+  function pupilSq(m, side, rec) {
+    const p = pupilOf(rec);
+    if (!p) return null;
+    if (p.lane === laneOf(m)) return m.armies[side].find(q => q.id === p.id) || null;
+    return G.teamArmy(m, side).find(q => q.id === p.id + LANE_OFF) || null;
+  }
+  // a level's worth of XP for squad sq: the step from the XP threshold it has reached to the next one (0 at the top)
+  function levelXp(m, sq) {
+    const u = m.units[sq.unit];
+    if (!u || (sq.level || 0) >= E.MAX_LEVEL) return 0;
+    let l = 0;
+    while (l < E.MAX_LEVEL && sq.xp >= G.xpNeeded(u, l)) l++;
+    if (l >= E.MAX_LEVEL) return 0;
+    return G.xpNeeded(u, l) - (l ? G.xpNeeded(u, l - 1) : 0);
+  }
+  const learnRounds = (rec) => (skillN(rec, 'fast') ? SCHOOL.fastLearn : SCHOOL.learn);
+  // the skill slots squad sq's unit could learn now (Game.canBuySkill without the gold)
+  function learnable(m, side, sq) {
+    const out = [], g = m.gold[side];
+    m.gold[side] = 1e9;
+    try { for (const k of E.SLOTS) if (G.skillDef(m, sq.unit, k) && G.canBuySkill(m, side, sq.unit, k) && !G.isBuildingSkill(m, sq.unit, k)) out.push(k); } finally { m.gold[side] = g; }
+    return out;
+  }
+  // the tile a squad put in the School this round came from is still free (a squad of theirs may have been placed there)
+  const backFree = (m, side, sq) => G.blockOf(m, sq.unit, sq.school.col, sq.school.row).every(([c, r]) => !G.occupied(m, side, c, r) && !G.enemyHolds(m, side, c, r));
+  // why this player may not do `action` on the school now (null: they may). Actions (Game.mpbAct): 'enroll' id (a squad
+  // of theirs), 'leave' [col, row] (their squad inside comes out, there or on the nearest free tile), 'learn' k,
+  // 'unlearn' (a skill started this round)
+  function schoolWhy(m, side, rec, action, args) {
+    const p = pupilOf(rec), L = laneOf(m);
+    if (action === 'enroll') {
+      if (p) return 'full';
+      const sq = m.armies[side].find(q => q.id === args[0]), u = sq && m.units[sq.unit];
+      if (sq && sq.school && sq.school.key === rec.key) return null; // (Undo all replays it on a lane where it went in already)
+      if (!sq || !u || u.building || G.isRider(sq) || G.riderOf(m, side, sq) || G.mpbHeld(sq) || sq.movedRound === m.round || G.footprint(m, sq.unit) > 1) return 'squad';
+      return null;
+    }
+    const sq = p && p.lane === L ? pupilSq(m, side, rec) : null;
+    if (!sq) return 'none';
+    if (action === 'leave' && !sq.school) return p.learn ? 'learning' : null; // (Undo all replays it on a lane where it came out already)
+    if (!sq.school) return 'none';
+    if (action === 'leave') {
+      if (p.learn) return 'learning';
+      if (args.length && !(args.length === 2 && Number.isInteger(args[0]) && Number.isInteger(args[1]))) return 'tile';
+      // put in this round: taking it out only takes the enrolment back, onto the tile it came from (no free move)
+      if (p.round === m.round) return (args.length && (args[0] !== sq.school.col || args[1] !== sq.school.row)) || !backFree(m, side, sq) ? 'tile' : null;
+      const t = homeTile([m], side, sq, args.length ? { col: args[0], row: args[1] } : { col: sq.school.col, row: sq.school.row });
+      if (!t || (args.length && (t.col !== args[0] || t.row !== args[1]))) return 'tile';
+      return null;
+    }
+    if (action === 'learn') return p.learn ? 'learning' : learnable(m, side, sq).includes(args[0]) ? null : 'skill';
+    if (action === 'unlearn') return p.learn && p.learn.round === m.round ? null : 'none';
+    return 'none';
+  }
+  def({ id: 'school', name: 'School', short: 'sch', kind: 'support', hp: SCHOOL.hp, armor: SCHOOL.armor, color: '#A8443A',
+    text: `Holds 1 squad of yours (either of you): it doesn’t fight, and its player can’t place another squad of that unit type while it is inside. Study (free): a level’s worth of XP every round. Learn (free): a skill of its unit, ready ${SCHOOL.learn} rounds later; it can’t leave meanwhile.`,
+    downside: 'Destroyed: the squad that destroyed it gets half a level’s XP; the squad inside comes out with the XP and level it went in with (a skill being learnt is lost).',
+    skills: [
+      { id: 'double', name: 'Double study', cost: SCHOOL.doubleCost, per: 'match', text: 'The squad inside gets twice the XP every round.' },
+      { id: 'fast', name: 'Quick learning', cost: SCHOOL.fastCost, per: 'match', text: `A skill is learnt in ${SCHOOL.fastLearn} round instead of ${SCHOOL.learn}.` },
+    ],
+    hooks: {
+      canAct: (m, side, rec, action, args) => !schoolWhy(m, side, rec, action, args),
+      act(m, side, rec, action, args, lane) {
+        if (action === 'enroll') {
+          const sq = m.armies[side].find(q => q.id === args[0]);
+          if (!sq.school) {
+            sq.school = { key: rec.key, round: m.round, col: sq.col, row: sq.row, xp: sq.xp, level: sq.level || 0 };
+            sq.col = rec.col; sq.row = rec.row; delete sq.aim;
+          }
+          rec.data.pupil = { lane, id: sq.id, ui: sq.unit, round: sq.school.round, learn: null, sq: clone(sq.school) };
+          return true;
+        }
+        const p = pupilOf(rec), sq = pupilSq(m, side, rec);
+        if (action === 'leave') {
+          const back = p.round === m.round; // the enrolment taken back: onto its own tile, nothing for the opponents to see
+          if (!back) { if (!rec.data.was) rec.data.was = []; rec.data.was.push({ round: m.round, pupil: clone(p), school: clone(p.sq || sq.school) }); }
+          if (sq.school) {
+            const t = back ? { col: sq.school.col, row: sq.school.row } : homeTile([m], side, sq, args.length ? { col: args[0], row: args[1] } : { col: sq.school.col, row: sq.school.row });
+            delete sq.school; sq.col = t.col; sq.row = t.row;
+          }
+          rec.data.pupil = null;
+          return true;
+        }
+        if (action === 'learn') { p.learn = { k: args[0], round: m.round }; return true; }
+        if (action === 'unlearn') { p.learn = null; return true; }
+        return false;
+      },
+      squadBodies(m, side, rec, sq, list) { if (sq.school && sq.school.key === rec.key) list.length = 0; },
+      // after Undo all: the pupil is the squad its record says; any other squad marked in it comes out (on its tile, or
+      // the nearest free one), a pupil whose squad isn't marked (or is gone) leaves the record
+      reconcile(lanes, side, rec) {
+        let did = false;
+        const p = pupilOf(rec);
+        lanes.forEach((m, L) => {
+          for (const q of m.armies[side]) {
+            if (!q.school || q.school.key !== rec.key || (p && p.lane === L && p.id === q.id)) continue;
+            const s = q.school;
+            delete q.school;
+            const t = homeTile(lanes, side, q, { col: s.col, row: s.row }) || { col: s.col, row: s.row };
+            q.col = t.col; q.row = t.row; did = true;
+          }
+        });
+        const sq = p && laneSquad(lanes, p.lane, side, p.id);
+        if (p && !(sq && sq.school && sq.school.key === rec.key)) { rec.data.pupil = null; did = true; }
+        return did;
+      },
+      // who destroys it: the Engine notes the squad that cut it down (opts.mpb.watchKills, b.watchKill)
+      bodies(m, side, rec, ctx) { const out = ctx.main(); for (const b of out) b.watchKill = true; return out; },
+      battleOpts(m, side, rec, opts) { opts.mpb.watchKills = true; },
+      roundStart(lanes, side, rec) {
+        rec.data.was = [];
+        const p = pupilOf(rec);
+        if (!p) return;
+        const m = lanes[p.lane], sq = m && m.armies[side].find(q => q.id === p.id && q.school);
+        if (!sq) { rec.data.pupil = null; return; }
+        const round = lanes[0].round;
+        if (p.learn && round >= p.learn.round + learnRounds(rec)) { // learnt: the skill is its unit type's, as if bought last round
+          // ...if it still may be (a skill it needs taken back meanwhile: not learnt; the other one of an either-or pair
+          // can't be bought meanwhile, Game.canBuySkill's schoolLearning)
+          if (!G.hasSkill(m, side, sq.unit, p.learn.k) && !G.skillNeedsMissing(m, side, sq.unit, p.learn.k).length && !G.skillOrTaken(m, side, sq.unit, p.learn.k).length) {
+            if (!m.tech) m.tech = [{}, {}];
+            const t = m.tech[side][sq.unit] || (m.tech[side][sq.unit] = E.SLOTS.map(() => 0));
+            t[p.learn.k] = Math.max(1, round - 1);
+          }
+          p.learn = null;
+        }
+        sq.xp += levelXp(m, sq) * (skillN(rec, 'double') ? 2 : 1); // Study
+      },
+      afterFight(lanes, side, rec, res, sums, round) {
+        if (rec.fell !== round) return;
+        const k = recs(lanes[0], side).indexOf(rec), kill = ((res && res.killedBy) || []).find(x => x.side === side && x.squad === squadOf(k)), by = kill && kill.by;
+        let got = null;
+        if (by && by.squad >= 0) { // the squad that cut it down (its lane from its id in the fight)
+          const lane = by.squad >= LANE_OFF ? 1 : 0, q = laneSquad(lanes, lane, by.side, lane ? by.squad - LANE_OFF : by.squad);
+          if (q) { const x = Math.floor(levelXp(lanes[lane], q) * SCHOOL.destroyXp); q.xp += x; got = { lane, id: q.id, unit: q.unit, xp: x }; }
+        }
+        const p = pupilOf(rec), sq = p && laneSquad(lanes, p.lane, side, p.id);
+        let out = null;
+        if (sq && sq.school) { // out it comes, as it went in (a jailing of it this round is called off first)
+          jailCallOff(lanes, side, p.lane, sq.id, round);
+          const s = sq.school;
+          sq.xp = s.xp; sq.level = s.level;
+          delete sq.school;
+          const t = homeTile(lanes, side, sq, { col: s.col, row: s.row }) || { col: s.col, row: s.row };
+          sq.col = t.col; sq.row = t.row;
+          out = { lane: p.lane, id: sq.id, unit: sq.unit };
+        }
+        rec.data.pupil = null;
+        const nm = (ui) => (lanes[0].units[ui] || {}).name || 'squad';
+        news(sums, side, { kind: 'school', xp: got, out, text: `Team ${TEAM_LETTER[side]}’s School was destroyed${got ? `: the ${nm(got.unit)} that did it got ${got.xp} XP` : ''}${out ? `${got ? ';' : ':'} the ${nm(out.unit)} inside lost what it gained there` : ''}.` });
+      },
+      // the opponents don't see this round's comings and goings until the fight
+      hide(s, h, rec) {
+        const p = pupilOf(rec), L = laneOf(s);
+        if (p && p.round === s.round) {
+          rec.data.pupil = null;
+          const q = p.lane === L && s.armies[h].find(x => x.id === p.id && x.school);
+          if (q) { q.col = q.school.col; q.row = q.school.row; delete q.school; }
+        } else if (p && p.learn && p.learn.round === s.round) p.learn = null;
+        for (const w of rec.data.was || []) {
+          if (w.round !== s.round || w.pupil.round >= s.round) continue;
+          rec.data.pupil = w.pupil;
+          const q = w.pupil.lane === L && s.armies[h].find(x => x.id === w.pupil.id);
+          if (q) { q.school = w.school; q.col = rec.col; q.row = rec.row; }
+        }
+        rec.data.was = [];
+      },
+      info(m, side, rec) {
+        const p = pupilOf(rec), sq = pupilSq(m, side, rec);
+        if (!p || !sq) return ['Empty'];
+        return [`${(m.units[sq.unit] || {}).name} inside since round ${p.round}`, p.learn ? `learning ${((G.skillDef(m, sq.unit, p.learn.k) || {}).name) || 'a skill'}` : ''].filter(Boolean);
+      },
+      // a bot: sometimes puts its most experienced squad in, learns a skill, takes it out after a few rounds
+      bot(m, side, rec) {
+        const r = rng(((m.seed || 0) + m.round * 6029 + side * 97 + laneOf(m) * 17) >>> 0), L = laneOf(m), p = pupilOf(rec);
+        if (!p && r() < 0.35) {
+          const ok = m.armies[side].filter(q => q.round < m.round && !schoolWhy(m, side, rec, 'enroll', [q.id])).sort((a, b) => b.xp - a.xp || a.id - b.id);
+          if (ok.length) mpbAct(m, side, rec.key, 'enroll', ok[0].id);
+        } else if (p && p.lane === L) {
+          const sq = pupilSq(m, side, rec), ks = sq && !p.learn ? learnable(m, side, sq) : [];
+          if (ks.length && r() < 0.6) mpbAct(m, side, rec.key, 'learn', ks[Math.floor(r() * ks.length)]);
+          else if (!p.learn && m.round - p.round >= 3 && r() < 0.5) mpbAct(m, side, rec.key, 'leave');
+        }
+        for (const id of ['double', 'fast']) if (pupilOf(rec) && canBuy(m, side, rec.key, id) && m.gold[side] >= skillOf('school', id).cost + 200 && r() < 0.25) mpbBuy(m, side, rec.key, id);
+      },
+    },
+  });
 
   // ===== shadowDen =====
   // Technical. While a team has its Den:
@@ -671,7 +1070,6 @@
   //   watch { round (the round it works in), by (the side that watches), free }
   const DEN = { hp: 800, armor: 2, units: ['Rogue', 'Assassin', 'Shadowhands'], hands: 'Shadowhands', from: 'Rogue', half: 0.5, cost: 1, tokens: 1,
     impersonate: 200, impAt: 5, impTier: 2, sabotage: 100, insider: 350, cut: 15000, color: '#8E7CC3' };
-  const LANE_OFF = 1000000; // = Duo.OFF: lane 1's squad ids in a fight (and the other lane's in m.team) are moved by this
   const denOf = (m, side) => recs(m, side).find(r => r.kind === 'shadowDen') || null;
   const denUnit = (m, ui) => !!(m && m.units && m.units[ui] && DEN.units.includes(m.units[ui].name));
   const handsIdx = (m) => (m && m.units ? m.units.findIndex(u => u && u.mpbUnit === 'shadowDen') : -1);
@@ -1111,6 +1509,7 @@
   }
   function squadBodies(m, side, sq, list, u) {
     for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.squadBodies) K.hooks.squadBodies(m, side, rec, sq, list, u); }
+    for (const rec of recs(m, 1 - side)) { const K = kindOf(rec.kind); if (K && K.hooks.foeSquadBodies) K.hooks.foeSquadBodies(m, 1 - side, rec, sq, list, u); } // the other team's buildings on this squad (the Jail: it sits the fight out)
   }
   // units a kind brings into the 2v2 set (kind field extraUnits(units) -> [unit]; Duo.unitSet appends them). Game.isOff
   // asks unitOff: such a unit (u.mpbUnit = the kind) is off for a team without a building of that kind (group B5)
@@ -1162,6 +1561,18 @@
     if (!on(m)) return;
     for (const side of [0, 1]) for (const rec of recs(m, side).slice()) { const K = kindOf(rec.kind); if (K && K.hooks.settle) K.hooks.settle(lanes, side, rec); }
   }
+  // after Undo all (Duo.rebuildTeam): the team's part was replayed, a lane's squads put back; a kind whose record and
+  // squads must agree puts them right (hooks.reconcile(lanes, side, rec), lanes[0]'s record; then copied to lane 1)
+  function reconcile(lanes) {
+    if (!on(lanes[0])) return;
+    for (const side of [0, 1]) {
+      let did = false;
+      for (const rec of recs(lanes[0], side)) { const K = kindOf(rec.kind); if (K && K.hooks.reconcile) did = K.hooks.reconcile(lanes, side, rec) || did; }
+      if (did) for (const L of lanes.slice(1)) L.mpb[side] = clone(lanes[0].mpb[side]);
+    }
+  }
+  // tiles a building lights up on the board (the Jail's Skywatch; hooks.lit): [{ col, row }], drawn by both renderers
+  const litTiles = (m, side, rec) => { const K = kindOf(rec.kind); return (K && K.hooks.lit && K.hooks.lit(m, side, rec)) || []; };
   // the start of a round (Duo.beginRound): this round's skill logs start empty, then the kinds' roundStart
   function roundStart(lanes) {
     const m = lanes[0];
@@ -1286,7 +1697,9 @@
     voteQueue, voteHead, queue, placeHead, mpbVote, voteResult,
     skillCost, whyNot, canBuy, mpbBuy, canUndo, undoAllOk, mpbUndo, mpbAct, seenTaken,
     vaultOf, vaultRec, vaultMode, vaultMoved, vaultRoom, canVault, vaultPut, vaultTake, golemOf, golemUnit, golemSkin,
-    hide, unitOf, squadOf, extraOf, indexOf, isSquad, bodies, battleOpts, squadMods, squadBodies, news, afterFight, roundStart, teamHeal, FH, OAK, oakMossTiles, oakEntUnit,
+    hide, unitOf, squadOf, extraOf, indexOf, isSquad, bodies, battleOpts, squadMods, squadBodies, news, afterFight, roundStart, teamHeal, litTiles, reconcile,
+    FH, OAK, oakMossTiles, oakEntUnit,
+    JAIL, jailWhy, jailable, jailSeen, homeTile, SCHOOL, pupilOf, pupilSq, levelXp, learnable, schoolWhy,
     cardPool, cardName, cardText, rollArtifacts, artifactsFor,
     dealDraft, draftOpen, draftTurn, giveCard, applyDraft, draftPick, botPick, rng, laneOf, on,
     extraUnits, unitOff, bots, botsAfter,

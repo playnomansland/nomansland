@@ -802,7 +802,46 @@ const Models3D = (THREE) => {
     P(box(0.2, 0.06, 0.05), LAKE_DEEP, [-0.22, 1.12, -0.62]), P(box(0.2, 0.06, 0.05), LAKE_DEEP, [0.22, 1.12, -0.62]), // calm, half-shut eyes
     P(ball(0.12), LAKE_FOAM, [0.35, 1.45, -0.45])];
   // ===== jail (3D) =====
+  // The Jail: a stern grey stone lock-up on a heavy plinth, stone courses, crenels on its roof above a band in the team
+  // colour, a big barred window and an iron door on its front (-z), a ring of brass keys by the door, and on top a squat
+  // lamp turret with a glowing amber lantern under a dark cap (Skywatch), its four lamp brackets pointing out
+  BUILD['mpb:jail'] = () => [
+    P(box(4.3, 0.5, 3.9), '#4E4A45', [0, 0.25, 0]), P(box(4.6, 0.15, 4.2), ROCK, [0, 0.05, 0]),
+    P(box(3.6, 2.6, 3.2), '#7C7F86', [0, 1.8, 0]),
+    ...[1.25, 2.15].map(y => P(box(3.66, 0.09, 3.26), '#62656B', [0, y, 0])), // stone courses
+    P(box(3.76, 0.32, 3.36), 'team', [0, 3.2, 0]),
+    ...[[-1.45, -1.25], [0, -1.25], [1.45, -1.25], [-1.45, 1.25], [0, 1.25], [1.45, 1.25], [-1.45, 0], [1.45, 0]].map(([x, z]) => P(box(0.62, 0.5, 0.62), '#6A6D74', [x, 3.6, z])), // crenels
+    P(box(1.9, 1.15, 0.1), DARK, [-0.55, 1.95, -1.62]), // the barred window
+    ...[-1.3, -0.92, -0.55, -0.18, 0.2].map(x => P(cyl(0.05, 0.05, 1.2, 5), METAL, [x, 1.95, -1.7])),
+    P(box(2.05, 0.1, 0.14), METAL, [-0.55, 2.55, -1.7]), P(box(2.05, 0.1, 0.14), METAL, [-0.55, 1.35, -1.7]),
+    P(box(0.95, 1.7, 0.12), IRON, [1.15, 1.35, -1.63]), // the iron door, studded
+    ...[0.85, 1.35, 1.85].map(y => P(box(1.0, 0.07, 0.06), DARK, [1.15, y, -1.71])),
+    P(new THREE.TorusGeometry(0.17, 0.04, 4, 10), BRASS, [1.15, 2.45, -1.72]), // keys on a ring
+    P(box(0.06, 0.32, 0.04), BRASS, [1.08, 2.18, -1.74], [0, 0, 0.25]), P(box(0.06, 0.28, 0.04), BRASS, [1.22, 2.2, -1.74], [0, 0, -0.3]),
+    P(cyl(0.6, 0.72, 1.0, 8), '#5A5D63', [0, 3.95, 0.25]), // the lamp turret
+    P(ball(0.44), '#FFE2A0', [0, 4.78, 0.25]), // its lantern, in an open iron cage
+    ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => P(box(0.08, 0.8, 0.08), DARK, [x * 0.42, 4.82, 0.25 + z * 0.42])),
+    P(cyl(0.22, 0.78, 0.28, 8), DARK, [0, 5.34, 0.25]), P(ball(0.1), BRASS, [0, 5.55, 0.25])];
   // ===== school (3D) =====
+  // The School: a little brick-red schoolhouse on a stone step: a hipped slate roof over a band in the team colour, a
+  // white bell turret with a brass bell on its ridge, a green chalkboard door (with a chalk line) and a round window
+  // glowing warm on its front (-z), a pennant in the team colour, and a red apple left on the step
+  const hipRoof = (r, h, col, y, [sx, sz]) => { const g = cone(r, h, 4); g.rotateY(Math.PI / 4); return P(g, col, [0, y, 0], [0, 0, 0], [sx, 1, sz]); };
+  BUILD['mpb:school'] = () => [
+    P(box(4.1, 0.35, 3.7), STONE, [0, 0.18, 0]),
+    P(box(3.4, 2.0, 2.8), '#A8443A', [0, 1.35, 0]),
+    ...[0.85, 1.5].map(y => P(box(3.44, 0.06, 2.84), '#8E3830', [0, y, 0])), // brick courses
+    P(box(3.55, 0.28, 2.95), 'team', [0, 2.45, 0]),
+    hipRoof(2.55, 1.5, '#56606A', 3.3, [1.0, 0.82]),
+    ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => P(box(0.1, 0.6, 0.1), PAPER, [x * 0.28, 4.25, z * 0.28])), // the bell turret's posts
+    P(cone(0.32, 0.4, 8), BRASS, [0, 4.15, 0]), P(ball(0.07), BRASS, [0, 3.92, 0]), // the bell
+    hipRoof(0.55, 0.5, '#56606A', 4.8, [1, 1]),
+    P(box(1.0, 1.55, 0.06), WOOD, [0.75, 1.1, -1.42]), P(box(0.82, 1.38, 0.08), '#2F4A3A', [0.75, 1.1, -1.45]), // the chalkboard door
+    P(box(0.5, 0.05, 0.03), PAPER, [0.72, 1.45, -1.5], [0, 0, 0.2]),
+    P(cyl(0.42, 0.42, 0.1, 12), GLOW, [-0.8, 1.5, -1.42], [Math.PI / 2, 0, 0]), // the round window
+    P(new THREE.TorusGeometry(0.44, 0.06, 4, 14), PAPER, [-0.8, 1.5, -1.47]),
+    P(ball(0.17), '#C4473A', [1.55, 0.5, -1.62]), P(box(0.03, 0.12, 0.03), '#5E8C3A', [1.55, 0.7, -1.62]), // an apple for the teacher
+    P(cyl(0.05, 0.05, 1.5, 4), WOOD, [-1.5, 3.2, 1.1]), P(box(0.05, 0.5, 0.85), 'team', [-1.5, 3.7, 1.52])];
   // ===== shadowDen (3D) =====
   // The Shadow Den: a crooked hideout of dark violet stone (the kind's colour, 'tint') on a rough plinth, a steep slate
   // roof with a band in the team colour under its eaves, a pale mask with glowing violet eyes on the gable over a black

@@ -639,6 +639,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
     // the opponent's squads from this round stay hidden until the fight; a squad they moved shows on its old tile
     // and one they sold this round still shows until the fight
     for (const sq of deploying ? Game.foeSeen(m, foe) : m.armies[foe].filter(q => !Game.hiddenFromFoe(m, q))) {
+      if (Game.mpbHeld(sq)) continue; // 2v2: in a Jail or a School (that building shows it)
       const p = deploying ? Game.seenAt(m, sq) : sq;
       const look = Game.shownUnit(m, me, foe, sq.unit); // a disguised unit shows as what it pretends to be
       squad(deploying ? { ...sq, unit: look, col: p.col, row: p.row, level: Game.seenLevel(m, sq) } : { ...sq, unit: look }, foe, false); // a level-up bought this round stays hidden
@@ -651,14 +652,14 @@ const Render3D = (THREE, el, view, opts = {}) => {
     };
     for (const sq of m.armies[me]) {
       if (deploying && sq.from && sq.movedRound === m.round) { const s = tileCenter(v, sq.from.col, sq.from.row); tileSq(s.c, s.r, color(css('--muted') || '#8DA1A1'), 0.6, 0.04, 10, 0.1); }
-      if (Game.isRider(sq)) continue; // shown as a badge on its carrier
+      if (Game.isRider(sq) || Game.mpbHeld(sq)) continue; // shown as a badge on its carrier (2v2: in a Jail or a School)
       const at = drag && drag.moved && drag.id === sq.id ? { ...sq, col: drag.over.col, row: drag.over.row } : sq;
       const [wx, wz] = squad(at, me, (sq.round === m.round || sq.movedRound === m.round) && deploying);
       riderIcon(wx, wz, Game.riderOf(m, me, sq));
       if (moving === sq.id && deploying) { const s = tileCenter(v, sq.col, sq.row); tileSq(s.c, s.r, gold, 1, 0.08, 0, 0.02); }
     }
     // 2v2: the other pair of players on this board (m.team): your teammate's squads, and the other opponent's as you may see them
-    for (const side of [me, foe]) for (const sq of Game.teamArmy(m, side)) if (!Game.isRider(sq)) { const [wx, wz] = squad(sq, side, false, true); if (side === me) riderIcon(wx, wz, Game.riderOf(m, me, sq)); }
+    for (const side of [me, foe]) for (const sq of Game.teamArmy(m, side)) if (!Game.isRider(sq) && !Game.mpbHeld(sq)) { const [wx, wz] = squad(sq, side, false, true); if (side === me) riderIcon(wx, wz, Game.riderOf(m, me, sq)); }
     // (the squad tapped last shows its range as a dotted ring drawn by the page over the board, as on the 2D board: boardMarks)
     // where things may go
     if ((selected !== null || (drag && drag.moved) || moving != null) && deploying) {
@@ -724,6 +725,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
       const w = Game.tileToWorld(tl.col, tl.row), u = Mpb.unitOf(m, side, rec);
       bodies.push({ u: tl.part ? { ...u, mpbPart: tl.part } : u, side, x: w.x, y: w.y, look: 'solid', edge: Art.teamCol(side, me) });
       if (deploying && rec.round === m.round && rec.round > 1) { const st = tileCenter(v, tl.col, tl.row); tileSq(st.c, st.r, teamColor(side, me), 0.8, 0.05, 14); }
+      if (!tl.part) for (const lt of Mpb.litTiles(m, side, rec)) { const st = tileCenter(v, lt.col, lt.row); tileSq(st.c, st.r, color('#FFE2A0'), 0.16, 1, 0, 0.02); } // tiles it lights up (the Jail's Skywatch)
     }
     if (v.placingBuilding && editable) for (const row of Game.zoneRows(me)) for (let c = 0; c < Game.COLS; c++) if (Game.buildingSpotOk(m, me, c, row)) { const s = tileCenter(v, c, row); tileSq(s.c, s.r, gold, 0.6, 0.06, 12); }
     if (Game.isIce(m)) for (const side of [me, foe]) {

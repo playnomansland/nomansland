@@ -1111,6 +1111,11 @@ const Game = (() => {
   // army (it levels, sells and counts like any other) with `in` = the carrier's squad id, on the carrier's tile.
   // The opponent never sees it on the board; in a fight it stays inside until the carrier dies (see Engine).
   const isRider = (sq) => !!sq && sq.in != null;
+  // 2v2 Jail and School (src/mpb.js): a squad held in a building (sq.jailed: in the enemy's Jail; sq.school: in its own
+  // team's School) stands on that building's tile, can't move, be taken back or carry anyone, and doesn't fight (a
+  // squad in a School can't be sold either). Only a 2v2 lane ever sets these.
+  const mpbHeld = (sq) => !!sq && !!(sq.jailed || sq.school);
+  const schoolLock = (m, side, ui) => !!m && m.armies[side].some(s => s.school && s.unit === ui); // no new squad of a unit type sitting in a School
   // 2v2: a squad can ride in its teammate's carrier too (the teammate's lane is another match: m.team). Its `in` is
   // then the carrier's id as m.team carries it (moved by TEAM_ID, as Duo.OFF), and in m.team a teammate's rider in one
   // of your carriers has `in` = your carrier's own id (Duo.teamOf flips the link back), so the lookups below find the
@@ -1141,7 +1146,7 @@ const Game = (() => {
   // the carrier on a tile that has room for a squad of unit ui: your own, or (2v2) your teammate's
   function boardable(m, side, col, row, ui) {
     const c = squadAt(m, side, col, row) || mateAt(m, side, col, row);
-    return c && isCarrier(m, c.unit) && !isCarrier(m, ui) && !(m.units[ui] && m.units[ui].building) && !riderOf(m, side, c) ? c : null;
+    return c && isCarrier(m, c.unit) && !isCarrier(m, ui) && !(m.units[ui] && m.units[ui].building) && !riderOf(m, side, c) && !mpbHeld(c) ? c : null;
   }
   // riders follow their carrier's tile. A carrier that is gone leaves its rider standing on the tile; in 2v2 a
   // teammate's carrier sold or taken back (it is no longer in m.team) does too, and the opponents go on thinking it
@@ -1464,6 +1469,10 @@ const Game = (() => {
   // ...and make skills either-or: skillOr = [[1, 2], ...] = a player can own only one skill of each group
   const skillOr = (m, ui, k) => { const g = m.units[ui] && Array.isArray(m.units[ui].skillOr) ? m.units[ui].skillOr : []; return [...new Set(g.filter(x => Array.isArray(x) && x.includes(k)).flat())].filter(j => j !== k && skillDef(m, ui, j)); };
   const skillOrTaken = (m, side, ui, k) => skillOr(m, ui, k).filter(j => hasSkill(m, side, ui, j));
+  // 2v2 School (src/mpb.js): the skill slots of unit ui this player's squad is learning in their team's School (only a
+  // 2v2 lane has m.mpb); the other skill of an either-or pair can't be bought meanwhile
+  const schoolLearning = (m, side, ui) => !m.mpb ? [] : (m.mpb[side] || []).map(r => r.kind === 'school' && r.data && r.data.pupil)
+    .filter(p => p && p.learn && p.ui === ui && p.lane === (m.duoLane === 1 ? 1 : 0)).map(p => p.learn.k);
   function canBuySkill(m, side, ui, k) {
     const d = skillDef(m, ui, k);
     if (!d || hasSkill(m, side, ui, k)) return false;
@@ -1473,6 +1482,7 @@ const Game = (() => {
     if (!m.armies[side].some(s => s.unit === ui)) return false; // needs a squad of that type on the board
     if (skillNeedsMissing(m, side, ui, k).length) return false;
     if (skillOrTaken(m, side, ui, k).length) return false; // either-or: it has the other one
+    if (m.mpb && schoolLearning(m, side, ui).some(j => skillOr(m, ui, k).includes(j))) return false; // ...or learns it (2v2 School)
     return m.gold[side] >= skillCost(m, ui, k, side);
   }
   function buySkill(m, side, ui, k) {
@@ -1808,7 +1818,7 @@ const Game = (() => {
   const sellValue = (m, sq) => { const ak = sq.awaken > 0 ? awakenCost(m, sq.unit) : 0, now = sq.awaken === m.round;
     return Math.floor((unitCostOf(m.units[sq.unit]) + (sq.level || 0) * levelCost(m.units[sq.unit]) + (now ? 0 : ak)) / 2 / 5) * 5 + (now ? ak : 0); };
   function sell(m, side, sqId) {
-    const i = m.armies[side].findIndex(s => s.id === sqId && s.round < m.round);
+    const i = m.armies[side].findIndex(s => s.id === sqId && s.round < m.round && !s.school); // (2v2: not while it sits in a School)
     if (i < 0) return 0;
     const [sq] = m.armies[side].splice(i, 1);
     for (const r of m.armies[side]) if (r.in === sq.id) r.outRound = m.round; // the opponent doesn't see it step out
@@ -1850,7 +1860,7 @@ const Game = (() => {
   // (it can go on moving, or get back in, for free); the opponent still sees nothing until the fight
   const freeOut = (m, side, sq) => !!sq && sq.round !== m.round && movedId(m, side) !== sq.id
     && (isRider(sq) || (!!sq.from && sq.movedRound === m.round && sq.from.in != null));
-  const canMove = (m, side, sq) => !!sq && !(m.units[sq.unit] && m.units[sq.unit].building) && (sq.round === m.round || freeMover(m, side, sq) || freeOut(m, side, sq) || // a building stays put
+  const canMove = (m, side, sq) => !!sq && !(m.units[sq.unit] && m.units[sq.unit].building) && !mpbHeld(sq) && (sq.round === m.round || freeMover(m, side, sq) || freeOut(m, side, sq) || // a building stays put
     sq.luckMove === m.round || (movedId(m, side) !== sq.id && freeMovesLeft(m, side) > 0) || // a free move (Bastion's March order, Otto's horseshoe)
     (movedId(m, side) == null ? m.gold[side] >= CONFIG.moveCost : movedId(m, side) === sq.id));
   // Each carrier lets one squad out and one squad in per round (2026-11-05; before, a rider could hop in and out
@@ -1966,6 +1976,7 @@ const Game = (() => {
     if (!isUnlocked(m, side, unitIdx)) return null;
     if (capFull(m, side, unitIdx)) return null; // DEVTESTLATEGAME: at most LATE.cap squads of a tier 3+ unit type
     if (mpbLocked(m, side, unitIdx)) return null; // 2v2: a unit type the other team's Shadow Den sabotaged this round
+    if (schoolLock(m, side, unitIdx)) return null; // 2v2 School: none of the unit type sitting in it
     const into = boardable(m, side, col, row, unitIdx); // a carrier with room: the new squad rides inside
     if (!spotFree(m, side, col, row, unitIdx) && !into) return null;
     const ride = into ? { in: into.id } : {};
@@ -1991,7 +2002,7 @@ const Game = (() => {
     return !!sq && unplaceSquad(m, side, sq.id);
   }
   function unplaceSquad(m, side, id) {
-    const i = m.armies[side].findIndex(s => s.id === id && s.round === m.round && !s.gift); // a slot machine goblin is kept
+    const i = m.armies[side].findIndex(s => s.id === id && s.round === m.round && !s.gift && !mpbHeld(s)); // a slot machine goblin is kept (and one in a 2v2 School)
     if (i < 0) return false;
     const [sq] = m.armies[side].splice(i, 1);
     m.gold[side] += sq.cost + (sq.awaken > 0 ? awakenCost(m, sq.unit) : 0); // its awakening too
@@ -3360,7 +3371,7 @@ const Game = (() => {
       const budget = m.gold[side] - reserve;
       let best = -1, bs = -Infinity;
       m.units.forEach((u, i) => {
-        if (isOff(m, i, side) || capFull(m, side, i) || mpbLocked(m, side, i)) return;
+        if (isOff(m, i, side) || capFull(m, side, i) || mpbLocked(m, side, i) || schoolLock(m, side, i)) return;
         if (shadowOnly && deploysLeft(m, side, i) <= 0) return;
         if (u.building && ((own[i] || 0) >= 1 || m.round < 3)) return; // a building (Altar of Build): one, from round 3
         const extra = isUnlocked(m, side, i) ? 0 : unlockCost(m, i, side); // a locked unit costs its unlock on top
@@ -3439,7 +3450,7 @@ const Game = (() => {
     setBuildings, BUILDINGS: () => BUILDINGS, buildingInfo, BUILDING_SQUAD, isBuildingSkill, buildingIdOf, buildingsOf, buildingOf, buildingAt, buildingShown, buildingSpotOk,
     canBuyBuilding, buyBuilding, buildingSkills, buildingSkillInfo, bskillOf, bskillCost, canBuyBuildingSkill, buyBuildingSkill, undoBuildingSkill,
     buildingXpNeeded, buildingLevelCost, buildingReady, levelBuilding, undoLevelBuilding, constructBuff, buildingBodies, canBuySkill, buySkill, undoSkill, sellValue, sell,
-    isRider, TEAM_ID, mateRide, mateAt, syncRiders, freeOut, horseUse, horseOk, horseLeft, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
+    isRider, mpbHeld, schoolLock, TEAM_ID, mateRide, mateAt, syncRiders, freeOut, horseUse, horseOk, horseLeft, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
     TOWER, TOWER_TYPES, OUTPOST, TOWER_PICK_ROUND, towerType, towerChoices, needsTowerPick, setTowerType, settleTowerPicks, TOWER_SKILL, towerSkillOf, towerSkillVisible, towerPicked, canBuyTowerSkill, buyTowerSkill, undoTowerSkill, towerSkillCost, towerSkill2Of, towerSkill2Visible, towerSkill2Cost, canBuyTowerSkill2, buyTowerSkill2, undoTowerSkill2, towerSkill2On, PARA, paraDropOf, MOAT, BWALL, BWALL_SQ, EDGES, bwallsOf, bwallOn, edgeOf, bwallWorld, bwallsLeft, bwallShown, bwallSpotOk, placeBwall, unplaceBwall, ensureBwalls, bwallUnit, INVEST, MAGE_GENERALS, mageGenPrice, MAGE, mageGenInfo, mageGenOf, mageTpOf, mageTpRound, mageTpNew, isExtraGen, mageGenCost, canBuyMageGen, buyMageGen, undoMageGen, mageTowerUnit, generalUnit, LOAN, loanNow, investNow, bankBusy, investNow, bankBusy, canTakeLoan, takeLoan, undoLoan, towerRounds, troundInfo, troundOn, troundCost, canBuyTround, buyTround, undoTround, SLIME_UNITS, slimeTowerUnit, slimeSkillDefs, TOWER_MID, towerColOk, towerAt, needsTower, placeTower, ensureTower,
     FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, anywhere, mpbAt, bldgSeen, nearBldg, isOff, enemyHolds, inNoMans, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
     STANDARD_PACK, ICE, ALTAR, GOLEM, isIce, hailRound, altarRound, stormShift, stormRows, hailTiles, altarCost, altarRefund, altarCount, pushRoom, altarBought, addAltar, buyAltar, undoAltar, snowgres, snowgreUnit,

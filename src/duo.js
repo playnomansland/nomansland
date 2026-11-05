@@ -487,6 +487,7 @@
     const mine = D.lanes[lane].m;
     if (mine.towers && mine.towers[sd] && O.towers && O.towers[sd]) mine.towers[sd].type = O.towers[sd].type;
     for (const m of ms(D)) copyTeam(sc, m, sd);
+    M.reconcile(ms(D)); // a building's record and the lanes' squads agree again (the School)
   }
 
   // a bot's turn at the start of a round: package, tower pick and squads (it levels up when the fight begins)

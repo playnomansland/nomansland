@@ -1230,6 +1230,14 @@ const Engine = (() => {
       obj.lead = lead;
       if (obj.won < 0 && lead >= 0 && obj.hold >= obj.secs - 1e-9) obj.won = lead;
     }
+    // ----- 2v2 Jail and School (opts.mpb, src/mpb.js; set only by src/duo.js, off by default) -----
+    // opts.mpb.discover = [{ x, y, r, side, squad }] (the Jail's Skywatch): while a living body of fight squad `squad`
+    // of `side` stands (no squad: always), a stealthed body of the other side standing in the square |dx|, |dy| <= r
+    // round (x, y) is seen (not hidden) while it is there. opts.mpb.watchKills (the School): a
+    // body with watchKill notes who cut it down (b.killedBy = { side, squad }), and result().killedBy lists them.
+    const discover = opts.mpb && Array.isArray(opts.mpb.discover) && opts.mpb.discover.length ? opts.mpb.discover : null;
+    const discovered = (b, lit) => lit.some(d => d.side !== b.side && Math.abs(b.x - d.x) <= d.r && Math.abs(b.y - d.y) <= d.r);
+    const watchKills = !!(opts.mpb && opts.mpb.watchKills);
     // ----- 2v2 artifacts (opts.artifacts = [{ x, y, r, cap }] in board metres, r and cap default ARTIFACT; set only by
     // src/duo.js, off by default: without it nothing here runs) -----
     // Points: at the end of every tick each squad of a side with a living, fighting body inside an unlocked artifact's
@@ -1348,6 +1356,7 @@ const Engine = (() => {
     function kill(owner, v) {
       for (const x of v.link ? v.link.filter(x => x.alive) : [v]) {
         x.hp = 0; x.alive = false; x.diedTick = tick;
+        if (watchKills && owner && x.watchKill) { const o = owner.credit ? owner.credit.convert || owner.credit : owner; x.killedBy = { side: o.side, squad: o.squad }; } // 2v2 School: its destroyers
         if (owner) owner.xp += x.u.hp * x.level;
         fell(x);
         if (owner) killed(owner, x);
@@ -1399,6 +1408,12 @@ const Engine = (() => {
     // Overwatch: a body sitting in a building counts the seconds it sees no enemy it could pick within its sight (range
     // + sight, at least the minimum sight); after WATCH_IDLE s in a row it leaves (true), and a watchtower it leaves
     // empty is taken down (not destroyed: no one gets anything for it and its side isn't crippled)
+    // an enemy b could pick within its awareness (range + sight, at least the minimum sight) that it can see
+    function seesFoe(b) {
+      const aware = Math.max(R(b) + sight, minSight);
+      for (const f of sides[1 - b.side]) if (pickable(b, f) && gap(f, b) <= aware && inSight(b, f)) return true;
+      return false;
+    }
     function watchIdle(b) {
       const aware = Math.max(R(b) + sight, minSight);
       let sees = false;
@@ -2482,12 +2497,14 @@ const Engine = (() => {
         for (const tl of tiles) if (b.alive && b.x >= tl.x0 && b.x < tl.x1 && b.y >= tl.y0 && b.y < tl.y1) onTile(b, tl);
       }
       // stealth: hidden until it attacks, and again after STEALTH_BACK s without attacking (roster rules can turn either off)
+      const lit = discover ? discover.filter(d => d.squad == null || all.some(a => a.alive && a.side === d.side && a.squad === d.squad)) : null; // 2v2 Jail: the Skywatches still standing
       for (const b of all) {
         if (!b.alive || !b.u.stealth) continue;
         if (!stealthOn) b.hidden = false;
         // "without attacking" counts from when it could have attacked again: a slow shooter (a Sniper reloads for 4 s or
         // more) no longer hides between its own shots, which made it impossible to hit (fixed 2026-11-03)
         else if (!b.hidden && stealthBack && t - b.lastAtk >= Math.max(STEALTH_BACK, 1 / Math.max(0.01, apsOf(b) * atkMul(b)) + STEALTH_GRACE) - 1e-9) b.hidden = true;
+        if (lit && lit.length && b.hidden && !b.u.aloft && discovered(b, lit)) b.hidden = false; // 2v2 Jail: Skywatch sees it while it stands in its light
       }
       // a body with a start delay (deployed on a flank) can't move or attack until it runs out
       for (const b of all) if (b.delay > 0) b.delay = Math.max(0, b.delay - dt);
@@ -2565,6 +2582,7 @@ const Engine = (() => {
         // shoot one enemy while it walks to another. Kept through a stun, roots and a charge's run-through.
         const was = b.intent;
         b.intent = null;
+        if (b.holdT > 0 && b.holdSee && seesFoe(b)) b.holdT = 0; // 2v2 Jail guards (b.holdSee): they hold until an enemy is in their awareness
         if (b.holdT > 0) { b.holdT -= dt; continue; } // holding its ground (it still shoots)
         const foes = sides[1 - b.side];
         if (b.trampleLeft > 0) {
@@ -3314,6 +3332,7 @@ const Engine = (() => {
         survivors: [aliveA, aliveB], counts: [A.length, B.length],
         stats, squads, markKill: markKill.slice(), objective: obj ? obj.won : -1,
         ...(arts ? { artifacts: artifactsNow(true) } : {}), // 2v2 artifacts: [{ x, y, r, cap, pts, rate, locked, won }] (only with opts.artifacts)
+        ...(watchKills ? { killedBy: all.filter(b => b.watchKill).map(b => ({ side: b.side, squad: b.squad, by: b.killedBy || null })) } : {}), // 2v2 School (opts.mpb.watchKills)
         charm, // charisma stacks after the fight, by side and squad id (null for a side without)
         converted: [0, 1].map(k => all.filter(b => b.convert && b.side === k).length), // bodies each side won over
         // each building: still standing, seconds of building done at the end (null when it was already built), whether any was done this fight
