@@ -64,11 +64,12 @@ assert.ok(!demo.units.some((u, i) => i !== AS && (u.anywhere || u.noBldg)), 'no 
   m.round = 2;
   assert.ok(!Game.canPlaceAt(m, 0, 6, 4, AS) && !Game.canPlaceAt(m, 0, 7, 2, AS), 'from the next round on it counts');
   // MPBs (2v2): src/mpb.js replaces Game.mpbAt
-  const was = Game.mpbAt;
+  // (Game.bldgSeen asks src/mpb.js's Mpb.at itself since the Coal mine, group B3: a stand-in registered with setMpb)
   assert.strictEqual(Game.mpbAt(m, 2, 8), false, 'the stub: no MPBs');
-  Game.mpbAt = (mm, col, row) => col === 2 && row === 8;
+  const stub = { at: (mm, col, row) => col === 2 && row === 8, terrainAt: () => false, holds: () => false, unitOff: () => false, sabotaged: () => false, watching: () => null, shadowBonus: () => 0, squadMods: (mm, sd, sq, u) => u, squadBodies: () => {} };
+  Game.setMpb(stub); m.mpb = [[], []];
   assert.ok(!Game.canPlaceAt(m, 0, 3, 9, AS) && !Game.canPlaceAt(m, 0, 2, 8, AS) && Game.canPlaceAt(m, 0, 4, 9, AS), 'not on or next to an MPB');
-  Game.mpbAt = was;
+  Game.setMpb(null); delete m.mpb;
 }
 // ----- hidden info -----
 {
