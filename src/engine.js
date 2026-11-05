@@ -886,6 +886,10 @@ const Engine = (() => {
     const charmUsed = [{}, {}]; // Gentleman squads that already won a body over this fight
     const charmGained = [{}, {}], charmGave = [{}, {}]; // squads that already gained / gave a stack this fight
     const turning = [];          // bodies won over this tick: they switch sides at the end of it
+    // 2v2 Shadow Den's Impersonate (opts.mpb.shadowImpersonate = [{ side, squad, at, unit, sq, lane }], set only by
+    // src/mpb.js through Duo.battle): `at` s into the fight one body of enemy squad `squad` leaves the fight and a
+    // Shadowhand (unit, squad id sq) of `side` takes its place. Absent: nothing changes.
+    const shImp = opts.mpb && Array.isArray(opts.mpb.shadowImpersonate) && opts.mpb.shadowImpersonate.length ? opts.mpb.shadowImpersonate.map(x => ({ ...x, done: false })) : null;
     // owner is about to kill v: count the kill for charisma, or win v over instead (returns true; v lives on)
     function finishing(owner, v) {
       const c = charm[owner.side];
@@ -2848,6 +2852,7 @@ const Engine = (() => {
               if (g.bounds) x = Math.max(g.bounds.x0, Math.min(g.bounds.x1, x));
               const kid = newBody(pu, b.side, x, y, spawnNo[b.side]++, -1);
               kid.credit = b;
+              if (b.produce.lane === 0 || b.produce.lane === 1) kid.lane = b.produce.lane; // 2v2 MPB Factory: the player who bought it (src/mpb.js)
               pendingKids.push(kid);
             });
           }
@@ -3136,6 +3141,17 @@ const Engine = (() => {
         if (!live.length) continue; // the whole squad fell first: nothing comes out
         for (const x of live) { x.hp = 0; x.alive = false; x.diedTick = tick; x.sacrificed = true; }
         pendingKids.push(pt.hf);
+      }
+      if (shImp) for (const x of shImp) { // the Shadow Den's Impersonate (see shImp): the body is gone, a Shadowhand stands there
+        if (x.done || t < x.at - 1e-9) continue;
+        x.done = true;
+        const v = sides[1 - x.side].find(b => b.alive && b.squad === x.squad && !b.boarded && !b.turning && !b.u.structure);
+        if (!v) continue; // the squad is gone (or never came): nothing happens
+        v.hp = 0; v.alive = false; v.diedTick = tick; v.sacrificed = true;
+        const kid = newBody(x.unit, x.side, v.x, v.y, spawnNo[x.side]++, x.sq);
+        kid.tier = 1; kid.impersonated = true;
+        if (x.lane === 0 || x.lane === 1) kid.lane = x.lane;
+        pendingKids.push(kid);
       }
       // bodies spawned by deaths this tick join the fight
       for (const kid of pendingKids) { all.push(kid); sides[kid.side].push(kid); if (counts(kid)) stats[kid.side].totalHp += kid.u.hp; if (terBlock && !kid.u.aloft) keepOut(kid); } // not in the water

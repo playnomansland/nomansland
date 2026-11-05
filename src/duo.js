@@ -131,7 +131,7 @@
   // server and node tests get it here).
   function unitSet(base, F) {
     const add = MECHITES.map(n => F.units.find(u => u.name === n)).filter(Boolean);
-    const units = base.units.concat(add.map(u => { const { faction, ...rest } = u; return rest; }));
+    const units = base.units.concat(add.map(u => { const { faction, ...rest } = u; return rest; })).concat(M.extraUnits(base.units)); // + units the 2v2 buildings bring (the Shadow Den's Shadowhands)
     const n0 = base.units.length, fi = (name) => F.units.findIndex(u => u.name === name);
     // the counter table (the AI's guide): the built-in part as it is; with a Mechite unit, the Factions table's value
     // where it has the other unit too (Goblin Swarm, Brute, Ent...), else 0 (not measured)
@@ -462,6 +462,7 @@
     setTeam(ms(D), own.lane);
     if (G.needsPack(m, sd)) G.choosePack(m, sd, Math.floor(Math.random() * m.packages[sd].length));
     if (G.needsTowerPick(m, sd)) { const ch = G.towerChoices(m, sd); G.setTowerType(m, sd, ch[Math.floor(Math.random() * ch.length)].id); }
+    M.bots(m, sd, M.rng((D.seed + m.round * 3571 + seat * 131) >>> 0)); // the team's buildings' skills now and then (src/mpb.js hooks.bot)
     G.aiDeploy(m, sd);
     // the Vault: gold the carry cap would take next round goes in instead (a put round only)
     const spare = Math.min(m.gold[sd] - G.CARRY_CAP, M.vaultRoom(m, sd, 'put'));
@@ -501,6 +502,9 @@
     return true;
   }
   const canAct = (D, seat) => D.phase === 'deploy' && !D.ready[seat] && !D.lanes[0].m.over;
+  // ms off this seat's deploy clock: the other team's Shadow Den watches them (Insider information, src/mpb.js). The
+  // fight still starts at D.deadline; their actions stop that much sooner (act) and their clock shows it (the server)
+  const cutFor = (D, seat) => (D.phase === 'deploy' && D.lanes[0] ? M.deployCut(D.lanes[0].m, SEATS[seat].side) : 0);
   // a placement vote or the draft's pick: both lanes at once (Referee.act's checks: the action's number, the clock,
   // its arguments)
   function sysAct(D, seat, d, now) {
@@ -525,6 +529,7 @@
     mirror(D);
     const no = (why) => { const seq = Number.isInteger(d && d.seq) ? d.seq : 0; if (seq > R.seq[sd]) R.seq[sd] = seq; return { ok: false, why }; };
     if (!canAct(D, seat)) return no(D.ready[seat] ? 'ready' : 'phase');
+    if (D.deadline && cutFor(D, seat) && now > D.deadline - cutFor(D, seat) + GRACE_MS) return no('time'); // watched: their clock runs out sooner
     if (SYS_FNS.has(fn)) return sysAct(D, seat, d, now);
     if (TEAM_FNS.has(fn) && !undoAllowed(D, seat, fn, d.a)) return no('team');
     setTeams(ms(D));
@@ -613,7 +618,9 @@
   // placement votes (both players' tiles) and Vault are in m (team state); the opponents' buildings without this
   // round's skills, votes and Vault moves (Referee.hide -> Mpb.hide). The clocks: clocks(D, seat, now).
   function viewFor(D, seat) {
-    const own = SEATS[seat], R = D.lanes[own.lane], O = D.lanes[1 - own.lane], deploy = D.phase === 'deploy';
+    const own = SEATS[seat], R = D.lanes[own.lane], O = D.lanes[1 - own.lane];
+    // the Shadow Den's Insider information (src/mpb.js watching): this team sees the opponents' deployment live
+    const deploy = D.phase === 'deploy' && !M.watching(R.m, own.side);
     const v = Ref.view(R.m, own.side, deploy, R.base), o = Ref.view(O.m, own.side, deploy, O.base);
     v.team = teamOf(o, own.lane);
     return { m: v };
@@ -629,7 +636,7 @@
   const api = {
     V, MAP, OFF, HP, PINGS, EMOTES, EMOTE_TEXT, SEATS, SEAT_NAMES, seatOf, mateOf, remap, unmap, laneOfId, move, teamOf, setTeam, setTeams,
     MECHITES, unitSet, TEAM_FIELDS, TEAM_FNS, SYS_FNS, copyTeam, copyAll, teamBody, settle, battle, laneResult, fight, view,
-    create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, viewFor, clock, clocks, canAct, save, load, humans,
+    create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, viewFor, clock, clocks, canAct, cutFor, save, load, humans,
     mpbPending, mpbTick, mpbSettle, rebuildTeam, teamState,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

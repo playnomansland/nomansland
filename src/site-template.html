@@ -432,6 +432,11 @@ html.dock .bar:has(> .task:not([hidden])) > .hint { display: none; }
 .mpb-box { display: grid; gap: 6px; font-size: 12px; line-height: 1.35; padding: 6px 8px; border: 1px solid var(--gold); border-radius: 10px; background: color-mix(in srgb, var(--gold) 10%, transparent); }
 .mpb-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .mpb-card { display: grid; gap: 2px; text-align: left; white-space: normal; padding: 6px 8px; }
+/* the Shadow Den (group B5): a sabotaged card's big red X, the watched / watching line, its pickers */
+.uc2 .mpb-x { position: absolute; inset: 0; display: grid; place-items: center; font: 700 46px/1 var(--font-data); color: #E5383B; text-shadow: 0 0 3px #000, 0 0 8px rgba(229,56,59,0.6); pointer-events: none; z-index: 2; }
+.mpb-watch { padding: 5px 8px; border-radius: 10px; font-weight: 600; font-size: 13px; border: 1px solid #E5383B; color: #F4EFE3; background: color-mix(in srgb, #E5383B 35%, transparent); animation: mpbGlow 1.4s ease-in-out infinite alternate; }
+.mpb-watch.us { border-color: #8E7CC3; background: color-mix(in srgb, #8E7CC3 30%, transparent); animation: none; }
+.mpb-picks { display: flex; flex-wrap: wrap; gap: 6px; }
 .marks .mpb-ok { fill: color-mix(in srgb, var(--gold) 22%, transparent); stroke: var(--gold); stroke-width: 1.5; animation: mpbGlow 1.4s ease-in-out infinite alternate; }
 .marks .mpb-vote { fill: none; stroke-width: 4; }
 @keyframes mpbGlow { from { opacity: 0.45; } to { opacity: 1; } }
@@ -2491,6 +2496,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     return `<button class="uc2" data-i="${i}" style="--tier:${tierColor(tierOf(i))}" aria-pressed="${selected === i}" aria-disabled="${disabled}" aria-label="${esc(u.name)}, ${free ? `${free} free` : `${Game.shopCost(m, me, i)} gold`}">
       ${stars ? `<span class="st">${'★'.repeat(stars)}</span>` : ''}
       ${Game.capped(m, i) ? `<span class="cap" aria-label="${Game.capCount(m, me, i)} of ${Game.LATE.cap} squads">${Game.capCount(m, me, i)}/${Game.LATE.cap}</span>` : ''}
+      ${Game.mpbLocked(m, me, i) ? '<span class="mpb-x" aria-label="Sabotaged: can’t be deployed this round">✕</span>' : ''}
       <span class="ic" style="color:${u.color}">${Shapes.svg(u.shape, 30)}</span>
       <span class="n">${esc(u.name)}</span>
       <span class="c${free ? ' free' : ''}">${free ? `Free ×${free}` : Game.shopCost(m, me, i)}</span></button>`;
@@ -2661,7 +2667,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     const locked = (i) => !Game.isUnlocked(m, me, i);
     const canUnlock = (i) => locked(i) && g >= Game.unlockCost(m, i, me); // a locked card shows gold when it can be unlocked now
     const freeN = (i) => Game.freeLeft(m, me).filter(x => x === i).length;
-    const canBuy = (i) => can && !choosingPack() && !choosingTower() && !devPicking() && !placingTower() && !Game.capFull(m, me, i) && (freeN(i) > 0 || (!locked(i) && g >= price(i) && left > 0));
+    const canBuy = (i) => can && !choosingPack() && !choosingTower() && !devPicking() && !placingTower() && !Game.capFull(m, me, i) && !Game.mpbLocked(m, me, i) && (freeN(i) > 0 || (!locked(i) && g >= price(i) && Game.deploysLeft(m, me, i) > 0)); // (2v2: a sabotaged type; the Shadow Den's extra deployment for its units)
     let hint;
     if (!can) hint = mode === 'claude' && claude.fightWaiting ? 'Waiting for Claude.' : timeUp ? 'Time’s up.' : 'You’re ready.';
     else {
@@ -5776,7 +5782,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (!placingWall() && !placingBuilding() && !moveMode && !charmMode && !Game.isDev(m)) { // Overwatch: a squad goes into one of your buildings, or one in it opens its sheet first (the building's on the next tap)
       if (selected !== null && editable() && Game.garrisonFree(m, me, t.col, t.row, selected)) {
         const sq = Game.place(m, me, selected, t.col, t.row);
-        if (sq) { rangeOf = { side: me, id: sq.id, placed: true }; if (m.gold[me] < Game.shopCost(m, me, selected) || Game.deploysLeft(m, me) <= 0) selected = null; changed(); }
+        if (sq) { rangeOf = { side: me, id: sq.id, placed: true }; if (m.gold[me] < Game.shopCost(m, me, selected) || Game.deploysLeft(m, me, selected) <= 0) selected = null; changed(); }
         return;
       }
       const gs = Game.squadAt(m, me, t.col, t.row);
@@ -5854,7 +5860,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     // a unit selected in the shop goes inside your horse (or other carrier) with room; in 2v2 your teammate's too
     if ((own || (duoOn() && Game.mateAt(m, me, t.col, t.row))) && selected !== null && editable() && Game.boardable(m, me, t.col, t.row, selected)) {
       if (Game.place(m, me, selected, t.col, t.row)) {
-        if (!Game.freeLeft(m, me).includes(selected) && (m.gold[me] < Game.shopCost(m, me, selected) || Game.deploysLeft(m, me) <= 0)) selected = null;
+        if (!Game.freeLeft(m, me).includes(selected) && (m.gold[me] < Game.shopCost(m, me, selected) || Game.deploysLeft(m, me, selected) <= 0)) selected = null;
         changed();
       }
       return;
@@ -5872,7 +5878,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       const sq = Game.place(m, me, selected, t.col, t.row);
       if (sq) {
         rangeOf = { side: me, id: sq.id, placed: true }; // its range shows at once (a tap on it shows it again before one takes it back)
-        if (!Game.freeLeft(m, me).includes(selected) && (m.gold[me] < Game.shopCost(m, me, selected) || Game.deploysLeft(m, me) <= 0)) selected = null;
+        if (!Game.freeLeft(m, me).includes(selected) && (m.gold[me] < Game.shopCost(m, me, selected) || Game.deploysLeft(m, me, selected) <= 0)) selected = null;
         changed();
       }
     }
@@ -8926,7 +8932,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const K = Mpb.kindOf(h.kind), L = duoMyLane(), mine = h.votes[L], theirs = h.votes[1 - L], part = h.part && ((K.place.parts || []).find(p => p.id === h.part) || {}).name;
     return `<div class="mpb-box"><div><b>Place ${part ? `the ${esc(K.name.replace(/^The /, ''))}’s ${esc(part)}` : `your team’s ${esc(K.name.replace(/^The /, ''))}`}</b> · tap a glowing tile. ${mine ? '<span style="color:' + duoRing(duoMySeat()).col + '">Your vote is in.</span> ' : ''}${theirs ? `<span style="color:${duoRing(Duo.mateOf(duoMySeat())).col}">Your teammate voted.</span>` : 'Waiting for your teammate.'} The same tile places it at once; two tiles: one of them when the time runs out. <span class="num" id="mpb-vote-s">${mpbClockAt.vote ? mpbLeft('vote') + ' s' : ''}</span></div></div>`;
   }
-  function mpbPanel() { return mpbOn() ? mpbDraftHtml() + mpbVoteHtml() : ''; }
+  function mpbPanel() { return mpbOn() ? mpbDraftHtml() + mpbVoteHtml() + Object.values(MPB_SHEET).map(x => x.panel ? x.panel() : '').join('') : ''; } // (a kind's own line: MPB_SHEET[kind].panel)
   function wireMpbPanel() {
     $('panel').querySelectorAll('[data-mpb-draft]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.draftPick(m, me, +b.dataset.mpbDraft)) { mpbNotice(); changed(); } }));
   }
@@ -9006,6 +9012,42 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     // ===== jail (page) =====
     // ===== school (page) =====
     // ===== shadowDen (page) =====
+    // The Den's sheet: what is on (a sabotage in force, being watched), the Shadow deployment, and the pickers of
+    // Impersonate (an enemy tier 1-2 squad you can see) and Sabotage (a unit type) in place of their plain Buy buttons.
+    // panel(): the line over the shop while a team watches the other ("You are being watched").
+    shadowDen: {
+      html(side, rec, live) {
+        const mine = side === me, L = duoMyLane(), key = rec.key, info = Mpb.kindOf('shadowDen').hooks.info(m, side, rec);
+        let out = info.length ? `<p style="margin:0">${info.map(esc).join(' · ')}</p>` : '';
+        if (!mine) return out;
+        out += `<p class="hint" style="margin:0">Shadow deployment: ${Mpb.DEN.tokens} more a round for each of you, only for Rogues, Assassins and Shadowhands. Shadowhands are in your shop (tier 1) while the Den stands.</p>`;
+        if (phase !== 'deploy') return out;
+        const imp = Mpb.impNow(m, rec), myImp = imp.find(x => x.lane === L), sab = rec.data.sab && rec.data.sab.round === m.round ? rec.data.sab : null;
+        const ins = rec.data.insider && rec.data.insider.round === m.round;
+        const nm = (ui) => esc((units[ui] || {}).name || '?');
+        const ts = Mpb.impTargets(m, me);
+        const impBtns = myImp ? `<p style="margin:0">Your Impersonate: their squad ${myImp.tl === L ? 'in front of you' : 'on your teammate’s side'} (Undo above to change it).</p>`
+          : ts.length ? `<div class="mpb-picks">${ts.map(t => `<button class="btn small" data-den-imp="${t.who}:${t.id}" ${live && !Mpb.whyNot(m, me, key, 'impersonate', [t.who, t.id]) ? '' : 'disabled'}>${nm(t.sq.unit)} · ${t.sq.col + 1},${t.sq.row + 1}</button>`).join('')}</div>`
+          : '<p class="hint" style="margin:0">No enemy tier 1 or 2 squad you can see yet.</p>';
+        const seen = new Set(Game.foeSeen(m, 1 - me).concat(Game.teamSeen(m, 1 - me)).map(q => q.unit));
+        const types = units.map((u, i) => i).filter(i => !u.building).sort((a, b) => (seen.has(b) - seen.has(a)) || a - b);
+        const sabBtns = sab ? `<p style="margin:0">Sabotage: their <b>${nm(sab.ui)}</b> next round.</p>`
+          : `<div class="mpb-picks">${types.map(i => `<button class="btn small${seen.has(i) ? ' either' : ''}" data-den-sab="${i}" ${live && !Mpb.whyNot(m, me, key, 'sabotage', [i]) ? '' : 'disabled'}>${nm(i)}</button>`).join('')}</div>`;
+        return out + `<p style="margin:0"><b>Impersonate</b> · ${Mpb.DEN.impersonate} gold · pick their squad:</p>${impBtns}
+          <p style="margin:0"><b>Sabotage</b> · ${Mpb.DEN.sabotage} gold · pick a unit type (the ones they field first):</p>${sabBtns}
+          ${ins ? '<p style="margin:0">Insider information is bought: next round you see their deployment.</p>' : ''}`;
+      },
+      wire(root, side, rec, again) {
+        root.querySelectorAll('[data-mpb-buy="impersonate"],[data-mpb-buy="sabotage"]').forEach(b => { b.hidden = true; }); // (their pickers are in the sheet)
+        root.querySelectorAll('[data-den-imp]').forEach(b => b.addEventListener('click', () => { const [who, id] = b.dataset.denImp.split(':').map(Number); if (editable() && Game.mpbBuy(m, me, rec.key, 'impersonate', who, id)) { changed(); again(); } }));
+        root.querySelectorAll('[data-den-sab]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.mpbBuy(m, me, rec.key, 'sabotage', +b.dataset.denSab)) { changed(); again(); } }));
+      },
+      panel() {
+        if (phase !== 'deploy') return '';
+        return (Mpb.watching(m, 1 - me) ? `<div class="mpb-watch" role="status">You are being watched · their Shadow Den sees your deployment, and your clock is ${Mpb.DEN.cut / 1000} s shorter</div>` : '')
+          + (Mpb.watching(m, me) ? '<div class="mpb-watch us" role="status">Insider information: you see their deployment live</div>' : '');
+      },
+    },
   };
   // a building's sheet: both teammates buy its skills (whoever buys pays; only your own buy can be taken back), the
   // opponents read it (this round's buys stay hidden from them until the fight)

@@ -28,7 +28,9 @@ const Game = (() => {
     ? (m.round === 1 ? CONFIG.firstRoundDeploys : CONFIG.deploysPerRound) + m.extraDeploys[side] + devDeploys(m, side) + (musterOn(m, side) ? 1 : 0) + (shoePerk(m, side, 'deploy') ? 1 : 0)
     : Infinity;
   const deployedThisRound = (m, side) => m.armies[side].filter(s => s.round === m.round && !s.free && !s.gift).length; // package squads and slot machine goblins don't count
-  const deploysLeft = (m, side) => deploysAllowed(m, side) - deployedThisRound(m, side);
+  // ui (optional): the unit about to be placed. 2v2 Shadow Den (src/mpb.js shadowBonus): +1 deployment a round only
+  // for its units (Rogue, Assassin, Shadowhands); nothing without m.mpb
+  const deploysLeft = (m, side, ui) => deploysAllowed(m, side) - deployedThisRound(m, side) + (MPB && m && m.mpb ? MPB.shadowBonus(m, side, ui) : 0);
   // A unit's `cost` is in lab units: 1 = one standard squad (SQUAD_COST gold)
   const unitCostOf = (unit) => Math.max(10, Math.round((unit.cost || 1) * SQUAD_COST / 10) * 10);
   // Upgrades cost half the unit's price at the default setting (50 for a 100-gold squad)
@@ -1034,7 +1036,11 @@ const Game = (() => {
   // the teammate's buildings from skills (the Cog Builder's Factory) in a 2v2 lane: their tiles are taken here too
   const teamBuildings = (m, side) => (m && m.team && m.team.buildings && m.team.buildings[side]) || [];
   const teamBuildingAt = (m, side, col, row) => teamBuildings(m, side).some(b => b.col === col && b.row === row);
-  const teamSeen = (m, side) => teamArmy(m, side).filter(s => s.round < m.round && !hiddenFromFoe(m, s));
+  const teamSeen = (m, side) => watchedLive(m, side) ? liveSeen(teamArmy(m, side)) : teamArmy(m, side).filter(s => s.round < m.round && !hiddenFromFoe(m, s));
+  // 2v2 Shadow Den's Insider information (src/mpb.js watching): the other team sees side's squads live this round,
+  // where they stand now (riders stay hidden); nothing without m.mpb
+  const watchedLive = (m, side) => !!(MPB && m && m.mpb && MPB.watching(m, 1 - side));
+  const liveSeen = (list) => list.filter(s => !isRider(s)).map(s => { const { from, movedRound, luckMove, outRound, ...q } = s; return q; });
   const enemyHolds = (m, side, col, row) => !!m && (foeSeen(m, 1 - side).some(s => { const p = seenAt(m, s); return p.col === col && p.row === row; }) ||
     teamSeen(m, 1 - side).some(s => { const p = seenAt(m, s); return p.col === col && p.row === row; }) ||
     (m.round > 1 && m.towers && m.towers[1 - side] && m.towers[1 - side].col === col && m.towers[1 - side].row === row));
@@ -1122,7 +1128,7 @@ const Game = (() => {
     m.sold[side] = soldNow(m, side).filter(q => q.id !== sq.id).concat({ ...sq, soldRound: m.round });
   }
   // the squads of side as the other side sees them while deploying: those from earlier rounds, those sold this round too
-  const foeSeen = (m, side) => m.armies[side].filter(s => s.round < m.round && !hiddenFromFoe(m, s)).concat(soldNow(m, side).filter(s => !hiddenFromFoe(m, s)));
+  const foeSeen = (m, side) => watchedLive(m, side) ? liveSeen(m.armies[side]) : m.armies[side].filter(s => s.round < m.round && !hiddenFromFoe(m, s)).concat(soldNow(m, side).filter(s => !hiddenFromFoe(m, s)));
   const isCarrier = (m, ui) => !!(m && m.units[ui] && m.units[ui].carrier);
   // the rider in carrier sq (yours or, in 2v2, your teammate's: either may sit in either's carrier)
   const riderOf = (m, side, sq) => sq ? m.armies[side].find(s => s.in === sq.id) || teamArmy(m, side).find(s => s.in === sq.id) || null : null;
@@ -1324,7 +1330,8 @@ const Game = (() => {
 
   // a unit left out of this match (match settings on the menu). side (optional): also a unit of a faction that
   // player didn't draft (Factions mode)
-  const isOff = (m, ui, side) => !!(m && ((Array.isArray(m.off) && m.off.includes(ui)) || (side != null && !ownsUnit(m, side, ui))));
+  // 2v2: a unit a building brings (the Shadow Den's Shadowhands, u.mpbUnit) is off for a team without that building
+  const isOff = (m, ui, side) => !!(m && ((Array.isArray(m.off) && m.off.includes(ui)) || (side != null && !ownsUnit(m, side, ui)) || (MPB && m.units && m.units[ui] && m.units[ui].mpbUnit && MPB.unitOff(m, side, ui))));
 
   // ---------- skills (bought per unit type, for all squads of that type) ----------
   // m.units[i].skillDefs = [def or null, ...], one per skill slot (Engine.SKILL_SLOTS)
@@ -1755,17 +1762,24 @@ const Game = (() => {
       const [b] = E.buildSquad(bu, side, w.x, w.y, r.squad, TILE, idx + k, lv);
       if (!built) b.site = { work: (r.rec.progress || 0) * info.buildSecs, need: info.buildSecs, self: info.selfBuild || 0 };
       const sk = built ? buildingSkillInfo(r.id, bskillOf(m, side, r.key)) : null;
-      const makes = !sk ? [] : sk.unit ? [[sk.unit, 1]] : (sk.make || []).map(([bid, sid, n]) => [(buildingSkillInfo(bid, sid) || {}).unit, n]);
-      const units = [];
-      for (const [u0, n] of makes) if (u0) for (let j = 0; j < n; j++) {
-        let pu = E.withTraits({ ...u0, level: 0, construct: true });
-        pu = blessed({ ...pu, aps: pu.aps * (1 + cb.aps / 100), shield: (pu.shield || 0) + cb.shield, bonusArmor: (pu.bonusArmor || 0) + cb.armor }, bl);
-        units.push(E.leveled(withCharacter(m, side, withFactionTrait(pu, info.faction)), lv));
-      }
-      if (units.length) b.produce = { units, time: (sk.time || 0) * (1 - cb.faster / 100) / (bl ? 1 + bl.build / 100 : 1) };
+      const pr = buildingMakes(m, side, info, sk, lv, cb, bl);
+      if (pr) b.produce = pr;
       out.push(b);
     });
     return out;
+  }
+  // what skill sk of a building of kind info makes in a fight: { units, time } (Engine b.produce), or null. lv: the
+  // building's level, cb: the builder skills' buff (constructBuff), bl: Blessing of the Cycle (or null). The 2v2 MPB
+  // Factory (src/mpb.js) makes its units with it too.
+  function buildingMakes(m, side, info, sk, lv, cb, bl) {
+    const makes = !sk ? [] : sk.unit ? [[sk.unit, 1]] : (sk.make || []).map(([bid, sid, n]) => [(buildingSkillInfo(bid, sid) || {}).unit, n]);
+    const units = [];
+    for (const [u0, n] of makes) if (u0) for (let j = 0; j < n; j++) {
+      let pu = E.withTraits({ ...u0, level: 0, construct: true });
+      pu = blessed({ ...pu, aps: pu.aps * (1 + cb.aps / 100), shield: (pu.shield || 0) + cb.shield, bonusArmor: (pu.bonusArmor || 0) + cb.armor }, bl);
+      units.push(E.leveled(withCharacter(m, side, withFactionTrait(pu, info.faction)), lv));
+    }
+    return units.length ? { units, time: (sk.time || 0) * (1 - cb.faster / 100) / (bl ? 1 + bl.build / 100 : 1) } : null;
   }
   // after a fight: sites built (or the work they kept), buildings destroyed, XP from what they made (a bought
   // building gets its XP as a squad). Returns what happened, per side: [{ id, built: true } | { id, lost: true } | { id, progress }]
@@ -1921,6 +1935,8 @@ const Game = (() => {
   const setMpb = (x) => { MPB = x || null; return true; };
   const mpbApi = () => MPB;
   const mpbAt = (m, col, row) => !!(MPB && m && m.mpb) && MPB.at(m, col, row);
+  // a unit type side may not deploy this round (the other team's Shadow Den: Sabotage)
+  const mpbLocked = (m, side, ui) => !!(MPB && m && m.mpb) && MPB.sabotaged(m, side, ui);
   const occupied = (m, side, col, row) => towerAt(m, side, col, row) || treasuryAt(m, side, col, row) || elfOwnAt(m, side, col, row) || !!buildingAt(m, side, col, row) || teamBuildingAt(m, side, col, row) || m.armies[side].some(s => covers(m, s, col, row)) || teamArmy(m, side).some(s => covers(m, s, col, row)) || devOccupied(m, side, col, row) || mpbAt(m, col, row);
   const needsTower = (m, side) => !!(m.towers && !m.towers[side]);
   // the tower can be placed (or moved) during round 1 only
@@ -1948,6 +1964,7 @@ const Game = (() => {
     if (needsTower(m, side)) return null; // the tower goes down first
     if (!isUnlocked(m, side, unitIdx)) return null;
     if (capFull(m, side, unitIdx)) return null; // DEVTESTLATEGAME: at most LATE.cap squads of a tier 3+ unit type
+    if (mpbLocked(m, side, unitIdx)) return null; // 2v2: a unit type the other team's Shadow Den sabotaged this round
     const into = boardable(m, side, col, row, unitIdx); // a carrier with room: the new squad rides inside
     if (!spotFree(m, side, col, row, unitIdx) && !into) return null;
     const ride = into ? { in: into.id } : {};
@@ -1958,7 +1975,7 @@ const Game = (() => {
     }
     const cost = shopCost(m, side, unitIdx), level = startLevel(m, side);
     if (m.gold[side] < cost) return null;
-    if (deploysLeft(m, side) <= 0) return null;
+    if (deploysLeft(m, side, unitIdx) <= 0) return null;
     // a squad that starts leveled up starts with the XP of that level, so the next one is as far off as usual
     const sq = { id: m.nextId[side]++, unit: unitIdx, col, row, round: m.round, xp: level ? xpNeeded(m.units[unitIdx], level - 1) : 0, level, cost, ...ride };
     m.armies[side].push(sq);
@@ -3340,7 +3357,7 @@ const Game = (() => {
       const budget = m.gold[side] - reserve;
       let best = -1, bs = -Infinity;
       m.units.forEach((u, i) => {
-        if (isOff(m, i, side) || capFull(m, side, i)) return;
+        if (isOff(m, i, side) || capFull(m, side, i) || mpbLocked(m, side, i)) return;
         if (u.building && ((own[i] || 0) >= 1 || m.round < 3)) return; // a building (Altar of Build): one, from round 3
         const extra = isUnlocked(m, side, i) ? 0 : unlockCost(m, i, side); // a locked unit costs its unlock on top
         if (shopCost(m, side, i) + extra > budget) return;
@@ -3427,6 +3444,7 @@ const Game = (() => {
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,
+    mpbLocked, buildingMakes,
     zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, teamBuildings, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, AIM, canAim, setAim, clearAim, aimEnd, aimTo, resolve, aiDeploy, occupied, setMpb, mpbApi,
     GRID, useGrid,
     DEV, CAT_NAMES, LESSER_SQ, WALL_SQ, setDevData, devBuilding, devPower, devSpell, isDev, towerUp, pickCat, devOffer, pickNow, needsDevPick, devPick, undoDevPick, devShown,

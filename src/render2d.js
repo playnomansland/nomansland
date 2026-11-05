@@ -976,10 +976,50 @@ const Render2D = (cv, view, opts = {}) => {
     // ===== scorch (2D) =====
     // ===== oak (2D) =====
     // ===== factory (2D) =====
+    // the Cog Builder's Factory as drawn for a Cog Builder (always built, its cog turning), under the team's tall
+    // swallow-tailed banner on a pole at its side with a white cog on it: the team's, not one player's
+    factory(x, y, t, side, o) {
+      const s = t * 0.92, c = teamCol(side);
+      drawFactory(x + s * 0.06, y, s, side, '#B07A3C', { built: true, time: o.time, level: 0 });
+      const px = x - s * 0.38, top = y - s * 0.56, bh = s * 0.36, bw = s * 0.34;
+      ctx.strokeStyle = '#2B2F33'; ctx.lineWidth = Math.max(1.5, s * 0.035);
+      ctx.beginPath(); ctx.moveTo(px, y + s * 0.22); ctx.lineTo(px, top - s * 0.05); ctx.stroke(); // the pole
+      const wave = Math.sin((o.time || 0) * 3 + x * 0.1) * s * 0.015;
+      ctx.fillStyle = c; ctx.strokeStyle = '#1D1A18'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px + bw, top + wave); ctx.lineTo(px + bw * 0.72, top + bh * 0.5); ctx.lineTo(px + bw, top + bh + wave); ctx.lineTo(px, top + bh); ctx.closePath(); ctx.fill(); ctx.stroke();
+      const cx = px + bw * 0.38, cy = top + bh * 0.5, cr = bh * 0.2; // a small white cog on it
+      ctx.fillStyle = '#F4EFE3'; ctx.beginPath(); for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6, r = k % 2 ? cr : cr * 1.35; ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } ctx.closePath(); ctx.fill();
+      ctx.fillStyle = c; ctx.beginPath(); ctx.arc(cx, cy, cr * 0.45, 0, Math.PI * 2); ctx.fill();
+    },
     // ===== magicLake (2D) =====
     // ===== jail (2D) =====
     // ===== school (2D) =====
     // ===== shadowDen (2D) =====
+    // a crooked hideout of dark violet stone under a steep slate roof with a band in the team colour, a pale mask with
+    // glowing violet eyes over its black doorway, two crossed daggers on the wall and a violet lantern
+    shadowDen(x, y, t, side, o) {
+      const s = t * 0.8, c = teamCol(side), w = s * 0.8, h = s * 0.46, x0 = x - w / 2, y0 = y - h * 0.1;
+      const glow = 0.65 + 0.35 * Math.sin((o.time || 0) * 2.4 + x * 0.05);
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y0 + h + s * 0.03, w * 0.6, s * 0.08, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#3B3350'; ctx.strokeStyle = '#7C6BAA'; ctx.lineWidth = Math.max(1, s * 0.03); // (a pale violet edge: it reads on dark boards)
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + w, y0 - h * 0.06); ctx.lineTo(x0 + w * 0.98, y0 + h); ctx.lineTo(x0 + w * 0.02, y0 + h); ctx.closePath(); ctx.fill(); ctx.stroke(); // the walls, a little askew
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x0 - s * 0.04, y0 + h * 0.02); ctx.lineTo(x0 + w + s * 0.04, y0 - h * 0.05); ctx.lineTo(x0 + w + s * 0.04, y0 + h * 0.14); ctx.lineTo(x0 - s * 0.04, y0 + h * 0.2); ctx.closePath(); ctx.fill(); // the team's band
+      ctx.fillStyle = '#231E2E'; ctx.beginPath(); ctx.moveTo(x0 - s * 0.08, y0 + h * 0.04); ctx.lineTo(x + w * 0.06, y0 - h * 1.05); ctx.lineTo(x0 + w + s * 0.08, y0 - h * 0.04); ctx.closePath(); ctx.fill(); ctx.stroke(); // the roof
+      ctx.fillStyle = '#0B0910'; ctx.beginPath(); ctx.moveTo(x - w * 0.13, y0 + h); ctx.lineTo(x - w * 0.13, y0 + h * 0.5); ctx.quadraticCurveTo(x, y0 + h * 0.28, x + w * 0.13, y0 + h * 0.5); ctx.lineTo(x + w * 0.13, y0 + h); ctx.closePath(); ctx.fill(); // the doorway
+      const mx = x, my = y0 - h * 0.38, mr = s * 0.11; // the mask on the gable
+      ctx.fillStyle = '#E9E3CF'; ctx.beginPath(); ctx.moveTo(mx - mr, my - mr * 0.5); ctx.quadraticCurveTo(mx, my - mr * 1.1, mx + mr, my - mr * 0.5); ctx.quadraticCurveTo(mx + mr * 0.8, my + mr * 0.9, mx, my + mr * 1.05); ctx.quadraticCurveTo(mx - mr * 0.8, my + mr * 0.9, mx - mr, my - mr * 0.5); ctx.fill();
+      ctx.fillStyle = '#B79CFF'; ctx.globalAlpha = glow;
+      for (const sd of [-1, 1]) { ctx.beginPath(); ctx.ellipse(mx + sd * mr * 0.42, my - mr * 0.05, mr * 0.26, mr * 0.12, sd * 0.35, 0, Math.PI * 2); ctx.fill(); } // its eyes
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#C9CED6'; ctx.lineWidth = Math.max(1.2, s * 0.035); // crossed daggers
+      const dx = x0 + w * 0.24, dy = y0 + h * 0.6, dl = s * 0.13;
+      ctx.beginPath(); ctx.moveTo(dx - dl, dy - dl); ctx.lineTo(dx + dl, dy + dl); ctx.moveTo(dx + dl, dy - dl); ctx.lineTo(dx - dl, dy + dl); ctx.stroke();
+      ctx.fillStyle = '#5B4A3A'; for (const sd of [-1, 1]) ctx.fillRect(dx + sd * dl * 0.75 - s * 0.025, dy + dl * 0.6, s * 0.05, s * 0.05);
+      const lx = x0 + w * 0.84, ly = y0 + h * 0.55; // a lantern with a violet flame
+      ctx.fillStyle = '#B79CFF'; ctx.globalAlpha = 0.25 * glow; ctx.beginPath(); ctx.arc(lx, ly, s * 0.13, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = '#2B2F33'; ctx.fillRect(lx - s * 0.04, ly - s * 0.06, s * 0.08, s * 0.11);
+      ctx.fillStyle = '#B79CFF'; ctx.globalAlpha = glow; ctx.fillRect(lx - s * 0.025, ly - s * 0.04, s * 0.05, s * 0.07); ctx.globalAlpha = 1;
+    },
   };
   const MPB_BODY = {
     // ===== golem (2D) =====
@@ -993,6 +1033,20 @@ const Render2D = (cv, view, opts = {}) => {
       for (let k = 0; k < 4; k++) { ctx.fillStyle = k % 2 ? dark : met; ctx.beginPath(); ctx.ellipse(x, y + r * (0.55 - k * 0.32), r * (0.62 - Math.abs(k - 1.5) * 0.06), r * 0.22, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } // the stacked coins
       ctx.fillStyle = '#FFE9A8'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.arc(x + sd * r * 0.2, y - r * 0.42, Math.max(1, r * 0.08), 0, Math.PI * 2); ctx.fill(); } // eyes
       ctx.fillStyle = '#2B2F33'; ctx.fillRect(x - r * 0.16, y - r * 0.78, r * 0.32, Math.max(1, r * 0.07)); // the coin slot on its head
+      ctx.strokeStyle = c; ctx.lineWidth = Math.max(1.5, r * 0.12); ctx.beginPath(); ctx.arc(x, y, r * 1.08, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    },
+    // ===== shadowDen: Shadowhands (2D) =====
+    // a Shadowhand (u.mpb 'shadowDen'): a hooded cloak in violet with a pale mask, two glowing eyes and a dagger,
+    // pointing the way its side faces; ringed in its team's colour
+    shadowDen(x, y, r, side, u, o) {
+      const c = teamCol(side), up = -upOf(side), col = u.color || '#8E7CC3'; // (up: the hood's point toward where its side faces)
+      ctx.globalAlpha = o.alpha == null ? 1 : o.alpha;
+      ctx.fillStyle = col; ctx.strokeStyle = '#17131F'; ctx.lineWidth = Math.max(1, r * 0.08);
+      ctx.beginPath(); ctx.moveTo(x, y + up * r * 0.95); ctx.quadraticCurveTo(x + r * 0.95, y + up * r * 0.1, x + r * 0.7, y - up * r * 0.8); ctx.lineTo(x - r * 0.7, y - up * r * 0.8); ctx.quadraticCurveTo(x - r * 0.95, y + up * r * 0.1, x, y + up * r * 0.95); ctx.fill(); ctx.stroke(); // the hooded cloak
+      ctx.fillStyle = '#E9E3CF'; ctx.beginPath(); ctx.ellipse(x, y + up * r * 0.25, r * 0.36, r * 0.3, 0, 0, Math.PI * 2); ctx.fill(); // the mask
+      ctx.fillStyle = '#5A2D91'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.ellipse(x + sd * r * 0.15, y + up * r * 0.27, r * 0.09, r * 0.05, 0, 0, Math.PI * 2); ctx.fill(); }
+      ctx.strokeStyle = '#C9CED6'; ctx.lineWidth = Math.max(1, r * 0.12); ctx.beginPath(); ctx.moveTo(x + r * 0.55, y - up * r * 0.2); ctx.lineTo(x + r * 0.95, y + up * r * 0.55); ctx.stroke(); // the dagger
       ctx.strokeStyle = c; ctx.lineWidth = Math.max(1.5, r * 0.12); ctx.beginPath(); ctx.arc(x, y, r * 1.08, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     },
