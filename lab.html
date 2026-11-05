@@ -829,6 +829,8 @@ const Engine = (() => {
   const PROJ_HIT_RADIUS = 1;   // a projectile hits a body within this distance of where it lands
   // A side whose tower falls is crippled for a while: it deals less damage, walks slower and takes more damage
   const TOWER_DOWN = { secs: 9, attack: 90, move: 70, taken: 50 };
+  // 2v2 artifacts (opts.artifacts, see createBattle): a circle's radius in metres (1.5 tiles) and the points that lock it
+  const ARTIFACT = { r: 9, cap: 100 };
   // Charisma (Matteo): opts.charm = [stacks by squad id or null, same for side 1]. A body of a squad with any
   // charisma that kills an enemy body (not a structure) gives its squad one more stack, up to CHARM_MAX, and one
   // stack to a friendly squad without any (the one with a body nearest the killer). A squad at CHARM_MAX is a
@@ -1801,6 +1803,82 @@ const Engine = (() => {
       obj.hold = lead >= 0 && lead === obj.lead ? obj.hold + dt : lead >= 0 ? dt : 0;
       obj.lead = lead;
       if (obj.won < 0 && lead >= 0 && obj.hold >= obj.secs - 1e-9) obj.won = lead;
+    }
+    // ----- 2v2 artifacts (opts.artifacts = [{ x, y, r, cap }] in board metres, r and cap default ARTIFACT; set only by
+    // src/duo.js, off by default: without it nothing here runs) -----
+    // Points: at the end of every tick each squad of a side with a living, fighting body inside an unlocked artifact's
+    // circle adds its tier (1-4) x dt to its side's points: per squad, not per body. Fighting: not riding in a carrier,
+    // not sheltered in a building (Overwatch), not a structure, building, wall, watchtower, drone or bot. The tier is
+    // b.tier (Game.bodiesFor sets it on every army squad's bodies from Game.tierOf); summons (bodies with b.credit,
+    // counted per squad that brought them), guards, paratroopers and anything else without one count as tier 1. Both
+    // sides tick at once; the moment either reaches cap the artifact locks: won = the side with more points (equal: -1)
+    // and the points freeze. A fight that ends first: more points wins (equal: -1), see result().
+    // Bodies soft-prioritise an unlocked artifact within their awareness (artifactMove, in the movement below).
+    const arts = opts.artifacts && opts.artifacts.length ? opts.artifacts.map(a => ({ x: +a.x, y: +a.y, r: a.r > 0 ? +a.r : ARTIFACT.r, cap: a.cap > 0 ? +a.cap : ARTIFACT.cap, pts: [0, 0], rate: [0, 0], locked: false, won: -1 })) : null;
+    const holds = (b) => b.alive && !b.boarded && !b.turning && !(b.inside && b.inside.alive) && !b.u.structure && !b.u.building && !(b.u.barrier > 0) && b.u.kind !== 'watchtower' && !b.u.aloft && !b.u.noCount;
+    const holdKey = (b) => b.credit ? 'c' + b.credit.side + ':' + b.credit.squad : 's' + b.squad;
+    const holdTier = (b) => !b.credit && b.tier >= 1 ? Math.min(4, Math.floor(b.tier)) : 1;
+    function artifactStep() {
+      for (const a of arts) {
+        if (a.locked) continue;
+        const sq = [new Map(), new Map()];
+        for (const b of all) if (holds(b) && hyp(b.x - a.x, b.y - a.y) <= a.r + 1e-9) sq[b.side].set(holdKey(b), holdTier(b));
+        for (const s of [0, 1]) { let n = 0; for (const v of sq[s].values()) n += v; a.rate[s] = n; }
+        a.pts[0] += a.rate[0] * dt; a.pts[1] += a.rate[1] * dt;
+        if (a.pts[0] >= a.cap - 1e-9 || a.pts[1] >= a.cap - 1e-9) { a.locked = true; a.won = a.pts[0] > a.pts[1] ? 0 : a.pts[1] > a.pts[0] ? 1 : -1; a.rate = [0, 0]; }
+      }
+    }
+    // as the boards (and result) see them; at the end (final) an artifact nobody locked goes to the side with more points
+    const artifactsNow = (final) => arts ? arts.map(a => ({ x: a.x, y: a.y, r: a.r, cap: a.cap, pts: a.pts.slice(), rate: a.rate.slice(), locked: a.locked,
+      won: a.locked || !final ? a.won : a.pts[0] > a.pts[1] ? 0 : a.pts[1] > a.pts[0] ? 1 : -1 })) : [];
+    // where body b stands in artifact a: one of 12 spots between a fifth and seven tenths of the radius out, picked from
+    // its place in its own side (side 1's mirrored front to back, as Spread does), so a crowd spreads over the circle; a
+    // spot in a wall or water: the next one (none: the middle)
+    function artSpot(b, a) {
+      if (b.artSpot && b.artSpot.a === a) return b.artSpot;
+      if (b.artK == null) b.artK = sides[b.side].indexOf(b);
+      const fwd = b.side === 1 ? -1 : 1;
+      let at = { a, x: a.x, y: a.y };
+      for (let j = 0; j < 12; j++) {
+        const k = b.artK + j, [dx, dy] = DIRS12[(k * 5) % 12], d = a.r * (0.2 + 0.5 * ((k * 7) % 12) / 11);
+        let x = a.x + dx * d, y = a.y + dy * d * fwd;
+        if (g.bounds) { x = Math.max(g.bounds.x0, Math.min(g.bounds.x1, x)); y = Math.max(g.bounds.y0, Math.min(g.bounds.y1, y)); }
+        if (!terBlock || !blocked(cellOf(x, y))) { at = { a, x, y }; break; }
+      }
+      return (b.artSpot = at);
+    }
+    // the movement part of a walking body's turn while an unlocked artifact is within its awareness (max(range + sight,
+    // min sight), to the circle's edge; the nearest one): true when it took care of the body's move this tick.
+    // Melee: an enemy it sees within its awareness comes first (it fights as usual, out of the circle if need be), else it
+    // walks to its spot in the circle and holds there. Ranged: it walks to its spot in the circle first, then holds
+    // inside, shooting only what it reaches from there (the attacks below); it never walks out after an enemy. Once the
+    // artifact locks: as usual.
+    function artifactMove(b, near, nd, unseen, rg) {
+      const aware = Math.max(rg + sight, minSight);
+      let a = null, ad = Infinity;
+      for (const c of arts) { if (c.locked) continue; const d = hyp(c.x - b.x, c.y - b.y); if (d - c.r <= aware && d < ad) { ad = d; a = c; } }
+      if (!a) { b.artAt = null; return false; }
+      const seen = !!near && !unseen;
+      if (rg <= AWARE.melee && seen && nd <= aware) { b.artAt = null; return false; }
+      const inReach = seen && nd <= reachTo(reachOf(b), b, near);
+      b.dashActive = false; if (g.aware2) b.goal = null;
+      if (b.artAt === a && ad <= a.r) { b.intent = inReach ? near : null; return true; } // in the circle: it holds
+      b.artAt = null;
+      const sp = artSpot(b, a), gx = sp.x - b.x, gy = sp.y - b.y, gd = hyp(gx, gy);
+      if ((ad <= a.r && (inReach || gd < 1)) || gd < 1e-6) { b.artAt = a; b.intent = inReach ? near : null; return true; }
+      const step = spd(b) * moveMul(b) * dt;
+      const [ux, uy] = steer(b, sp.x, sp.y, gx / gd, gy / gd);
+      if (b.hx === undefined) { b.hx = ux; b.hy = uy; }
+      const k = Math.min(1, TURN * dt);
+      let hx = b.hx + (ux - b.hx) * k, hy = b.hy + (uy - b.hy) * k, hl = hyp(hx, hy);
+      if (hl < 1e-6) { hx = ux; hy = uy; hl = 1; }
+      b.hx = hx / hl; b.hy = hy / hl;
+      const mv = Math.min(step, gd);
+      b.x += b.hx * mv; b.y += b.hy * mv; b.moved += mv;
+      if (b.u.windUp > 0 && mv > 0) { b.setUp = false; if (b.windTarget) { b.windTarget = null; stats[b.side].windLost++; } }
+      if (gd - mv < 1) b.artAt = a;
+      b.intent = inReach ? near : null;
+      return true;
     }
     // current range: shortsight can shrink it for a while, but never below 1 m (or the unit's own range if shorter)
     // Flow state stacks add to it
@@ -3143,6 +3221,8 @@ const Engine = (() => {
           if (b.u.windUp > 0 && mv > 0) { b.setUp = false; if (b.windTarget) { b.windTarget = null; stats[b.side].windLost++; } }
           continue;
         }
+        // 2v2 artifacts (see artifactMove): an unlocked one within its awareness pulls it in (a guard after its attacker doesn't care)
+        if (arts && b.u.speed > 0 && !b.u.structure && !b.avenge && artifactMove(b, near, nd, unseen, rg)) continue;
         let blind = unseen; // walking to an enemy it can't see
         if (g.aware2 && b.engaged && near) { const gl = goalOf(b, rg); if (gl) { near = gl; nd = gap(gl, b); blind = false; } }
         if (b.avenge) { if (b.avenge.alive && !b.avenge.hidden) { near = b.avenge; nd = gap(near, b); blind = !inSight(b, near); } else b.avenge = null; } // a guard going for its attacker
@@ -3698,6 +3778,7 @@ const Engine = (() => {
         for (const x of grp) if (x.alive) { s += x.hp; mx += x.u.hp; }
         if (mx > 0) for (const x of grp) if (x.alive) x.hp = x.u.hp * s / mx;
       }
+      if (arts) artifactStep(); // 2v2 artifacts: the tick's points, from where everyone stands once it is done
       for (const sd of downNow) cripple[sd] = towerDown.secs;
       downNow.length = 0;
       for (const s of gatesNow) if (!gates[s]) { const h = homes[1 - s]; gates[s] = { x: h.x, y: h.y, side: s, t: t + dt }; }
@@ -3748,6 +3829,7 @@ const Engine = (() => {
         score: frac[0] - frac[1],
         survivors: [aliveA, aliveB], counts: [A.length, B.length],
         stats, squads, markKill: markKill.slice(), objective: obj ? obj.won : -1,
+        ...(arts ? { artifacts: artifactsNow(true) } : {}), // 2v2 artifacts: [{ x, y, r, cap, pts, rate, locked, won }] (only with opts.artifacts)
         charm, // charisma stacks after the fight, by side and squad id (null for a side without)
         converted: [0, 1].map(k => all.filter(b => b.convert && b.side === k).length), // bodies each side won over
         // each building: still standing, seconds of building done at the end (null when it was already built), whether any was done this fight
@@ -3756,7 +3838,8 @@ const Engine = (() => {
     }
 
     return { step, frame, result, bodies: all, neutrals, mines: () => mines, pools: () => pools, portals: () => portals.filter(p => t >= p.t0 && t < p.t0 + p.secs), drops: () => drops.filter(d => !d.done).map(d => ({ side: d.side, t: d.t, r: d.r, spots: d.spots, left: Math.max(0, d.t - t) })), isOver: () => over, time: () => t, lastShots: () => shots, projectiles: () => projectiles, crippled: (side, lane) => cripple[side + 2 * (lane | 0)], gates: () => gates.filter(Boolean), gateFx: () => gateFx, charm: (side, squad) => (charm[side] && charm[side][squad]) || 0,
-      objective: () => obj && { n: obj.n.slice(), lead: obj.lead, hold: obj.hold, secs: obj.secs, won: obj.won } };
+      objective: () => obj && { n: obj.n.slice(), lead: obj.lead, hold: obj.hold, secs: obj.secs, won: obj.won },
+      artifacts: () => artifactsNow(false) }; // 2v2 artifacts as they stand ([] without opts.artifacts)
   }
 
   function matrix(units, g, onProgress, instrumentation = {}) {
@@ -3800,7 +3883,7 @@ const Engine = (() => {
     return m;
   }
 
-  return { NAV, HEIGHT, SIGHT_NEAR, POISON_SLOW, DASH_SPEED, LONE_R, WATCH_IDLE, BURN, FROST_ON, EAT_R, glutUnit, TOWER_DOWN, RULES, ruleOn, STEALTH_BACK, SKILL_SLOTS, SLOTS, SKILL_TYPES, skillParam, describeSkill, applySkills, innateUnit, fairBudget, battle, makeArmy, matrix, createBattle, buildSquad, rawStrength, squadsFor, withTraits, leveled, TRAIT_DEFAULTS, SPIN_CAP, CHARGE_RUN, TRAMPLE_RUN, BLAST_RADIUS, BLEED, POISON_HEAL, RAM_REACH, ROLL_START, ROLL_PAST, BUILD_GAP, BUILD_COOP, SITE_REACH, MINE_TRIGGER, REPAIR_SECS, LEVEL_BONUS, levelHpK, MAX_LEVEL, CHARM_MAX, CONVERT_HP, CONVERT_SQUAD };
+  return { NAV, HEIGHT, SIGHT_NEAR, POISON_SLOW, DASH_SPEED, LONE_R, WATCH_IDLE, BURN, FROST_ON, EAT_R, glutUnit, TOWER_DOWN, ARTIFACT, RULES, ruleOn, STEALTH_BACK, SKILL_SLOTS, SLOTS, SKILL_TYPES, skillParam, describeSkill, applySkills, innateUnit, fairBudget, battle, makeArmy, matrix, createBattle, buildSquad, rawStrength, squadsFor, withTraits, leveled, TRAIT_DEFAULTS, SPIN_CAP, CHARGE_RUN, TRAMPLE_RUN, BLAST_RADIUS, BLEED, POISON_HEAL, RAM_REACH, ROLL_START, ROLL_PAST, BUILD_GAP, BUILD_COOP, SITE_REACH, MINE_TRIGGER, REPAIR_SECS, LEVEL_BONUS, levelHpK, MAX_LEVEL, CHARM_MAX, CONVERT_HP, CONVERT_SQUAD };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
 

@@ -223,7 +223,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
   atlas.colorSpace = THREE.SRGBColorSpace; atlas.generateMipmaps = false; atlas.minFilter = THREE.LinearFilter;
   const sprMat = new THREE.ShaderMaterial({
     uniforms: { atlas: { value: atlas } },
-    transparent: true, depthWrite: false,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, // (a ground arc drawn mirrored, the 2v2 artifact meter, faces down)
     vertexShader: `
       attribute vec3 aPos; attribute vec2 aSize; attribute vec4 aCol; attribute vec4 aP; attribute float aMode;
       varying vec2 vUv; varying vec4 vCol; varying vec4 vP; varying float vMode;
@@ -303,6 +303,10 @@ const Render3D = (THREE, el, view, opts = {}) => {
     plus: (g) => { // ready to level up: a gold badge with a plus
       g.fillStyle = css('--gold'); g.beginPath(); g.arc(32, 32, 28, 0, Math.PI * 2); g.fill();
       g.strokeStyle = css('--bg'); g.lineWidth = 8; g.beginPath(); g.moveTo(16, 32); g.lineTo(48, 32); g.moveTo(32, 16); g.lineTo(32, 48); g.stroke(); },
+    lock: (g) => { // a locked 2v2 artifact: a padlock
+      g.strokeStyle = '#fff'; g.fillStyle = '#fff'; g.lineWidth = 7;
+      g.beginPath(); g.arc(32, 26, 12, Math.PI, 0); g.lineTo(44, 32); g.moveTo(20, 32); g.lineTo(20, 26); g.stroke();
+      g.fillRect(12, 30, 40, 28); g.fillStyle = 'rgba(8,12,14,0.9)'; g.fillRect(29, 38, 6, 12); },
     hat: (g) => { // the Gentleman's top hat
       g.fillStyle = '#16161C'; g.strokeStyle = '#EDEFF2'; g.lineWidth = 2.5;
       g.beginPath(); g.rect(4, 44, 56, 8); g.rect(16, 6, 32, 40); g.fill(); g.stroke();
@@ -449,6 +453,51 @@ const Render3D = (THREE, el, view, opts = {}) => {
       spire(w.x, w.y, sd, Art.teamCol(sd, v.me), arms(sd), 0.85);
     }
   }
+  // ---------- 2v2 artifacts (docs/MPB-2V2.md), as on the 2D board ----------
+  // While deploying from the board state (m.artifacts = { round, list: [{ col, row, card }] }, in the round they stand
+  // in), in a fight from the battle (bt.artifacts(): [{ x, y, r, cap, pts, rate, locked, won }]): a glowing orb floating
+  // over its spot (part of the scene), a dashed ring as wide as its circle and, in a fight, a round meter on the ground
+  // round the orb: your team's bar (--you) climbs the left half from the bottom, theirs (--foe) the right half, both
+  // to the top at the cap. Locked: the ring and meter in the winner's colour (white for nobody) and a lock over the orb.
+  const ART_COL = '#CDB8FF';
+  const orbGeo = new THREE.IcosahedronGeometry(0.9, 1), haloGeo = new THREE.SphereGeometry(1.7, 16, 12);
+  const orbMat = new THREE.MeshBasicMaterial({ toneMapped: false });
+  const haloMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  const orbs = []; // [x, z, colour] this frame
+  function addArtifacts(v, f) {
+    const { m, me, bt, phase } = v;
+    let list = [];
+    if (bt && bt.artifacts && (phase === 'battle' || phase === 'result' || phase === 'end')) list = bt.artifacts();
+    else if (m && m.artifacts && m.artifacts.round === m.round && Array.isArray(m.artifacts.list)) {
+      const r = typeof Engine !== 'undefined' && Engine.ARTIFACT ? Engine.ARTIFACT.r : 9;
+      list = m.artifacts.list.map(q => { const w = Game.tileToWorld(q.col, q.row); return { x: w.x, y: w.y, r, pts: null, locked: false, won: -1 }; });
+    }
+    for (const a of list) {
+      const [wx, wz] = world(f, a.x, a.y), col = a.locked ? (a.won >= 0 ? teamColor(a.won, me) : color('#F4F1E6')) : color(ART_COL);
+      arc(wx, wz, a.r, col, a.locked ? 0.9 : 0.75, 1, 0.022, a.locked ? 0 : 40);
+      disc(wx, wz, a.r, col, 0.07);
+      scene_(() => disc(wx, wz, 2.8, col, 0.5, 1));
+      orbs.push([wx, wz, col]);
+      if (!a.pts) continue;
+      const R = 3.6, th = 0.24, share = (sd) => Math.max(0, Math.min(1, a.pts[sd] / a.cap));
+      arc(wx, wz, R, color('#0B0F11'), 0.75, 1, th, 0, 0, 0.065);
+      if (a.locked) { arc(wx, wz, R, col, 1, 1, th); icon('lock', wx, 5.4, wz, 1.6, col); continue; }
+      // a ground arc starts at the top of the screen and runs clockwise; drawn mirrored (negative sizes) it starts at the bottom
+      if (share(me) > 0) spr(MODE.arc, wx, 0.07, wz, -2 * R, -2 * R, teamColor(me, me), 1, share(me) * 0.5, th, 0, 0);
+      if (share(1 - me) > 0) spr(MODE.arc, wx, 0.07, wz, 2 * R, -2 * R, teamColor(1 - me, me), 1, share(1 - me) * 0.5, th, 0, 0);
+    }
+  }
+  function drawOrbs() {
+    const core = group('artOrb', orbGeo, orbMat, orbs.length), halo = group('artHalo', haloGeo, haloMat, orbs.length);
+    orbs.forEach(([x, z, c], i) => {
+      tmpP.set(x, 2.3 + Math.sin(clock * 2 + x) * 0.25 + groundY(x, z), z); tmpQ.setFromAxisAngle(up, clock * 0.8); tmpS.setScalar(1 + 0.06 * Math.sin(clock * 3 + z));
+      tmpM.compose(tmpP, tmpQ, tmpS);
+      core.setMatrixAt(i, tmpM); core.setColorAt(i, tmpC.copy(c).lerp(white, 0.55));
+      halo.setMatrixAt(i, tmpM); halo.setColorAt(i, c);
+    });
+    finish(core, orbs.length); finish(halo, orbs.length);
+    orbs.length = 0;
+  }
   let squadTiles = new Set(); // 'col,row' of the squads drawn while deploying (model columns / rows), for pick()
   let models_ = []; // the squad models drawn while deploying, for pick(): [x, z, radius, height, col, row] (world metres)
   function collectBattle(v, dt, f) {
@@ -502,6 +551,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
       const [wx, wz] = world(f, fx.x, fx.y);
       scene_(() => { arc(wx, wz, 0.8 + age * 4, color('#B9A8FF'), 1 - age / 0.6, 1, 0.2, 10); });
     }
+    addArtifacts(v, f); // 2v2: the artifacts and their meters
     // Drop paratroopers (sniper tower): until they land, a shadow on each landing spot that darkens as they come,
     // ringed in the dropping side's colour as wide as the landing hit
     for (const d of bt.drops ? bt.drops() : []) {
@@ -674,6 +724,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
       const wb = (m.altar || []).find(b => b.side === side && b.type === 'walls' && b.round === m.round);
       if (wb && Game.altarShown(m, me, deploying, wb) && m.towers && m.towers[side]) { const w = Game.tileToWorld(m.towers[side].col, m.towers[side].row); addWalls(f, w.x, w.y, [1, 1, 1, 1].map(() => Game.ICE.wallHits)); }
     }
+    addArtifacts(v, f); // 2v2: this round's artifacts
   }
 
   // markers on a battle body: health, wind-up, flank wait, statuses, charisma, level, mushroom and Zoe buffs
@@ -970,7 +1021,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
     placeBodies(v, dt);
     drawFx(v);
     if (v.hoverTile && cam.handsOn() && !(v.selected !== null || v.moving != null)) { const s = screenTile(v.me, v.hoverTile.col, v.hoverTile.row); tileSq(s.col, s.row, color(css('--you') || '#5CC6DF'), 0.35, 1, 0, 0.03); }
-    drawBeams(); drawWalls(); drawStones();
+    drawBeams(); drawWalls(); drawStones(); drawOrbs();
     for (const g of Object.values(groups)) if (!used.has(g)) g.count = 0;
     sprGeo.instanceCount = ns;
     for (const a of Object.values(sprAttr)) { a.clearUpdateRanges(); a.addUpdateRange(0, ns * a.itemSize); a.needsUpdate = true; }

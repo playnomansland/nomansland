@@ -330,6 +330,62 @@ const Render2D = (cv, view, opts = {}) => {
     }
     ctx.globalAlpha = 1;
   }
+  // ---------- 2v2 artifacts (docs/MPB-2V2.md) ----------
+  // While deploying, from the board state: m.artifacts = { round, list: [{ id, col, row, card }] } in the round they stand
+  // in. In a fight, from the battle: bt.artifacts() = [{ x, y, r, cap, pts: [a, b], rate, locked, won }] (Engine
+  // opts.artifacts). Each: a glowing orb on its spot and a dashed ring as wide as its circle; in a fight a round meter
+  // round the orb: your team's bar (--you, blue) climbs the left half from the bottom, theirs (--foe, red) the right
+  // half, each to the top at the cap (both phones see their own team in blue, as for everything else on the board);
+  // locked: the ring and meter in the winner's colour (white for nobody) and a small lock over the orb.
+  const ART_COL = '#CDB8FF';
+  const artR = () => (typeof Engine !== 'undefined' && Engine.ARTIFACT ? Engine.ARTIFACT.r : 9);
+  function artifactsShown() {
+    if (bt && bt.artifacts && (phase === 'battle' || phase === 'result' || phase === 'end')) return bt.artifacts();
+    const a = m && m.artifacts;
+    if (!a || a.round !== m.round || !Array.isArray(a.list)) return [];
+    return a.list.map(q => { const w = Game.tileToWorld(q.col, q.row); return { x: w.x, y: w.y, r: artR(), cap: 0, pts: null, locked: false, won: -1 }; });
+  }
+  function drawArtifacts() {
+    const t = tilePx(), now = (typeof performance !== 'undefined' ? performance.now() : 0) / 1000;
+    for (const a of artifactsShown()) {
+      const x = PX(a.x), y = PY(a.y), col = a.locked ? (a.won >= 0 ? teamCol(a.won) : '#F4F1E6') : ART_COL;
+      ctx.strokeStyle = col; ctx.globalAlpha = a.locked ? 0.7 : 0.55; ctx.lineWidth = Math.max(1.5, t * 0.04);
+      if (!a.locked) ctx.setLineDash([t * 0.18, t * 0.12]);
+      ctx.beginPath(); ctx.arc(x, y, a.r * S, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = col; ctx.globalAlpha = 0.06; ctx.fill();
+      // the orb: a soft halo and a bright core
+      const pr = t * 0.26 * (1 + 0.06 * Math.sin(now * 3 + a.x));
+      const grd = ctx.createRadialGradient(x, y, 0, x, y, pr * 2.2);
+      grd.addColorStop(0, 'rgba(255,255,255,0.95)'); grd.addColorStop(0.35, col); grd.addColorStop(1, 'rgba(205,184,255,0)');
+      ctx.globalAlpha = a.locked ? 0.6 : 0.95; ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(x, y, pr * 2.2, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(x, y, pr * 0.45, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function artifactMeters() {
+    const t = tilePx(), R = t * 0.42, lw = Math.max(3, t * 0.09);
+    for (const a of artifactsShown()) {
+      if (!a.pts) continue;
+      const x = PX(a.x), y = PY(a.y), share = (sd) => Math.max(0, Math.min(1, a.pts[sd] / a.cap)), B = Math.PI / 2;
+      ctx.lineWidth = lw; ctx.lineCap = 'butt';
+      ctx.strokeStyle = 'rgba(8,12,14,0.75)'; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke();
+      if (a.locked) { ctx.strokeStyle = a.won >= 0 ? teamCol(a.won) : '#F4F1E6'; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke(); }
+      else {
+        const mine = share(me), theirs = share(foe());
+        if (mine > 0) { ctx.strokeStyle = teamCol(me); ctx.beginPath(); ctx.arc(x, y, R, B, B + mine * Math.PI); ctx.stroke(); } // up the left from the bottom
+        if (theirs > 0) { ctx.strokeStyle = teamCol(foe()); ctx.beginPath(); ctx.arc(x, y, R, B - theirs * Math.PI, B); ctx.stroke(); } // up the right
+        ctx.strokeStyle = 'rgba(244,241,230,0.8)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y - R - lw * 0.7); ctx.lineTo(x, y - R + lw * 0.7); ctx.stroke(); // the cap, at the top
+      }
+      if (a.locked) { // a small padlock over the orb
+        const s = Math.max(5, t * 0.13), lx = x, ly = y - R - s * 1.2;
+        ctx.fillStyle = a.won >= 0 ? teamCol(a.won) : '#F4F1E6'; ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(1.5, s * 0.28);
+        ctx.beginPath(); ctx.arc(lx, ly - s * 0.25, s * 0.5, Math.PI, 0); ctx.stroke();
+        ctx.fillRect(lx - s * 0.75, ly - s * 0.25, s * 1.5, s * 1.1);
+        ctx.fillStyle = 'rgba(8,12,14,0.85)'; ctx.fillRect(lx - s * 0.1, ly + s * 0.1, s * 0.2, s * 0.4);
+      }
+    }
+  }
   const ICE_COL = '#BFE3F5';
   // the storm band (a faint frost) and this round's hail tiles (animated during the fight)
   function drawStorm(v) {
@@ -991,6 +1047,7 @@ const Render2D = (cv, view, opts = {}) => {
 
   function drawDeploy() {
     drawBoard();
+    drawArtifacts(); // 2v2: this round's artifacts (under the squads)
     const t = tilePx();
     if (placingBuilding && editable) { // where the building may go: any free tile of your zone
       ctx.strokeStyle = css('--gold'); ctx.globalAlpha = 0.6; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
@@ -1158,6 +1215,7 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.beginPath(); ctx.arc(PX(fx.x), PY(fx.y), tilePx() * (0.2 + age), 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     }
+    drawArtifacts(); // 2v2: the artifacts (their meters go over the bodies, below)
     // Drop paratroopers (sniper tower): until they land, a shadow on each landing spot that darkens as they come,
     // inside a dashed ring in the dropping side's colour as wide as the landing hit
     for (const d of bt.drops ? bt.drops() : []) {
@@ -1387,6 +1445,7 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.fillStyle = teamCol(p.owner.side);
       ctx.fillRect(x - 2.5, y - 2.5, 5, 5);
     }
+    artifactMeters(); // 2v2: each artifact's points
     // a fallen tower cripples its army for a few seconds
     // (a 2v2 fight: per board, bt.crippled(side, lane); the longest of the two shows)
     const cripOf = (sd) => Math.max(bt.crippled(sd, 0), bt.crippled(sd, 1) || 0);

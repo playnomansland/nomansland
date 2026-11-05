@@ -1986,6 +1986,7 @@ const Game = (() => {
       if (MPB && m.mpb) u = MPB.squadMods(m, side, sq, u); // 2v2 buildings (src/mpb.js hooks.squadMods)
       const b = E.buildSquad(u, side, w.x, w.y, sq.id, TILE, idx, sq.level);
       if (u.glut) for (const x of b) x.glutN = glutOf(sq); // Glut it has eaten (already in its stats): it eats on from there
+      const tier = tierOf(m.units, sq.unit); for (const x of b) x.tier = tier; // what the squad holds a 2v2 artifact for (Engine opts.artifacts; nothing else reads it)
       if (aura) for (const x of b) x.aura = true;
       const dis = isDev(m) && m.units[sq.unit].disguise ? m.units.find(x => x.name === m.units[sq.unit].disguise) : null; // devtest: a disguise, until its first attack
       if (dis) { const mask = { name: dis.name, shape: dis.shape, color: dis.color, bodies: dis.bodies, range: dis.range }; for (const x of b) x.mask = mask; }

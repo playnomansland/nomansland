@@ -16,3 +16,4 @@ tools/exploit/runs/**/*.json
 !tools/exploit/runs/**/bot-check.json
 tools/exploit/runs/**/*.jsonl
 tools/exploit/runs/**/*.log
+.claude/worktrees/
