@@ -108,6 +108,7 @@ check('placement: interior, spacing, MPB tiles taken for both teams', () => {
   const t = ok[0];
   for (const R of x.D.lanes) Mpb.addRec(R.m, 0, 'oak', t.col, t.row);
   for (const L of [0, 1]) for (const sd of [0, 1]) { assert.ok(Game.mpbAt(x.m(L), t.col, t.row)); assert.ok(Game.occupied(x.m(L), sd, t.col, t.row), 'taken for side ' + sd); assert.ok(!Game.spotFree(x.m(L), sd, t.col, t.row, 0)); }
+  if (Game.nearBldg) for (const sd of [0, 1]) assert.ok(Game.nearBldg(m, sd, t.col + 1, t.row + 1) && Game.nearBldg(m, sd, t.col, t.row), 'next to a building for the Assassin (Game.mpbAt in nearBldg), side ' + sd);
   const ui = Object.keys(m.unlocks[0]).map(Number)[0];
   m.gold[0] += 1000;
   assert.ok(!x.act(0, 'place', ui, t.col, t.row).ok, 'A1 can\'t place on it');
