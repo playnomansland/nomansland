@@ -2672,7 +2672,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     if (!can) hint = mode === 'claude' && claude.fightWaiting ? 'Waiting for Claude.' : timeUp ? 'Time’s up.' : 'You’re ready.';
     else {
       hint = selected !== null
-        ? (canBuy(selected) ? `Tap a tile in your zone${Game.flankOpen(m) ? ' or a flank tile in theirs' : ''} to place ${esc(units[selected].name)}.` : Game.capFull(m, me, selected) ? `${Game.LATE.cap} squads of ${esc(units[selected].name)} is the most you can have.` : left <= 0 ? 'No deployments left this round.' : `Not enough gold for ${esc(units[selected].name)}.`)
+        ? (canBuy(selected) ? `Tap a tile in your zone${Game.flankOpen(m) ? ' or a flank tile in theirs' : ''} to place ${esc(units[selected].name)}.` : Game.capFull(m, me, selected) ? `${Game.LATE.cap} squads of ${esc(units[selected].name)} is the most you can have.` : Game.mpbLocked(m, me, selected) ? `Sabotaged by their Shadow Den: no ${esc(units[selected].name)} can be deployed this round.` : Game.deploysLeft(m, me, selected) <= 0 ? 'No deployments left this round.' : `Not enough gold for ${esc(units[selected].name)}.`)
         : (fresh ? 'Drag a squad to move it.' : 'Pick a unit, then tap a tile in your zone.');
       if (left <= 0 && selected === null) hint = Game.deployBuyable(m, me) ? `No deployments left. +1 costs ${Game.deployCost(m, me)}.` : 'No deployments left.';
       if (readyN && selected === null) hint = `${readyN} squad${readyN === 1 ? '' : 's'} ready to level up.`;
