@@ -5833,8 +5833,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (Game.hailRound(m) && selected === null && freeTile && Game.hailTiles(m).some(h => h.col === t.col && h.row === t.row)) { openMapSheet(); return; }
     if ((shroomShown(m, t.col, t.row) || myRemovalNow(t.col, t.row)) && selected === null && !Game.occupied(m, me, t.col, t.row) && !Game.foeSeen(m, foe()).some(s => { const p = Game.seenAt(m, s); return p.col === t.col && p.row === t.row; })) { openMapSheet(t); return; }
     const own = Game.squadAt(m, me, t.col, t.row);
-    // a unit selected in the shop goes inside your horse (or other carrier) with room
-    if (own && selected !== null && editable() && Game.boardable(m, me, t.col, t.row, selected)) {
+    // a unit selected in the shop goes inside your horse (or other carrier) with room; in 2v2 your teammate's too
+    if ((own || (duoOn() && Game.mateAt(m, me, t.col, t.row))) && selected !== null && editable() && Game.boardable(m, me, t.col, t.row, selected)) {
       if (Game.place(m, me, selected, t.col, t.row)) {
         if (!Game.freeLeft(m, me).includes(selected) && (m.gold[me] < Game.shopCost(m, me, selected) || Game.deploysLeft(m, me) <= 0)) selected = null;
         changed();
@@ -5843,8 +5843,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     }
     if (own) {
       rangeOf = { side: me, id: own.id };
-      if (Game.riderOf(m, me, own)) openPairSheet(own, Game.riderOf(m, me, own));
-      else openSheet(own.unit, own, me); // one placed this round is taken back with the X on its top right corner
+      openSheet(own.unit, own, me); // one placed this round is taken back with the X on its top right corner; with a rider of yours inside: both side by side (openPairSheet)
       return;
     }
     if (duoTapSquad(t)) return; // 2v2: your teammate's squad (read only), or the other opponent's
@@ -6916,14 +6915,14 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const ro = !!(opt && opt.ro), who = sq && m && duoOn() ? ownerOf(sq, owner) : null; // 2v2: whose squad it is
     if (sq && m && owner === me && !ro) {
       const c = Game.isRider(sq) ? Game.carrierOf(m, me, sq) : sq, r = c && Game.riderOf(m, me, c);
-      if (c && r) { openPairSheet(c, r); return; }
+      if (c && r && m.armies[me].includes(c) && m.armies[me].includes(r)) { openPairSheet(c, r); return; } // 2v2: a ride across the team gets a line instead (duoRideNote)
     }
     const p = sheetPane(i, sq, side);
     const zq = sq && m && (owner === me ? sq : charVisible(owner) ? Game.seenAt(m, sq) : null); // Zoe: the squad stands on a buff tile
     const zoeNote = zq && phase === 'deploy' && Game.onBuffTile(m, owner, zq.col, zq.row) ? `<p class="hint" style="margin:0;color:var(--gold)">★ On a buff tile. ${esc(zoeText(owner))}</p>` : '';
     $('sheet').innerHTML = `
       <div class="bar"><h3 id="sheet-h"><span style="color:${p.u.color}">${Shapes.svg(p.u.shape, 18)}</span> ${esc(p.u.name)}</h3><button class="btn small" id="close">Close</button></div>
-      ${ownerLine(who)}${ro && sq.aim && Game.canAim(m, me, sq) ? `<p class="hint" style="margin:0"><b style="color:${who ? who.ring.col : 'var(--you)'}">Direction:</b> an arrow ${Math.round(Math.hypot(sq.aim.dc, sq.aim.dr) * 10) / 10} tiles long (dashed on the board). It walks it first, then fights as usual.</p>` : ''}${zoeNote}${p.html}`;
+      ${ownerLine(who)}${sq && m && owner === me && !ro ? duoRideNote(sq) : ''}${ro && sq.aim && Game.canAim(m, me, sq) ? `<p class="hint" style="margin:0"><b style="color:${who ? who.ring.col : 'var(--you)'}">Direction:</b> an arrow ${Math.round(Math.hypot(sq.aim.dc, sq.aim.dr) * 10) / 10} tiles long (dashed on the board). It walks it first, then fights as usual.</p>` : ''}${zoeNote}${p.html}`;
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', closeSheet);
     if (!ro) bindPane($('sheet'), i, sq, side, () => openSheet(i, sq, side, opt));
@@ -8715,7 +8714,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const at = (q) => Game.blockOf(m, q.unit, q.col, q.row).some(([c, r]) => c === t.col && r === t.row);
     const deploy = phase === 'deploy';
     const mate = Game.teamArmy(m, me).find(q => !Game.isRider(q) && at(q));
-    if (mate) { openSheet(mate.unit, mate, me, { ro: true }); return true; }
+    if (mate) { openSheet(mate.unit, mate, me, { ro: true }); duoRideSheet(mate); return true; }
     const foe2 = (deploy ? Game.teamSeen(m, foe()) : Game.teamArmy(m, foe())).find(q => at(deploy ? { ...q, ...Game.seenAt(m, q) } : q));
     if (foe2) { const look = Game.shownUnit(m, me, foe(), foe2.unit); openSheet(look, { ...foe2, unit: look }, foe(), { other: true }); return true; }
     if (deploy) return false;
@@ -8724,6 +8723,32 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const foe1 = m.armies[foe()].find(q => !Game.isRider(q) && !Game.hiddenFromFoe(m, q) && at(q));
     if (foe1) { const look = Game.shownUnit(m, me, foe(), foe1.unit); openSheet(look, { ...foe1, unit: look }, foe()); return true; }
     return false;
+  }
+  // ----- riding in each other's carriers (docs/HANDOFF-DUO-HORSE.md) -----
+  // A squad can ride in the teammate's horse (Game.mateRide): it stays yours, the horse stays theirs. If they move the
+  // horse it goes along; if they sell it, it steps out on the tile.
+  // the line on your own squad's sheet when the ride is across the team: your squad in their horse, or theirs in yours
+  function duoRideNote(sq) {
+    if (!duoOn() || !sq || !m) return '';
+    const c = Game.isRider(sq) ? Game.carrierOf(m, me, sq) : sq, r = c && Game.riderOf(m, me, c);
+    if (!c || !r) return '';
+    const cMine = m.armies[me].includes(c), rMine = m.armies[me].includes(r);
+    if (cMine === rMine) return '';
+    const o = ownerOf(cMine ? r : c, me), mate = o ? esc(o.name) : 'Your teammate', col = o ? o.ring.col : 'var(--you)';
+    return rMine
+      ? `<p class="hint ride-note" style="margin:0"><b style="color:${col}">Riding in ${mate}’s ${esc(units[c.unit].name)}.</b> Your opponents can’t see it. It jumps out where the ${esc(units[c.unit].name)} is destroyed. If ${mate} moves it, your squad goes along; if they sell it, your squad steps out on its tile.</p>`
+      : `<p class="hint ride-note" style="margin:0"><b style="color:${col}">Carries ${mate}’s ${esc(units[r.unit].name)}.</b> It stays theirs. If you move this squad it goes along; if you sell it, theirs steps out on the tile.</p>`;
+  }
+  // the teammate's carrier's sheet (read only): what rides inside, and Step out for a squad of yours
+  function duoRideSheet(c) {
+    const r = m && Game.riderOf(m, me, c), bar = $('sheet') && $('sheet').querySelector('.bar');
+    if (!r || !bar) return;
+    const mine = m.armies[me].includes(r), o = ownerOf(c, me), mate = o ? esc(o.name) : 'your teammate';
+    const canOut = mine && phase === 'deploy' && editable() && (r.round === m.round || Game.freeOut(m, me, r));
+    bar.insertAdjacentHTML('afterend', mine
+      ? `<div class="bar ride-note"><span class="hint" style="margin:0"><b style="color:var(--you)">Carries your ${esc(units[r.unit].name)}.</b> It jumps out where the ${esc(units[c.unit].name)} is destroyed.</span>${canOut ? '<button class="btn small" id="ride-out">Step out · free</button>' : ''}</div>`
+      : `<p class="hint ride-note" style="margin:0">Carries ${mate}’s ${esc(units[r.unit].name)}.</p>`);
+    if ($('ride-out')) $('ride-out').addEventListener('click', () => { if (!editable()) return; closeSheet(); moveMode = true; moving = r.id; selected = null; changed(); });
   }
   // ----- team talk: pings and quick lines (to the team only) -----
   const PING_MS = 3000, PING_SYM = { '?': '?', '!': '!', go: '⚔' }, PING_NAME = { '?': 'Question', '!': 'Look here', go: 'Attack here' };

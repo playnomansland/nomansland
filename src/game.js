@@ -1077,6 +1077,12 @@ const Game = (() => {
   // army (it levels, sells and counts like any other) with `in` = the carrier's squad id, on the carrier's tile.
   // The opponent never sees it on the board; in a fight it stays inside until the carrier dies (see Engine).
   const isRider = (sq) => !!sq && sq.in != null;
+  // 2v2: a squad can ride in its teammate's carrier too (the teammate's lane is another match: m.team). Its `in` is
+  // then the carrier's id as m.team carries it (moved by TEAM_ID, as Duo.OFF), and in m.team a teammate's rider in one
+  // of your carriers has `in` = your carrier's own id (Duo.teamOf flips the link back), so the lookups below find the
+  // carrier and the rider in either army.
+  const TEAM_ID = 1000000; // = Duo.OFF
+  const mateRide = (sq) => isRider(sq) && sq.in >= TEAM_ID;
   // what the opponent can't see on the board: riders, and a squad that stepped out of a carrier this round (it is
   // still inside as far as they know)
   // (outRound: it stepped out of a carrier sold this round, so the opponent still thinks it rides inside)
@@ -1091,17 +1097,31 @@ const Game = (() => {
   // the squads of side as the other side sees them while deploying: those from earlier rounds, those sold this round too
   const foeSeen = (m, side) => m.armies[side].filter(s => s.round < m.round && !hiddenFromFoe(m, s)).concat(soldNow(m, side).filter(s => !hiddenFromFoe(m, s)));
   const isCarrier = (m, ui) => !!(m && m.units[ui] && m.units[ui].carrier);
-  const riderOf = (m, side, sq) => sq ? m.armies[side].find(s => s.in === sq.id) || null : null;
-  const carrierOf = (m, side, sq) => isRider(sq) ? m.armies[side].find(s => s.id === sq.in) || null : null;
+  // the rider in carrier sq (yours or, in 2v2, your teammate's: either may sit in either's carrier)
+  const riderOf = (m, side, sq) => sq ? m.armies[side].find(s => s.in === sq.id) || teamArmy(m, side).find(s => s.in === sq.id) || null : null;
+  const carrierOf = (m, side, sq) => isRider(sq) ? m.armies[side].find(s => s.id === sq.in) || teamArmy(m, side).find(s => s.id === sq.in) || null : null;
   // the squad standing on a tile (a carrier, never its rider)
   const squadAt = (m, side, col, row) => m.armies[side].find(s => !isRider(s) && covers(m, s, col, row)) || null;
-  // the carrier on a tile that has room for a squad of unit ui
+  // the teammate's squad standing on a tile (2v2)
+  const mateAt = (m, side, col, row) => teamArmy(m, side).find(s => !isRider(s) && covers(m, s, col, row)) || null;
+  // the carrier on a tile that has room for a squad of unit ui: your own, or (2v2) your teammate's
   function boardable(m, side, col, row, ui) {
-    const c = squadAt(m, side, col, row);
+    const c = squadAt(m, side, col, row) || mateAt(m, side, col, row);
     return c && isCarrier(m, c.unit) && !isCarrier(m, ui) && !(m.units[ui] && m.units[ui].building) && !riderOf(m, side, c) ? c : null;
   }
-  // riders follow their carrier's tile
-  const syncRiders = (m, side) => { for (const s of m.armies[side]) if (isRider(s)) { const c = carrierOf(m, side, s); if (c) { s.col = c.col; s.row = c.row; } else delete s.in; } };
+  // riders follow their carrier's tile. A carrier that is gone leaves its rider standing on the tile; in 2v2 a
+  // teammate's carrier sold or taken back (it is no longer in m.team) does too, and the opponents go on thinking it
+  // rides inside this round (outRound, as when you sell your own). Without m.team (a fight's snapshot) a ride in the
+  // teammate's carrier is kept as it is.
+  const syncRiders = (m, side) => {
+    for (const s of m.armies[side]) {
+      if (!isRider(s)) continue;
+      const c = carrierOf(m, side, s);
+      if (c) { s.col = c.col; s.row = c.row; continue; }
+      if (mateRide(s)) { if (!(m.team && m.team.armies)) continue; s.outRound = m.round; }
+      delete s.in;
+    }
+  };
   // XOFF: metres added to every tile's x (0 except while a 2v2 lane builds its bodies beside the other lane: see withXOff)
   let XOFF = 0;
   const tileToWorld = (col, row) => ({ x: (col - (COLS - 1) / 2) * TILE + XOFF, y: ((ROWS - 1) / 2 - row) * TILE });
@@ -1796,7 +1816,10 @@ const Game = (() => {
   // m.horse[side][carrier id] = { r: round, in: squad id, out: squad id }. A squad that goes back to where it was
   // gives its places back.
   const horseUse = (m, side, cid) => { const h = m.horse && m.horse[side] && m.horse[side][cid]; return h && h.r === m.round ? h : null; };
-  const horseOk = (m, side, cid, way, sqId) => { const h = horseUse(m, side, cid); return !h || h[way] == null || h[way] === sqId; };
+  // 2v2: the other lane's use of the same carrier (m.team.horse, keyed by its id as this lane sees it) counts too, so a
+  // carrier's one in and one out per round are the team's, whoever's squad it is
+  const mateHorse = (m, side, cid) => { const h = m && m.team && m.team.horse && m.team.horse[side] && m.team.horse[side][cid]; return h && h.r === m.round ? h : null; };
+  const horseOk = (m, side, cid, way, sqId) => { const h = horseUse(m, side, cid), t = mateHorse(m, side, cid); return (!h || h[way] == null || h[way] === sqId) && !(t && t[way] != null); };
   const horseLeft = (m, side, cid) => ['in', 'out'].filter(w => horseOk(m, side, cid, w, -1)); // what a carrier has left this round
   function horseNote(m, side, cid, way, sqId) {
     if (!m.horse) m.horse = [{}, {}];
@@ -1851,7 +1874,7 @@ const Game = (() => {
     const id = movedId(m, side);
     const sq = id != null && m.armies[side].find(s => s.id === id);
     if (!sq || !sq.from) return false;
-    const back = sq.from.in != null ? m.armies[side].find(s => s.id === sq.from.in) : null;
+    const back = sq.from.in != null ? m.armies[side].find(s => s.id === sq.from.in) || teamArmy(m, side).find(s => s.id === sq.from.in) || null : null;
     if (sq.from.in != null ? !(back && back.col === sq.from.col && back.row === sq.from.row && (sq.in === back.id || !riderOf(m, side, back)))
       : (sq.col !== sq.from.col || sq.row !== sq.from.row) && occupied(m, side, sq.from.col, sq.from.row)) return false;
     sq.col = sq.from.col; sq.row = sq.from.row;
@@ -3348,7 +3371,7 @@ const Game = (() => {
     setBuildings, BUILDINGS: () => BUILDINGS, buildingInfo, BUILDING_SQUAD, isBuildingSkill, buildingIdOf, buildingsOf, buildingOf, buildingAt, buildingShown, buildingSpotOk,
     canBuyBuilding, buyBuilding, buildingSkills, buildingSkillInfo, bskillOf, bskillCost, canBuyBuildingSkill, buyBuildingSkill, undoBuildingSkill,
     buildingXpNeeded, buildingLevelCost, buildingReady, levelBuilding, undoLevelBuilding, constructBuff, buildingBodies, canBuySkill, buySkill, undoSkill, sellValue, sell,
-    isRider, freeOut, horseUse, horseOk, horseLeft, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
+    isRider, TEAM_ID, mateRide, mateAt, syncRiders, freeOut, horseUse, horseOk, horseLeft, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
     TOWER, TOWER_TYPES, OUTPOST, TOWER_PICK_ROUND, towerType, towerChoices, needsTowerPick, setTowerType, settleTowerPicks, TOWER_SKILL, towerSkillOf, towerSkillVisible, towerPicked, canBuyTowerSkill, buyTowerSkill, undoTowerSkill, towerSkillCost, towerSkill2Of, towerSkill2Visible, towerSkill2Cost, canBuyTowerSkill2, buyTowerSkill2, undoTowerSkill2, towerSkill2On, PARA, paraDropOf, MOAT, BWALL, BWALL_SQ, EDGES, bwallsOf, bwallOn, edgeOf, bwallWorld, bwallsLeft, bwallShown, bwallSpotOk, placeBwall, unplaceBwall, ensureBwalls, bwallUnit, INVEST, MAGE_GENERALS, mageGenPrice, MAGE, mageGenInfo, mageGenOf, mageTpOf, mageTpRound, mageTpNew, isExtraGen, mageGenCost, canBuyMageGen, buyMageGen, undoMageGen, mageTowerUnit, generalUnit, LOAN, loanNow, investNow, bankBusy, investNow, bankBusy, canTakeLoan, takeLoan, undoLoan, towerRounds, troundInfo, troundOn, troundCost, canBuyTround, buyTround, undoTround, SLIME_UNITS, slimeTowerUnit, slimeSkillDefs, TOWER_MID, towerColOk, towerAt, needsTower, placeTower, ensureTower,
     FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, isOff, enemyHolds, inNoMans, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
     STANDARD_PACK, ICE, ALTAR, GOLEM, isIce, hailRound, altarRound, stormShift, stormRows, hailTiles, altarCost, altarRefund, altarCount, pushRoom, altarBought, addAltar, buyAltar, undoAltar, snowgres, snowgreUnit,

@@ -50,7 +50,10 @@
   const unmap = (id) => id >= OFF ? id - OFF : id <= -OFF ? id + OFF : id;
 
   // ----- the other lane on this lane's board (m.team) -----
-  const moved = (q) => { const o = { ...q, id: move(q.id) }; if (q.in != null) o.in = move(q.in); if (q.from && q.from.in != null) o.from = { ...q.from, in: move(q.from.in) }; return o; };
+  // a carrier link (sq.in) seen from the other lane: a carrier in that lane is moved by OFF, and a ride in this lane's
+  // teammate's carrier (already moved) points back at this lane's own id (2v2 rides, see Game.mateRide)
+  const flip = (id) => typeof id !== 'number' ? id : id >= OFF ? id - OFF : move(id);
+  const moved = (q) => { const o = { ...q, id: move(q.id) }; if (q.in != null) o.in = flip(q.in); if (q.from && q.from.in != null) o.from = { ...q.from, in: flip(q.from.in) }; return o; };
   // the squads of match o (the other lane) as m.team carries them; half: the half of the board this lane's players use.
   // buildings: the other lane's buildings from skills (the Cog Builder's Factory: { id, col, row, round, built }), so
   // their tiles are taken in this lane too (Game.occupied) and the board can draw them.
@@ -59,10 +62,20 @@
   // along with the squads: the teammate's all, the opponents' never while deploying (Referee.hide drops them).
   const teamOf = (o, half) => ({ half, armies: [0, 1].map(sd => (o.armies[sd] || []).map(moved)),
     buildings: [0, 1].map(sd => ((o.buildings && o.buildings[sd]) || []).map(b => ({ id: b.id, col: b.col, row: b.row, round: b.round, built: !!b.built }))),
-    tech: [0, 1].map(sd => (o.tech && o.tech[sd]) || null) });
+    tech: [0, 1].map(sd => (o.tech && o.tech[sd]) || null),
+    // each carrier's one in and one out this round (Game.horseOk), under the carrier's id as this lane sees it
+    horse: [0, 1].map(sd => { const h = (o.horse && o.horse[sd]) || {}, out = {}; for (const k in h) out[flip(+k)] = { r: h[k].r, in: h[k].in != null ? 1 : null, out: h[k].out != null ? 1 : null }; return out; }) });
   // the server's copy: each lane gets the other lane's squads as they really stand (the rules check against them)
   function setTeam(lanes, L) { lanes[L].team = teamOf(lanes[1 - L], L); }
-  function setTeams(lanes) { setTeam(lanes, 0); setTeam(lanes, 1); }
+  // both lanes, and riders in a teammate's carrier follow it (moved) or step out (sold, taken back): those riders
+  // changed, so the other lane's copy is made again
+  function setTeams(lanes) {
+    setTeam(lanes, 0); setTeam(lanes, 1);
+    const was = JSON.stringify(lanes.map(m => [0, 1].map(sd => (m.armies[sd] || []).filter(G.mateRide).map(q => [q.id, q.col, q.row, q.in]))));
+    for (const m of lanes) for (const sd of [0, 1]) G.syncRiders(m, sd);
+    const now = JSON.stringify(lanes.map(m => [0, 1].map(sd => (m.armies[sd] || []).filter(G.mateRide).map(q => [q.id, q.col, q.row, q.in]))));
+    if (was !== now) { setTeam(lanes, 0); setTeam(lanes, 1); }
+  }
 
   // ----- the team's tower: what is shared, and copying it from one lane to the other -----
   const TEAM_FIELDS = ['towerSkill', 'towerSkill2', 'bwalls', 'mageGen', 'tround'];
@@ -128,7 +141,7 @@
   // The fight of two lanes (matches with units, as they stand when it begins): a steppable Engine battle on the one
   // board. Changes nothing. Bodies carry .lane.
   function battle(lanes, opts = {}) {
-    const A = [], B = [], charm = [{}, {}], host = [{}, {}], dropped = new Map();
+    const A = [], B = [], charm = [{}, {}], host = [{}, {}], dropped = new Map(), rides = [];
     let s0 = null;
     lanes.forEach((m, L) => {
       const s = G.battleSetup(m);
@@ -137,6 +150,9 @@
         const c = s.opts.charm && s.opts.charm[sd];
         if (c) for (const k in c) charm[sd][remap(L, +k)] = c[k];
         const bodies = G.bodiesFor(m, sd);
+        // a squad riding in the teammate's carrier: its bodies go inside that carrier (its id in the fight: lane 1's
+        // are moved by OFF, so lane 0's link already is; lane 1's points at lane 0's own id)
+        for (const q of m.armies[sd]) if (G.mateRide(q)) rides.push({ sd, rider: remap(L, q.id), carrier: L === 0 ? q.in : q.in - OFF });
         for (const b of bodies) if (teamBody(b.squad)) { if (L === 1) dropped.set(b, b.squad); else if (!host[sd][b.squad]) host[sd][b.squad] = b; }
         for (const b of bodies) {
           if (dropped.has(b)) continue;
@@ -145,6 +161,10 @@
         }
       }
     });
+    for (const r of rides) {
+      const list = r.sd === 0 ? A : B, c = list.find(x => x.squad === r.carrier);
+      if (c) for (const x of list) if (x.squad === r.rider) { x.boarded = true; x.alive = false; x.carrier = c; x.x = c.x; x.y = c.y; x.delay = 0; }
+    }
     G.useGrid(MAP);
     const ch = charm.map(c => Object.keys(c).length ? c : null);
     // portal: where a team's tower falls, a portal to the other team's tower opens (Engine opts.portal; 2v2 only)

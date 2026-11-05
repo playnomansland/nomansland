@@ -20,6 +20,23 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 5 November 2026 – 2v2: ride your ally's horse
+
+2v2 is still a developer test.
+
+- **You can put your squads in your teammate's horse.** Pick a unit in the shop and tap their horse, or move one of your squads onto it. It costs the same as boarding your own horse, and stepping out again is free. Their horses with room get the gold outline too.
+- **The squad stays yours:** your gold, levels, skills, selling and XP. The horse stays theirs.
+- **Both of you see it:** a small badge on the horse, ringed in the colour of the player whose squad it is. Tap the horse to see what it carries. If it's your squad, there's a **Step out** button. Opponents never see what rides inside.
+- **If your teammate moves the horse, your squad goes along. If they sell it, your squad steps out on that tile.** Nothing else they do can remove it.
+- **One rider per horse.** Whoever gets in first holds it. The second try is refused. The horse's one squad in and one out per round count for the whole team.
+- **In the fight** your squad rides inside the horse and jumps out where it is destroyed, just like with your own horse. Its damage counts as yours.
+- 1v1 is unchanged.
+
+### To check with Vilhelm
+- **No consent needed:** you can get into your teammate's horse without them agreeing. They can only get you out by selling or taking back the horse.
+
+---
+
 ## 5 November 2026 – Leader draft, fairer online play, horse limit, 2v2 without a treasury
 
 ### Leader draft

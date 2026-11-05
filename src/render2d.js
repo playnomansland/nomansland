@@ -951,7 +951,7 @@ const Render2D = (cv, view, opts = {}) => {
       }
       // your carriers with room for this unit
       ctx.strokeStyle = css('--gold'); ctx.globalAlpha = 0.8; ctx.lineWidth = 1.5;
-      if (pu != null) for (const sq of m.armies[me]) if (Game.boardable(m, me, sq.col, sq.row, pu) && !(drag && drag.id === sq.id)) ctx.strokeRect(scol(sq.col) * t + 2, srow(sq.row) * t + 2, t - 4, t - 4);
+      if (pu != null) for (const sq of m.armies[me].concat(Game.teamArmy(m, me))) if (Game.boardable(m, me, sq.col, sq.row, pu) && !(drag && drag.id === sq.id)) ctx.strokeRect(scol(sq.col) * t + 2, srow(sq.row) * t + 2, t - 4, t - 4); // 2v2: your teammate's carriers too
       ctx.globalAlpha = 1;
     }
     if (hoverTile && (selected !== null || moving != null) && Game.canPlaceAt(m, me, hoverTile.col, hoverTile.row, placingUnit, selected === null) && (Game.spotFree(m, me, hoverTile.col, hoverTile.row, placingUnit) || (placingUnit != null && Game.boardable(m, me, hoverTile.col, hoverTile.row, placingUnit)))) {
@@ -967,6 +967,15 @@ const Render2D = (cv, view, opts = {}) => {
       const look = Game.shownUnit(m, me, foe(), sq.unit); // a disguised unit shows as what it pretends to be
       drawSquad(phase === 'deploy' ? { ...sq, unit: look, col: p.col, row: p.row, level: Game.seenLevel(m, sq) } : { ...sq, unit: look }, foe(), false); // a level-up bought this round stays hidden
     }
+    // what rides inside a carrier: a small disc with its shape, bottom left of the tile (only its team sees it), ringed in
+    // its player's colour in 2v2 (yours in your teammate's horse, theirs in yours)
+    const riderBadge = (at, rider) => {
+      if (!rider) return;
+      const ru = units[rider.unit], br = Math.max(6, t * 0.2), bx = scol(at.col) * t + br + 2, by = (srow(at.row) + 1) * t - br - 2;
+      ctx.fillStyle = css('--bg'); ctx.strokeStyle = duo ? duo.ring(me, m.armies[me].includes(rider) ? duo.lane : 1 - duo.lane) : teamCol(me); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = ru.color; Shapes.draw(ctx, ru.shape, bx, by, br * 0.55, 1);
+    };
     for (const sq of m.armies[me]) {
       if (phase === 'deploy' && sq.from && sq.movedRound === m.round) { // where your moved squad came from
         ctx.strokeStyle = css('--muted'); ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
@@ -975,20 +984,14 @@ const Render2D = (cv, view, opts = {}) => {
       if (Game.isRider(sq)) continue; // drawn as a badge on its carrier
       const at = drag && drag.moved && drag.id === sq.id ? { ...sq, col: drag.over.col, row: drag.over.row } : sq;
       drawSquad(at, me, (sq.round === m.round || sq.movedRound === m.round) && phase === 'deploy');
-      const rider = Game.riderOf(m, me, sq);
-      if (rider) { // what rides inside: a small disc with its shape, bottom left of the tile (only you see it)
-        const ru = units[rider.unit], br = Math.max(6, t * 0.2), bx = scol(at.col) * t + br + 2, by = (srow(at.row) + 1) * t - br - 2;
-        ctx.fillStyle = css('--bg'); ctx.strokeStyle = teamCol(me); ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = ru.color; Shapes.draw(ctx, ru.shape, bx, by, br * 0.55, 1);
-      }
+      riderBadge(at, Game.riderOf(m, me, sq));
       if (moving === sq.id && phase === 'deploy') {
         ctx.strokeStyle = css('--gold'); ctx.lineWidth = 2;
         ctx.strokeRect(scol(sq.col) * t + 1, srow(sq.row) * t + 1, t - 2, t - 2);
       }
     }
     // 2v2: the other pair of players on this board (m.team): your teammate's squads, and the other opponent's as you may see them
-    for (const side of [me, foe()]) for (const sq of Game.teamArmy(m, side)) if (!Game.isRider(sq)) drawSquad(sq, side, false, true);
+    for (const side of [me, foe()]) for (const sq of Game.teamArmy(m, side)) if (!Game.isRider(sq)) { drawSquad(sq, side, false, true); if (side === me) riderBadge(sq, Game.riderOf(m, me, sq)); }
     for (const side of [me, foe()]) if (towerVisible(side) && Game.towerUp(m, side)) drawTowerTile(side);
     if (Game.isDev(m)) drawLessers();
     if (Game.treasuryOn(m)) drawTreasuries();

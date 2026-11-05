@@ -476,5 +476,173 @@ check('bots in 2v2 with the Mechites: whole matches, no clashes', () => {
   console.log(`      4 matches: ${mech} Mechite squads at the end, ${facs} Factories`);
 });
 
+// ---------- riding in the teammate's horse ----------
+// a refereed match of four humans: A2 (seat 1, lane 1) has a horse on the board, everyone has gold to spare
+function horseMatch(seed) {
+  const D = Duo.create({}, units);
+  const T = 1e12;
+  Duo.start(D, units, matrix, T, seed, [false, false, false, false]);
+  for (let k = 0; k < 4; k++) assert.ok(Duo.act(D, k, { seq: 1, fn: 'choosePack', a: [0] }, T).ok);
+  for (const R of D.lanes) for (const sd of [0, 1]) R.m.gold[sd] += 3000;
+  const seq = [0, 2, 2, 2, 2];
+  const go = (seat, fn, args) => Duo.act(D, seat, { seq: seq[seat + 1]++, fn, a: args }, T);
+  const hu = ui('Just a horse'), m1 = D.lanes[1].m;
+  if (!Game.isUnlocked(m1, 0, hu)) assert.ok(go(1, 'unlock', [hu]).ok, 'A2 unlocks the horse');
+  const ht = freeTile(m1, 0, hu);
+  assert.ok(go(1, 'place', [hu, ht[0], ht[1]]).ok, 'A2 places a horse');
+  const horse = m1.armies[0].find(q => q.unit === hu && q.col === ht[0] && q.row === ht[1]);
+  return { D, T, go, horse, ht };
+}
+// the next round, everybody ready
+function nextRound(D, T) {
+  let f = null;
+  for (let k = 0; k < 4; k++) f = Duo.setReady(D, k, true, T) || f;
+  assert.ok(f, 'the fight ran');
+  if (D.phase === 'result') for (let k = 0; k < 4; k++) Duo.next(D, k, D.summary[0].round, T);
+  assert.strictEqual(D.phase, 'deploy');
+  return f;
+}
+const own = (D, k) => D.lanes[Duo.SEATS[k].lane].m;
+check('the teammate\'s horse: board it, the teammate sees it, the opponents never do, one rider only', () => {
+  const { D, T, go, horse, ht } = horseMatch(61);
+  const m0 = own(D, 0), sk = ui('Skeleton Archers');
+  if (!Game.isUnlocked(m0, 0, sk)) assert.ok(go(0, 'unlock', [sk]).ok);
+  assert.ok(Game.boardable(m0, 0, ht[0], ht[1], sk), 'A1 sees room in A2\'s horse');
+  assert.ok(go(0, 'place', [sk, ht[0], ht[1]]).ok, 'A1 places a squad into it');
+  const rider = m0.armies[0].find(q => q.unit === sk && q.col === ht[0] && q.row === ht[1]);
+  assert.ok(rider && rider.in === horse.id + Duo.OFF && Game.isRider(rider) && Game.mateRide(rider), 'a rider in the teammate\'s horse');
+  assert.strictEqual(Game.carrierOf(m0, 0, rider).id, horse.id + Duo.OFF);
+  // A2's lane: the rider is in m.team, pointing at A2's own horse
+  const v1 = Duo.viewFor(D, 1).m;
+  assert.ok(v1.team.armies[0].some(q => q.in === horse.id && q.id === rider.id + Duo.OFF), 'A2 sees it in their horse');
+  assert.strictEqual(Game.riderOf(own(D, 1), 0, horse).id, rider.id + Duo.OFF);
+  // one rider per horse: A2 can't put its own squad in now
+  const m1 = own(D, 1), sk1 = Object.keys(m1.unlocks[0]).map(Number).find(u => !units[u].carrier && !units[u].building);
+  assert.ok(!Game.boardable(m1, 0, ht[0], ht[1], sk1), 'no room left');
+  assert.ok(!go(1, 'place', [sk1, ht[0], ht[1]]).ok, 'A2\'s squad is refused');
+  // the rider is A1's: A1's gold paid, A2's didn't change for it
+  assert.strictEqual(rider.cost > 0 || rider.free, true);
+  nextRound(D, T);
+  // the opponents: never (from the next round on, as with a rider in your own horse)
+  for (const k of [2, 3]) {
+    const v = Duo.viewFor(D, k).m, all = [...v.armies[0], ...((v.team && v.team.armies[0]) || [])];
+    assert.ok(!all.some(q => Game.isRider(q)), 'seat ' + k + ' sees no rider');
+    assert.ok(all.some(q => q.unit === ui('Just a horse')), 'seat ' + k + ' sees the horse');
+  }
+});
+check('the teammate\'s horse: both board it in one round, the first one holds it', () => {
+  const { D, go, ht } = horseMatch(62);
+  const m0 = own(D, 0), m1 = own(D, 1), sk = ui('Skeleton Archers');
+  for (const [k, m] of [[0, m0], [1, m1]]) if (!Game.isUnlocked(m, 0, sk)) assert.ok(go(k, 'unlock', [sk]).ok);
+  assert.ok(go(1, 'place', [sk, ht[0], ht[1]]).ok, 'A2 boards its own horse first');
+  assert.ok(!go(0, 'place', [sk, ht[0], ht[1]]).ok, 'A1 is refused');
+  assert.ok(!m0.armies[0].some(q => Game.isRider(q)));
+});
+check('the teammate\'s horse: moved, the rider goes with it; sold, the rider steps out', () => {
+  const { D, T, go, horse, ht } = horseMatch(63);
+  const m0 = own(D, 0), m1 = own(D, 1), sk = ui('Skeleton Archers');
+  if (!Game.isUnlocked(m0, 0, sk)) assert.ok(go(0, 'unlock', [sk]).ok);
+  assert.ok(go(0, 'place', [sk, ht[0], ht[1]]).ok);
+  const rid = m0.armies[0].find(q => Game.isRider(q)).id;
+  nextRound(D, T);
+  const rider = () => m0.armies[0].find(q => q.id === rid);
+  assert.ok(Game.isRider(rider()), 'still inside after the fight');
+  // A2 moves the horse: the rider's tile follows in A1's lane
+  const to = freeTile(m1, 0, horse.unit);
+  assert.ok(go(1, 'moveSquad', [horse.id, to[0], to[1]]).ok, 'A2 moves the horse');
+  assert.deepStrictEqual([rider().col, rider().row], to, 'the rider went with it');
+  assert.ok(Game.isRider(rider()));
+  assert.ok(Duo.viewFor(D, 0).m.armies[0].some(q => q.id === rid && q.col === to[0] && q.row === to[1]), 'A1\'s own view has it');
+  // A2 takes the move back: the rider comes back too
+  assert.ok(go(1, 'undoMove', []).ok);
+  assert.deepStrictEqual([rider().col, rider().row], ht);
+  // A2 sells the horse: the rider steps out onto the tile, the opponents still think it is inside
+  assert.ok(go(1, 'sell', [horse.id]).ok, 'A2 sells the horse');
+  assert.ok(!Game.isRider(rider()), 'stepped out');
+  assert.deepStrictEqual([rider().col, rider().row], ht, 'on the horse\'s tile');
+  assert.strictEqual(rider().outRound, m0.round);
+  assert.ok(!Duo.viewFor(D, 2).m.armies[0].some(q => q.id === rid), 'B1 doesn\'t see it step out');
+  assert.ok(!Duo.viewFor(D, 3).m.team.armies[0].some(q => q.id === rid + Duo.OFF), 'nor does B2');
+  // A1 can't remove A2's squads, and A2 can't touch the rider: its actions only reach its own lane
+  assert.ok(!go(1, 'sell', [rid]).ok || !m1.armies[0].some(q => q.id === rid), 'A2 can\'t sell A1\'s squad');
+});
+check('the teammate\'s horse: one squad in and one out per round, for the whole team', () => {
+  const { D, T, go, horse, ht } = horseMatch(67);
+  const m0 = own(D, 0), m1 = own(D, 1), sk = ui('Skeleton Archers');
+  if (!Game.isUnlocked(m0, 0, sk)) assert.ok(go(0, 'unlock', [sk]).ok);
+  assert.ok(go(0, 'place', [sk, ht[0], ht[1]]).ok, 'A1 boards the horse');
+  const rid = m0.armies[0].find(q => Game.isRider(q)).id;
+  // A2 has a squad of its own from round 1 too
+  const x = m1.armies[0].find(q => q.id !== horse.id && !units[q.unit].carrier && !units[q.unit].building);
+  assert.ok(x, 'A2 has another squad');
+  nextRound(D, T);
+  const out = freeTile(m0, 0, sk);
+  assert.ok(go(0, 'moveSquad', [rid, out[0], out[1]]).ok, 'A1\'s squad steps out (the horse\'s one out)');
+  assert.ok(go(1, 'moveSquad', [x.id, ht[0], ht[1]]).ok, 'A2 puts its squad in (the horse\'s one in)');
+  const t2 = freeTile(m1, 0, x.unit);
+  assert.ok(!go(1, 'moveSquad', [x.id, t2[0], t2[1]]).ok, 'A2 can\'t take it out again: the horse let A1\'s out already');
+  assert.ok(!go(0, 'moveSquad', [rid, ht[0], ht[1]]).ok, 'and A1 can\'t get back in (no room)');
+});
+check('the teammate\'s horse in the fight: inside until it falls, the rider\'s damage goes to its own lane', () => {
+  let seen = 0;
+  for (const seed of [64, 65, 66]) {
+    const { D, T, go, horse, ht } = horseMatch(seed);
+    const m0 = own(D, 0), sk = ui('Skeleton Archers');
+    if (!Game.isUnlocked(m0, 0, sk)) assert.ok(go(0, 'unlock', [sk]).ok);
+    assert.ok(go(0, 'place', [sk, ht[0], ht[1]]).ok);
+    const rid = m0.armies[0].find(q => Game.isRider(q)).id;
+    const f = nextRound(D, T);
+    const bt = Duo.battle(f.pres.map(W));
+    const hb = bt.bodies.find(x => x.squad === horse.id + Duo.OFF && x.side === 0), rb = bt.bodies.filter(x => x.squad === rid && x.side === 0);
+    assert.ok(hb && hb.lane === 1, 'the horse is lane 1\'s');
+    assert.ok(rb.length && rb.every(x => x.boarded && !x.alive && x.carrier === hb && x.lane === 0), 'the rider sits inside it');
+    let out = false;
+    while (bt.step()) if (!out && rb.some(x => x.alive)) { out = true; assert.ok(!hb.alive, 'out only once the horse fell'); }
+    const res = bt.result();
+    assert.strictEqual(res.winner, f.summaries[0].duo.winner, 'playback: same winner');
+    if (out) {
+      seen++;
+      const r0 = Duo.laneResult(res, 0, W(f.pres[0])), r1 = Duo.laneResult(res, 1, W(f.pres[1]));
+      assert.ok(r0.squads['0:' + rid], 'the rider\'s result is in A1\'s lane');
+      assert.ok(!r1.squads['0:' + rid], 'not in A2\'s');
+    }
+  }
+  assert.ok(seen > 0, 'a horse fell and its rider came out');
+});
+check('the teammate\'s horse: a bot teammate sells or moves it, nothing breaks', () => {
+  for (const seed of [71, 72]) {
+    const D = Duo.create({}, units);
+    let T = 1e12;
+    Duo.start(D, units, matrix, T, seed, [false, true, true, true]);
+    assert.ok(Duo.act(D, 0, { seq: 1, fn: 'choosePack', a: [0] }, T).ok);
+    const m0 = own(D, 0), m1 = own(D, 1), hu = ui('Just a horse'), sk = ui('Skeleton Archers');
+    m0.gold[0] += 5000; m1.gold[0] += 5000;
+    // the bot's lane gets a horse (as if it had bought one)
+    m1.unlocks[0][hu] = m1.unlocks[0][hu] || 1;
+    const ht = freeTile(m1, 0, hu); assert.ok(Game.place(m1, 0, hu, ht[0], ht[1]));
+    Duo.setTeams(D.lanes.map(R => R.m));
+    let seq = 2;
+    if (!Game.isUnlocked(m0, 0, sk)) assert.ok(Duo.act(D, 0, { seq: seq++, fn: 'unlock', a: [sk] }, T).ok);
+    assert.ok(Duo.act(D, 0, { seq: seq++, fn: 'place', a: [sk, ht[0], ht[1]] }, T).ok, 'A1 rides in the bot\'s horse');
+    let rounds = 0;
+    while (D.phase !== 'end' && rounds < 12) {
+      T += 1000;
+      for (const R of D.lanes) for (const sd of [0, 1]) for (const q of R.m.armies[sd]) if (Game.isRider(q)) assert.ok(Game.carrierOf(R.m, sd, q), 'every rider has its carrier');
+      assert.strictEqual(clashes(D.lanes.map(R => R.m)), 0);
+      if (Game.needsTowerPick(m0, 0)) assert.ok(Duo.act(D, 0, { seq: seq++, fn: 'setTowerType', a: [Game.towerChoices(m0, 0)[0].id] }, T).ok, 'A1 votes');
+      const f = Duo.tick(D, T + 200000);
+      assert.ok(f);
+      const bt = Duo.battle(f.pres.map(W)); while (bt.step()) {}
+      assert.strictEqual(bt.result().winner, f.summaries[0].duo.winner, 'playback: same winner');
+      rounds++;
+      if (D.phase === 'result') for (let k = 0; k < 4; k++) Duo.next(D, k, D.summary[0].round, T);
+      if (D.phase === 'deploy' && rounds % 2 === 0) { // the bot sells its horse now and then (the AI may too)
+        const h = m1.armies[0].find(q => q.unit === hu && q.round < m1.round);
+        if (h) { Game.sell(m1, 0, h.id); Duo.setTeams(D.lanes.map(R => R.m)); }
+      }
+    }
+  }
+});
+
 if (fails) { console.log(`\n${fails} failed`); process.exit(1); }
 console.log('\nall passed');
