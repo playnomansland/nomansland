@@ -20,6 +20,33 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 6 November 2026 – The Assassin strikes anywhere, free Bastion walls
+
+For every mode and map, 1v1 and 2v2.
+
+### Assassin
+- **Place it anywhere.** An Assassin can go on any free tile of the board from round 1: your zone, no man's land, the enemy's zone, even the flank tiles. Moves work the same way. The only rule: not on or next to a building (towers, treasuries, the Factory, the Altar, elf towers, your teammate's buildings). Allowed tiles light up as usual when you pick it.
+- **They won't see it coming.** An Assassin you put in the enemy's zone stays hidden from them until the fight, like every new squad. They might put a squad on that same tile without knowing. Then the fight just starts the two close together.
+- **It lands, then strikes.** In its first fight, an Assassin in the enemy's zone or on a flank tile stands still for 3 s, like a flank squad.
+- **It ignores buildings.** It never goes for the tower, the treasury, walls or any other building while there is an enemy unit it can reach. If nothing else is left, it attacks buildings after all, so a fight never gets stuck. A wall right in its way it breaks through.
+- **Bloodrush: 3 bleed per hit** (was 2).
+- The AI sometimes drops its Assassins on your back rows now. Watch your back.
+
+### Bastion
+- **Defensive walls are free** (were 250 gold). You still get them once a match, from the tower's sheet. The AI's Bastion takes them straight away.
+
+### To check with Vilhelm
+- "Next to a building" means any of the 8 tiles around it (diagonals too). A building of the opponent's that they put down this round doesn't count yet, since you can't see it.
+- "Any tile" includes the edge tiles of your own zone that are kept as the enemy's flank tiles.
+- "A flank tile" for the 3 s wait means a flank tile on either side of the board. An Assassin in no man's land or in your own zone doesn't wait.
+- The map's elf tower counts as standing on both middle-row tiles of its column.
+- Bleed still stops at 4 stacks, so the extra stack mostly shows on the first hit: one hit gives 3 (was 2), two hits give 4, as before.
+- When an Assassin has no unit left to pick, it goes for buildings as before: with only stealthed units left, it hits the tower.
+- A wall counts as "in its way" when it stands between the Assassin and the unit it is after, within its reach. It then hits the wall even mid-dash.
+- Free walls don't use up Blixten's discount.
+
+---
+
 ## 6 November 2026 – 2v2: artifacts in the fight
 
 2v2 is still a developer test.

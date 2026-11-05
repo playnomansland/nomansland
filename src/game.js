@@ -56,7 +56,7 @@ const Game = (() => {
     { id: 'bastion', name: 'Bastion', text: `Tough. Burns all enemies within ${MOAT.range} m.`,
       unit: { ...TOWER, name: 'Bastion', kind: 'bastion', hp: 1000, hit: MOAT.hit, aps: MOAT.aps, range: MOAT.range, moat: { ...MOAT }, idle: true, color: '#B79C8A' }, // idle: the moat is its only attack
       skill: { name: 'Home ground', text: 'Bastion blocks 2 hits a fight. Units in your zone: +2 armor, +10% health.' },
-      skill2: { name: 'Defensive walls', cost: 250, text: 'Place 3 walls on your side that block enemies. Bastion +4 armor.' },
+      skill2: { name: 'Defensive walls', cost: 0, noFree: true, text: 'Place 3 walls on your side that block enemies. Bastion +4 armor.' }, // free since 2026-11-06, still once a match (noFree: Blixten's discount isn't spent on it)
       fortify: { name: 'Fortify', cost: 50, text: 'Once a round: one extra wall on your side for this round’s fight only.' }, // see FORTIFY
       vault: { name: 'Vault', text: 'Your treasury has +6 armor, and a raid on it steals half as much.' },
       freeMove: { name: 'March order', text: '1 free move every round.' } }, // see freeMoves
@@ -1052,12 +1052,40 @@ const Game = (() => {
   const footprint = (m, ui) => Math.max(1, Math.round(+((m && m.units && m.units[ui]) || {}).footprint || 1));
   const blockOf = (m, ui, col, row) => { const n = ui == null ? 1 : footprint(m, ui), out = []; for (let dr = 0; dr < n; dr++) for (let dc = 0; dc < n; dc++) out.push([col + dc, row + dr]); return out; };
   const covers = (m, s, col, row) => { const n = footprint(m, s.unit); return col >= s.col && col < s.col + n && row >= s.row && row < s.row + n; };
+  // ---------- placed anywhere (the Assassin: `anywhere` on the unit, since 2026-11-06) ----------
+  // Its squads may go on any tile of the board from round 1 (own zone, no man's land, the enemy's zone, either side's
+  // flank tiles) that is free as its player sees it and not on or next to (the 8 tiles around) a building: either
+  // side's tower and treasury, the elf towers (the map's and the players' own), buildings (the Factory, the Altar of
+  // Build...), devtest lesser buildings, the 2v2 teammate's and the other pair's, and 2v2 MPBs (Game.mpbAt). The
+  // opponent's count once that player may see them (from the fight of the round they were put down), so a hidden one
+  // is never given away. In its first fight one in the enemy's zone or on a flank tile stands still FLANK.delay s.
+  const anywhere = (m, ui) => ui != null && !!(m && m.units && m.units[ui] && m.units[ui].anywhere);
+  // 2v2 buildings (MPBs) on a tile: a stub that src/mpb.js replaces (Game.mpbAt; called through api so it can)
+  const mpbAt = (m, col, row) => false;
+  // a building of either side on the tile, as `side` sees the board while deploying
+  function bldgSeen(m, side, col, row) {
+    for (const s of [0, 1]) {
+      const own = s === side, t = (m.towers && m.towers[s]) || towerSpot(m, s);
+      if (t && t.col === col && t.row === row) return true;
+      if (treasuryAt(m, s, col, row)) return true;
+      const e = elfOwnOf(m, s); if (e && e.col === col && e.row === row && (own || e.round < m.round)) return true;
+      if (buildingsOf(m, s).concat(teamBuildings(m, s)).some(b => b.col === col && b.row === row && (own || b.round < m.round))) return true; // (2v2: the other lane's too)
+      if (isDev(m) && placedLessers(m, s).some(b => b.col === col && b.row === row && (own || b.round < m.round))) return true;
+      const squads = (own ? m.armies[s] : foeSeen(m, s)).concat(own ? teamArmy(m, s) : teamSeen(m, s));
+      if (squads.some(q => m.units[q.unit] && m.units[q.unit].building && covers(m, q, col, row))) return true; // (a building never moves)
+    }
+    const el = elfSpot(m); // the map's elf tower stands between the two middle rows
+    if (el && el.col === col && (row === ROWS / 2 - 1 || row === ROWS / 2)) return true;
+    return !!api.mpbAt(m, col, row);
+  }
+  const nearBldg = (m, side, col, row) => { for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (bldgSeen(m, side, col + dc, row + dr)) return true; return false; };
   // ui (optional): the unit being placed, for unit-specific tiles (all of a footprint's tiles must be allowed)
   // moving: the squad is already on the board (a move), not a new one
   const canPlaceAt = (m, side, col, row, ui, moving) => blockOf(m, ui, col, row).every(([c, r]) => canPlaceTile(m, side, c, r, ui, moving));
   // no squad, tower or building on any tile the unit would take
   const spotFree = (m, side, col, row, ui) => blockOf(m, ui, col, row).every(([c, r]) => !occupied(m, side, c, r) || garrisonFree(m, side, c, r, ui));
-  const canPlaceTile = (m, side, col, row, ui, moving) => col >= 0 && col < COLS && row >= 0 && row < ROWS && !reserved(side, col, row) && !terrainBlocks(m, col, row) && !(ui != null && isOff(m, ui, side)) &&
+  const canPlaceTile = (m, side, col, row, ui, moving) => anywhere(m, ui) ? col >= 0 && col < COLS && row >= 0 && row < ROWS && !terrainBlocks(m, col, row) && !isOff(m, ui, side) && !nearBldg(m, side, col, row) && !enemyHolds(m, side, col, row) :
+    col >= 0 && col < COLS && row >= 0 && row < ROWS && !reserved(side, col, row) && !terrainBlocks(m, col, row) && !(ui != null && isOff(m, ui, side)) &&
     !(ui != null && m && m.units[ui] && m.units[ui].noFlank && isFlank(side, col, row)) &&
     (inZone(side, row) || (flankOpen(m) && isFlank(side, col, row)) || (inNoMans(row) && hasSkillType(m, side, ui, 'forward', moving ? 0 : 1)) || garrisonFree(m, side, col, row, ui)) && !enemyHolds(m, side, col, row);
   // ---------- Overwatch (the Sniper's Master skill) ----------
@@ -1995,7 +2023,8 @@ const Game = (() => {
       if (home) for (const x of b) x.band = { ...home };
       if (zoe) for (const x of b) x.zoe = true; // for the rising-stars effect
       if (purple) for (const x of b) x.shroom = true; // for the drifting spores effect
-      if (isFlank(side, sq.col, sq.row) && (sq.round === m.round || sq.movedRound === m.round)) for (const x of b) x.delay = FLANK.delay * (ch === 'wilhelm' ? CHAR.wilhelmDelay : 1); // only in its first fight
+      const lands = isFlank(side, sq.col, sq.row) || (anywhere(m, sq.unit) && (inZone(1 - side, sq.row) || isFlank(1 - side, sq.col, sq.row))); // (an Assassin in the enemy's zone too)
+      if (lands && (sq.round === m.round || sq.movedRound === m.round)) for (const x of b) x.delay = FLANK.delay * (ch === 'wilhelm' ? CHAR.wilhelmDelay : 1); // only in its first fight
       if (isFlank(side, sq.col, sq.row)) for (const x of b) x.march = [w.x - XOFF < 0 ? 1 : -1, 0]; // a flank squad marches in toward the middle until it spots an enemy
       idx += b.length;
       out.push(...b);
@@ -3204,7 +3233,7 @@ const Game = (() => {
     }
     if (needsTowerPick(m, side)) { const ch = towerChoices(m, side); aiCall('setTowerType', m, side, ch[Math.floor(rng(m.seed + side * 7477)() * ch.length)].id); } // own stream: the rest of the AI rolls stay as they were
     if (canBuyTowerSkill(m, side) && rng(m.seed + m.round * 331 + side * 17)() < 0.5) aiCall('buyTowerSkill', m, side); // own stream, as above
-    if (canBuyTowerSkill2(m, side) && m.gold[side] - towerSkill2Cost(m, side) >= SQUAD_COST && rng(m.seed + m.round * 347 + side * 19)() < 0.35) aiCall('buyTowerSkill2', m, side);
+    if (canBuyTowerSkill2(m, side) && (towerSkill2Cost(m, side) === 0 || (m.gold[side] - towerSkill2Cost(m, side) >= SQUAD_COST && rng(m.seed + m.round * 347 + side * 19)() < 0.35))) aiCall('buyTowerSkill2', m, side); // a free one (the Bastion's walls) at once
     if (canTakeLoan(m, side) && loanTerms(m, side) === CREDIT_LINE && m.gold[side] < SQUAD_COST * 3 && rng(m.seed + m.round * 613 + side * 37)() < 0.4) aiCall('takeLoan', m, side); // short on gold: sometimes a loan
     if (canMark(m, side) && m.gold[side] - markCost(m, side) >= SQUAD_COST) { // Mark Bounty: their priciest squad
       const t = m.armies[1 - side].filter(q => markTarget(m, side, q.id)).sort((a, b) => (b.cost || 0) - (a.cost || 0) || a.id - b.id)[0];
@@ -3340,6 +3369,16 @@ const Game = (() => {
     }
     const half = m.team && (m.team.half === 0 || m.team.half === 1) ? m.team.half : null; // 2v2: this player's half of the shared board
     const target = wsum > 0 ? csum / wsum : (half == null ? (COLS - 1) / 2 : (COLS - 1) * (half === 0 ? 0.25 : 0.75)) + (r() - 0.5) * 6;
+    // a unit that may go anywhere (the Assassin) now and then drops in on the enemy's back rows, near those columns
+    if (u.anywhere && r() < 0.25) {
+      let deep = null, dc = Infinity;
+      for (const row of zoneRows(1 - side).slice(-2)) for (let col = 0; col < COLS; col++) {
+        if (!spotFree(m, side, col, row, unitIdx) || !canPlaceAt(m, side, col, row, unitIdx)) continue;
+        const c = Math.abs(col - target) + r() * 2;
+        if (c < dc) { dc = c; deep = { col, row }; }
+      }
+      if (deep) return deep;
+    }
     // fast melee units sometimes take a flank column, on the side of the enemy tower when it is known
     if (flankOpen(m) && u.range <= 5 && u.speed >= 6 && r() < 0.5) {
       const et = m.towers && m.towers[1 - side];
@@ -3374,7 +3413,7 @@ const Game = (() => {
     buildingXpNeeded, buildingLevelCost, buildingReady, levelBuilding, undoLevelBuilding, constructBuff, buildingBodies, canBuySkill, buySkill, undoSkill, sellValue, sell,
     isRider, TEAM_ID, mateRide, mateAt, syncRiders, freeOut, horseUse, horseOk, horseLeft, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
     TOWER, TOWER_TYPES, OUTPOST, TOWER_PICK_ROUND, towerType, towerChoices, needsTowerPick, setTowerType, settleTowerPicks, TOWER_SKILL, towerSkillOf, towerSkillVisible, towerPicked, canBuyTowerSkill, buyTowerSkill, undoTowerSkill, towerSkillCost, towerSkill2Of, towerSkill2Visible, towerSkill2Cost, canBuyTowerSkill2, buyTowerSkill2, undoTowerSkill2, towerSkill2On, PARA, paraDropOf, MOAT, BWALL, BWALL_SQ, EDGES, bwallsOf, bwallOn, edgeOf, bwallWorld, bwallsLeft, bwallShown, bwallSpotOk, placeBwall, unplaceBwall, ensureBwalls, bwallUnit, INVEST, MAGE_GENERALS, mageGenPrice, MAGE, mageGenInfo, mageGenOf, mageTpOf, mageTpRound, mageTpNew, isExtraGen, mageGenCost, canBuyMageGen, buyMageGen, undoMageGen, mageTowerUnit, generalUnit, LOAN, loanNow, investNow, bankBusy, investNow, bankBusy, canTakeLoan, takeLoan, undoLoan, towerRounds, troundInfo, troundOn, troundCost, canBuyTround, buyTround, undoTround, SLIME_UNITS, slimeTowerUnit, slimeSkillDefs, TOWER_MID, towerColOk, towerAt, needsTower, placeTower, ensureTower,
-    FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, isOff, enemyHolds, inNoMans, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
+    FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, anywhere, mpbAt, bldgSeen, nearBldg, isOff, enemyHolds, inNoMans, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
     STANDARD_PACK, ICE, ALTAR, GOLEM, isIce, hailRound, altarRound, stormShift, stormRows, hailTiles, altarCost, altarRefund, altarCount, pushRoom, altarBought, addAltar, buyAltar, undoAltar, snowgres, snowgreUnit,
     MAPS, SKINS, MAP_LOOK, lookOf, EDITOR_MAPS, TERRAIN, objectiveOf, objectiveTiles, SHAPE_PATH, terrainTile, terrainBlocks, terrainOf, groundHeight, ELF_TOWER, SHROOM, SHROOM_SPLIT, shroomAt, shroomTileAt, shroomRemoval, SHROOM_REMOVE, shroomCost, removeShroom, undoRemoveShroom, mapOf, elfSpot, rollMap, BRIBE_COST, bribeList, bribeGold, bribeCount, bribeNow, bribeCost, bribeRefund, ELF_POWER, elfPowered, elfUnit, ELF_OWN, elfOwnCost, elfOwnOf, elfOwnAt, elfOwnUnlocked, elfOwnOffered, canBuyElfOwn, elfOwnSpotOk, buyElfOwn, undoElfOwn, bribeLeader, canBribe, bribe, undoBribe,
     CHARACTERS, CHAR, charOf, SLOT, slotSpins, slotDry, slotWins, slotMovesLeft, freeMoves, freeMovesLeft, shoePerks, shoePerk, canSpin, slotOutcome, slotReels, spin, takeSpins, aiSlots, charInfo, enzoSkill, enzoActive, charmOf, isGentleman, canGiveCharm, giveCharm, undoCharm, ensureCharm, felixGold, isTier1, rollBuffTiles, onBuffTile, zoeBuff, yotImps, yotLevel, TOWER_SPOT, towerSpot,
