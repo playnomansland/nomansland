@@ -21,8 +21,8 @@
 const Render2D = (cv, view, opts = {}) => {
   let ctx = cv.getContext('2d'); // swapped for a moment while drawing map thumbnails (thumb)
   let m = null, me = 0, phase = 'start', units = [], mode = 'ai', bt = null, battlePre = null, fx = [], battleCam = null, win = null;
-  let selected = null, moving = null, drag = null, hoverTile = null, rangeOf = null, editable = false, placingUnit = null, placingElf = false, placingTower = false, placingWall = false, dev = null, placingBuilding = null, aim = null;
-  const pull = () => { ({ m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf, editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev, aim = null, win = null } = view()); };
+  let selected = null, moving = null, drag = null, hoverTile = null, rangeOf = null, editable = false, placingUnit = null, placingElf = false, placingTower = false, placingWall = false, dev = null, placingBuilding = null, aim = null, duo = null;
+  const pull = () => { ({ m, me, phase, units, mode, bt, battlePre, fx, selected, moving, drag, hoverTile, rangeOf, editable, placingUnit, placingElf, placingTower, placingWall, placingBuilding, battleCam, dev, aim = null, win = null, duo = null } = view()); };
   // win (a 2v2 fight on a phone): { aspect, cols, x } the canvas is shaped for `aspect` columns, shows `cols` of them
   // (zoomed out up to the whole wide board) and starts at screen column x; the board sits in the middle top to bottom
   const foe = () => 1 - me;
@@ -519,6 +519,10 @@ const Render2D = (cv, view, opts = {}) => {
   function aimFloor(v) {
     const draft = aim && v.armies[me].find(q => q.id === aim.id);
     for (const sq of v.armies[me]) if (sq.aim && sq !== draft && Game.canAim(v, me, sq)) drawArrow(v, sq, [Game.aimEnd(v, sq)], 0.75);
+    if (duo) { // 2v2: your teammate's, in their colour, thinner (checked as on their own board: their squads on your side)
+      const tv = { ...v, armies: v.armies.slice() }; tv.armies[me] = Game.teamArmy(v, me);
+      for (const sq of tv.armies[me]) if (sq.aim && Game.canAim(tv, me, sq)) drawArrow(tv, sq, [Game.aimEnd(tv, sq)], 0.7, duo.ring(me, 1 - duo.lane), true);
+    }
     if (!draft) return;
     const t = tilePx(), cx = (scol(draft.col) + 0.5) * t, cy = (srow(draft.row) + 0.5) * t;
     ctx.strokeStyle = css('--you'); ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
@@ -528,15 +532,17 @@ const Render2D = (cv, view, opts = {}) => {
   }
   // a squad's arrow: from its tile through its points, with a head at the end, and the squad's speed written along
   // its longest leg
-  function drawArrow(v, sq, pts, a) {
+  // col, thin (2v2): a teammate's arrow, in their colour, thinner with shorter dashes
+  function drawArrow(v, sq, pts, a, col, thin) {
     const t = tilePx(), at = (p) => [(scol(p.col) + 0.5) * t, (srow(p.row) + 0.5) * t];
     const list = [sq, ...pts].map(at).filter((p, i, l) => !i || p[0] !== l[i - 1][0] || p[1] !== l[i - 1][1]);
     if (list.length < 2) return;
-    ctx.strokeStyle = css('--you'); ctx.fillStyle = css('--you'); ctx.globalAlpha = a; ctx.lineWidth = Math.max(2, t * 0.08); ctx.lineJoin = 'round'; ctx.setLineDash([t * 0.18, t * 0.12]);
+    const c = col || css('--you');
+    ctx.strokeStyle = c; ctx.fillStyle = c; ctx.globalAlpha = a; ctx.lineWidth = thin ? Math.max(1.2, t * 0.04) : Math.max(2, t * 0.08); ctx.lineJoin = 'round'; ctx.setLineDash(thin ? [t * 0.09, t * 0.11] : [t * 0.18, t * 0.12]);
     ctx.beginPath(); ctx.moveTo(...list[0]); for (const p of list.slice(1)) ctx.lineTo(...p); ctx.stroke(); ctx.setLineDash([]);
     const [x2, y2] = list[list.length - 1], [x1, y1] = list[list.length - 2], ang = Math.atan2(y2 - y1, x2 - x1), h = t * 0.32;
     ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x2 - h * Math.cos(ang - 0.5), y2 - h * Math.sin(ang - 0.5)); ctx.lineTo(x2 - h * Math.cos(ang + 0.5), y2 - h * Math.sin(ang + 0.5)); ctx.closePath(); ctx.fill();
-    const u = Game.unitFor(v, me, sq.unit, sq);
+    const u = thin ? units[sq.unit] : Game.unitFor(v, me, sq.unit, sq); // a teammate's skills are theirs: their base speed
     if (u && u.speed > 0) {
       let k = 1, best = 0;
       for (let i = 1; i < list.length; i++) { const d = Math.hypot(list[i][0] - list[i - 1][0], list[i][1] - list[i - 1][1]); if (d > best) { best = d; k = i; } }
@@ -548,7 +554,7 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.translate((ax + bx) / 2, (ay + by) / 2); ctx.rotate(rot); ctx.translate(0, -t * 0.24); // just beside the line
       ctx.font = `600 ${fs}px "IBM Plex Mono", monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.globalAlpha = a; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(11,15,17,0.85)'; ctx.strokeText(txt, 0, 0);
-      ctx.fillStyle = css('--you'); ctx.fillText(txt, 0, 0);
+      ctx.fillStyle = c; ctx.fillText(txt, 0, 0);
       ctx.restore();
     }
     ctx.globalAlpha = 1;
@@ -609,7 +615,15 @@ const Render2D = (cv, view, opts = {}) => {
     }
   }
 
-  // other: a squad of the other pair of players on a 2v2 board (m.team): no level-up badge; a teammate's gets a small ring
+  // 2v2 (duo): an outline circle in the colour of the squad's player (Art.DUO_RING), under it. Its lane: a fight's
+  // squads carry it, on this phone's board the other pair's (m.team, other) are the other lane
+  function ownerRing(x, y, R, side, sq, other) {
+    const lane = sq.lane === 0 || sq.lane === 1 ? sq.lane : other ? 1 - duo.lane : duo.lane;
+    ctx.globalAlpha = 0.95; ctx.strokeStyle = duo.ring(side, lane); ctx.lineWidth = Math.max(1.5, tilePx() * 0.055);
+    ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  // other: a squad of the other pair of players on a 2v2 board (m.team): no level-up badge; on a 2v2 board every squad
+  // has an outline circle in its player's colour (ownerRing)
   function drawSquad(sq, side, fresh, other) {
     const u = Game.glutOf(sq) > 0 ? Engine.glutUnit(units[sq.unit], Game.glutOf(sq)) : units[sq.unit]; // the Obelisk grows with its Glut
     if (u.building) { // a building bought in the shop (the Altar of Build): drawn in the middle of its block
@@ -619,6 +633,7 @@ const Render2D = (cv, view, opts = {}) => {
         ctx.strokeStyle = teamCol(side); ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
         ctx.strokeRect(Math.min(...cs) * t + 1.5, Math.min(...rs) * t + 1.5, n * t - 3, n * t - 3); ctx.setLineDash([]);
       }
+      if (duo) ownerRing(PX(w.x), PY(w.y), n * t * 0.47, side, sq, other);
       drawBuilding(u.building, PX(w.x), PY(w.y), t, side, u.color, { built: !!sq.built, progress: sq.progress || 0, level: sq.level });
       if (side === me && !other && phase === 'deploy' && Game.isReady(m, sq)) {
         const br = Math.max(5, t * 0.17), bx = PX(w.x) + t * 0.75, by = PY(w.y) - t * 0.75;
@@ -637,6 +652,7 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.strokeRect(c * t + 1.5, r0 * t + 1.5, t - 3, t - 3); ctx.setLineDash([]);
     }
     const r = radius(u);
+    if (duo) ownerRing((c + 0.5) * t, (r0 + 0.5) * t, t * 0.46, side, sq, other); // 2v2: whose it is, under the bodies
     // an awakened or evolved squad (the opponent's awakening from this round stays hidden): a gold ring round each body, the Leafblade suit's blades
     const awake = Game.shownAwake(m, sq, side === me || phase !== 'deploy'), mech = awake && Game.unitFor(m, side, sq.unit, sq).mech;
     for (const b of bodies) {
@@ -645,10 +661,6 @@ const Render2D = (cv, view, opts = {}) => {
       if (awake) { ctx.globalAlpha = 0.9; ctx.strokeStyle = css('--gold'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(PX(b.x), PY(b.y), r + 3, 0, Math.PI * 2); ctx.stroke(); }
     }
     ctx.globalAlpha = 1;
-    if (other && side === me) { // 2v2: your teammate's squad: a small hollow ring at the tile's bottom right
-      const br = Math.max(3, t * 0.1), bx = (c + 1) * t - br - 3, by = (r0 + 1) * t - br - 3;
-      ctx.strokeStyle = col; ctx.lineWidth = Math.max(1.5, br * 0.45); ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.stroke();
-    }
     if (side === me && !other && phase === 'deploy' && Game.isReady(m, sq)) { // ready to level up: gold plus badge
       const br = Math.max(5, t * 0.17), bx = (c + 1) * t - br - 2, by = r0 * t + br + 2;
       ctx.fillStyle = css('--gold'); ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
@@ -1139,6 +1151,7 @@ const Render2D = (cv, view, opts = {}) => {
       // what Mechites build rattles as it goes (the Mechites themselves move smoothly)
       const rattle = b.u.construct ? Math.sin(bt.time() * 47 + b.x * 3.1) * r * 0.08 : 0;
       const lk = b.mask && b.side !== me && !b.revealed ? b.mask : b.u; // a disguise, until its first attack (devtest)
+      if (duo && (b.lane === 0 || b.lane === 1)) { ctx.globalAlpha = 0.9; ctx.strokeStyle = duo.ring(b.side, b.lane); ctx.lineWidth = Math.max(1.5, r * 0.22); ctx.beginPath(); ctx.arc(PX(b.x) + rattle, PY(b.y), r + Math.max(2, r * 0.35), 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1; } // 2v2: its player's colour
       Shapes.body(ctx, lk.shape, PX(b.x) + rattle, PY(b.y), r, upOf(b.side), lk.color, c, (0.35 + 0.65 * hpr) * (b.delay > 0 ? 0.45 : 1));
       if (b.u.mech) bladeMark(PX(b.x) + rattle, PY(b.y), r, bt.time() * (b.lastAtk > bt.time() - 0.4 ? 14 : 1.5) + b.x); // the Leafblade suit: its blades spin as it strikes
       if (b.u.unfolded) { ctx.fillStyle = 'rgba(30,24,20,0.75)'; for (const o of [-1, 1]) ctx.fillRect(PX(b.x) + o * r * 0.45 - r * 0.15, PY(b.y) + r * 0.75, r * 0.3, r * 0.45); } // an unfolded roller: two stumpy legs

@@ -154,7 +154,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
     if (!v.m) return;
     // while deploying, the board changes with what the player buys (mushrooms, buff tiles, the altar): look again twice a second
     floorAge += dt;
-    const key = [idOf(v.m), idOf(v.battlePre), v.m.round, v.me, v.phase, uiOff, v.dev ? JSON.stringify([v.dev, v.editable, v.m.dev.casts.length, v.m.armies[v.me].map(q => q.guide || 0)]) : '', v.phase === 'deploy' ? JSON.stringify([v.aim, v.m.armies[v.me].map(q => q.aim ? [q.col, q.row, q.aim.dc, q.aim.dr] : 0)]) : ''].join('|'); // devtest: arrows, spells and placing show at once; direction arrows too
+    const key = [idOf(v.m), idOf(v.battlePre), v.m.round, v.me, v.phase, uiOff, v.dev ? JSON.stringify([v.dev, v.editable, v.m.dev.casts.length, v.m.armies[v.me].map(q => q.guide || 0)]) : '', v.phase === 'deploy' ? JSON.stringify([v.aim, v.m.armies[v.me].map(q => q.aim ? [q.col, q.row, q.aim.dc, q.aim.dr] : 0), v.duo ? Game.teamArmy(v.m, v.me).map(q => q.aim ? [q.col, q.row, q.aim.dc, q.aim.dr] : 0) : 0]) : ''].join('|'); // devtest: arrows, spells and placing show at once; direction arrows too
     if (key === floorKey && !(v.phase === 'deploy' && floorAge > 0.5)) return;
     floorKey = key; floorAge = 0;
     floorView = { ...v, bt: v.phase === 'battle' ? null : v.bt, fx: [], selected: null, moving: null, drag: null, hoverTile: null, placingElf: false, placingTower: false, placingWall: false, placingBuilding: null };
@@ -456,6 +456,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
       const u = b.mask && b.side !== me && !b.revealed ? { ...b.u, ...b.mask } : b.u; // a disguise, until its first attack (devtest)
       const tag = b.u.structure || b.u.aloft || b.u.noCount || (b.hidden && b.side !== me) ? null : `${b.side}|${b.squad}|${u.name}`;
       bodies.push({ u, side: b.side, x: p.x, y: p.y, hx: b.hx, hy: b.hy, look, moving: p.moving, phase: p.phase, b, crest, edge: Art.teamCol(b.side, me), tag, raise: b.inside && b.inside.alive ? roofOf(b.inside.u) : 0 });
+      if (v.duo && (b.lane === 0 || b.lane === 1) && !b.u.structure && !b.u.aloft && !(b.hidden && b.side !== me)) { const [wx, wz] = world(f, p.x, p.y), rc = color(v.duo.ring(b.side, b.lane)); arc(wx, wz, Math.max(0.6, size(b.u) * 0.62), rc, 0.9, 1, 0.14); } // 2v2: its player's colour (a marker: not in the ground view)
       if (b.u.structure && b.walls) addWalls(f, b.x, b.y, b.walls);
     }
     // Pool shaper's pools: water on the ground, ringed in their side's colour
@@ -515,9 +516,12 @@ const Render3D = (THREE, el, view, opts = {}) => {
     const { m, me, phase, units, drag, moving, selected, hoverTile, placingUnit, editable } = v, foe = 1 - me;
     const deploying = phase === 'deploy';
     const you = color(css('--you') || '#5CC6DF'), gold = color(css('--gold') || '#E6B84A');
+    // 2v2 (v.duo): an outline circle on the ground in the colour of the squad's player (Art.DUO_RING)
+    const ownerRing = (wx, wz, R, side, sq, other) => { if (!v.duo) return; const lane = sq.lane === 0 || sq.lane === 1 ? sq.lane : other ? 1 - v.duo.lane : v.duo.lane; arc(wx, wz, R, color(v.duo.ring(side, lane)), 0.95, 1, 0.07); };
     const squad = (sq, side, fresh, other) => { // other: a squad of the other pair of players on a 2v2 board (m.team)
       if (units[sq.unit].building) { // a building bought in the shop (the Altar of Build): in the middle of its block
         const u = units[sq.unit], n = Game.footprint(m, sq.unit), w = Game.recordWorld({ col: sq.col, row: sq.row, size: n }), [wx, wz] = world(f, w.x, w.y);
+        ownerRing(wx, wz, T * 0.47 * n, side, sq, other);
         bodies.push({ u: { ...u, size: n }, side, x: w.x, y: w.y, look: sq.built ? 'solid' : 'glass' });
         if (!sq.built) arc(wx, wz, 2.6 * n, gold, 0.95, sq.progress || 0, 0.05);
         if (fresh) for (const [c, r] of Game.blockOf(m, sq.unit, sq.col, sq.row)) { const st = tileCenter(v, c, r); tileSq(st.c, st.r, teamColor(side, me), 0.8, 0.05, 14); }
@@ -549,7 +553,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
       if (awake) arc(wx, wz, T * 0.42, gold, 0.85, 1, 0.07); // awakened: a gold ring on its tile
       if (Game.glutOf(sq) > 0 && u.glut) arc(wx, wz, T * 0.36, color(GLUT_COL), 0.85, Math.min(1, Game.glutOf(sq) / u.glut.max), 0.08, 24); // the Obelisk's Glut
       if (side === me && !other && deploying && Game.isReady(m, sq)) icon('plus', wx + (camRight.x - camDown.x) * o, top + 0.2, wz + (camRight.z - camDown.z) * o, 0.9 * bs);
-      if (other && side === me) arc(wx, wz, T * 0.44, teamColor(side, me), 0.55, 1, 0.05); // your teammate's: a thin ring on its tile
+      ownerRing(wx, wz, T * 0.46, side, sq, other); // 2v2: whose it is
       return [wx, wz];
     };
     // the opponent's squads from this round stay hidden until the fight; a squad they moved shows on its old tile

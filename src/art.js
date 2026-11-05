@@ -6,6 +6,15 @@ const Art = (() => {
   const ELF_COL = '#D8E68C'; // the neutral elf tower and its arrows
   // a side's colour as the screen of side `me` shows it: yours, the opponent's, or the elves' (side 2)
   const teamCol = (side, me) => side === 2 ? ELF_COL : side === me ? css('--you') : css('--foe');
+  // 2v2: a colour per player, as one phone sees them (the outline circles under squads, the HUD legend, pings, stats).
+  // Your team in two shades of your team colour (you light, your teammate a deeper blue); the opponents in two warm
+  // colours (your own lane's opponent red, the other one orange). Each pair also differs in lightness (colour blindness).
+  const DUO_RING = {
+    you: { col: '#B4EEFA', name: 'light cyan' },
+    mate: { col: '#3F6FFF', name: 'blue' },
+    foe: { col: '#E5392F', name: 'red' },
+    foe2: { col: '#FFB341', name: 'orange' },
+  };
   // mushroom tiles, by type
   const SHROOM_COL = { purple: '#B57BFF', yellow: '#F2D25C', green: '#7BD66A' };
   // Matteo's charisma
@@ -145,5 +154,5 @@ const Art = (() => {
   }
   // a held beam's strength: steady with a cold shimmer, fading out over its last 0.1 s
   const beamAlpha = (e) => e.held ? Math.min(1, (e.life - e.age) / 0.1) * (0.85 + 0.15 * Math.sin(e.age * 31)) : 1 - e.age / e.life;
-  return { frostBeam, frostFollow, beamAlpha, css, teamCol, ELF_COL, SHROOM_COL, CHARM_COL, BLEED_COL, POOL_COL, FROST_COL, GLUT_COL, ARMS, arms, armsFlag, armsImg, keep };
+  return { frostBeam, frostFollow, beamAlpha, css, teamCol, ELF_COL, SHROOM_COL, CHARM_COL, BLEED_COL, POOL_COL, FROST_COL, GLUT_COL, DUO_RING, ARMS, arms, armsFlag, armsImg, keep };
 })();

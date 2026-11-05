@@ -517,11 +517,11 @@ const Game = (() => {
       flank: Array(18).fill('F............F').map((r, i) => i === 0 || i === 17 ? 'FF..........FF' : r),
       buildings: [{ kind: 'tower', side: 0, col: 9, row: 16 }, { kind: 'tower', side: 1, col: 4, row: 1 }, { kind: 'treasury', side: 0, col: 4, row: 15 }, { kind: 'treasury', side: 1, col: 9, row: 2 }] },
     // 2v2 (src/duo.js): one wide board both players of a team deploy on, one shared tower and treasury per team in the
-    // middle of the back rows, and two columns of flank tiles on each edge
+    // back rows (tower right of centre, treasury left, point-mirrored for the other team), and two columns of flank tiles on each edge
     duo: { format: 'nml-map', version: 1, name: '2v2', base: 'testgrid', cols: 24, rows: 18, zone: 7, symmetry: 'point',
       tiles: Array(18).fill('.'.repeat(24)), shape: Array(18).fill('.'.repeat(24)), height: Array(18).fill('.'.repeat(24)),
       flank: Array(18).fill('FF' + '.'.repeat(20) + 'FF'),
-      buildings: [{ kind: 'tower', side: 0, col: 12, row: 16 }, { kind: 'tower', side: 1, col: 11, row: 1 }, { kind: 'treasury', side: 0, col: 10, row: 15 }, { kind: 'treasury', side: 1, col: 13, row: 2 }] },
+      buildings: [{ kind: 'tower', side: 0, col: 17, row: 16 }, { kind: 'tower', side: 1, col: 6, row: 1 }, { kind: 'treasury', side: 0, col: 6, row: 15 }, { kind: 'treasury', side: 1, col: 17, row: 2 }] },
   };
   // A map entry for MAPS from an editor map: its grid, its towers' and treasuries' tiles (spots), its flank tiles (when
   // they differ from the game's: flankSet) and its terrain (when it has any). Rules on top come in `extra`. Maps made on

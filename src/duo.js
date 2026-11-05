@@ -10,7 +10,8 @@
 //   seat 2 = B1 (lane 0, side 1)   seat 3 = B2 (lane 1, side 1)
 //
 // - m.team (Game.teamArmy / teamSeen): each lane's match carries the other lane's squads, so a teammate's squad takes
-//   its tile and the other opponent's squads hold theirs, as your own would. Their ids are moved by OFF.
+//   its tile and the other opponent's squads hold theirs, as your own would. Their ids are moved by OFF. It also carries
+//   that lane's skills (tech) for the unit sheets; the page's ownerOf says whose any squad is (seat, name, you/mate/foe).
 // - The team's tower and treasury: lane 0's stand in the fight; lane 1's never do (same tiles, same type). Tower
 //   purchases (tower skills, walls, Fortify, mage generals) are the team's: whoever buys pays, and both lanes get it
 //   (copyTeam). Only the buyer can take back their own buy. The Bank's Major investment stays each player's own.
@@ -52,9 +53,13 @@
   const moved = (q) => { const o = { ...q, id: move(q.id) }; if (q.in != null) o.in = move(q.in); if (q.from && q.from.in != null) o.from = { ...q.from, in: move(q.from.in) }; return o; };
   // the squads of match o (the other lane) as m.team carries them; half: the half of the board this lane's players use.
   // buildings: the other lane's buildings from skills (the Cog Builder's Factory: { id, col, row, round, built }), so
-  // their tiles are taken in this lane too (Game.occupied) and the board can draw them
+  // their tiles are taken in this lane too (Game.occupied) and the board can draw them.
+  // tech: that lane's skills, so a teammate's (or the other opponent's) unit sheet shows their own (a seat's view gets
+  // o as Referee.view hides it, so the opponents' skills bought this round stay hidden). Direction arrows (sq.aim) come
+  // along with the squads: the teammate's all, the opponents' never while deploying (Referee.hide drops them).
   const teamOf = (o, half) => ({ half, armies: [0, 1].map(sd => (o.armies[sd] || []).map(moved)),
-    buildings: [0, 1].map(sd => ((o.buildings && o.buildings[sd]) || []).map(b => ({ id: b.id, col: b.col, row: b.row, round: b.round, built: !!b.built }))) });
+    buildings: [0, 1].map(sd => ((o.buildings && o.buildings[sd]) || []).map(b => ({ id: b.id, col: b.col, row: b.row, round: b.round, built: !!b.built }))),
+    tech: [0, 1].map(sd => (o.tech && o.tech[sd]) || null) });
   // the server's copy: each lane gets the other lane's squads as they really stand (the rules check against them)
   function setTeam(lanes, L) { lanes[L].team = teamOf(lanes[1 - L], L); }
   function setTeams(lanes) { setTeam(lanes, 0); setTeam(lanes, 1); }

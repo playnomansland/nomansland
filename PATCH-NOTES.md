@@ -20,6 +20,21 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 5 November 2026 – 2v2: see whose unit is whose
+
+- **Tap any unit to see its sheet**, in every phase: yours, your teammate's and the opponents'. The sheet says whose it is: **Yours**, **Name's (teammate)** or **Name's (opponent)**. A teammate's sheet is complete (stats, level, XP, skills, awakening, direction) but read only. The opponents' sheets hide this round's buys, as in 1v1. In a fight, the card of a tapped unit says whose it is too.
+- **A colour per player:** every squad has a circle in its player's colour under it, in deploy and in the fight. You are light cyan and your teammate blue; your opponents are red and orange. The top bar shows the four colours by the players' names.
+- **Your teammate's direction arrows** show on your board, thinner, in their colour. The opponents still don't see arrows until the fight.
+- **Damage stats: My units / Team units.** Team units lists both players' units, each tagged with its player, with a total for each player. Your choice is kept until you close the page.
+- **Pings fade faster:** 3 seconds instead of 8, in the colour of the player who pinged.
+- **New tower and treasury spots:** the tower stands 5 squares right of the middle and the treasury 4 squares left, mirrored for the other team.
+
+**To check with Vilhelm**
+- In a fight, tapping a unit opens its battle card (as in 1v1), now with whose it is, rather than the full sheet. The full sheet opens with a tap after the fight.
+- The team's tower, guards and airship are listed under Team units as the team's, not under one player.
+
+---
+
 ## 5 November 2026 – 2v2: tower portal and Mechites
 
 2v2 is still a developer test.
