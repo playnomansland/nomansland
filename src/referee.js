@@ -26,25 +26,28 @@
 
   // ----- actions -----
   // The Game functions a player may call on their own side: name -> kinds of the arguments after (m, side).
-  // i = integer, s = short string, x = integer or short string. A trailing '?' makes the rest optional.
+  // i = whole number 0 or more (an index, id, column or row), d = any whole number (an offset, e.g. a direction
+  // arrow's), s = short string, x = whole number 0 or more, or a short string. A trailing '?' makes the rest optional.
   // Nothing else gets through (no fortify(..., paid = false), no addAltar, no aiDeploy).
   const ACTIONS = {
     place: 'iii', unplaceSquad: 'i', moveSquad: 'iii', undoMove: '', sell: 'i',
     levelUp: 'i', undoLevel: 'i', levelAll: 'i',
     buySkill: 'ii', undoSkill: 'ii', unlock: 'i', undoUnlock: 'i', awaken: 'i', undoAwaken: 'i', huntMark: 'ii', undoHunt: 'i',
-    choosePack: 'i', setTowerType: 's',
+    choosePack: 'i', setTowerType: 's', pickLeader: 's',
     buyDeploy: '', refundDeploy: '', takeLoan: '', undoLoan: '', spin: '',
     buyTowerSkill: '', undoTowerSkill: '', buyTowerSkill2: '', undoTowerSkill2: '',
     fortify: 'iis', placeBwall: 'iis', unplaceBwall: 'iis', placeMark: 'i',
     buyMageGen: 's', undoMageGen: '?s', buyTround: 's', undoTround: 's',
     giveCharm: 'i', undoCharm: 'i', buyAltar: 's', undoAltar: 's', bribe: '', undoBribe: '',
     buyElfOwn: 'ii', undoElfOwn: '', removeShroom: 'ii', undoRemoveShroom: 'ii',
-    setAim: 'iii', clearAim: 'i',
+    setAim: 'idd', clearAim: 'i',
     buyBuilding: 'iiii', buyBuildingSkill: 'xs', undoBuildingSkill: 'x', levelBuilding: 'x', undoLevelBuilding: 'x',
   };
-  const okArg = (k, v) => k === 'i' ? Number.isInteger(v) && Math.abs(v) < 1e6
-    : k === 's' ? typeof v === 'string' && v.length <= 40
-      : k === 'x' ? (Number.isInteger(v) && Math.abs(v) < 1e6) || (typeof v === 'string' && v.length <= 40) : false;
+  const okNat = (v) => Number.isInteger(v) && v >= 0 && v < 1e6; // negative indices never reach the rules (2026-11-05)
+  const okArg = (k, v) => k === 'i' ? okNat(v)
+    : k === 'd' ? Number.isInteger(v) && Math.abs(v) < 1e6
+      : k === 's' ? typeof v === 'string' && v.length <= 40
+        : k === 'x' ? okNat(v) || (typeof v === 'string' && v.length <= 40) : false;
   // the arguments as the function gets them, or null when they don't fit
   function cleanArgs(fn, a) {
     if (!Object.prototype.hasOwnProperty.call(ACTIONS, fn) || typeof G[fn] !== 'function') return null;
@@ -93,7 +96,8 @@
     if (s.towerSkill && s.towerSkill[h] === round) s.towerSkill[h] = 0;
     if (s.towerSkill2 && s.towerSkill2[h] === round) s.towerSkill2[h] = 0;
     if (s.mageGen) { const tr = G.mageTpRound(s, h); s.mageGen[h] = tr && tr < round ? { round: -1, id: null, tp: tr } : null; } // the teleport general stays seen once its round is over
-    if (s.loan && s.loan[h] === round) s.loan[h] = 0;
+    if (s.horse) s.horse[h] = {}; // which carriers let squads in or out this round
+    if (s.loan && s.loan[h] === round) { s.loan[h] = 0; if (s.loanT) s.loanT[h] = null; }
     if (s.tround) s.tround[h] = {};
     if (s.mapFree && s.mapFree[h]) delete s.mapFree[h][round];
     if (s.map && s.map.removed) s.map.removed = s.map.removed.filter(x => !(x.side === h && x.round === round));
@@ -121,7 +125,7 @@
   // ----- Undo all: one side's part of the match, to put back -----
   // Every per-side field ([side 0, side 1] arrays, also in m.dev) plus this side's entries in the shared lists.
   const UNDO_SKIP = new Set(['units', 'matrix', 'history', 'round', 'over', 'winner', 'seed', 'off', 'offTowers', 'rules', 'factions', 'map', 'dev', 'altar', 'hp', 'packages']);
-  const UNDO_NULL = new Set(['chars', 'elfOwn', 'mageGen', 'moved', 'towers', 'woke']); // per-side fields that start as null (see game.js)
+  const UNDO_NULL = new Set(['chars', 'elfOwn', 'loanT', 'mageGen', 'mark', 'moved', 'pack', 'towers', 'vote', 'woke']); // per-side fields that start as null (see game.js)
   const perSide = (v) => Array.isArray(v) && v.length === 2;
   function sideState(m, side) {
     const o = { top: {}, dev: {} };
@@ -196,11 +200,24 @@
   // ----- the refereed match -----
   function create(settings, units) { return { v: V, settings: cleanSettings(settings, units), phase: 'lobby', m: null, round: 0, ready: [false, false], nextReady: [false, false], rematch: [false, false], seq: [0, 0], deadline: 0, held: 0, away: [0, 0], undo: [null, null], summary: null, fights: 0, lastMap: null, seed: 0 }; }
   const deployMsOf = (R) => (R.m && R.m.round === 1 ? R.settings.deploy1 : R.settings.deploy) * 1000;
-  const picksPending = (R) => !!R.m && (G.needsTowerPick(R.m, 0) || G.needsTowerPick(R.m, 1));
+  const picksPending = (R) => !!R.m && (G.needsTowerPick(R.m, 0) || G.needsTowerPick(R.m, 1) || G.needsLeaderPick(R.m, 0) || G.needsLeaderPick(R.m, 1)); // the clock waits for tower picks and the leader draft
   const someoneAway = (R, now) => [0, 1].some(sd => R.away[sd] && now - R.away[sd] < AWAY_MAX_MS);
 
   // the clock: runs unless tower picks are pending or a player is away (then held keeps what is left)
+  // The leader draft (Game.DRAFT): each pick has DRAFT_PICK_MS; a player who doesn't pick in time gets the first leader
+  // left in the pool, and the other player's turn starts. R.draftDue = when the current pick runs out (0: none pending).
+  const DRAFT_PICK_MS = 30000;
+  function draftClock(R, now) {
+    const m = R.m, turn = R.phase === 'deploy' && m && !m.over ? [0, 1].find(sd => G.leaderTurn(m, sd)) : undefined;
+    if (turn == null) { R.draftDue = 0; R.draftTurn = null; return; }
+    if (R.draftTurn !== turn || !R.draftDue) { R.draftTurn = turn; R.draftDue = now + DRAFT_PICK_MS; return; }
+    if (now < R.draftDue) return;
+    G.pickLeader(m, turn, G.draftLeft(m)[0]);
+    R.draftDue = 0;
+    draftClock(R, now); // the other player's turn
+  }
   function clock(R, now) {
+    draftClock(R, now);
     if (R.phase !== 'deploy') { R.deadline = 0; R.held = 0; return; }
     const stop = picksPending(R) || someoneAway(R, now);
     if (stop && R.deadline) { R.held = Math.max(MIN_LEFT_MS / 2, R.deadline - now); R.deadline = 0; }
@@ -226,13 +243,15 @@
   // Undo all goes back to this side as it stood once the round's picks (package, tower) were done
   function undoPoint(R, side) {
     if (R.undo[side] && R.undo[side].round === R.m.round) return;
-    if (G.needsPack(R.m, side) || G.needsTowerPick(R.m, side)) return;
+    if (G.needsPack(R.m, side) || G.needsTowerPick(R.m, side) || G.needsLeaderPick(R.m, side)) return;
     R.undo[side] = { round: R.m.round, state: sideState(R.m, side) };
   }
   // One action from a player. d: { seq, fn, a }. Returns { ok, h } (h: that side's fingerprint after it).
   function act(R, side, d, now) {
+    // Each action is handled once: a message whose number isn't above the last one handled is a resend (2026-11-05).
     const seq = Number.isInteger(d && d.seq) ? d.seq : 0;
-    if (seq > R.seq[side]) R.seq[side] = seq;
+    if (seq <= R.seq[side]) return { ok: false, why: 'dup' };
+    R.seq[side] = seq;
     if (!canAct(R, side)) return { ok: false, why: R.ready[side] ? 'ready' : 'phase' };
     if (R.deadline && now > R.deadline + GRACE_MS) return { ok: false, why: 'time' };
     const m = R.m;
@@ -244,12 +263,12 @@
     }
     const args = cleanArgs(d.fn, d.a);
     if (!args) return { ok: false, why: 'bad' };
-    if (d.fn !== 'choosePack' && d.fn !== 'setTowerType') undoPoint(R, side);
+    if (d.fn !== 'choosePack' && d.fn !== 'setTowerType' && d.fn !== 'pickLeader') undoPoint(R, side);
     let r;
     try { r = G[d.fn](m, side, ...args); } catch (e) { return { ok: false, why: 'error' }; }
     if (!r) return { ok: false, why: 'rules' };
     if (d.fn === 'spin' && R.undo[side]) R.undo[side] = { round: m.round, state: sideState(m, side) }; // a spin can't be undone
-    if (d.fn === 'choosePack' || d.fn === 'setTowerType') clock(R, now); // a tower pick may let the clock start
+    if (d.fn === 'choosePack' || d.fn === 'setTowerType' || d.fn === 'pickLeader') clock(R, now); // a tower pick or the draft may let the clock start
     return { ok: true, h: sideHash(m, side) };
   }
   // Ready (or not). Returns the fight when both are ready.
@@ -283,6 +302,7 @@
     if (R.phase !== 'deploy') return 0;
     if (R.deadline) return R.deadline + GRACE_MS;
     const left = [0, 1].filter(sd => R.away[sd]).map(sd => R.away[sd] + AWAY_MAX_MS).filter(t => t > now);
+    if (R.draftDue) left.push(R.draftDue - 50); // a leader pick running out
     return left.length ? Math.min(...left) + 50 : 0;
   }
   // the results screen: both moved on (or the clock for it ran out on their phones) -> the next round
@@ -317,7 +337,7 @@
   const api = {
     V, ACTIONS, cleanArgs, snapshot, withUnits, hide, view, viewOf, sideState, restoreSide, stable, fnv, sideHash, fight,
     cleanSettings, newMatch, create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, clock,
-    canAct, save, load, GRACE_MS, AWAY_MAX_MS, DEPLOY_SECONDS, FIRST_DEPLOY_SECONDS,
+    canAct, save, load, DRAFT_PICK_MS, GRACE_MS, AWAY_MAX_MS, DEPLOY_SECONDS, FIRST_DEPLOY_SECONDS,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Referee = api;

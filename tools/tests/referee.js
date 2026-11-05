@@ -61,7 +61,7 @@ function playMatch(settings, seed, opts = {}) {
     assert.strictEqual(res.winner, f.summary.winner, 'playback winner');
     assert.ok(Math.abs(res.time - f.summary.time) < 1e-9, 'playback time');
     assert.deepStrictEqual(copy(f.post), copy(Ref.snapshot(R.m)), 'post is the match now');
-    if (!stats.chars) stats.chars = R.m.chars.slice();
+    if (!stats.chars && R.m.chars.every(Boolean)) stats.chars = R.m.chars.slice(); // both leaders, once drafted (before round 2)
     if (R.phase === 'end') break;
     assert.ok(!Ref.next(R, 0, f.summary.round, T));
     assert.ok(Ref.next(R, 1, f.summary.round, T), 'both moved on: next round');
@@ -76,16 +76,20 @@ const maps = Game.MAPS.map(x => x.id);
 const chars = Game.CHARACTERS.map(c => c.id);
 const QUICK = !!process.env.QUICK;
 let n = 0, refused = 0, acts = 0;
+// the leader draft: two leaders left in, so each match has both (one each, never the same)
+const pairOf = (k) => [chars[(2 * k) % chars.length], chars[(2 * k + 1) % chars.length]];
+const sameSet = (a, b) => assert.deepStrictEqual(a.slice().sort(), b.slice().sort());
 for (const [k, map] of maps.entries()) {
-  const lead = chars[k % chars.length];
-  const { stats } = playMatch({ map, offChars: chars.filter(c => c !== lead) }, 100 + k);
+  const pair = pairOf(k);
+  const { stats } = playMatch({ map, offChars: chars.filter(c => !pair.includes(c)) }, 100 + k);
   assert.strictEqual(stats.maps, map);
-  assert.deepStrictEqual(stats.chars, [lead, lead], 'leader forced');
+  sameSet(stats.chars, pair);
   n++; refused += stats.refused; acts += stats.acts;
 }
 for (const [k, lead] of (QUICK ? ['otto', 'zoe'] : chars).entries()) {
-  const { stats } = playMatch({ offChars: chars.filter(c => c !== lead), mirror: k % 2 === 1 }, 500 + k);
-  assert.deepStrictEqual(stats.chars, [lead, lead]);
+  const pair = [lead, lead === 'cage' ? 'felix' : 'cage'];
+  const { stats } = playMatch({ offChars: chars.filter(c => !pair.includes(c)), mirror: k % 2 === 1 }, 500 + k);
+  sameSet(stats.chars, pair);
   n++; refused += stats.refused; acts += stats.acts;
 }
 console.log(`whole matches: ${n} (every map and leader), ${acts} actions, ${refused} refused for hidden info`);
@@ -94,10 +98,10 @@ assert.ok(refused <= acts * 0.02, 'almost every honest action goes through');
 // ----- cheating -----
 {
   const R = Ref.create({ map: 'forest' }, units);
-  Ref.start(R, units, matrix, T, 42);
+  Ref.start(R, units, matrix, T, 42); let Q = 0; // action numbers: each one higher than the last (a resend is refused)
   const m = R.m, before = () => JSON.stringify(Ref.snapshot(m));
   let s0 = before();
-  const no = (side, fn, a, why) => { const res = Ref.act(R, side, { seq: 1, fn, a }, T); assert.ok(!res.ok, `${fn} ${JSON.stringify(a)} refused (${why})`); assert.strictEqual(before(), s0, `${fn}: nothing changed`); };
+  const no = (side, fn, a, why) => { const res = Ref.act(R, side, { seq: ++Q, fn, a }, T); assert.ok(!res.ok, `${fn} ${JSON.stringify(a)} refused (${why})`); assert.strictEqual(before(), s0, `${fn}: nothing changed`); };
   // things that aren't actions at all
   no(0, 'addAltar', ['x'], 'not an action');
   no(0, 'aiDeploy', [], 'not an action');
@@ -112,9 +116,9 @@ assert.ok(refused <= acts * 0.02, 'almost every honest action goes through');
   no(0, 'sell', [{ id: 1 }], 'an object');
   no(0, 'setTowerType', ['x'.repeat(200)], 'a long string');
   // the package first
-  assert.ok(Ref.act(R, 0, { seq: 2, fn: 'choosePack', a: [0] }, T).ok);
-  assert.ok(Ref.act(R, 1, { seq: 2, fn: 'choosePack', a: [1] }, T).ok);
-  assert.ok(!Ref.act(R, 0, { seq: 3, fn: 'choosePack', a: [1] }, T).ok, 'a second package');
+  assert.ok(Ref.act(R, 0, { seq: ++Q, fn: 'choosePack', a: [0] }, T).ok);
+  assert.ok(Ref.act(R, 1, { seq: ++Q, fn: 'choosePack', a: [1] }, T).ok);
+  assert.ok(!Ref.act(R, 0, { seq: ++Q, fn: 'choosePack', a: [1] }, T).ok, 'a second package');
   s0 = before();
   const locked = units.map((u, i) => i).find(i => !Game.isUnlocked(m, 0, i) && !Game.isOff(m, i, 0));
   no(0, 'place', [locked, 3, 13], 'a locked unit');
@@ -127,7 +131,7 @@ assert.ok(refused <= acts * 0.02, 'almost every honest action goes through');
   no(0, 'moveSquad', [m.armies[1][0].id + 1000, 4, 13], 'a squad of the other side');
   // side 1 can't touch side 0's squads: the same id on side 1 is their own (ids are per side)
   const id0 = m.armies[0][0].id, at0 = { col: m.armies[0][0].col, row: m.armies[0][0].row };
-  Ref.act(R, 1, { seq: 9, fn: 'unplaceSquad', a: [id0] }, T);
+  Ref.act(R, 1, { seq: ++Q, fn: 'unplaceSquad', a: [id0] }, T);
   assert.ok(m.armies[0].some(q => q.id === id0 && q.col === at0.col && q.row === at0.row), 'side 0\'s squad stays');
   s0 = before();
   // gold runs out: as many squads as the gold buys, then no more
@@ -137,12 +141,12 @@ assert.ok(refused <= acts * 0.02, 'almost every honest action goes through');
   let placed = 0;
   const spots = [];
   for (let row = 10; row <= 15; row++) for (let col = 0; col < Game.COLS; col++) spots.push([col, row]);
-  for (const [col, row] of spots) { if (Ref.act(R, 0, { seq: 10, fn: 'place', a: [mine, col, row] }, T).ok) placed++; if (placed > 10) break; }
+  for (const [col, row] of spots) { if (Ref.act(R, 0, { seq: ++Q, fn: 'place', a: [mine, col, row] }, T).ok) placed++; if (placed > 10) break; }
   assert.ok(placed <= Math.min(Math.floor(250 / cost), Game.deploysAllowed(m, 0)), `no more squads than gold and deployments allow (${placed})`);
   assert.ok(m.gold[0] >= 0);
   // Undo all puts the round back as it was after the package
   const pick = m.armies[0].filter(q => q.round === 1 && q.free).length;
-  assert.ok(Ref.act(R, 0, { seq: 11, fn: 'undoAll' }, T).ok);
+  assert.ok(Ref.act(R, 0, { seq: ++Q, fn: 'undoAll' }, T).ok);
   assert.strictEqual(m.gold[0], R.undo[0].state.top.gold, 'gold as it was before the squads');
   assert.strictEqual(m.armies[0].filter(q => q.round === 1 && !q.free).length, 0, 'Undo all: the bought squads are gone');
   assert.strictEqual(m.armies[0].filter(q => q.free).length, pick, 'the package squads stay');
@@ -151,11 +155,11 @@ assert.ok(refused <= acts * 0.02, 'almost every honest action goes through');
   s0 = before();
   no(0, 'buyDeploy', [], 'after Ready');
   Ref.setReady(R, 0, false, T); // Ready can be taken back while the clock runs
-  assert.ok(Ref.act(R, 0, { seq: 12, fn: 'buyDeploy', a: [] }, T).ok || true);
+  assert.ok(Ref.act(R, 0, { seq: ++Q, fn: 'buyDeploy', a: [] }, T).ok || true);
   // after the clock: nothing more, then the fight starts by itself
   s0 = before();
   const late = R.deadline + Ref.GRACE_MS + 1;
-  assert.ok(!Ref.act(R, 1, { seq: 13, fn: 'buyDeploy', a: [] }, late).ok, 'after the clock');
+  assert.ok(!Ref.act(R, 1, { seq: ++Q, fn: 'buyDeploy', a: [] }, late).ok, 'after the clock');
   assert.strictEqual(Ref.tick(R, R.deadline - 1), null, 'not yet');
   const f = Ref.tick(R, late);
   assert.ok(f && R.phase === 'result', 'the clock ran out: the fight');

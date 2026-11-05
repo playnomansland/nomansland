@@ -20,6 +20,7 @@ function deploy(local, side, opts) {
   const call = (fn, ...a) => { let ok; try { ok = Game[fn](local, side, ...a); } catch (e) { ok = false; } if (ok) acts.push({ fn, a }); return ok; };
   const m = local;
   if (Game.needsPack(m, side)) call('choosePack', Math.floor(r() * m.packages[side].length));
+  if (Game.leaderTurn(m, side)) { const left = Game.draftLeft(m); call('pickLeader', left[Math.floor(r() * left.length)]); } // the leader draft (2026-11-05)
   if (Game.needsTowerPick(m, side)) { const ch = Game.towerChoices(m, side); call('setTowerType', ch[Math.floor(r() * ch.length)].id); }
   for (let k = 0; k < (opts.spins || 0); k++) if (Game.canSpin(m, side)) call('spin');
   // level up what is ready, now and then a skill, a loan, a sale or a move

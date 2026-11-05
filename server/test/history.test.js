@@ -85,7 +85,7 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 5 * 60 *
       assert.ok(Array.isArray(row.armies[0]) && Array.isArray(row.skills[1]) && row.towers.length === 2);
     });
     assert.ok(one.rounds.some((row) => row.armies[0].length && row.armies[0][0].unit && row.armies[0][0].level >= 1), 'armies saved with unit and level');
-    assert.ok(one.rounds.every((row) => row.leaders.every((x) => x)), 'leaders saved');
+    assert.ok(one.rounds.every((row) => row.round < 2 || row.leaders.every((x) => x)), 'leaders saved (drafted before round 2)');
     // a match id with the seed gives the same rounds
     assert.strictEqual((await getJson(`/history/${one.matchId}`)).rounds.length, fights.length);
     // the list: newest first, paged

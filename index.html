@@ -4668,6 +4668,9 @@ const Game = (() => {
   const LOAN = { gold: 100, payback: 200 }, CREDIT_LINE = { gold: 200, payback: 300 };
   const loanTerms = (m, side) => towerPicked(m, side) && towerType(m, side).id === 'bank' ? CREDIT_LINE : LOAN;
   const loanNow = (m, side) => !!(m && m.loan && m.loan[side] === m.round);
+  // the terms the last loan was taken on (m.loanT[side], kept from takeLoan, 2026-11-05): payback and undo use these, not
+  // whatever the tower offers by then. A match from before has none: the terms of the tower it has now, as before.
+  const loanTaken = (m, side) => (m && m.loanT && m.loanT[side]) || loanTerms(m, side);
   // the bank does one thing a round: a loan or the Major investment, not both. bankBusy(m, side, want): the other one
   // was used this round, so `want` ('loan' or 'invest') can't be
   const investNow = (m, side) => !!(m && m.towerSkill2 && m.towerSkill2[side] === m.round && towerType(m, side).id === 'bank');
@@ -4677,13 +4680,17 @@ const Game = (() => {
     if (!canTakeLoan(m, side)) return false;
     if (!m.loan) m.loan = [0, 0];
     m.loan[side] = m.round;
-    m.gold[side] += loanTerms(m, side).gold;
+    const L = loanTerms(m, side);
+    if (!m.loanT) m.loanT = [null, null];
+    m.loanT[side] = { gold: L.gold, payback: L.payback };
+    m.gold[side] += L.gold;
     return true;
   }
   function undoLoan(m, side) {
-    const L = loanTerms(m, side);
+    const L = loanTaken(m, side);
     if (!loanNow(m, side) || m.gold[side] < L.gold) return false;
     m.loan[side] = 0;
+    if (m.loanT) m.loanT[side] = null;
     m.gold[side] -= L.gold;
     return true;
   }
@@ -4803,6 +4810,44 @@ const Game = (() => {
   const charmMap = (m, side) => charOf(m, side) === 'matteo' ? Object.fromEntries(m.armies[side].map(q => [q.id, charmOf(q)])) : null;
   const charOf = (m, side) => (m && m.chars && m.chars[side]) || null;
   const charInfo = (id) => CHARACTERS.find(c => c.id === id) || null;
+  // ---------- the leader draft (2026-11-05) ----------
+  // Packages no longer come with a leader. Before round DRAFT.round both players pick one from the same pool of
+  // DRAFT.pool leaders: the winner of round 1 first (a draw: a seeded coin flip), then the other player from what is
+  // left, so the two leaders are never the same. The picks are open: each player sees what the other took.
+  // m.draft = { pool: [ids] } (null: leaders come with the packages, as before: Factions, 2v2, the tutorial).
+  const DRAFT = { round: 2, pool: 5 };
+  function draftPool(r, offChars) {
+    const shuffle = (ids) => { for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; } return ids; };
+    const ids = shuffle(CHARACTERS.map(c => c.id).filter(id => !(offChars || []).includes(id)));
+    if (ids.length < 2) ids.push(...shuffle(CHARACTERS.map(c => c.id).filter(id => !ids.includes(id))).slice(0, 2 - ids.length)); // a draft needs two at least
+    return ids.slice(0, Math.max(2, DRAFT.pool));
+  }
+  const drafting = (m) => !!(m && m.draft && Array.isArray(m.draft.pool));
+  // who picks first: round 1's winner; a draw is a coin flip from the match's seed
+  function draftFirst(m) {
+    if (!drafting(m) || m.round < DRAFT.round) return null;
+    const h = m.history && m.history[0], w = h ? h.winner : -1;
+    return w === 0 || w === 1 ? w : (rng(m.seed + 9091)() < 0.5 ? 0 : 1);
+  }
+  const needsLeaderPick = (m, side) => drafting(m) && m.round >= DRAFT.round && !charOf(m, side);
+  // whether it is this player's turn to pick (the first picker always; the other once the first has picked)
+  const leaderTurn = (m, side) => needsLeaderPick(m, side) && (side === draftFirst(m) || !!charOf(m, 1 - side));
+  const leaderTaken = (m, id) => !!(m && m.chars && m.chars.includes(id));
+  const draftLeft = (m) => drafting(m) ? m.draft.pool.filter(id => !leaderTaken(m, id)) : [];
+  const canPickLeader = (m, side, id) => leaderTurn(m, side) && m.draft.pool.includes(id) && !leaderTaken(m, id);
+  function pickLeader(m, side, id) {
+    if (!canPickLeader(m, side, id)) return false;
+    if (!m.chars) m.chars = [null, null];
+    m.chars[side] = id;
+    rollBuffTiles(m, side); // Zoe's buff tiles for this round
+    return true;
+  }
+  // before a fight: a player who didn't pick gets the first leader left in the pool (the first picker first)
+  function settleLeaders(m) {
+    if (!drafting(m) || m.round < DRAFT.round) return;
+    const f = draftFirst(m);
+    for (const sd of [f, 1 - f]) if (needsLeaderPick(m, sd)) pickLeader(m, sd, draftLeft(m)[0]);
+  }
   // Blixten: the first map or tower purchase each round is BLIX_OFF gold cheaper. m.mapFree[side][round] = the purchase that got it:
   // { kind: 'bribe' } (the round's first bribe), { kind: 'altar', type }, { kind: 'shroom', col, row }, { kind: 'elf' },
   // { kind: 'tskill' }, { kind: 'tskill2' } (not Major investment), { kind: 'mgen' } (a mage general) or { kind: 'mtp' } (the teleport general)
@@ -4855,12 +4900,12 @@ const Game = (() => {
       nml: Array(18).fill('..............').map((r, i) => i === 8 || i === 9 ? 'NNNNNNNNNNNNNN' : r),
       flank: Array(18).fill('F............F').map((r, i) => i === 0 || i === 17 ? 'FF..........FF' : r),
       buildings: [{ kind: 'tower', side: 0, col: 9, row: 16 }, { kind: 'tower', side: 1, col: 4, row: 1 }, { kind: 'treasury', side: 0, col: 4, row: 15 }, { kind: 'treasury', side: 1, col: 9, row: 2 }] },
-    // 2v2 (src/duo.js): one wide board both players of a team deploy on, one shared tower and treasury per team in the
-    // back rows (tower right of centre, treasury left, point-mirrored for the other team), and two columns of flank tiles on each edge
+    // 2v2 (src/duo.js): one wide board both players of a team deploy on, one shared tower per team in the back rows
+    // (right of centre, point-mirrored for the other team), and two columns of flank tiles on each edge
     duo: { format: 'nml-map', version: 1, name: '2v2', base: 'testgrid', cols: 24, rows: 18, zone: 7, symmetry: 'point',
       tiles: Array(18).fill('.'.repeat(24)), shape: Array(18).fill('.'.repeat(24)), height: Array(18).fill('.'.repeat(24)),
       flank: Array(18).fill('FF' + '.'.repeat(20) + 'FF'),
-      buildings: [{ kind: 'tower', side: 0, col: 17, row: 16 }, { kind: 'tower', side: 1, col: 6, row: 1 }, { kind: 'treasury', side: 0, col: 6, row: 15 }, { kind: 'treasury', side: 1, col: 17, row: 2 }] },
+      buildings: [{ kind: 'tower', side: 0, col: 17, row: 16 }, { kind: 'tower', side: 1, col: 6, row: 1 }] }, // no treasury since 2026-11-05 (a 2v2 building system is coming)
   };
   // A map entry for MAPS from an editor map: its grid, its towers' and treasuries' tiles (spots), its flank tiles (when
   // they differ from the game's: flankSet) and its terrain (when it has any). Rules on top come in `extra`. Maps made on
@@ -4892,7 +4937,7 @@ const Game = (() => {
     editorMap('rush', EDITOR_MAPS.rush, { short: 'Deep zones, only 2 rows of no man’s land: the armies meet at once.', text: 'Each zone is 14 by 8 tiles, with only 2 rows of no man’s land between them, so the armies meet almost at once. The towers stand one column further in, and the back corners are flank tiles too. A treasury pays 50 gold per fight it survives.' }), // only when picked, never random
   ];
   // Boards played only by a game mode of their own, never picked or rolled (not in MAPS): 'duo' is the 2v2 board (src/duo.js)
-  const TEAM_MAPS = [editorMap('duo', EDITOR_MAPS.duo, { short: 'One wide board for two teams of two.', text: 'One wide board: both players of a team deploy in the same zone and share one tower and one treasury. Two columns of flank tiles on each edge.', skins: true, team: true })];
+  const TEAM_MAPS = [editorMap('duo', EDITOR_MAPS.duo, { short: 'One wide board for two teams of two.', text: 'One wide board: both players of a team deploy in the same zone and share one tower. Two columns of flank tiles on each edge.', skins: true, team: true })];
   // Boards only drawn, never played or picked (none since 2v2 became one board, 2026-11-03)
   const VIEW_MAPS = [];
   const findMap = (id) => MAPS.find(x => x.id === id) || TEAM_MAPS.find(x => x.id === id) || VIEW_MAPS.find(x => x.id === id);
@@ -5275,7 +5320,7 @@ const Game = (() => {
   // Lab can play the AI through the server referee (tools/balance-lab.js).
   let aiRec = null, aiFns = null;
   function aiCall(fn, m, side, ...a) {
-    aiFns = aiFns || { awaken, bribe, buyAltar, buyBuilding, buyBuildingSkill, buyDeploy, buyElfOwn, buyMageGen, buySkill, buyTowerSkill, buyTowerSkill2, buyTround, choosePack, fortify, huntMark, levelBuilding, levelUp, place, placeMark, removeShroom, setTowerType, spin, takeLoan, unlock };
+    aiFns = aiFns || { awaken, bribe, buyAltar, buyBuilding, buyBuildingSkill, buyDeploy, buyElfOwn, buyMageGen, buySkill, buyTowerSkill, buyTowerSkill2, buyTround, choosePack, fortify, huntMark, levelBuilding, levelUp, pickLeader, place, placeMark, removeShroom, setTowerType, spin, takeLoan, unlock };
     const r = aiFns[fn](m, side, ...a);
     if (r && aiRec) aiRec.push({ fn, a });
     return r;
@@ -5493,6 +5538,7 @@ const Game = (() => {
   // before a fight: pick the first package for a player who didn't choose, and put unplaced package squads down
   function ensurePack(m, side) {
     if (needsPack(m, side)) choosePack(m, side, 0);
+    settleLeaders(m); // and the leader draft
     const r = rng(m.seed + 4242 + side);
     for (const ui of freeLeft(m, side)) {
       const spot = aiSpot(m, side, ui, [], r);
@@ -5527,7 +5573,7 @@ const Game = (() => {
       moved: [null, null], // id of the squad each player moved this round (one move per round, CONFIG.moveCost gold)
       tech: [{}, {}], // skills bought per unit type: tech[side][unitIdx] = [round bought or 0, round bought or 0]
       towers: null, // { col, row } of each player's tower (fixed; set below, as it depends on the map)
-      chars: [null, null], // each player's character id (comes with the package)
+      chars: [null, null], // each player's character (leader) id: picked in the draft before round 2 (DRAFT), or with the package
       buff: [[], []], // Zoe's buff tiles for this round: [{ col, row }, ...]
       zoeUses: [0, 0], // fights each player has used Zoe's buff tiles in (the buff grows with them: zoeBuff)
       buildings: [[], []], // each player's buildings (the Mechites' Factory), see buyBuilding
@@ -5554,6 +5600,10 @@ const Game = (() => {
     if (opts && opts.late && !factions && !dev) { m.late = true; m.hp = [startHp(m), startHp(m)]; } // DEVTESTLATEGAME
     if (opts && opts.mirror && !factions) { m.mirror = true; m.packages[1] = JSON.parse(JSON.stringify(m.packages[0])); } // the same rolls for both
     if (opts && opts.noChars) { m.noChars = true; for (const ps of m.packages) for (const p of ps) p.char = null; } // no leaders (2v2)
+    if (!factions && !dev && !(opts && opts.noChars) && !(opts && opts.draft === false)) { // the leader draft before round 2 (DRAFT)
+      m.draft = { pool: draftPool(rng((seed >>> 0) + 6113), offChars) };
+      for (const ps of m.packages) for (const p of ps) p.char = null;
+    }
     m.towers = [towerSpot(m, 0), towerSpot(m, 1)];
     { // the look: the host's pick, or 'random': one of the looks from the match's seed (never the last match's again)
       const mp = findMap(m.map.id); let sk = opts && opts.skin;
@@ -6079,6 +6129,25 @@ const Game = (() => {
   const canMove = (m, side, sq) => !!sq && !(m.units[sq.unit] && m.units[sq.unit].building) && (sq.round === m.round || freeMover(m, side, sq) || freeOut(m, side, sq) || // a building stays put
     sq.luckMove === m.round || (movedId(m, side) !== sq.id && freeMovesLeft(m, side) > 0) || // a free move (Bastion's March order, Otto's horseshoe)
     (movedId(m, side) == null ? m.gold[side] >= CONFIG.moveCost : movedId(m, side) === sq.id));
+  // Each carrier lets one squad out and one squad in per round (2026-11-05; before, a rider could hop in and out
+  // without limit). Only squads from earlier rounds count: this round's squads move freely anyway.
+  // m.horse[side][carrier id] = { r: round, in: squad id, out: squad id }. A squad that goes back to where it was
+  // gives its places back.
+  const horseUse = (m, side, cid) => { const h = m.horse && m.horse[side] && m.horse[side][cid]; return h && h.r === m.round ? h : null; };
+  const horseOk = (m, side, cid, way, sqId) => { const h = horseUse(m, side, cid); return !h || h[way] == null || h[way] === sqId; };
+  const horseLeft = (m, side, cid) => ['in', 'out'].filter(w => horseOk(m, side, cid, w, -1)); // what a carrier has left this round
+  function horseNote(m, side, cid, way, sqId) {
+    if (!m.horse) m.horse = [{}, {}];
+    if (!m.horse[side]) m.horse[side] = {};
+    const h = horseUse(m, side, cid) || { r: m.round };
+    h[way] = sqId;
+    m.horse[side][cid] = h;
+  }
+  function horseForget(m, side, sqId) {
+    const all = m.horse && m.horse[side];
+    if (!all) return;
+    for (const cid in all) { const h = all[cid]; if (h.r !== m.round) continue; if (h.in === sqId) delete h.in; if (h.out === sqId) delete h.out; }
+  }
   function moveSquad(m, side, sqId, col, row) {
     const sq = m.armies[side].find(s => s.id === sqId);
     if (!sq || (sq.col === col && sq.row === row) || !canMove(m, side, sq)) return false;
@@ -6086,6 +6155,9 @@ const Game = (() => {
     const into = boardable(m, side, col, row, sq.unit);
     if (into && into.id === sq.in) return false;
     if (!canPlaceAt(m, side, col, row, sq.unit, true) || (occupied(m, side, col, row) && !into && !garrisonFree(m, side, col, row, sq.unit))) return false;
+    const old = sq.round !== m.round, outOf = isRider(sq) ? sq.in : null;
+    if (old && outOf != null && !horseOk(m, side, outOf, 'out', sq.id)) return false; // this carrier has let one out already
+    if (old && into && !horseOk(m, side, into.id, 'in', sq.id)) return false;          // or taken one in
     const free = freeMover(m, side, sq) || freeOut(m, side, sq);
     if (sq.round !== m.round && !free && movedId(m, side) !== sq.id && sq.luckMove !== m.round && freeMovesLeft(m, side) > 0) { // a free move (used before the paid one)
       sq.from = { col: sq.col, row: sq.row, ...(isRider(sq) ? { in: sq.in } : {}) };
@@ -6104,7 +6176,10 @@ const Game = (() => {
     sq.col = col; sq.row = row;
     if (into) sq.in = into.id; else delete sq.in;
     syncRiders(m, side);
+    if (old && outOf != null) horseNote(m, side, outOf, 'out', sq.id);
+    if (old && into) horseNote(m, side, into.id, 'in', sq.id);
     if (sq.from && sq.movedRound === m.round && sq.from.col === col && sq.from.row === row && sq.from.in === sq.in) {
+      horseForget(m, side, sq.id);
       if (movedId(m, side) === sq.id) undoMove(m, side); else { delete sq.from; delete sq.movedRound; delete sq.luckMove; } // back where it was (a free move costs nothing to undo)
     }
     return true;
@@ -6120,6 +6195,7 @@ const Game = (() => {
     sq.col = sq.from.col; sq.row = sq.from.row;
     if (back) sq.in = back.id; else delete sq.in;
     delete sq.from; delete sq.movedRound;
+    horseForget(m, side, sq.id);
     syncRiders(m, side);
     m.moved[side] = null;
     m.gold[side] += CONFIG.moveCost;
@@ -6788,7 +6864,7 @@ const Game = (() => {
     // a bank loan taken in the round just fought is paid back out of this round's gold (never below nothing)
     summary.loan = [0, 1].map(sd => {
       if (!(m.loan && m.loan[sd] === m.round - 1)) return 0;
-      const cut = Math.min(loanTerms(m, sd).payback, m.gold[sd] - before[sd]);
+      const cut = Math.min(loanTaken(m, sd).payback, m.gold[sd] - before[sd]);
       m.gold[sd] -= cut;
       return cut;
     });
@@ -7434,6 +7510,7 @@ const Game = (() => {
       });
       aiCall('choosePack', m, side, bk);
     }
+    if (leaderTurn(m, side)) { const left = draftLeft(m); aiCall('pickLeader', m, side, left[Math.floor(rng(m.seed + side * 3331 + 5)() * left.length)]); } // the leader draft (own stream)
     if (needsTower(m, side)) { // tower first: a back corner, left or right
       const rows = zoneRows(side);
       const col = r() < 0.5 ? 1 + Math.floor(r() * 2) : 9 + Math.floor(r() * 2);
@@ -7599,17 +7676,17 @@ const Game = (() => {
 
   const api = {
     MAX_ROUND_DMG, TIER_DMG, bankBusy, seenAt, charShown, towerTypeShown, altarShown, elfOwnShown, shroomShown, removingShroom, movedId, canMove, moveSquad, undoMove,
-    COLS, ROWS, TILE, ZONE, START_HP, LATE, startHp, capped, capCount, capFull, START_GOLD, INCOME, incomeFor, LOSER_BONUS, LOSER_BONUS_ROUND, TOWER_FALL_HP, CARRY_CAP, SHUTDOWN, shutdownGold, CREDIT_LINE, loanTerms, treasurySteal, SQUAD_COST, SETTINGS, XP_STEPS, xpNeeded, unitCostOf,
+    COLS, ROWS, TILE, ZONE, START_HP, LATE, startHp, capped, capCount, capFull, START_GOLD, INCOME, incomeFor, LOSER_BONUS, LOSER_BONUS_ROUND, TOWER_FALL_HP, CARRY_CAP, SHUTDOWN, shutdownGold, CREDIT_LINE, loanTerms, loanTaken, treasurySteal, SQUAD_COST, SETTINGS, XP_STEPS, xpNeeded, unitCostOf,
     levelCost, isReady, levelUp, undoLevel, levelAllPlan, levelAll, upgradeOffer, seenLevel, aiLevel, AI, CONFIG,
     deploysAllowed, deploysLeft, deployedThisRound, canBuyDeploy, buyDeploy, refundDeploy, musterOn, deployBuyable,
-    PACKAGE, allPackages, packOf, needsPack, freeLeft, choosePack, ensurePack,
+    PACKAGE, allPackages, packOf, needsPack, freeLeft, choosePack, ensurePack, DRAFT, drafting, draftFirst, needsLeaderPick, leaderTurn, leaderTaken, draftLeft, canPickLeader, pickLeader, settleLeaders,
     unlockCost, tierOf, startLevel, shopCost, mapFreeOf, mapFreeLeft, isUnlocked, unlockVisible, unlock, undoUnlock,
     isHunter, preyOf, canHunt, huntMark, undoHunt, preyShown, preyOn, aiHunt, skillDef, skillCost, SKILL_STEP, skillsBought, isInnate, hasSkill, skillVisible, skillNeeds, skillNeedsAny, skillNeedsMissing, skillHeldUp, isFlat, isMaster, isAwaken, awakenSlot, awakenCost, wokeUnit, awakenBlock, canAwaken, awaken, undoAwaken, seenAwake, isEvolve, evolveSlot, evolveReady, isEvolved, shownAwake, glutOf, glutMax, glutFull, skillOr, skillOrTaken, unitFor, withCharacter,
     footprint, blockOf, spotFree, buildingRecords, recordOf, recordWorld, buildingEffects,
     setBuildings, BUILDINGS: () => BUILDINGS, buildingInfo, BUILDING_SQUAD, isBuildingSkill, buildingIdOf, buildingsOf, buildingOf, buildingAt, buildingShown, buildingSpotOk,
     canBuyBuilding, buyBuilding, buildingSkills, buildingSkillInfo, bskillOf, bskillCost, canBuyBuildingSkill, buyBuildingSkill, undoBuildingSkill,
     buildingXpNeeded, buildingLevelCost, buildingReady, levelBuilding, undoLevelBuilding, constructBuff, buildingBodies, canBuySkill, buySkill, undoSkill, sellValue, sell,
-    isRider, freeOut, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
+    isRider, freeOut, horseUse, horseOk, horseLeft, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
     TOWER, TOWER_TYPES, OUTPOST, TOWER_PICK_ROUND, towerType, towerChoices, needsTowerPick, setTowerType, settleTowerPicks, TOWER_SKILL, towerSkillOf, towerSkillVisible, towerPicked, canBuyTowerSkill, buyTowerSkill, undoTowerSkill, towerSkillCost, towerSkill2Of, towerSkill2Visible, towerSkill2Cost, canBuyTowerSkill2, buyTowerSkill2, undoTowerSkill2, towerSkill2On, PARA, paraDropOf, MOAT, BWALL, BWALL_SQ, EDGES, bwallsOf, bwallOn, edgeOf, bwallWorld, bwallsLeft, bwallShown, bwallSpotOk, placeBwall, unplaceBwall, ensureBwalls, bwallUnit, INVEST, MAGE_GENERALS, mageGenPrice, MAGE, mageGenInfo, mageGenOf, mageTpOf, mageTpRound, mageTpNew, isExtraGen, mageGenCost, canBuyMageGen, buyMageGen, undoMageGen, mageTowerUnit, generalUnit, LOAN, loanNow, investNow, bankBusy, investNow, bankBusy, canTakeLoan, takeLoan, undoLoan, towerRounds, troundInfo, troundOn, troundCost, canBuyTround, buyTround, undoTround, SLIME_UNITS, slimeTowerUnit, slimeSkillDefs, TOWER_MID, towerColOk, towerAt, needsTower, placeTower, ensureTower,
     FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, isOff, enemyHolds, inNoMans, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
     STANDARD_PACK, ICE, ALTAR, GOLEM, isIce, hailRound, altarRound, stormShift, stormRows, hailTiles, altarCost, altarRefund, altarCount, pushRoom, altarBought, addAltar, buyAltar, undoAltar, snowgres, snowgreUnit,
@@ -7663,25 +7740,28 @@ if (typeof module !== 'undefined') module.exports = Game;
 
   // ----- actions -----
   // The Game functions a player may call on their own side: name -> kinds of the arguments after (m, side).
-  // i = integer, s = short string, x = integer or short string. A trailing '?' makes the rest optional.
+  // i = whole number 0 or more (an index, id, column or row), d = any whole number (an offset, e.g. a direction
+  // arrow's), s = short string, x = whole number 0 or more, or a short string. A trailing '?' makes the rest optional.
   // Nothing else gets through (no fortify(..., paid = false), no addAltar, no aiDeploy).
   const ACTIONS = {
     place: 'iii', unplaceSquad: 'i', moveSquad: 'iii', undoMove: '', sell: 'i',
     levelUp: 'i', undoLevel: 'i', levelAll: 'i',
     buySkill: 'ii', undoSkill: 'ii', unlock: 'i', undoUnlock: 'i', awaken: 'i', undoAwaken: 'i', huntMark: 'ii', undoHunt: 'i',
-    choosePack: 'i', setTowerType: 's',
+    choosePack: 'i', setTowerType: 's', pickLeader: 's',
     buyDeploy: '', refundDeploy: '', takeLoan: '', undoLoan: '', spin: '',
     buyTowerSkill: '', undoTowerSkill: '', buyTowerSkill2: '', undoTowerSkill2: '',
     fortify: 'iis', placeBwall: 'iis', unplaceBwall: 'iis', placeMark: 'i',
     buyMageGen: 's', undoMageGen: '?s', buyTround: 's', undoTround: 's',
     giveCharm: 'i', undoCharm: 'i', buyAltar: 's', undoAltar: 's', bribe: '', undoBribe: '',
     buyElfOwn: 'ii', undoElfOwn: '', removeShroom: 'ii', undoRemoveShroom: 'ii',
-    setAim: 'iii', clearAim: 'i',
+    setAim: 'idd', clearAim: 'i',
     buyBuilding: 'iiii', buyBuildingSkill: 'xs', undoBuildingSkill: 'x', levelBuilding: 'x', undoLevelBuilding: 'x',
   };
-  const okArg = (k, v) => k === 'i' ? Number.isInteger(v) && Math.abs(v) < 1e6
-    : k === 's' ? typeof v === 'string' && v.length <= 40
-      : k === 'x' ? (Number.isInteger(v) && Math.abs(v) < 1e6) || (typeof v === 'string' && v.length <= 40) : false;
+  const okNat = (v) => Number.isInteger(v) && v >= 0 && v < 1e6; // negative indices never reach the rules (2026-11-05)
+  const okArg = (k, v) => k === 'i' ? okNat(v)
+    : k === 'd' ? Number.isInteger(v) && Math.abs(v) < 1e6
+      : k === 's' ? typeof v === 'string' && v.length <= 40
+        : k === 'x' ? okNat(v) || (typeof v === 'string' && v.length <= 40) : false;
   // the arguments as the function gets them, or null when they don't fit
   function cleanArgs(fn, a) {
     if (!Object.prototype.hasOwnProperty.call(ACTIONS, fn) || typeof G[fn] !== 'function') return null;
@@ -7730,7 +7810,8 @@ if (typeof module !== 'undefined') module.exports = Game;
     if (s.towerSkill && s.towerSkill[h] === round) s.towerSkill[h] = 0;
     if (s.towerSkill2 && s.towerSkill2[h] === round) s.towerSkill2[h] = 0;
     if (s.mageGen) { const tr = G.mageTpRound(s, h); s.mageGen[h] = tr && tr < round ? { round: -1, id: null, tp: tr } : null; } // the teleport general stays seen once its round is over
-    if (s.loan && s.loan[h] === round) s.loan[h] = 0;
+    if (s.horse) s.horse[h] = {}; // which carriers let squads in or out this round
+    if (s.loan && s.loan[h] === round) { s.loan[h] = 0; if (s.loanT) s.loanT[h] = null; }
     if (s.tround) s.tround[h] = {};
     if (s.mapFree && s.mapFree[h]) delete s.mapFree[h][round];
     if (s.map && s.map.removed) s.map.removed = s.map.removed.filter(x => !(x.side === h && x.round === round));
@@ -7758,7 +7839,7 @@ if (typeof module !== 'undefined') module.exports = Game;
   // ----- Undo all: one side's part of the match, to put back -----
   // Every per-side field ([side 0, side 1] arrays, also in m.dev) plus this side's entries in the shared lists.
   const UNDO_SKIP = new Set(['units', 'matrix', 'history', 'round', 'over', 'winner', 'seed', 'off', 'offTowers', 'rules', 'factions', 'map', 'dev', 'altar', 'hp', 'packages']);
-  const UNDO_NULL = new Set(['chars', 'elfOwn', 'mageGen', 'moved', 'towers', 'woke']); // per-side fields that start as null (see game.js)
+  const UNDO_NULL = new Set(['chars', 'elfOwn', 'loanT', 'mageGen', 'mark', 'moved', 'pack', 'towers', 'vote', 'woke']); // per-side fields that start as null (see game.js)
   const perSide = (v) => Array.isArray(v) && v.length === 2;
   function sideState(m, side) {
     const o = { top: {}, dev: {} };
@@ -7833,11 +7914,24 @@ if (typeof module !== 'undefined') module.exports = Game;
   // ----- the refereed match -----
   function create(settings, units) { return { v: V, settings: cleanSettings(settings, units), phase: 'lobby', m: null, round: 0, ready: [false, false], nextReady: [false, false], rematch: [false, false], seq: [0, 0], deadline: 0, held: 0, away: [0, 0], undo: [null, null], summary: null, fights: 0, lastMap: null, seed: 0 }; }
   const deployMsOf = (R) => (R.m && R.m.round === 1 ? R.settings.deploy1 : R.settings.deploy) * 1000;
-  const picksPending = (R) => !!R.m && (G.needsTowerPick(R.m, 0) || G.needsTowerPick(R.m, 1));
+  const picksPending = (R) => !!R.m && (G.needsTowerPick(R.m, 0) || G.needsTowerPick(R.m, 1) || G.needsLeaderPick(R.m, 0) || G.needsLeaderPick(R.m, 1)); // the clock waits for tower picks and the leader draft
   const someoneAway = (R, now) => [0, 1].some(sd => R.away[sd] && now - R.away[sd] < AWAY_MAX_MS);
 
   // the clock: runs unless tower picks are pending or a player is away (then held keeps what is left)
+  // The leader draft (Game.DRAFT): each pick has DRAFT_PICK_MS; a player who doesn't pick in time gets the first leader
+  // left in the pool, and the other player's turn starts. R.draftDue = when the current pick runs out (0: none pending).
+  const DRAFT_PICK_MS = 30000;
+  function draftClock(R, now) {
+    const m = R.m, turn = R.phase === 'deploy' && m && !m.over ? [0, 1].find(sd => G.leaderTurn(m, sd)) : undefined;
+    if (turn == null) { R.draftDue = 0; R.draftTurn = null; return; }
+    if (R.draftTurn !== turn || !R.draftDue) { R.draftTurn = turn; R.draftDue = now + DRAFT_PICK_MS; return; }
+    if (now < R.draftDue) return;
+    G.pickLeader(m, turn, G.draftLeft(m)[0]);
+    R.draftDue = 0;
+    draftClock(R, now); // the other player's turn
+  }
   function clock(R, now) {
+    draftClock(R, now);
     if (R.phase !== 'deploy') { R.deadline = 0; R.held = 0; return; }
     const stop = picksPending(R) || someoneAway(R, now);
     if (stop && R.deadline) { R.held = Math.max(MIN_LEFT_MS / 2, R.deadline - now); R.deadline = 0; }
@@ -7863,13 +7957,15 @@ if (typeof module !== 'undefined') module.exports = Game;
   // Undo all goes back to this side as it stood once the round's picks (package, tower) were done
   function undoPoint(R, side) {
     if (R.undo[side] && R.undo[side].round === R.m.round) return;
-    if (G.needsPack(R.m, side) || G.needsTowerPick(R.m, side)) return;
+    if (G.needsPack(R.m, side) || G.needsTowerPick(R.m, side) || G.needsLeaderPick(R.m, side)) return;
     R.undo[side] = { round: R.m.round, state: sideState(R.m, side) };
   }
   // One action from a player. d: { seq, fn, a }. Returns { ok, h } (h: that side's fingerprint after it).
   function act(R, side, d, now) {
+    // Each action is handled once: a message whose number isn't above the last one handled is a resend (2026-11-05).
     const seq = Number.isInteger(d && d.seq) ? d.seq : 0;
-    if (seq > R.seq[side]) R.seq[side] = seq;
+    if (seq <= R.seq[side]) return { ok: false, why: 'dup' };
+    R.seq[side] = seq;
     if (!canAct(R, side)) return { ok: false, why: R.ready[side] ? 'ready' : 'phase' };
     if (R.deadline && now > R.deadline + GRACE_MS) return { ok: false, why: 'time' };
     const m = R.m;
@@ -7881,12 +7977,12 @@ if (typeof module !== 'undefined') module.exports = Game;
     }
     const args = cleanArgs(d.fn, d.a);
     if (!args) return { ok: false, why: 'bad' };
-    if (d.fn !== 'choosePack' && d.fn !== 'setTowerType') undoPoint(R, side);
+    if (d.fn !== 'choosePack' && d.fn !== 'setTowerType' && d.fn !== 'pickLeader') undoPoint(R, side);
     let r;
     try { r = G[d.fn](m, side, ...args); } catch (e) { return { ok: false, why: 'error' }; }
     if (!r) return { ok: false, why: 'rules' };
     if (d.fn === 'spin' && R.undo[side]) R.undo[side] = { round: m.round, state: sideState(m, side) }; // a spin can't be undone
-    if (d.fn === 'choosePack' || d.fn === 'setTowerType') clock(R, now); // a tower pick may let the clock start
+    if (d.fn === 'choosePack' || d.fn === 'setTowerType' || d.fn === 'pickLeader') clock(R, now); // a tower pick or the draft may let the clock start
     return { ok: true, h: sideHash(m, side) };
   }
   // Ready (or not). Returns the fight when both are ready.
@@ -7920,6 +8016,7 @@ if (typeof module !== 'undefined') module.exports = Game;
     if (R.phase !== 'deploy') return 0;
     if (R.deadline) return R.deadline + GRACE_MS;
     const left = [0, 1].filter(sd => R.away[sd]).map(sd => R.away[sd] + AWAY_MAX_MS).filter(t => t > now);
+    if (R.draftDue) left.push(R.draftDue - 50); // a leader pick running out
     return left.length ? Math.min(...left) + 50 : 0;
   }
   // the results screen: both moved on (or the clock for it ran out on their phones) -> the next round
@@ -7954,7 +8051,7 @@ if (typeof module !== 'undefined') module.exports = Game;
   const api = {
     V, ACTIONS, cleanArgs, snapshot, withUnits, hide, view, viewOf, sideState, restoreSide, stable, fnv, sideHash, fight,
     cleanSettings, newMatch, create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, clock,
-    canAct, save, load, GRACE_MS, AWAY_MAX_MS, DEPLOY_SECONDS, FIRST_DEPLOY_SECONDS,
+    canAct, save, load, DRAFT_PICK_MS, GRACE_MS, AWAY_MAX_MS, DEPLOY_SECONDS, FIRST_DEPLOY_SECONDS,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Referee = api;
@@ -11567,7 +11664,7 @@ Floors.floor = (() => {
   // ----- Report a bug (2026-11-04): a new post in the Discord forum #bug-reports with the game version and match id
   // filled in. The server posts it through a webhook (/account/bug, accounts.js BUG); when that's off or fails, the report
   // is copied and the Discord server opens, so it can be pasted there by hand.
-  const GAME_VERSION = '5 Nov 2026 · 33d400b'; // src/build.js: the newest patch notes date and a hash of this page
+  const GAME_VERSION = '5 Nov 2026 · 3814961'; // src/build.js: the newest patch notes date and a hash of this page
   const DISCORD_FALLBACK = 'https://discord.gg/TBpDKSBWsY';
   const bug = { draft: '', busy: false };
   // the id the server's match history uses (room.js historyInfo: <room>-<seed>), or one made the same way for other matches
@@ -12210,6 +12307,8 @@ Floors.floor = (() => {
   // the squad Matteo gave his first Charisma stack to this round, if he did
   const charmGivenNow = () => m && m.armies[me].find(q => q.charmGiven === m.round && q.charm === 1);
   const choosingTower = () => phase === 'deploy' && m && !Game.needsPack(m, me) && Game.needsTowerPick(m, me);
+  // the leader draft before round 2 (Game.DRAFT): my pick is still to make (my turn or not yet)
+  const choosingLeader = () => phase === 'deploy' && !!m && !Game.needsPack(m, me) && Game.needsLeaderPick(m, me);
   const charLine = (id) => { const c = Game.charInfo(id); return c ? `${armsImg(id)}<b>${esc(c.name)}</b> · ${esc(c.ability)}` : ''; };
   // tiers by squad price: 100 = tier 1, 200 = tier 2, 400 = tier 3, 600 = tier 4 (any other prices rank in between)
   const TIER_COLORS = ['#9AA5A8', '#6FD08C', '#5BA8F5', '#C58BF2', '#F2B84B'];
@@ -12366,6 +12465,18 @@ Floors.floor = (() => {
         items: o.ids.map(id => devItem(o.cat, id)),
       };
     }
+    if (choosingLeader()) {
+      const turn = Game.leaderTurn(m, me), first = Game.draftFirst(m), fn0 = foeName(), who = fn0 === 'Enemy' ? 'The AI' : fn0;
+      return {
+        kind: 'leader', eyebrow: `Round ${m.round} · Leader draft`, title: turn ? 'Pick your leader' : `${esc(who)} picks first`,
+        sub: turn ? (first === me ? `${m.history[0] && m.history[0].winner === -1 ? 'Round 1 was a draw and the coin flip says you' : 'You won round 1, so you'} pick first. ${esc(who)} picks from the rest: you can't both have the same leader.` : `${esc(who)} picked first. Pick from the rest.`)
+          : `${m.history[0] && m.history[0].winner === -1 ? `Round 1 was a draw and the coin flip says ${esc(who)}` : `${esc(who)} won round 1, so they`} pick first. Then it's your turn.`,
+        items: m.draft.pool.map(id => {
+          const c = Game.charInfo(id), taken = m.chars && m.chars[1 - me] === id;
+          return { key: id, art: armsImg(id), name: esc(c.name), who: taken ? `Taken by ${esc(who)}` : '', det: charLine(id), off: taken };
+        }),
+      };
+    }
     if (choosingTower()) return {
       kind: 'tower', eyebrow: `Round ${m.round}`, title: net.duo && mode === 'net' ? 'Vote for your team’s tower' : 'Choose your tower',
       sub: mode === 'tutorial' ? 'Your outpost becomes a real tower. It stays all match.' : net.duo && mode === 'net' ? 'You and your teammate share one tower for the rest of the match. If you vote differently, a coin flip decides.' : 'It stays for the rest of the match.',
@@ -12391,7 +12502,20 @@ Floors.floor = (() => {
       const ui = units.findIndex(u => u.name === key && u.faction === 'neutral');
       if (ui >= 0) shopTier = tierOf(ui);
       changed();
+    } else if (o.kind === 'leader') {
+      if (!Game.pickLeader(m, me, key)) { sfx('nope'); return; }
+      foeLeaderTurn(); // vs the computer: its pick (and its deploy, if it waited for this)
+      changed(); releaseClock();
     } else if (Game.setTowerType(m, me, key)) { changed(); releaseClock(); }
+  }
+  // vs the computer (the AI or the Claude opponent): when it's the computer's turn in the leader draft it picks, and an
+  // AI that waited for the player's pick (it won round 1's draw... or lost round 1) deploys now
+  let aiWaits = false;
+  function foeLeaderTurn() {
+    if (!m || !(mode === 'ai' || mode === 'claude') || !Game.leaderTurn(m, 1)) return;
+    if (aiWaits && mode === 'ai') { aiWaits = false; aiFoeDeploy(1); return; } // its deploy picks its leader too
+    const left = Game.draftLeft(m);
+    Game.pickLeader(m, 1, left[Math.floor(Math.random() * left.length)]);
   }
   // ---------- Factions devtest: cards, sheets and helpers ----------
   const DEV_ICON = {
@@ -12510,9 +12634,9 @@ Floors.floor = (() => {
     if (id !== pickFor) { pickFor = id; pickSel = null; pickPeek = false; }
     if (!o) { el.hidden = true; peek.hidden = true; pickHtml = ''; return; }
     el.hidden = pickPeek; peek.hidden = !pickPeek;
-    peek.textContent = o.kind === 'pack' ? 'Choose your start' : o.kind === 'dev' ? 'Choose your pick' : 'Choose your tower';
+    peek.textContent = o.kind === 'pack' ? 'Choose your start' : o.kind === 'dev' ? 'Choose your pick' : o.kind === 'leader' ? 'Pick your leader' : 'Choose your tower';
     const html = `<div class="ph"><span class="eyebrow">${o.eyebrow}</span><h2 id="pick-h">${o.title}</h2><span class="hint">${o.sub}</span></div>
-      <div class="opts" style="grid-template-columns:repeat(${Math.max(2, o.items.length)},1fr)">${o.items.map(x => `<button class="opt" data-opt="${x.key}"${o.kind === 'pack' ? ` data-pack="${x.key}"` : ` data-ttype="${x.key}"`} aria-pressed="false">
+      <div class="opts" style="grid-template-columns:repeat(${o.kind === 'leader' ? Math.min(3, o.items.length) : Math.max(2, o.items.length)},1fr)">${o.items.map(x => `<button class="opt" data-opt="${x.key}"${o.kind === 'pack' ? ` data-pack="${x.key}"` : o.kind === 'leader' ? ` data-leader="${x.key}"` : ` data-ttype="${x.key}"`}${x.off ? ' disabled' : ''} aria-pressed="false">
         <span class="art">${x.art}</span><span class="nm">${x.name}</span>${x.who ? `<span class="who">${x.who}</span>` : ''}${x.sub ? `<span class="sub">${x.sub}</span>` : ''}
       </button>`).join('')}</div>
       <div class="det" id="pick-det" aria-live="polite"></div>
@@ -12530,7 +12654,7 @@ Floors.floor = (() => {
     el.querySelectorAll('[data-opt]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.opt === pickSel)));
     const sel = o.items.find(x => x.key === pickSel);
     $('pick-det').innerHTML = sel ? sel.det : ''; $('pick-det').style.visibility = sel ? '' : 'hidden'; // keeps its space, so the cards don't jump
-    $('pick-go').disabled = !sel;
+    $('pick-go').disabled = !sel || (o.kind === 'leader' && !Game.canPickLeader(m, me, sel.key)); // the draft: only in your turn, and not the leader they took
   }
 
   $('pick-peek').addEventListener('click', () => { pickPeek = false; syncPick(); });
@@ -12831,7 +12955,7 @@ Floors.floor = (() => {
     const extraBtns = `<span class="xbtns" style="display:flex;gap:6px;flex-wrap:wrap">
         ${mode === 'sandbox' ? '<button class="btn small" id="sbx-back">Back to results</button>' : ''}
         ${undoable ? '<button class="btn small" id="undo-all">Undo all</button>' : ''}
-        ${loanOffer() ? (Game.loanNow(m, me) ? `<button class="btn small" id="loan-undo" ${can && m.gold[me] >= Game.loanTerms(m, me).gold ? '' : 'disabled'}>Pay back loan · −${Game.loanTerms(m, me).gold}</button>` : `<button class="btn small" id="loan" title="${esc(loanText())}" ${can && Game.canTakeLoan(m, me) ? '' : 'disabled'}${Game.investNow(m, me) ? ' title="Not this round: you made the Major investment"' : ''}>Loan · +${Game.loanTerms(m, me).gold}</button>`) : ''}
+        ${loanOffer() ? (Game.loanNow(m, me) ? `<button class="btn small" id="loan-undo" ${can && m.gold[me] >= Game.loanTaken(m, me).gold ? '' : 'disabled'}>Pay back loan · −${Game.loanTaken(m, me).gold}</button>` : `<button class="btn small" id="loan" title="${esc(loanText())}" ${can && Game.canTakeLoan(m, me) ? '' : 'disabled'}${Game.investNow(m, me) ? ' title="Not this round: you made the Major investment"' : ''}>Loan · +${Game.loanTerms(m, me).gold}</button>`) : ''}
         ${Game.charOf(m, me) === 'otto' ? `<button class="btn small" id="slot-open" ${can ? '' : 'disabled'}>Slots · ${Game.SLOT.perRound - Game.slotSpins(m, me).length} left</button>` : ''}
         ${markOffer() ? `<button class="btn small" id="mark" ${can ? '' : 'disabled'}>${pickingMark() ? 'Cancel mark' : `Mark · ${Game.markCost(m, me) || 'free'}`}</button>` : ''}
         ${fortOffer() ? (Game.fortifyOf(m, me) ? '<button class="btn small" id="fort-undo">Undo Fortify</button>' : `<button class="btn small" id="fort" ${can && Game.canFortify(m, me) ? '' : 'disabled'}>${placingFort() ? 'Cancel Fortify' : `Fortify · ${Game.FORTIFY.cost}`}</button>`) : ''}
@@ -13634,7 +13758,7 @@ Floors.floor = (() => {
           <p class="role" style="margin:0">${esc(t.text)}</p>${towerStats(t.unit)}${extra(t).map(([n, x, tag]) => row(n, esc(x), tag)).join('')}</div>`).join('');
     } else if (view === 'leaders') {
       head = 'Leaders';
-      body = back('') + `<p class="hint" style="margin:0">Each starting package comes with a leader.</p>` + Game.CHARACTERS.map(c => `<p style="margin:0">${charLine(c.id)}</p>`).join('');
+      body = back('') + `<p class="hint" style="margin:0">After round 1 both players draft a leader from the same ${Game.DRAFT.pool}: the winner of round 1 picks first, and you never have the same one.</p>` + Game.CHARACTERS.map(c => `<p style="margin:0">${charLine(c.id)}</p>`).join('');
     } else if (view === 'maps') {
       head = 'Maps';
       body = back('') + Game.MAPS.map(mp => row(mp.name, esc(mp.text || mp.short || ''), '')).join('');
@@ -13659,9 +13783,12 @@ Floors.floor = (() => {
       </ul>
       <div class="learn">
         ${[
-          ['Starting package', 'Round 1: pick one of three, each with free squads and a character.', `
-            <li>Each package unlocks two units for free and gives you free squads of them worth ${Game.PACKAGE.value}, plus ${Game.START_GOLD} gold to spend.</li>
-            <li>Each comes with a random character (never two the same) whose ability lasts the whole match. Tap the enemy tower after the first fight to see theirs.</li>
+          ['Starting package', 'Round 1: pick one of three, each with free squads.', `
+            <li>Each package unlocks two units for free and gives you free squads of them worth ${Game.PACKAGE.value}, plus ${Game.START_GOLD} gold to spend.</li>`],
+          ['Leader draft', `Before round ${Game.DRAFT.round}: the winner of round 1 picks a leader first.`, `
+            <li>After the first fight you both pick a leader from the same ${Game.DRAFT.pool}. Their ability lasts the whole match.</li>
+            <li>The winner of round 1 picks first (a draw: a coin flip); the other player picks from the rest, so you never have the same leader. Both picks are open.</li>
+            <li>In an online match each pick has ${Math.round(Referee.DRAFT_PICK_MS / 1000)} seconds; then you get the first leader left.</li>
             ${Game.CHARACTERS.map(c => `<li>${armsImg(c.id)}<b>${esc(c.name)}</b>: ${esc(c.ability)}</li>`).join('')}`],
           ['Towers', `If yours falls, your army is crippled for a few seconds. Pick your real one in round ${Game.TOWER_PICK_ROUND}.`, `
             <li>Your tower stands in the back of your zone. Until round ${Game.TOWER_PICK_ROUND} it is a small outpost; then, before the clock runs, you pick one for the rest of the match.</li>
@@ -14925,7 +15052,7 @@ Floors.floor = (() => {
       if (u.deathBlast > 0) t.push(`explodes on death for ${u.deathBlast}% of max health within ${Engine.BLAST_RADIUS} m`);
       if (u.windUp > 0) t.push(`wind-up ${u.windUp} s`);
       if (u.ram) t.push(`NEVER ATTACKS: runs straight at the enemy tower (the nearest enemy once it is down) and rams it once for its hit (${n1(u.hit)}), then is destroyed`);
-      if (u.carrier) t.push('CARRIES ONE SQUAD of any other unit, hidden from the opponent until it is destroyed: place a squad on its tile (price and deployment as usual) and it rides inside, then jumps out where the carrier falls');
+      if (u.carrier) t.push('CARRIES ONE SQUAD of any other unit, hidden from the opponent until it is destroyed: place a squad on its tile (price and deployment as usual) and it rides inside, then jumps out where the carrier falls Each carrier lets one squad from an earlier round out and one in per round.');
       if (u.noFlank) t.push('can\'t be placed on flank tiles');
       if (u.building) t.push(`A BUILDING (${Game.footprint(m, i)}x${Game.footprint(m, i)} tiles: "col"/"row" in "place" is its first column and row, every tile must be free in your zone; it never moves, never attacks and doesn't count as a unit left standing). See Buildings below for how it is built and its skills`);
       if (u.roll > 0) t.push(`NEVER STOPS TO ATTACK: rolls at its target from ${Engine.ROLL_START} m/s up to its speed over ${n1(u.roll)} s, hits every enemy body it rolls over for its hit, carries on ${Engine.ROLL_PAST} m past the target, stops and rolls back (the faster it gets going, the more often it hits)`);
@@ -15256,7 +15383,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (speed !== 1) { tutSpeed = speed; speed = 1; } // the fights at 1x, to watch them
     if (customSet && !standardSet) standardSet = { set: rawSet, custom: customSet }; // restoreSet puts the player's units back
     useSet(BUILTIN, false);
-    m = Game.createMatch(units, M, 1, 'standard');
+    m = Game.createMatch(units, M, 1, 'standard', null, [], { draft: false });
     m.packages = [[], []];
     for (const n of TUT.shop) m.unlocks[0][unitIx(n)] = 1;
     tutEnemy([[TUT.foe, ...TUT.foeAt]]);
@@ -15381,7 +15508,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (speed !== 1) { tutSpeed = speed; speed = 1; }
     if (customSet && !standardSet) standardSet = { set: rawSet, custom: customSet };
     useSet(BUILTIN, false);
-    m = Game.createMatch(units, M, 1, 'standard');
+    m = Game.createMatch(units, M, 1, 'standard', null, [], { draft: false });
     m.packages = [[], []];
     for (const n of P.shop) m.unlocks[0][unitIx(n)] = 1;
     // the enemy's squads, each as if placed in an earlier round: in plain sight, and not counted against this round's
@@ -15597,8 +15724,9 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
 
   function beginAiRound() {
     if (mode === 'tutorial') { tutRound(); enterDeploy(0); return; } // the enemy's army is set by the script; no clock
-    if (mode === 'claude') { startClaudeTurn(); enterDeploy(timerOn ? deployMs() : 0); return; }
-    aiFoeDeploy(1);            // the AI commits first; its new squads stay hidden until the fight
+    if (mode === 'claude') { foeLeaderTurn(); startClaudeTurn(); enterDeploy(timerOn ? deployMs() : 0); return; } // Claude picks its leader first when it won round 1
+    aiWaits = Game.needsLeaderPick(m, 1) && !Game.leaderTurn(m, 1); // the player picks a leader first: the AI deploys after (foeLeaderTurn)
+    if (!aiWaits) aiFoeDeploy(1); // the AI commits first; its new squads stay hidden until the fight
     enterDeploy(timerOn || tourSet() ? deployMs() : 0); // a tournament match against a bot always has the clock
   }
 
@@ -15621,7 +15749,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
 
   // the players whose tower pick holds the clock: this player, and on the host the guest too
-  const picksPending = () => !!m && (Game.needsTowerPick(m, me) || (mode === 'host' && Game.needsTowerPick(m, 1)));
+  const picksPending = () => !!m && (Game.needsTowerPick(m, me) || (mode === 'host' && Game.needsTowerPick(m, 1)) || Game.needsLeaderPick(m, me) || (mode === 'host' && Game.needsLeaderPick(m, 1)));
   function releaseClock() {
     if (mode === 'guest' || mode === 'net' || phase !== 'deploy' || !heldMs || picksPending()) return;
     if (mode === 'host' && !net.connected) { pausedLeft = heldMs; heldMs = 0; return; } // starts when they're back
@@ -15661,6 +15789,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (mode === 'ai' || (mode === 'claude' && claude.bot)) lastAiLevels = aiFoeLevel(1); // the AI spends its level-ups now
     else if (mode !== 'claude') lastAiLevels = [];
     Game.ensureTower(m, 0); Game.ensureTower(m, 1);
+    if (aiWaits && mode === 'ai') { aiWaits = false; Game.settleLeaders(m); aiFoeDeploy(1); } // the player never picked: their leader is settled, then the AI deploys
     Game.ensurePack(m, 0); Game.ensurePack(m, 1);
     Game.settleTowerPicks(m);
     Game.ensureBwalls(m, 0); Game.ensureBwalls(m, 1); // walls not placed go up by themselves
@@ -16432,7 +16561,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // It falls back to the 2D board when it can't start (no WebGL), when the phone drops the WebGL context, and when
   // fights run under 20 fps at low quality (slower fights step the quality down first), with one line on the board.
   const THREE_URL = './vendor/three.module.min.js'; // the artifact build points this at jsDelivr
-  const V3D = 'de457aefc0'; // the 3D code's version (src/build.js puts a hash of it here)
+  const V3D = '902bc64038'; // the 3D code's version (src/build.js puts a hash of it here)
   const B3D_STORE = 'phone-bellum-board';
   const force2d = /[?&]board=2d\b/.test(location.search);
   const force3d = !force2d && (/[?&]board=3d\b/.test(location.search) || window.PB_FORCE3D === true);
@@ -16919,7 +17048,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // the bank tower's loan: take one this round (yours), or whether they took one (theirs, once the fight is on)
   function loanBlock(side, tt) {
     if (!tt.loan) return '';
-    const L = Game.loanTerms(m, side), took = Game.loanNow(m, side), chip = (txt, col) => `<span class="chip" style="color:${col};border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px">${txt}</span>`;
+    const took = Game.loanNow(m, side), L = took ? Game.loanTaken(m, side) : Game.loanTerms(m, side), chip = (txt, col) => `<span class="chip" style="color:${col};border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px">${txt}</span>`;
     let act;
     if (side !== me) act = took && phase !== 'deploy' ? chip('Took one', 'var(--foe)') : '';
     else if (took) act = chip('Taken', 'var(--gold)') + (phase === 'deploy' && editable() ? ` <button class="btn small" id="tloan-undo" ${m.gold[me] >= L.gold ? '' : 'disabled'}>Pay back · −${L.gold}</button>` : '');
@@ -17194,7 +17323,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         const freeMv = sq.round < m.round && (sq.luckMove === m.round || Game.freeMovesLeft(m, me) > 0); // a free move: just drag it there
         if (sq.round < m.round && editable() && Game.movedId(m, me) === sq.id) btns.push(`<button class="btn" data-act="move-undo">Undo move · +${Game.CONFIG.moveCost}</button>`);
         else if (freeMv && editable() && !Game.isRider(sq)) btns.push(`<button class="btn" data-act="move-sq">Move · free</button>`);
-        else if (sq.round < m.round && editable() && Game.isRider(sq)) btns.push(`<button class="btn" data-act="move-sq">Take out · free</button>`);
+        else if (sq.round < m.round && editable() && Game.isRider(sq)) btns.push(Game.horseOk(m, me, sq.in, 'out', sq.id) ? `<button class="btn" data-act="move-sq">Take out · free</button>` : `<button class="btn" disabled>Its carrier let one out this round</button>`);
         else if (sq.round < m.round && editable() && Game.movedId(m, me) == null) btns.push(`<button class="btn" data-act="move-sq" ${m.gold[me] >= Game.CONFIG.moveCost || Game.freeOut(m, me, sq) ? '' : 'disabled'}>Move${Game.freeOut(m, me, sq) ? ' · free' : ` · ${Game.CONFIG.moveCost} gold`}</button>`);
         if (sq.round < m.round && editable()) btns.push(`<button class="btn" data-act="sell">Sell · ${Game.sellValue(m, sq)} gold</button>`);
         if (editable() && Game.canGuide(m, me, sq)) btns.push(`<button class="btn" data-act="guide">${sq.guide ? 'Redraw path' : 'Draw path'}</button>`);
@@ -17210,7 +17339,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const bad = units.map((v, j) => [row[j], v.name]).filter(x => x[0] < -0.3).sort((a, b) => a[0] - b[0]).slice(0, 3);
     const tr = [];
     if (u.ram) tr.push(`Runs for the enemy tower and rams it for ${Math.round(u.hit)}`);
-    if (u.carrier) tr.push('Carries one squad inside, hidden');
+    if (u.carrier) tr.push('Carries one squad inside, hidden; one squad in and one out per round');
     if (u.noFlank) tr.push('Can’t deploy on flanks');
     if (u.building) tr.push(`Building · ${Game.footprint(m, i)}×${Game.footprint(m, i)} tiles · never moves or attacks`);
     if (u.roll > 0) tr.push(`Rolls over enemies: ${Engine.ROLL_START}→${Math.round(u.speed * 100) / 100} m/s in ${Math.round(u.roll * 100) / 100} s`);
@@ -17702,7 +17831,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (s.towerSkill && s.towerSkill[0] === m.round) s.towerSkill[0] = 0; // and a tower skill
       if (s.towerSkill2 && s.towerSkill2[0] === m.round) s.towerSkill2[0] = 0; // and a second one
       if (s.mageGen) { const tr = Game.mageTpRound(s, 0); s.mageGen[0] = tr && tr < m.round ? { round: -1, id: null, tp: tr } : null; } // and the mage general called this round (a teleport general from an earlier round stays)
-      if (s.loan && s.loan[0] === m.round) s.loan[0] = 0; // and a bank loan taken this round
+      if (s.loan && s.loan[0] === m.round) { s.loan[0] = 0; if (s.loanT) s.loanT[0] = null; } // and a bank loan taken this round
       if (s.tround) s.tround[0] = {}; // and the Mecha Tower's bots
       if (s.mapFree && s.mapFree[0]) delete s.mapFree[0][m.round]; // and which purchase got Blixten's free slot
       if (s.map && s.map.removed) s.map.removed = s.map.removed.filter(x => !(x.side === 0 && x.round === m.round)); // and mushroom tiles removed this round
@@ -17812,6 +17941,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     ready[1] = !!d.ready;
     // the guest's package: picked once in round 1; package squads beyond what it holds are dropped
     if (m.round === 1 && m.pack && m.pack[1] == null && Number.isInteger(d.pack)) Game.choosePack(m, 1, d.pack);
+    if (typeof d.leader === 'string' && Game.canPickLeader(m, 1, d.leader)) Game.pickLeader(m, 1, d.leader); // the leader draft: only in turn and from what's left
     if (m.round === 1) {
       const allow = (Game.packOf(m, 1) || { squads: [] }).squads.slice();
       m.armies[1] = m.armies[1].filter(s => { if (!s.free) return true; const k = allow.indexOf(s.unit); if (k < 0) return false; allow.splice(k, 1); return true; });
@@ -17837,6 +17967,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (!m.loan) m.loan = [0, 0];
     if (!(m.loan[1] > 0 && m.loan[1] < m.round)) m.loan[1] = 0;
     if ((d.loan | 0) === m.round && !Game.investNow(m, 1)) m.loan[1] = m.round; // anyone may borrow; a bank does one thing a round
+    if (!m.loanT) m.loanT = [null, null];
+    if (m.loan[1] === m.round) { if (!m.loanT[1]) { const L = Game.loanTerms(m, 1); m.loanT[1] = { gold: L.gold, payback: L.payback }; } } else if (m.loan[1] === 0) m.loanT[1] = null; // the terms the guest borrowed on
     // the guest's Mecha Tower bots for this round (gold was checked on their side)
     if (!m.tround) m.tround = [{}, {}];
     m.tround[1] = {};
@@ -18017,7 +18149,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
 
   function sendSide() {
     if (mode !== 'guest' || !m || phase !== 'deploy') return;
-    send({ t: 'side', round: m.round, slots: Game.slotSpins(m, 1).length, army: m.armies[1], gold: m.gold[1], extra: m.extraDeploys[1], nextId: m.nextId[1], tech: (m.tech && m.tech[1]) || {}, tower: (m.towers && m.towers[1]) || null, pack: m.pack ? m.pack[1] : null, unlocks: (m.unlocks && m.unlocks[1]) || {}, bribe: Game.bribeList(m, 1), elfOwn: Game.elfOwnOf(m, 1), bwalls: Game.bwallsOf(m, 1), mark: Game.markOf(m, 1), towerSkill: (m.towerSkill && m.towerSkill[1]) || 0, towerSkill2: (m.towerSkill2 && m.towerSkill2[1]) || 0, mageGen: Game.mageGenOf(m, 1) || Game.mageTpOf(m, 1) ? { id: Game.mageGenOf(m, 1), tp: Game.mageTpRound(m, 1) } : null, loan: Game.loanNow(m, 1) ? m.round : 0, tround: Game.towerRounds(m, 1).filter(x => Game.troundOn(m, 1, x.id)).map(x => x.id), altar: (m.altar || []).filter(x => x.side === 1 && x.round === m.round).map(x => x.type), shrooms: ((m.map && m.map.removed) || []).filter(x => x.side === 1 && x.round === m.round).map(x => ({ col: x.col, row: x.row })), buildings: Game.buildingsOf(m, 1), bskill: (m.bskill && m.bskill[1]) || {}, ready: ready[1] || timeUp });
+    send({ t: 'side', round: m.round, slots: Game.slotSpins(m, 1).length, army: m.armies[1], gold: m.gold[1], extra: m.extraDeploys[1], nextId: m.nextId[1], tech: (m.tech && m.tech[1]) || {}, tower: (m.towers && m.towers[1]) || null, pack: m.pack ? m.pack[1] : null, leader: (m.chars && m.chars[1]) || null, unlocks: (m.unlocks && m.unlocks[1]) || {}, bribe: Game.bribeList(m, 1), elfOwn: Game.elfOwnOf(m, 1), bwalls: Game.bwallsOf(m, 1), mark: Game.markOf(m, 1), towerSkill: (m.towerSkill && m.towerSkill[1]) || 0, towerSkill2: (m.towerSkill2 && m.towerSkill2[1]) || 0, mageGen: Game.mageGenOf(m, 1) || Game.mageTpOf(m, 1) ? { id: Game.mageGenOf(m, 1), tp: Game.mageTpRound(m, 1) } : null, loan: Game.loanNow(m, 1) ? m.round : 0, tround: Game.towerRounds(m, 1).filter(x => Game.troundOn(m, 1, x.id)).map(x => x.id), altar: (m.altar || []).filter(x => x.side === 1 && x.round === m.round).map(x => x.type), shrooms: ((m.map && m.map.removed) || []).filter(x => x.side === 1 && x.round === m.round).map(x => ({ col: x.col, row: x.row })), buildings: Game.buildingsOf(m, 1), bskill: (m.bskill && m.bskill[1]) || {}, ready: ready[1] || timeUp });
   }
 
   function guestRecv(d) {

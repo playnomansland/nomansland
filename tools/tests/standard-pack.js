@@ -15,10 +15,11 @@ for (let seed = 1; seed <= 40; seed++) {
   for (const sd of [0, 1]) {
     assert.strictEqual(m.packages[sd].length, Game.PACKAGE.options, 'three packages to pick from');
     for (const p of m.packages[sd]) {
-      assert.ok(SP.chars.includes(p.char), `package leader ${p.char} is in the pack`);
+      assert.strictEqual(p.char, null, 'no leader with a package (the leader draft, 2026-11-05)');
       for (const ui of p.units) assert.ok(SP.units.includes(units[ui].name), `package unit ${units[ui].name} is in the pack`);
     }
   }
+  assert.ok(m.draft.pool.every(id => SP.chars.includes(id)), 'the draft pool: pack leaders only');
   m.round = Game.TOWER_PICK_ROUND;
   for (const sd of [0, 1]) for (const t of Game.towerChoices(m, sd)) assert.ok(!SP.offTowers.includes(t.id), `no ${t.id} tower on offer`);
   assert.ok(Game.isOff(m, units.findIndex(u => u.name === 'Slime Wizard')), 'Slime Wizard is out');

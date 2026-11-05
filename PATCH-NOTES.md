@@ -20,6 +20,37 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 5 November 2026 – Leader draft, fairer online play, horse limit, 2v2 without a treasury
+
+### Leader draft
+- **Starting packages no longer come with a leader.** Round 1 is units and gold only.
+- **After the first fight, both players draft a leader from the same five.** The **winner of round 1 picks first**; the other player picks from the rest, so **you can never have the same leader as your opponent**. A draw in round 1 is a coin flip.
+- Both picks are open: you see what your opponent took (and they see yours).
+- The deploy clock waits for the draft. Online, each pick has **30 seconds**; take longer and you get the first leader left.
+- Against the computer it works the same: if the AI won round 1 it has already picked when your round 2 starts.
+- Leaders still work all match, from round 2 on. Factions, 2v2, the tutorial and the puzzles are unchanged.
+
+### Fairer online play
+- **Undo all no longer gives the Mark Bounty mark back for free.** After an Undo all the mark costs its 50 gold again.
+- **A tap sent twice is handled once.** On a bad connection a resent action (a spin, a bribe, an extra deployment) could be paid twice; the server now ignores the copy.
+- **A loan is paid back on the terms you took it on.** Borrowing before picking the Bank and then picking it no longer charges you 300 for a 100-gold loan.
+- The server refuses impossible numbers (negative squad or unit numbers) before they reach the rules. Nobody could gain anything from it, it just stops errors.
+
+### Just a horse
+- **Each horse lets one squad out and one squad in per round.** Before, a rider could hop in and out of horses without limit and reposition for free. Squads placed this round still move freely, and a squad that goes back where it was gives its places back.
+- A rider whose horse has already let one out says so in its sheet.
+
+### 2v2
+- **No treasury in 2v2 for now.** A new building system for 2v2 is coming.
+
+### To check with Vilhelm
+- The draft pool is 5 leaders (in ranked: 5 of the Standard pack's 6), and a pick has 30 seconds online.
+- A draw in round 1 is a seeded coin flip for who picks first.
+- Both picks are visible to both players right away (a draft can't work otherwise for the second picker; the first picker also sees the second pick before the fight).
+- The horse limit counts only squads from earlier rounds; a squad placed this round can go in and out freely.
+
+---
+
 ## 5 November 2026 – Medium tutorial puzzles
 
 - **Three new puzzles, level Medium.** The Tutorial puzzles list is now split into **Easy** and **Medium**, each with its own "solved" count, and the coach line says which one you're on ("Medium 2 of 3"). Finishing the last Easy puzzle offers **On to Medium**. Each Medium puzzle teaches something new:

@@ -2060,6 +2060,8 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
   // the squad Matteo gave his first Charisma stack to this round, if he did
   const charmGivenNow = () => m && m.armies[me].find(q => q.charmGiven === m.round && q.charm === 1);
   const choosingTower = () => phase === 'deploy' && m && !Game.needsPack(m, me) && Game.needsTowerPick(m, me);
+  // the leader draft before round 2 (Game.DRAFT): my pick is still to make (my turn or not yet)
+  const choosingLeader = () => phase === 'deploy' && !!m && !Game.needsPack(m, me) && Game.needsLeaderPick(m, me);
   const charLine = (id) => { const c = Game.charInfo(id); return c ? `${armsImg(id)}<b>${esc(c.name)}</b> · ${esc(c.ability)}` : ''; };
   // tiers by squad price: 100 = tier 1, 200 = tier 2, 400 = tier 3, 600 = tier 4 (any other prices rank in between)
   const TIER_COLORS = ['#9AA5A8', '#6FD08C', '#5BA8F5', '#C58BF2', '#F2B84B'];
@@ -2216,6 +2218,18 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
         items: o.ids.map(id => devItem(o.cat, id)),
       };
     }
+    if (choosingLeader()) {
+      const turn = Game.leaderTurn(m, me), first = Game.draftFirst(m), fn0 = foeName(), who = fn0 === 'Enemy' ? 'The AI' : fn0;
+      return {
+        kind: 'leader', eyebrow: `Round ${m.round} · Leader draft`, title: turn ? 'Pick your leader' : `${esc(who)} picks first`,
+        sub: turn ? (first === me ? `${m.history[0] && m.history[0].winner === -1 ? 'Round 1 was a draw and the coin flip says you' : 'You won round 1, so you'} pick first. ${esc(who)} picks from the rest: you can't both have the same leader.` : `${esc(who)} picked first. Pick from the rest.`)
+          : `${m.history[0] && m.history[0].winner === -1 ? `Round 1 was a draw and the coin flip says ${esc(who)}` : `${esc(who)} won round 1, so they`} pick first. Then it's your turn.`,
+        items: m.draft.pool.map(id => {
+          const c = Game.charInfo(id), taken = m.chars && m.chars[1 - me] === id;
+          return { key: id, art: armsImg(id), name: esc(c.name), who: taken ? `Taken by ${esc(who)}` : '', det: charLine(id), off: taken };
+        }),
+      };
+    }
     if (choosingTower()) return {
       kind: 'tower', eyebrow: `Round ${m.round}`, title: net.duo && mode === 'net' ? 'Vote for your team’s tower' : 'Choose your tower',
       sub: mode === 'tutorial' ? 'Your outpost becomes a real tower. It stays all match.' : net.duo && mode === 'net' ? 'You and your teammate share one tower for the rest of the match. If you vote differently, a coin flip decides.' : 'It stays for the rest of the match.',
@@ -2241,7 +2255,20 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
       const ui = units.findIndex(u => u.name === key && u.faction === 'neutral');
       if (ui >= 0) shopTier = tierOf(ui);
       changed();
+    } else if (o.kind === 'leader') {
+      if (!Game.pickLeader(m, me, key)) { sfx('nope'); return; }
+      foeLeaderTurn(); // vs the computer: its pick (and its deploy, if it waited for this)
+      changed(); releaseClock();
     } else if (Game.setTowerType(m, me, key)) { changed(); releaseClock(); }
+  }
+  // vs the computer (the AI or the Claude opponent): when it's the computer's turn in the leader draft it picks, and an
+  // AI that waited for the player's pick (it won round 1's draw... or lost round 1) deploys now
+  let aiWaits = false;
+  function foeLeaderTurn() {
+    if (!m || !(mode === 'ai' || mode === 'claude') || !Game.leaderTurn(m, 1)) return;
+    if (aiWaits && mode === 'ai') { aiWaits = false; aiFoeDeploy(1); return; } // its deploy picks its leader too
+    const left = Game.draftLeft(m);
+    Game.pickLeader(m, 1, left[Math.floor(Math.random() * left.length)]);
   }
   // ---------- Factions devtest: cards, sheets and helpers ----------
   const DEV_ICON = {
@@ -2360,9 +2387,9 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     if (id !== pickFor) { pickFor = id; pickSel = null; pickPeek = false; }
     if (!o) { el.hidden = true; peek.hidden = true; pickHtml = ''; return; }
     el.hidden = pickPeek; peek.hidden = !pickPeek;
-    peek.textContent = o.kind === 'pack' ? 'Choose your start' : o.kind === 'dev' ? 'Choose your pick' : 'Choose your tower';
+    peek.textContent = o.kind === 'pack' ? 'Choose your start' : o.kind === 'dev' ? 'Choose your pick' : o.kind === 'leader' ? 'Pick your leader' : 'Choose your tower';
     const html = `<div class="ph"><span class="eyebrow">${o.eyebrow}</span><h2 id="pick-h">${o.title}</h2><span class="hint">${o.sub}</span></div>
-      <div class="opts" style="grid-template-columns:repeat(${Math.max(2, o.items.length)},1fr)">${o.items.map(x => `<button class="opt" data-opt="${x.key}"${o.kind === 'pack' ? ` data-pack="${x.key}"` : ` data-ttype="${x.key}"`} aria-pressed="false">
+      <div class="opts" style="grid-template-columns:repeat(${o.kind === 'leader' ? Math.min(3, o.items.length) : Math.max(2, o.items.length)},1fr)">${o.items.map(x => `<button class="opt" data-opt="${x.key}"${o.kind === 'pack' ? ` data-pack="${x.key}"` : o.kind === 'leader' ? ` data-leader="${x.key}"` : ` data-ttype="${x.key}"`}${x.off ? ' disabled' : ''} aria-pressed="false">
         <span class="art">${x.art}</span><span class="nm">${x.name}</span>${x.who ? `<span class="who">${x.who}</span>` : ''}${x.sub ? `<span class="sub">${x.sub}</span>` : ''}
       </button>`).join('')}</div>
       <div class="det" id="pick-det" aria-live="polite"></div>
@@ -2380,7 +2407,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     el.querySelectorAll('[data-opt]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.opt === pickSel)));
     const sel = o.items.find(x => x.key === pickSel);
     $('pick-det').innerHTML = sel ? sel.det : ''; $('pick-det').style.visibility = sel ? '' : 'hidden'; // keeps its space, so the cards don't jump
-    $('pick-go').disabled = !sel;
+    $('pick-go').disabled = !sel || (o.kind === 'leader' && !Game.canPickLeader(m, me, sel.key)); // the draft: only in your turn, and not the leader they took
   }
 
   $('pick-peek').addEventListener('click', () => { pickPeek = false; syncPick(); });
@@ -2681,7 +2708,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     const extraBtns = `<span class="xbtns" style="display:flex;gap:6px;flex-wrap:wrap">
         ${mode === 'sandbox' ? '<button class="btn small" id="sbx-back">Back to results</button>' : ''}
         ${undoable ? '<button class="btn small" id="undo-all">Undo all</button>' : ''}
-        ${loanOffer() ? (Game.loanNow(m, me) ? `<button class="btn small" id="loan-undo" ${can && m.gold[me] >= Game.loanTerms(m, me).gold ? '' : 'disabled'}>Pay back loan · −${Game.loanTerms(m, me).gold}</button>` : `<button class="btn small" id="loan" title="${esc(loanText())}" ${can && Game.canTakeLoan(m, me) ? '' : 'disabled'}${Game.investNow(m, me) ? ' title="Not this round: you made the Major investment"' : ''}>Loan · +${Game.loanTerms(m, me).gold}</button>`) : ''}
+        ${loanOffer() ? (Game.loanNow(m, me) ? `<button class="btn small" id="loan-undo" ${can && m.gold[me] >= Game.loanTaken(m, me).gold ? '' : 'disabled'}>Pay back loan · −${Game.loanTaken(m, me).gold}</button>` : `<button class="btn small" id="loan" title="${esc(loanText())}" ${can && Game.canTakeLoan(m, me) ? '' : 'disabled'}${Game.investNow(m, me) ? ' title="Not this round: you made the Major investment"' : ''}>Loan · +${Game.loanTerms(m, me).gold}</button>`) : ''}
         ${Game.charOf(m, me) === 'otto' ? `<button class="btn small" id="slot-open" ${can ? '' : 'disabled'}>Slots · ${Game.SLOT.perRound - Game.slotSpins(m, me).length} left</button>` : ''}
         ${markOffer() ? `<button class="btn small" id="mark" ${can ? '' : 'disabled'}>${pickingMark() ? 'Cancel mark' : `Mark · ${Game.markCost(m, me) || 'free'}`}</button>` : ''}
         ${fortOffer() ? (Game.fortifyOf(m, me) ? '<button class="btn small" id="fort-undo">Undo Fortify</button>' : `<button class="btn small" id="fort" ${can && Game.canFortify(m, me) ? '' : 'disabled'}>${placingFort() ? 'Cancel Fortify' : `Fortify · ${Game.FORTIFY.cost}`}</button>`) : ''}
@@ -3484,7 +3511,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
           <p class="role" style="margin:0">${esc(t.text)}</p>${towerStats(t.unit)}${extra(t).map(([n, x, tag]) => row(n, esc(x), tag)).join('')}</div>`).join('');
     } else if (view === 'leaders') {
       head = 'Leaders';
-      body = back('') + `<p class="hint" style="margin:0">Each starting package comes with a leader.</p>` + Game.CHARACTERS.map(c => `<p style="margin:0">${charLine(c.id)}</p>`).join('');
+      body = back('') + `<p class="hint" style="margin:0">After round 1 both players draft a leader from the same ${Game.DRAFT.pool}: the winner of round 1 picks first, and you never have the same one.</p>` + Game.CHARACTERS.map(c => `<p style="margin:0">${charLine(c.id)}</p>`).join('');
     } else if (view === 'maps') {
       head = 'Maps';
       body = back('') + Game.MAPS.map(mp => row(mp.name, esc(mp.text || mp.short || ''), '')).join('');
@@ -3509,9 +3536,12 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
       </ul>
       <div class="learn">
         ${[
-          ['Starting package', 'Round 1: pick one of three, each with free squads and a character.', `
-            <li>Each package unlocks two units for free and gives you free squads of them worth ${Game.PACKAGE.value}, plus ${Game.START_GOLD} gold to spend.</li>
-            <li>Each comes with a random character (never two the same) whose ability lasts the whole match. Tap the enemy tower after the first fight to see theirs.</li>
+          ['Starting package', 'Round 1: pick one of three, each with free squads.', `
+            <li>Each package unlocks two units for free and gives you free squads of them worth ${Game.PACKAGE.value}, plus ${Game.START_GOLD} gold to spend.</li>`],
+          ['Leader draft', `Before round ${Game.DRAFT.round}: the winner of round 1 picks a leader first.`, `
+            <li>After the first fight you both pick a leader from the same ${Game.DRAFT.pool}. Their ability lasts the whole match.</li>
+            <li>The winner of round 1 picks first (a draw: a coin flip); the other player picks from the rest, so you never have the same leader. Both picks are open.</li>
+            <li>In an online match each pick has ${Math.round(Referee.DRAFT_PICK_MS / 1000)} seconds; then you get the first leader left.</li>
             ${Game.CHARACTERS.map(c => `<li>${armsImg(c.id)}<b>${esc(c.name)}</b>: ${esc(c.ability)}</li>`).join('')}`],
           ['Towers', `If yours falls, your army is crippled for a few seconds. Pick your real one in round ${Game.TOWER_PICK_ROUND}.`, `
             <li>Your tower stands in the back of your zone. Until round ${Game.TOWER_PICK_ROUND} it is a small outpost; then, before the clock runs, you pick one for the rest of the match.</li>
@@ -4775,7 +4805,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
       if (u.deathBlast > 0) t.push(`explodes on death for ${u.deathBlast}% of max health within ${Engine.BLAST_RADIUS} m`);
       if (u.windUp > 0) t.push(`wind-up ${u.windUp} s`);
       if (u.ram) t.push(`NEVER ATTACKS: runs straight at the enemy tower (the nearest enemy once it is down) and rams it once for its hit (${n1(u.hit)}), then is destroyed`);
-      if (u.carrier) t.push('CARRIES ONE SQUAD of any other unit, hidden from the opponent until it is destroyed: place a squad on its tile (price and deployment as usual) and it rides inside, then jumps out where the carrier falls');
+      if (u.carrier) t.push('CARRIES ONE SQUAD of any other unit, hidden from the opponent until it is destroyed: place a squad on its tile (price and deployment as usual) and it rides inside, then jumps out where the carrier falls Each carrier lets one squad from an earlier round out and one in per round.');
       if (u.noFlank) t.push('can\'t be placed on flank tiles');
       if (u.building) t.push(`A BUILDING (${Game.footprint(m, i)}x${Game.footprint(m, i)} tiles: "col"/"row" in "place" is its first column and row, every tile must be free in your zone; it never moves, never attacks and doesn't count as a unit left standing). See Buildings below for how it is built and its skills`);
       if (u.roll > 0) t.push(`NEVER STOPS TO ATTACK: rolls at its target from ${Engine.ROLL_START} m/s up to its speed over ${n1(u.roll)} s, hits every enemy body it rolls over for its hit, carries on ${Engine.ROLL_PAST} m past the target, stops and rolls back (the faster it gets going, the more often it hits)`);
@@ -5106,7 +5136,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (speed !== 1) { tutSpeed = speed; speed = 1; } // the fights at 1x, to watch them
     if (customSet && !standardSet) standardSet = { set: rawSet, custom: customSet }; // restoreSet puts the player's units back
     useSet(BUILTIN, false);
-    m = Game.createMatch(units, M, 1, 'standard');
+    m = Game.createMatch(units, M, 1, 'standard', null, [], { draft: false });
     m.packages = [[], []];
     for (const n of TUT.shop) m.unlocks[0][unitIx(n)] = 1;
     tutEnemy([[TUT.foe, ...TUT.foeAt]]);
@@ -5169,7 +5199,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (speed !== 1) { tutSpeed = speed; speed = 1; }
     if (customSet && !standardSet) standardSet = { set: rawSet, custom: customSet };
     useSet(BUILTIN, false);
-    m = Game.createMatch(units, M, 1, 'standard');
+    m = Game.createMatch(units, M, 1, 'standard', null, [], { draft: false });
     m.packages = [[], []];
     for (const n of P.shop) m.unlocks[0][unitIx(n)] = 1;
     // the enemy's squads, each as if placed in an earlier round: in plain sight, and not counted against this round's
@@ -5385,8 +5415,9 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
 
   function beginAiRound() {
     if (mode === 'tutorial') { tutRound(); enterDeploy(0); return; } // the enemy's army is set by the script; no clock
-    if (mode === 'claude') { startClaudeTurn(); enterDeploy(timerOn ? deployMs() : 0); return; }
-    aiFoeDeploy(1);            // the AI commits first; its new squads stay hidden until the fight
+    if (mode === 'claude') { foeLeaderTurn(); startClaudeTurn(); enterDeploy(timerOn ? deployMs() : 0); return; } // Claude picks its leader first when it won round 1
+    aiWaits = Game.needsLeaderPick(m, 1) && !Game.leaderTurn(m, 1); // the player picks a leader first: the AI deploys after (foeLeaderTurn)
+    if (!aiWaits) aiFoeDeploy(1); // the AI commits first; its new squads stay hidden until the fight
     enterDeploy(timerOn || tourSet() ? deployMs() : 0); // a tournament match against a bot always has the clock
   }
 
@@ -5409,7 +5440,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
 
   // the players whose tower pick holds the clock: this player, and on the host the guest too
-  const picksPending = () => !!m && (Game.needsTowerPick(m, me) || (mode === 'host' && Game.needsTowerPick(m, 1)));
+  const picksPending = () => !!m && (Game.needsTowerPick(m, me) || (mode === 'host' && Game.needsTowerPick(m, 1)) || Game.needsLeaderPick(m, me) || (mode === 'host' && Game.needsLeaderPick(m, 1)));
   function releaseClock() {
     if (mode === 'guest' || mode === 'net' || phase !== 'deploy' || !heldMs || picksPending()) return;
     if (mode === 'host' && !net.connected) { pausedLeft = heldMs; heldMs = 0; return; } // starts when they're back
@@ -5449,6 +5480,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (mode === 'ai' || (mode === 'claude' && claude.bot)) lastAiLevels = aiFoeLevel(1); // the AI spends its level-ups now
     else if (mode !== 'claude') lastAiLevels = [];
     Game.ensureTower(m, 0); Game.ensureTower(m, 1);
+    if (aiWaits && mode === 'ai') { aiWaits = false; Game.settleLeaders(m); aiFoeDeploy(1); } // the player never picked: their leader is settled, then the AI deploys
     Game.ensurePack(m, 0); Game.ensurePack(m, 1);
     Game.settleTowerPicks(m);
     Game.ensureBwalls(m, 0); Game.ensureBwalls(m, 1); // walls not placed go up by themselves
@@ -6707,7 +6739,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // the bank tower's loan: take one this round (yours), or whether they took one (theirs, once the fight is on)
   function loanBlock(side, tt) {
     if (!tt.loan) return '';
-    const L = Game.loanTerms(m, side), took = Game.loanNow(m, side), chip = (txt, col) => `<span class="chip" style="color:${col};border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px">${txt}</span>`;
+    const took = Game.loanNow(m, side), L = took ? Game.loanTaken(m, side) : Game.loanTerms(m, side), chip = (txt, col) => `<span class="chip" style="color:${col};border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px">${txt}</span>`;
     let act;
     if (side !== me) act = took && phase !== 'deploy' ? chip('Took one', 'var(--foe)') : '';
     else if (took) act = chip('Taken', 'var(--gold)') + (phase === 'deploy' && editable() ? ` <button class="btn small" id="tloan-undo" ${m.gold[me] >= L.gold ? '' : 'disabled'}>Pay back · −${L.gold}</button>` : '');
@@ -6982,7 +7014,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         const freeMv = sq.round < m.round && (sq.luckMove === m.round || Game.freeMovesLeft(m, me) > 0); // a free move: just drag it there
         if (sq.round < m.round && editable() && Game.movedId(m, me) === sq.id) btns.push(`<button class="btn" data-act="move-undo">Undo move · +${Game.CONFIG.moveCost}</button>`);
         else if (freeMv && editable() && !Game.isRider(sq)) btns.push(`<button class="btn" data-act="move-sq">Move · free</button>`);
-        else if (sq.round < m.round && editable() && Game.isRider(sq)) btns.push(`<button class="btn" data-act="move-sq">Take out · free</button>`);
+        else if (sq.round < m.round && editable() && Game.isRider(sq)) btns.push(Game.horseOk(m, me, sq.in, 'out', sq.id) ? `<button class="btn" data-act="move-sq">Take out · free</button>` : `<button class="btn" disabled>Its carrier let one out this round</button>`);
         else if (sq.round < m.round && editable() && Game.movedId(m, me) == null) btns.push(`<button class="btn" data-act="move-sq" ${m.gold[me] >= Game.CONFIG.moveCost || Game.freeOut(m, me, sq) ? '' : 'disabled'}>Move${Game.freeOut(m, me, sq) ? ' · free' : ` · ${Game.CONFIG.moveCost} gold`}</button>`);
         if (sq.round < m.round && editable()) btns.push(`<button class="btn" data-act="sell">Sell · ${Game.sellValue(m, sq)} gold</button>`);
         if (editable() && Game.canGuide(m, me, sq)) btns.push(`<button class="btn" data-act="guide">${sq.guide ? 'Redraw path' : 'Draw path'}</button>`);
@@ -6998,7 +7030,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const bad = units.map((v, j) => [row[j], v.name]).filter(x => x[0] < -0.3).sort((a, b) => a[0] - b[0]).slice(0, 3);
     const tr = [];
     if (u.ram) tr.push(`Runs for the enemy tower and rams it for ${Math.round(u.hit)}`);
-    if (u.carrier) tr.push('Carries one squad inside, hidden');
+    if (u.carrier) tr.push('Carries one squad inside, hidden; one squad in and one out per round');
     if (u.noFlank) tr.push('Can’t deploy on flanks');
     if (u.building) tr.push(`Building · ${Game.footprint(m, i)}×${Game.footprint(m, i)} tiles · never moves or attacks`);
     if (u.roll > 0) tr.push(`Rolls over enemies: ${Engine.ROLL_START}→${Math.round(u.speed * 100) / 100} m/s in ${Math.round(u.roll * 100) / 100} s`);
@@ -7490,7 +7522,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (s.towerSkill && s.towerSkill[0] === m.round) s.towerSkill[0] = 0; // and a tower skill
       if (s.towerSkill2 && s.towerSkill2[0] === m.round) s.towerSkill2[0] = 0; // and a second one
       if (s.mageGen) { const tr = Game.mageTpRound(s, 0); s.mageGen[0] = tr && tr < m.round ? { round: -1, id: null, tp: tr } : null; } // and the mage general called this round (a teleport general from an earlier round stays)
-      if (s.loan && s.loan[0] === m.round) s.loan[0] = 0; // and a bank loan taken this round
+      if (s.loan && s.loan[0] === m.round) { s.loan[0] = 0; if (s.loanT) s.loanT[0] = null; } // and a bank loan taken this round
       if (s.tround) s.tround[0] = {}; // and the Mecha Tower's bots
       if (s.mapFree && s.mapFree[0]) delete s.mapFree[0][m.round]; // and which purchase got Blixten's free slot
       if (s.map && s.map.removed) s.map.removed = s.map.removed.filter(x => !(x.side === 0 && x.round === m.round)); // and mushroom tiles removed this round
@@ -7600,6 +7632,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     ready[1] = !!d.ready;
     // the guest's package: picked once in round 1; package squads beyond what it holds are dropped
     if (m.round === 1 && m.pack && m.pack[1] == null && Number.isInteger(d.pack)) Game.choosePack(m, 1, d.pack);
+    if (typeof d.leader === 'string' && Game.canPickLeader(m, 1, d.leader)) Game.pickLeader(m, 1, d.leader); // the leader draft: only in turn and from what's left
     if (m.round === 1) {
       const allow = (Game.packOf(m, 1) || { squads: [] }).squads.slice();
       m.armies[1] = m.armies[1].filter(s => { if (!s.free) return true; const k = allow.indexOf(s.unit); if (k < 0) return false; allow.splice(k, 1); return true; });
@@ -7625,6 +7658,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (!m.loan) m.loan = [0, 0];
     if (!(m.loan[1] > 0 && m.loan[1] < m.round)) m.loan[1] = 0;
     if ((d.loan | 0) === m.round && !Game.investNow(m, 1)) m.loan[1] = m.round; // anyone may borrow; a bank does one thing a round
+    if (!m.loanT) m.loanT = [null, null];
+    if (m.loan[1] === m.round) { if (!m.loanT[1]) { const L = Game.loanTerms(m, 1); m.loanT[1] = { gold: L.gold, payback: L.payback }; } } else if (m.loan[1] === 0) m.loanT[1] = null; // the terms the guest borrowed on
     // the guest's Mecha Tower bots for this round (gold was checked on their side)
     if (!m.tround) m.tround = [{}, {}];
     m.tround[1] = {};
@@ -7805,7 +7840,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
 
   function sendSide() {
     if (mode !== 'guest' || !m || phase !== 'deploy') return;
-    send({ t: 'side', round: m.round, slots: Game.slotSpins(m, 1).length, army: m.armies[1], gold: m.gold[1], extra: m.extraDeploys[1], nextId: m.nextId[1], tech: (m.tech && m.tech[1]) || {}, tower: (m.towers && m.towers[1]) || null, pack: m.pack ? m.pack[1] : null, unlocks: (m.unlocks && m.unlocks[1]) || {}, bribe: Game.bribeList(m, 1), elfOwn: Game.elfOwnOf(m, 1), bwalls: Game.bwallsOf(m, 1), mark: Game.markOf(m, 1), towerSkill: (m.towerSkill && m.towerSkill[1]) || 0, towerSkill2: (m.towerSkill2 && m.towerSkill2[1]) || 0, mageGen: Game.mageGenOf(m, 1) || Game.mageTpOf(m, 1) ? { id: Game.mageGenOf(m, 1), tp: Game.mageTpRound(m, 1) } : null, loan: Game.loanNow(m, 1) ? m.round : 0, tround: Game.towerRounds(m, 1).filter(x => Game.troundOn(m, 1, x.id)).map(x => x.id), altar: (m.altar || []).filter(x => x.side === 1 && x.round === m.round).map(x => x.type), shrooms: ((m.map && m.map.removed) || []).filter(x => x.side === 1 && x.round === m.round).map(x => ({ col: x.col, row: x.row })), buildings: Game.buildingsOf(m, 1), bskill: (m.bskill && m.bskill[1]) || {}, ready: ready[1] || timeUp });
+    send({ t: 'side', round: m.round, slots: Game.slotSpins(m, 1).length, army: m.armies[1], gold: m.gold[1], extra: m.extraDeploys[1], nextId: m.nextId[1], tech: (m.tech && m.tech[1]) || {}, tower: (m.towers && m.towers[1]) || null, pack: m.pack ? m.pack[1] : null, leader: (m.chars && m.chars[1]) || null, unlocks: (m.unlocks && m.unlocks[1]) || {}, bribe: Game.bribeList(m, 1), elfOwn: Game.elfOwnOf(m, 1), bwalls: Game.bwallsOf(m, 1), mark: Game.markOf(m, 1), towerSkill: (m.towerSkill && m.towerSkill[1]) || 0, towerSkill2: (m.towerSkill2 && m.towerSkill2[1]) || 0, mageGen: Game.mageGenOf(m, 1) || Game.mageTpOf(m, 1) ? { id: Game.mageGenOf(m, 1), tp: Game.mageTpRound(m, 1) } : null, loan: Game.loanNow(m, 1) ? m.round : 0, tround: Game.towerRounds(m, 1).filter(x => Game.troundOn(m, 1, x.id)).map(x => x.id), altar: (m.altar || []).filter(x => x.side === 1 && x.round === m.round).map(x => x.type), shrooms: ((m.map && m.map.removed) || []).filter(x => x.side === 1 && x.round === m.round).map(x => ({ col: x.col, row: x.row })), buildings: Game.buildingsOf(m, 1), bskill: (m.bskill && m.bskill[1]) || {}, ready: ready[1] || timeUp });
   }
 
   function guestRecv(d) {

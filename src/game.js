@@ -330,6 +330,9 @@ const Game = (() => {
   const LOAN = { gold: 100, payback: 200 }, CREDIT_LINE = { gold: 200, payback: 300 };
   const loanTerms = (m, side) => towerPicked(m, side) && towerType(m, side).id === 'bank' ? CREDIT_LINE : LOAN;
   const loanNow = (m, side) => !!(m && m.loan && m.loan[side] === m.round);
+  // the terms the last loan was taken on (m.loanT[side], kept from takeLoan, 2026-11-05): payback and undo use these, not
+  // whatever the tower offers by then. A match from before has none: the terms of the tower it has now, as before.
+  const loanTaken = (m, side) => (m && m.loanT && m.loanT[side]) || loanTerms(m, side);
   // the bank does one thing a round: a loan or the Major investment, not both. bankBusy(m, side, want): the other one
   // was used this round, so `want` ('loan' or 'invest') can't be
   const investNow = (m, side) => !!(m && m.towerSkill2 && m.towerSkill2[side] === m.round && towerType(m, side).id === 'bank');
@@ -339,13 +342,17 @@ const Game = (() => {
     if (!canTakeLoan(m, side)) return false;
     if (!m.loan) m.loan = [0, 0];
     m.loan[side] = m.round;
-    m.gold[side] += loanTerms(m, side).gold;
+    const L = loanTerms(m, side);
+    if (!m.loanT) m.loanT = [null, null];
+    m.loanT[side] = { gold: L.gold, payback: L.payback };
+    m.gold[side] += L.gold;
     return true;
   }
   function undoLoan(m, side) {
-    const L = loanTerms(m, side);
+    const L = loanTaken(m, side);
     if (!loanNow(m, side) || m.gold[side] < L.gold) return false;
     m.loan[side] = 0;
+    if (m.loanT) m.loanT[side] = null;
     m.gold[side] -= L.gold;
     return true;
   }
@@ -465,6 +472,44 @@ const Game = (() => {
   const charmMap = (m, side) => charOf(m, side) === 'matteo' ? Object.fromEntries(m.armies[side].map(q => [q.id, charmOf(q)])) : null;
   const charOf = (m, side) => (m && m.chars && m.chars[side]) || null;
   const charInfo = (id) => CHARACTERS.find(c => c.id === id) || null;
+  // ---------- the leader draft (2026-11-05) ----------
+  // Packages no longer come with a leader. Before round DRAFT.round both players pick one from the same pool of
+  // DRAFT.pool leaders: the winner of round 1 first (a draw: a seeded coin flip), then the other player from what is
+  // left, so the two leaders are never the same. The picks are open: each player sees what the other took.
+  // m.draft = { pool: [ids] } (null: leaders come with the packages, as before: Factions, 2v2, the tutorial).
+  const DRAFT = { round: 2, pool: 5 };
+  function draftPool(r, offChars) {
+    const shuffle = (ids) => { for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; } return ids; };
+    const ids = shuffle(CHARACTERS.map(c => c.id).filter(id => !(offChars || []).includes(id)));
+    if (ids.length < 2) ids.push(...shuffle(CHARACTERS.map(c => c.id).filter(id => !ids.includes(id))).slice(0, 2 - ids.length)); // a draft needs two at least
+    return ids.slice(0, Math.max(2, DRAFT.pool));
+  }
+  const drafting = (m) => !!(m && m.draft && Array.isArray(m.draft.pool));
+  // who picks first: round 1's winner; a draw is a coin flip from the match's seed
+  function draftFirst(m) {
+    if (!drafting(m) || m.round < DRAFT.round) return null;
+    const h = m.history && m.history[0], w = h ? h.winner : -1;
+    return w === 0 || w === 1 ? w : (rng(m.seed + 9091)() < 0.5 ? 0 : 1);
+  }
+  const needsLeaderPick = (m, side) => drafting(m) && m.round >= DRAFT.round && !charOf(m, side);
+  // whether it is this player's turn to pick (the first picker always; the other once the first has picked)
+  const leaderTurn = (m, side) => needsLeaderPick(m, side) && (side === draftFirst(m) || !!charOf(m, 1 - side));
+  const leaderTaken = (m, id) => !!(m && m.chars && m.chars.includes(id));
+  const draftLeft = (m) => drafting(m) ? m.draft.pool.filter(id => !leaderTaken(m, id)) : [];
+  const canPickLeader = (m, side, id) => leaderTurn(m, side) && m.draft.pool.includes(id) && !leaderTaken(m, id);
+  function pickLeader(m, side, id) {
+    if (!canPickLeader(m, side, id)) return false;
+    if (!m.chars) m.chars = [null, null];
+    m.chars[side] = id;
+    rollBuffTiles(m, side); // Zoe's buff tiles for this round
+    return true;
+  }
+  // before a fight: a player who didn't pick gets the first leader left in the pool (the first picker first)
+  function settleLeaders(m) {
+    if (!drafting(m) || m.round < DRAFT.round) return;
+    const f = draftFirst(m);
+    for (const sd of [f, 1 - f]) if (needsLeaderPick(m, sd)) pickLeader(m, sd, draftLeft(m)[0]);
+  }
   // Blixten: the first map or tower purchase each round is BLIX_OFF gold cheaper. m.mapFree[side][round] = the purchase that got it:
   // { kind: 'bribe' } (the round's first bribe), { kind: 'altar', type }, { kind: 'shroom', col, row }, { kind: 'elf' },
   // { kind: 'tskill' }, { kind: 'tskill2' } (not Major investment), { kind: 'mgen' } (a mage general) or { kind: 'mtp' } (the teleport general)
@@ -517,12 +562,12 @@ const Game = (() => {
       nml: Array(18).fill('..............').map((r, i) => i === 8 || i === 9 ? 'NNNNNNNNNNNNNN' : r),
       flank: Array(18).fill('F............F').map((r, i) => i === 0 || i === 17 ? 'FF..........FF' : r),
       buildings: [{ kind: 'tower', side: 0, col: 9, row: 16 }, { kind: 'tower', side: 1, col: 4, row: 1 }, { kind: 'treasury', side: 0, col: 4, row: 15 }, { kind: 'treasury', side: 1, col: 9, row: 2 }] },
-    // 2v2 (src/duo.js): one wide board both players of a team deploy on, one shared tower and treasury per team in the
-    // back rows (tower right of centre, treasury left, point-mirrored for the other team), and two columns of flank tiles on each edge
+    // 2v2 (src/duo.js): one wide board both players of a team deploy on, one shared tower per team in the back rows
+    // (right of centre, point-mirrored for the other team), and two columns of flank tiles on each edge
     duo: { format: 'nml-map', version: 1, name: '2v2', base: 'testgrid', cols: 24, rows: 18, zone: 7, symmetry: 'point',
       tiles: Array(18).fill('.'.repeat(24)), shape: Array(18).fill('.'.repeat(24)), height: Array(18).fill('.'.repeat(24)),
       flank: Array(18).fill('FF' + '.'.repeat(20) + 'FF'),
-      buildings: [{ kind: 'tower', side: 0, col: 17, row: 16 }, { kind: 'tower', side: 1, col: 6, row: 1 }, { kind: 'treasury', side: 0, col: 6, row: 15 }, { kind: 'treasury', side: 1, col: 17, row: 2 }] },
+      buildings: [{ kind: 'tower', side: 0, col: 17, row: 16 }, { kind: 'tower', side: 1, col: 6, row: 1 }] }, // no treasury since 2026-11-05 (a 2v2 building system is coming)
   };
   // A map entry for MAPS from an editor map: its grid, its towers' and treasuries' tiles (spots), its flank tiles (when
   // they differ from the game's: flankSet) and its terrain (when it has any). Rules on top come in `extra`. Maps made on
@@ -554,7 +599,7 @@ const Game = (() => {
     editorMap('rush', EDITOR_MAPS.rush, { short: 'Deep zones, only 2 rows of no man’s land: the armies meet at once.', text: 'Each zone is 14 by 8 tiles, with only 2 rows of no man’s land between them, so the armies meet almost at once. The towers stand one column further in, and the back corners are flank tiles too. A treasury pays 50 gold per fight it survives.' }), // only when picked, never random
   ];
   // Boards played only by a game mode of their own, never picked or rolled (not in MAPS): 'duo' is the 2v2 board (src/duo.js)
-  const TEAM_MAPS = [editorMap('duo', EDITOR_MAPS.duo, { short: 'One wide board for two teams of two.', text: 'One wide board: both players of a team deploy in the same zone and share one tower and one treasury. Two columns of flank tiles on each edge.', skins: true, team: true })];
+  const TEAM_MAPS = [editorMap('duo', EDITOR_MAPS.duo, { short: 'One wide board for two teams of two.', text: 'One wide board: both players of a team deploy in the same zone and share one tower. Two columns of flank tiles on each edge.', skins: true, team: true })];
   // Boards only drawn, never played or picked (none since 2v2 became one board, 2026-11-03)
   const VIEW_MAPS = [];
   const findMap = (id) => MAPS.find(x => x.id === id) || TEAM_MAPS.find(x => x.id === id) || VIEW_MAPS.find(x => x.id === id);
@@ -937,7 +982,7 @@ const Game = (() => {
   // Lab can play the AI through the server referee (tools/balance-lab.js).
   let aiRec = null, aiFns = null;
   function aiCall(fn, m, side, ...a) {
-    aiFns = aiFns || { awaken, bribe, buyAltar, buyBuilding, buyBuildingSkill, buyDeploy, buyElfOwn, buyMageGen, buySkill, buyTowerSkill, buyTowerSkill2, buyTround, choosePack, fortify, huntMark, levelBuilding, levelUp, place, placeMark, removeShroom, setTowerType, spin, takeLoan, unlock };
+    aiFns = aiFns || { awaken, bribe, buyAltar, buyBuilding, buyBuildingSkill, buyDeploy, buyElfOwn, buyMageGen, buySkill, buyTowerSkill, buyTowerSkill2, buyTround, choosePack, fortify, huntMark, levelBuilding, levelUp, pickLeader, place, placeMark, removeShroom, setTowerType, spin, takeLoan, unlock };
     const r = aiFns[fn](m, side, ...a);
     if (r && aiRec) aiRec.push({ fn, a });
     return r;
@@ -1155,6 +1200,7 @@ const Game = (() => {
   // before a fight: pick the first package for a player who didn't choose, and put unplaced package squads down
   function ensurePack(m, side) {
     if (needsPack(m, side)) choosePack(m, side, 0);
+    settleLeaders(m); // and the leader draft
     const r = rng(m.seed + 4242 + side);
     for (const ui of freeLeft(m, side)) {
       const spot = aiSpot(m, side, ui, [], r);
@@ -1189,7 +1235,7 @@ const Game = (() => {
       moved: [null, null], // id of the squad each player moved this round (one move per round, CONFIG.moveCost gold)
       tech: [{}, {}], // skills bought per unit type: tech[side][unitIdx] = [round bought or 0, round bought or 0]
       towers: null, // { col, row } of each player's tower (fixed; set below, as it depends on the map)
-      chars: [null, null], // each player's character id (comes with the package)
+      chars: [null, null], // each player's character (leader) id: picked in the draft before round 2 (DRAFT), or with the package
       buff: [[], []], // Zoe's buff tiles for this round: [{ col, row }, ...]
       zoeUses: [0, 0], // fights each player has used Zoe's buff tiles in (the buff grows with them: zoeBuff)
       buildings: [[], []], // each player's buildings (the Mechites' Factory), see buyBuilding
@@ -1216,6 +1262,10 @@ const Game = (() => {
     if (opts && opts.late && !factions && !dev) { m.late = true; m.hp = [startHp(m), startHp(m)]; } // DEVTESTLATEGAME
     if (opts && opts.mirror && !factions) { m.mirror = true; m.packages[1] = JSON.parse(JSON.stringify(m.packages[0])); } // the same rolls for both
     if (opts && opts.noChars) { m.noChars = true; for (const ps of m.packages) for (const p of ps) p.char = null; } // no leaders (2v2)
+    if (!factions && !dev && !(opts && opts.noChars) && !(opts && opts.draft === false)) { // the leader draft before round 2 (DRAFT)
+      m.draft = { pool: draftPool(rng((seed >>> 0) + 6113), offChars) };
+      for (const ps of m.packages) for (const p of ps) p.char = null;
+    }
     m.towers = [towerSpot(m, 0), towerSpot(m, 1)];
     { // the look: the host's pick, or 'random': one of the looks from the match's seed (never the last match's again)
       const mp = findMap(m.map.id); let sk = opts && opts.skin;
@@ -1741,6 +1791,25 @@ const Game = (() => {
   const canMove = (m, side, sq) => !!sq && !(m.units[sq.unit] && m.units[sq.unit].building) && (sq.round === m.round || freeMover(m, side, sq) || freeOut(m, side, sq) || // a building stays put
     sq.luckMove === m.round || (movedId(m, side) !== sq.id && freeMovesLeft(m, side) > 0) || // a free move (Bastion's March order, Otto's horseshoe)
     (movedId(m, side) == null ? m.gold[side] >= CONFIG.moveCost : movedId(m, side) === sq.id));
+  // Each carrier lets one squad out and one squad in per round (2026-11-05; before, a rider could hop in and out
+  // without limit). Only squads from earlier rounds count: this round's squads move freely anyway.
+  // m.horse[side][carrier id] = { r: round, in: squad id, out: squad id }. A squad that goes back to where it was
+  // gives its places back.
+  const horseUse = (m, side, cid) => { const h = m.horse && m.horse[side] && m.horse[side][cid]; return h && h.r === m.round ? h : null; };
+  const horseOk = (m, side, cid, way, sqId) => { const h = horseUse(m, side, cid); return !h || h[way] == null || h[way] === sqId; };
+  const horseLeft = (m, side, cid) => ['in', 'out'].filter(w => horseOk(m, side, cid, w, -1)); // what a carrier has left this round
+  function horseNote(m, side, cid, way, sqId) {
+    if (!m.horse) m.horse = [{}, {}];
+    if (!m.horse[side]) m.horse[side] = {};
+    const h = horseUse(m, side, cid) || { r: m.round };
+    h[way] = sqId;
+    m.horse[side][cid] = h;
+  }
+  function horseForget(m, side, sqId) {
+    const all = m.horse && m.horse[side];
+    if (!all) return;
+    for (const cid in all) { const h = all[cid]; if (h.r !== m.round) continue; if (h.in === sqId) delete h.in; if (h.out === sqId) delete h.out; }
+  }
   function moveSquad(m, side, sqId, col, row) {
     const sq = m.armies[side].find(s => s.id === sqId);
     if (!sq || (sq.col === col && sq.row === row) || !canMove(m, side, sq)) return false;
@@ -1748,6 +1817,9 @@ const Game = (() => {
     const into = boardable(m, side, col, row, sq.unit);
     if (into && into.id === sq.in) return false;
     if (!canPlaceAt(m, side, col, row, sq.unit, true) || (occupied(m, side, col, row) && !into && !garrisonFree(m, side, col, row, sq.unit))) return false;
+    const old = sq.round !== m.round, outOf = isRider(sq) ? sq.in : null;
+    if (old && outOf != null && !horseOk(m, side, outOf, 'out', sq.id)) return false; // this carrier has let one out already
+    if (old && into && !horseOk(m, side, into.id, 'in', sq.id)) return false;          // or taken one in
     const free = freeMover(m, side, sq) || freeOut(m, side, sq);
     if (sq.round !== m.round && !free && movedId(m, side) !== sq.id && sq.luckMove !== m.round && freeMovesLeft(m, side) > 0) { // a free move (used before the paid one)
       sq.from = { col: sq.col, row: sq.row, ...(isRider(sq) ? { in: sq.in } : {}) };
@@ -1766,7 +1838,10 @@ const Game = (() => {
     sq.col = col; sq.row = row;
     if (into) sq.in = into.id; else delete sq.in;
     syncRiders(m, side);
+    if (old && outOf != null) horseNote(m, side, outOf, 'out', sq.id);
+    if (old && into) horseNote(m, side, into.id, 'in', sq.id);
     if (sq.from && sq.movedRound === m.round && sq.from.col === col && sq.from.row === row && sq.from.in === sq.in) {
+      horseForget(m, side, sq.id);
       if (movedId(m, side) === sq.id) undoMove(m, side); else { delete sq.from; delete sq.movedRound; delete sq.luckMove; } // back where it was (a free move costs nothing to undo)
     }
     return true;
@@ -1782,6 +1857,7 @@ const Game = (() => {
     sq.col = sq.from.col; sq.row = sq.from.row;
     if (back) sq.in = back.id; else delete sq.in;
     delete sq.from; delete sq.movedRound;
+    horseForget(m, side, sq.id);
     syncRiders(m, side);
     m.moved[side] = null;
     m.gold[side] += CONFIG.moveCost;
@@ -2450,7 +2526,7 @@ const Game = (() => {
     // a bank loan taken in the round just fought is paid back out of this round's gold (never below nothing)
     summary.loan = [0, 1].map(sd => {
       if (!(m.loan && m.loan[sd] === m.round - 1)) return 0;
-      const cut = Math.min(loanTerms(m, sd).payback, m.gold[sd] - before[sd]);
+      const cut = Math.min(loanTaken(m, sd).payback, m.gold[sd] - before[sd]);
       m.gold[sd] -= cut;
       return cut;
     });
@@ -3096,6 +3172,7 @@ const Game = (() => {
       });
       aiCall('choosePack', m, side, bk);
     }
+    if (leaderTurn(m, side)) { const left = draftLeft(m); aiCall('pickLeader', m, side, left[Math.floor(rng(m.seed + side * 3331 + 5)() * left.length)]); } // the leader draft (own stream)
     if (needsTower(m, side)) { // tower first: a back corner, left or right
       const rows = zoneRows(side);
       const col = r() < 0.5 ? 1 + Math.floor(r() * 2) : 9 + Math.floor(r() * 2);
@@ -3261,17 +3338,17 @@ const Game = (() => {
 
   const api = {
     MAX_ROUND_DMG, TIER_DMG, bankBusy, seenAt, charShown, towerTypeShown, altarShown, elfOwnShown, shroomShown, removingShroom, movedId, canMove, moveSquad, undoMove,
-    COLS, ROWS, TILE, ZONE, START_HP, LATE, startHp, capped, capCount, capFull, START_GOLD, INCOME, incomeFor, LOSER_BONUS, LOSER_BONUS_ROUND, TOWER_FALL_HP, CARRY_CAP, SHUTDOWN, shutdownGold, CREDIT_LINE, loanTerms, treasurySteal, SQUAD_COST, SETTINGS, XP_STEPS, xpNeeded, unitCostOf,
+    COLS, ROWS, TILE, ZONE, START_HP, LATE, startHp, capped, capCount, capFull, START_GOLD, INCOME, incomeFor, LOSER_BONUS, LOSER_BONUS_ROUND, TOWER_FALL_HP, CARRY_CAP, SHUTDOWN, shutdownGold, CREDIT_LINE, loanTerms, loanTaken, treasurySteal, SQUAD_COST, SETTINGS, XP_STEPS, xpNeeded, unitCostOf,
     levelCost, isReady, levelUp, undoLevel, levelAllPlan, levelAll, upgradeOffer, seenLevel, aiLevel, AI, CONFIG,
     deploysAllowed, deploysLeft, deployedThisRound, canBuyDeploy, buyDeploy, refundDeploy, musterOn, deployBuyable,
-    PACKAGE, allPackages, packOf, needsPack, freeLeft, choosePack, ensurePack,
+    PACKAGE, allPackages, packOf, needsPack, freeLeft, choosePack, ensurePack, DRAFT, drafting, draftFirst, needsLeaderPick, leaderTurn, leaderTaken, draftLeft, canPickLeader, pickLeader, settleLeaders,
     unlockCost, tierOf, startLevel, shopCost, mapFreeOf, mapFreeLeft, isUnlocked, unlockVisible, unlock, undoUnlock,
     isHunter, preyOf, canHunt, huntMark, undoHunt, preyShown, preyOn, aiHunt, skillDef, skillCost, SKILL_STEP, skillsBought, isInnate, hasSkill, skillVisible, skillNeeds, skillNeedsAny, skillNeedsMissing, skillHeldUp, isFlat, isMaster, isAwaken, awakenSlot, awakenCost, wokeUnit, awakenBlock, canAwaken, awaken, undoAwaken, seenAwake, isEvolve, evolveSlot, evolveReady, isEvolved, shownAwake, glutOf, glutMax, glutFull, skillOr, skillOrTaken, unitFor, withCharacter,
     footprint, blockOf, spotFree, buildingRecords, recordOf, recordWorld, buildingEffects,
     setBuildings, BUILDINGS: () => BUILDINGS, buildingInfo, BUILDING_SQUAD, isBuildingSkill, buildingIdOf, buildingsOf, buildingOf, buildingAt, buildingShown, buildingSpotOk,
     canBuyBuilding, buyBuilding, buildingSkills, buildingSkillInfo, bskillOf, bskillCost, canBuyBuildingSkill, buyBuildingSkill, undoBuildingSkill,
     buildingXpNeeded, buildingLevelCost, buildingReady, levelBuilding, undoLevelBuilding, constructBuff, buildingBodies, canBuySkill, buySkill, undoSkill, sellValue, sell,
-    isRider, freeOut, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
+    isRider, freeOut, horseUse, horseOk, horseLeft, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
     TOWER, TOWER_TYPES, OUTPOST, TOWER_PICK_ROUND, towerType, towerChoices, needsTowerPick, setTowerType, settleTowerPicks, TOWER_SKILL, towerSkillOf, towerSkillVisible, towerPicked, canBuyTowerSkill, buyTowerSkill, undoTowerSkill, towerSkillCost, towerSkill2Of, towerSkill2Visible, towerSkill2Cost, canBuyTowerSkill2, buyTowerSkill2, undoTowerSkill2, towerSkill2On, PARA, paraDropOf, MOAT, BWALL, BWALL_SQ, EDGES, bwallsOf, bwallOn, edgeOf, bwallWorld, bwallsLeft, bwallShown, bwallSpotOk, placeBwall, unplaceBwall, ensureBwalls, bwallUnit, INVEST, MAGE_GENERALS, mageGenPrice, MAGE, mageGenInfo, mageGenOf, mageTpOf, mageTpRound, mageTpNew, isExtraGen, mageGenCost, canBuyMageGen, buyMageGen, undoMageGen, mageTowerUnit, generalUnit, LOAN, loanNow, investNow, bankBusy, investNow, bankBusy, canTakeLoan, takeLoan, undoLoan, towerRounds, troundInfo, troundOn, troundCost, canBuyTround, buyTround, undoTround, SLIME_UNITS, slimeTowerUnit, slimeSkillDefs, TOWER_MID, towerColOk, towerAt, needsTower, placeTower, ensureTower,
     FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, isOff, enemyHolds, inNoMans, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
     STANDARD_PACK, ICE, ALTAR, GOLEM, isIce, hailRound, altarRound, stormShift, stormRows, hailTiles, altarCost, altarRefund, altarCount, pushRoom, altarBought, addAltar, buyAltar, undoAltar, snowgres, snowgreUnit,

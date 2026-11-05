@@ -1,8 +1,8 @@
 // Headless check of 2v2 (src/duo.js; one shared board since 2026-11-03): no server needed.
-//  - the board: Game's 'duo' map, 24 x 18, two flank columns on each edge, one tower and one treasury per team
-//  - the fight: both lanes' bodies on the one board, only lane 0's tower/treasury/walls, ids split back exactly
+//  - the board: Game's 'duo' map, 24 x 18, two flank columns on each edge, one tower per team (no treasury since 2026-11-05)
+//  - the fight: both lanes' bodies on the one board, only lane 0's tower/walls, ids split back exactly
 //  - team tiles: a teammate's squad takes its tile, the other opponent's squads hold theirs
-//  - the tower and treasury spots (tower right of centre, treasury left), walls by the tower
+//  - the tower spots (right of centre), walls by the tower
 //  - direction arrows (sq.aim): the teammate's reach m.team, the opponents' never while deploying; so do skills (m.team.tech)
 //  - whole matches with four bots: no two squads of a team on one tile, one tower type per team, shared health,
 //    the same result when played back from pre
@@ -42,21 +42,20 @@ check('the 2v2 board', () => {
   assert.strictEqual(m.map.id, 'duo');
   assert.strictEqual(Game.COLS, 24); assert.strictEqual(Game.ROWS, 18);
   assert.deepStrictEqual(Game.towerSpot(m, 0), { col: 17, row: 16 }); assert.deepStrictEqual(Game.towerSpot(m, 1), { col: 6, row: 1 });
-  assert.ok(Game.treasuryOn(m));
-  assert.deepStrictEqual(Game.treasurySpot(m, 0), { col: 6, row: 15 }); assert.deepStrictEqual(Game.treasurySpot(m, 1), { col: 17, row: 2 });
+  assert.ok(!Game.treasuryOn(m), 'no treasury in 2v2 (2026-11-05)');
   const cols = new Set(Game.flankTiles(0).map(t => t.col));
   assert.deepStrictEqual([...cols].sort((a, b) => a - b), [0, 1, 22, 23], 'two flank columns on each edge');
   assert.ok(!Game.MAPS.some(x => x.id === 'duo'), 'not offered as a 1v1 map');
 });
 
-check('one board: one tower and treasury per team, lane 1 ids moved and split back', () => {
+check('one board: one tower per team and no treasury, lane 1 ids moved and split back', () => {
   const a = lane(11), b = lane(12); [a, b].forEach(m => { m.round = 1; }); setup([a, b]);
   assert.strictEqual(clashes([a, b]), 0, 'package squads never share a tile');
   Duo.settle([a, b]);
   const bt = Duo.battle([a, b]);
   for (const sd of [0, 1]) {
     assert.strictEqual(bt.bodies.filter(x => x.side === sd && x.squad === -2).length, 1, 'one tower for side ' + sd);
-    assert.strictEqual(bt.bodies.filter(x => x.side === sd && x.squad === Game.TREASURY_SQ).length, 1, 'one treasury for side ' + sd);
+    assert.strictEqual(bt.bodies.filter(x => x.side === sd && x.squad === Game.TREASURY_SQ).length, 0, 'no treasury for side ' + sd);
     assert.ok(!bt.bodies.some(x => x.side === sd && Duo.laneOfId(x.squad) === 1 && Duo.teamBody(Duo.unmap(x.squad))), 'no lane 1 tower bodies');
   }
   const l1 = bt.bodies.filter(x => x.lane === 1);
@@ -66,7 +65,6 @@ check('one board: one tower and treasury per team, lane 1 ids moved and split ba
   for (const L of [0, 1]) {
     const m = [a, b][L], r = Duo.laneResult(res, L, m);
     for (const sd of [0, 1]) for (const sq of m.armies[sd]) assert.ok(r.squads[sd + ':' + sq.id], `lane ${L} side ${sd} squad ${sq.id} has its result`);
-    for (const sd of [0, 1]) assert.ok(r.squads[sd + ':' + Game.TREASURY_SQ], `lane ${L} sees the shared treasury`);
     if (L === 1) assert.ok(!r.squads['0:-2'] && !r.squads['1:-2'], 'the tower counts in lane 0 only');
   }
 });
@@ -215,15 +213,15 @@ check('refereed: what each seat sees, Ready, forfeit, rematch, save / load', () 
   assert.strictEqual(Duo.load({ v: 1, lanes: [] }, units, matrix), null, 'an old two-board match isn\'t loaded');
 });
 
-check('the new spots: tower right of centre, treasury left, both lanes, walls and bots keep to them', () => {
+check('the new spots: tower right of centre, both lanes, walls and bots keep to them', () => {
   const a = lane(31), b = lane(32); [a, b].forEach(m => { m.round = 1; }); setup([a, b]);
   Duo.settle([a, b]);
   for (const m of [a, b]) {
     assert.deepStrictEqual({ col: m.towers[0].col, row: m.towers[0].row }, { col: 17, row: 16 }, 'side 0 tower');
     assert.deepStrictEqual({ col: m.towers[1].col, row: m.towers[1].row }, { col: 6, row: 1 }, 'side 1 tower');
     for (const sd of [0, 1]) {
-      const t = Game.towerSpot(m, sd), tr = Game.treasurySpot(m, sd);
-      assert.ok(!m.armies[sd].some(q => q.in == null && ((q.col === t.col && q.row === t.row) || (q.col === tr.col && q.row === tr.row))), 'the bot keeps clear of tower and treasury');
+      const t = Game.towerSpot(m, sd);
+      assert.ok(!m.armies[sd].some(q => q.in == null && q.col === t.col && q.row === t.row), 'the bot keeps clear of the tower');
     }
   }
   // Bastion walls go up by the tower where it now stands
