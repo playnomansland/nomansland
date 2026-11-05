@@ -656,6 +656,12 @@ const Render3D = (THREE, el, view, opts = {}) => {
       if (bl.level > 0) iconRow([...Array(bl.level)].map(() => 'dot'), wx, 5.6, wz, 0.5, gold);
       if (side === me && deploying && Game.buildingReady(bl)) icon('plus', wx + camRight.x * 2.4, 4.2, wz + camRight.z * 2.4, 1.0);
     }
+    // 2v2 buildings (src/mpb.js): both teams', each part on its own tile (models3d 'mpb:<kind>')
+    if (typeof Mpb !== 'undefined' && Mpb.on(m)) for (const side of [me, foe]) for (const rec of Mpb.recs(m, side)) for (const tl of Mpb.tilesOf(rec)) {
+      const w = Game.tileToWorld(tl.col, tl.row), u = Mpb.unitOf(m, side, rec);
+      bodies.push({ u: tl.part ? { ...u, mpbPart: tl.part } : u, side, x: w.x, y: w.y, look: 'solid', edge: Art.teamCol(side, me) });
+      if (deploying && rec.round === m.round && rec.round > 1) { const st = tileCenter(v, tl.col, tl.row); tileSq(st.c, st.r, teamColor(side, me), 0.8, 0.05, 14); }
+    }
     if (v.placingBuilding && editable) for (const row of Game.zoneRows(me)) for (let c = 0; c < Game.COLS; c++) if (Game.buildingSpotOk(m, me, c, row)) { const s = tileCenter(v, c, row); tileSq(s.c, s.r, gold, 0.6, 0.06, 12); }
     if (Game.isIce(m)) for (const side of [me, foe]) {
       // Snowgres on their tiles in no man's land (an opponent's new one shows up at the fight), and walls bought this round

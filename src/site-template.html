@@ -428,6 +428,13 @@ html.dock .bar:has(> .task:not([hidden])) > .hint { display: none; }
 .duo-tot > span { display: inline-flex; align-items: center; gap: 2px; }
 .duo-who { font-size: 12px; }
 .duo-row .seg.pings button { min-width: 38px; font-weight: 700; }
+/* 2v2 buildings (src/mpb.js): the draft's cards, the placement vote, its tiles over the board */
+.mpb-box { display: grid; gap: 6px; font-size: 12px; line-height: 1.35; padding: 6px 8px; border: 1px solid var(--gold); border-radius: 10px; background: color-mix(in srgb, var(--gold) 10%, transparent); }
+.mpb-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mpb-card { display: grid; gap: 2px; text-align: left; white-space: normal; padding: 6px 8px; }
+.marks .mpb-ok { fill: color-mix(in srgb, var(--gold) 22%, transparent); stroke: var(--gold); stroke-width: 1.5; animation: mpbGlow 1.4s ease-in-out infinite alternate; }
+.marks .mpb-vote { fill: none; stroke-width: 4; }
+@keyframes mpbGlow { from { opacity: 0.45; } to { opacity: 1; } }
 .marks .range { fill: none; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 0.1 6; opacity: 0.9; }
 /* intent: where a squad means to go (arrows to the enemy squads it heads for, dashed straight ahead with nothing in sight yet), whom it attacks in a fight (small rings) */
 .marks .intent, .marks .intent-under { fill: none; stroke-linecap: round; }
@@ -801,6 +808,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
 <script>
 /*GAME*/
 /*REFEREE*/
+/*MPB*/
 /*DUO*/
 /*TOUR*/
 /*EXPLOITBOT*/
@@ -2231,12 +2239,12 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
       };
     }
     if (choosingTower()) return {
-      kind: 'tower', eyebrow: `Round ${m.round}`, title: net.duo && mode === 'net' ? 'Vote for your team’s tower' : 'Choose your tower',
-      sub: mode === 'tutorial' ? 'Your outpost becomes a real tower. It stays all match.' : net.duo && mode === 'net' ? 'You and your teammate share one tower for the rest of the match. If you vote differently, a coin flip decides.' : 'It stays for the rest of the match.',
+      kind: 'tower', eyebrow: `Round ${m.round}`, title: 'Choose your tower',
+      sub: mode === 'tutorial' ? 'Your outpost becomes a real tower. It stays all match.' : 'It stays for the rest of the match.',
       items: Game.towerChoices(m, me).map(x => ({
         key: x.id,
         art: `<canvas data-ticon="${x.id}" width="96" height="96" style="width:48px;height:48px" aria-hidden="true"></canvas>`,
-        name: esc(x.name), who: net.duo && m.team && m.team.vote === x.id ? 'Teammate’s vote' : '', sub: `${x.unit.hp} hp · ${towerAttack(x.unit).range} m`,
+        name: esc(x.name), who: '', sub: `${x.unit.hp} hp · ${towerAttack(x.unit).range} m`,
         det: mode === 'tutorial' && TUT.towers[x.id] ? `<b>${esc(x.name)}</b> · ${esc(TUT.towers[x.id])}` : `<b>${esc(x.name)}</b> · ${x.unit.hp} hp · ${(a => `${x.unit.drone ? 'drone ' : ''}hit ${a.hit} × ${a.aps}/s · ${a.range} m${a.splash ? ` · ${a.splash} m splash` : ''}`)(towerAttack(x.unit))}<br>${esc(x.text)}${(x.rounds || []).map(r => `<br><span style="color:var(--gold)">${esc(r.name)}, every round, ${r.cost} gold:</span> ${esc(r.text)}`).join('')}${x.skill ? `<br><span style="color:var(--gold)">Skill, bought separately for ${Game.TOWER_SKILL.cost} gold: ${esc(x.skill.name)}.</span> ${esc(x.skill.text)}` : ''}${x.skill2 ? `<br><span style="color:var(--gold)">Skill, bought separately for ${x.skill2.cost} gold: ${esc(x.skill2.name)}.</span> ${esc(x.skill2.text)}` : ''}${x.loan ? `<br><span style="color:var(--gold)">Loan, every round:</span> ${esc(loanText())}` : ''}${x.passive ? `<br><span style="color:var(--gold)">${esc(x.passive.name)} (always on):</span> ${esc(x.passive.text)}` : ''}${x.generals ? `<br><span style="color:var(--gold)">Mage generals, one per round, for that round's fight:</span> ${Game.MAGE_GENERALS.map(g => `<b>${esc(g.name)}</b> (${g.cost} gold): ${esc(g.text)}`).join(' ')}` : ''}`,
       })),
     };
@@ -2763,6 +2771,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
         ${action}
       </div>
       <div class="hint2">${tip}</div>
+      ${duoOn() ? mpbPanel() : ''}
       ${net.duo && mode === 'net' ? duoRow(false) : ''}
       ${xb.includes('<button') ? `<div class="xrow">${xb}</div>` : ''}
       ${showShop ? `<div class="shop2" id="shop">${shopHtml}</div>` : ''}`;
@@ -2798,6 +2807,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     if ($('buy-deploy')) $('buy-deploy').addEventListener('click', () => { if (editable() && Game.buyDeploy(m, me)) changed(); });
     wireMore();
     if (net.duo && mode === 'net') wireDuoRow();
+    if (duoOn()) wireMpbPanel(); // 2v2: the artifact draft's cards
     $('help-btn').addEventListener('click', openHelp);
     if ($('mage-gen')) $('mage-gen').addEventListener('click', () => openTowerSheet(me));
     if ($('loan')) $('loan').addEventListener('click', () => { if (editable() && Game.takeLoan(m, me)) changed(); });
@@ -3654,11 +3664,13 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     if (tr && tr.lost) gold.push(`−${tr.lost} stolen from your treasury`);
     if (sum.devGold && sum.devGold[me]) gold.push(`+${sum.devGold[me]} buildings and Powers`);
     if (sum.devLoss && sum.devLoss[me].gold) gold.push(`−${sum.devLoss[me].gold} buildings lost`);
+    gold.push(...mpbGold(sum)); // 2v2: artifacts, an opponent's Vault
     const waiting = !solo() && nextReady[me];
     overlay(`<div class="card">
       <h2 class="${cls}">${head}</h2>
       <p class="big">${lines.join(' ')}</p>
       ${lvLines.join('')}
+      ${mpbResultHtml(sum)}
       <p class="num" style="color:var(--gold)">${gold.join(' · ')}</p>
       <div class="btnrow">
         ${waiting ? '<p class="status wait">Waiting for your opponent</p>' : `<button class="btn primary" id="next">Next round</button>`}
@@ -5711,7 +5723,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       watchSq = inspect && inspect.squad >= 0 && !inspect.u.structure ? { side: inspect.side, id: inspect.squad } : null;
       boardMarks(); return;
     }
-    if ((phase === 'result' || phase === 'end') && duoOn()) { duoTapSquad(t); return; } // 2v2: after the fight any squad's sheet
+    if ((phase === 'result' || phase === 'end') && duoOn()) { if (!mpbTap(t)) duoTapSquad(t); return; } // 2v2: after the fight any squad's (or building's) sheet
     const had = rangeOf;
     rangeOf = null;
     tapTile(t, had);
@@ -5732,6 +5744,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (phase !== 'deploy' || !t) return;
     if (choosingPack() || choosingTower() || devPicking()) return; // the package (and in round 3 the tower, in the devtest the pick) comes first
     if (performance.now() - dragEndAt < 400) return;
+    if (selected === null && duoOn() && mpbTap(t)) return; // 2v2: a placement vote, or a building's sheet
     if (mode === 'tutorial') {
       const step = tutStep(), own = Game.squadAt(m, me, t.col, t.row);
       if (m.round >= 3 && Game.towerAt(m, me, t.col, t.row)) { tut.towerSeen = true; openTowerSheet(me); panelDeploy(); return; }
@@ -6151,6 +6164,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     let html = '';
     if (!cinematic && m && (phase === 'deploy' || phase === 'battle')) html += intentMarks(wrapMap());
     if (net.duo) html += pingMarks(cinematic ? null : wrapMap());
+    if (!cinematic && duoOn() && m && phase === 'deploy') html += mpbMarks(wrapMap()); // 2v2: where a building may go, both players' votes
     if (!cinematic && m && phase === 'deploy') for (const sd of [0, 1]) { // Mark Bounty: crosshairs on the marked squad
       const k = Game.markOn(m, sd) && Game.markShown(m, me, true, sd) ? Game.markOf(m, sd) : null, q = k && m.armies[1 - sd].find(x => x.id === k.squad);
       if (!q) continue;
@@ -8529,7 +8543,6 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   var pingKind = null; // the ping the next tap on the board puts down
   var duoToast = null; // a line from the team for the status bar: { text, until }
   var duoPick = -1;   // the host's first tap when swapping two seats
-  var duoVoteSeen = ''; // the tower vote already announced on this phone
   function duoHost(o = {}) {
     if (!devMode()) { overlayMsg('2v2', 'Only developer accounts can make a 2v2 lobby for now. Ask a developer for the code.'); return; }
     leaveNet();
@@ -8585,20 +8598,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (d.duo) {
       net.duoInfo = { ...(net.duoInfo || {}), ...d.duo };
       if (d.t === 'fight') net.duoPres = d.duo.pres || null;
-      duoVoteNews();
+      mpbClockIn(d.duo.clock); // the draft's and the placement vote's 15 s
+      setTimeout(mpbNotice, 0); // (once this sync's m is in)
       netStatus(); hud();
     }
     return false;
-  }
-  // the round's tower vote, once it is settled (the team's tower)
-  function duoVoteNews() {
-    const v = net.duoInfo && net.duoInfo.vote, x = net.duoInfo;
-    if (!v || !x || x.seat == null) return;
-    const key = net.code + ':' + v.round + ':' + v.type;
-    if (duoVoteSeen === key) return;
-    duoVoteSeen = key;
-    const t = Game.towerTypeById(v.type), name = t ? t.name : v.type, mine = v.votes[x.lane], theirs = v.votes[1 - x.lane];
-    duoToastSay(mine === theirs ? `Your team’s tower: ${name}` : v.flip ? `You voted differently: a coin flip picked ${name}` : `Your team’s tower: ${name} (${mine === v.type ? 'your' : 'your teammate’s'} vote)`, 6000);
   }
   // the lobby: four seats in two teams. The host taps two seats to swap them (a player onto an empty seat moves them)
   function drawDuoLobby(problem) {
@@ -8620,7 +8624,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     </div>`);
     const link = duoLink();
     $('panel').innerHTML = `
-      <span class="hint">One wide board. You and your teammate deploy in the same zone, each with your own gold and shop, and share one tower (you vote for its type in round ${Game.TOWER_PICK_ROUND}) and one treasury. Two columns of flank tiles on each edge. No leaders. Each team shares one health of ${Duo.HP}.</span>
+      <span class="hint">One wide board. You and your teammate deploy in the same zone, each with your own gold and shop, and share one tower (an Outpost until your team wins a tower card in the artifact draft) and one Vault, and the buildings you win. Two columns of flank tiles on each edge. No leaders. Each team shares one health of ${Duo.HP}.</span>
       <div class="linkbox" id="link">${esc(link)}</div>
       <div class="bar">
         <span class="btnrow">
@@ -8816,9 +8820,180 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const x = net.duoInfo;
     if (!x || x.seat == null) return `2v2 · ${net.code}`;
     const mate = Duo.mateOf(x.seat), nm = (x.names && x.names[mate]) || Duo.SEAT_NAMES[mate];
-    const vote = m && m.team && m.team.vote && Game.needsTowerPick(m, me) ? Game.towerTypeById(m.team.vote) : null;
-    const st = x.bots && x.bots[mate] ? '' : x.here && !x.here[mate] ? 'away' : phase === 'deploy' ? (x.ready && x.ready[mate] ? 'ready' : vote ? `voted ${vote.name}` : 'deploying') : '';
+    const st = x.bots && x.bots[mate] ? '' : x.here && !x.here[mate] ? 'away' : phase === 'deploy' ? (x.ready && x.ready[mate] ? 'ready' : 'deploying') : '';
     return `2v2 · ${Duo.SEAT_NAMES[x.seat]} · teammate ${nm}${st ? ': ' + st : ''}`;
+  }
+
+  // =====================================================================
+  // 2v2 buildings (src/mpb.js, docs/MPB-2V2.md; 2026-11-06): the artifact draft, the placement vote, the MPB sheet
+  // (and the Vault's part of it), the news after a fight. Hooks elsewhere: panelDeploy (mpbPanel / wireMpbPanel),
+  // tapTile and boardTap (mpbTap), boardMarks (mpbMarks), duoRecv (mpbClockIn), showResult (mpbGold / mpbResultHtml).
+  // A kind that needs more than the generic sheet (a squad to pick, a tile to tap) adds its part to MPB_SHEET, one
+  // marked region per kind: MPB_SHEET[kind] = { html(side, rec, live) -> html, wire(root, side, rec, again) }.
+  // =====================================================================
+  var mpbClockAt = { vote: 0, draft: 0 }; // when (on this phone's clock) the team's vote and the draft's pick run out
+  var mpbSeen = '';  // the draft deal already announced
+  var mpbAmt = 50;   // the Vault sheet's amount
+  var mpbSpotCache = { key: '', at: 0, tiles: [] };
+  function mpbClockIn(c) { if (!c) return; const t = now(); mpbClockAt = { vote: c.vote ? t + c.vote : 0, draft: c.draft ? t + c.draft : 0 }; }
+  const mpbLeft = (k) => Math.max(0, Math.ceil((mpbClockAt[k] - now()) / 1000));
+  setInterval(() => { for (const k of ['vote', 'draft']) { const el = $('mpb-' + k + '-s'); if (el) el.textContent = mpbClockAt[k] ? mpbLeft(k) + ' s' : ''; } }, 250);
+  const mpbOn = () => duoOn() && !!m && typeof Mpb !== 'undefined' && Mpb.on(m);
+  const teamName = (sd) => sd === me ? 'Your team' : 'Their team';
+  const MPB_PER = { round: 'Once a round for the team', roundPlayer: 'Once a round for each of you', match: 'Once a match', building: 'Once for this building', free: 'As often as you like' };
+  const mpbPerText = (sk) => (MPB_PER[sk.per] || MPB_PER.free) + (sk.costStep ? `, +${sk.costStep} gold for each of your clicks this round` : '');
+  const mpbCardBtn = (c, i, ok) => `<button class="btn mpb-card" data-mpb-draft="${i}" ${ok ? '' : 'disabled'}><b>${esc(Mpb.cardName(c))}</b><span class="hint" style="margin:0">${c.type === 'tower' ? 'Tower' : 'Building'} · ${esc(Mpb.cardText(c))}</span></button>`;
+  // the draft (rounds 3 and 9): the picking team picks one of the two cards; then what each team got
+  function mpbDraftHtml() {
+    const d = m.draft;
+    if (!d || d.round !== m.round) return '';
+    if (Mpb.draftOpen(m)) {
+      const mine = d.first === me, why = d.how === 'both' ? `${teamName(d.first)} won both artifacts` : 'Nobody won the artifacts: a coin flip says who picks';
+      return `<div class="mpb-box"><div><b>Artifact draft</b> · ${esc(why)}. ${mine ? 'Pick a card for your team (either of you: the first pick counts). The other team gets the one left.' : 'They pick first; your team gets the card left.'} <span class="num" id="mpb-draft-s">${mpbClockAt.draft ? mpbLeft('draft') + ' s' : ''}</span></div>
+        <div class="mpb-cards">${d.cards.map((c, i) => mpbCardBtn(c, i, mine && editable())).join('')}</div></div>`;
+    }
+    return `<div class="hint2">Artifact draft: ${d.cards.map((c, i) => `${teamName(d.owner[i])} got <b>${esc(Mpb.cardName(c))}</b>`).join(' · ')}</div>`;
+  }
+  // the placement vote of the team's first building in the queue
+  function mpbVoteHtml() {
+    const h = Mpb.voteHead(m, me);
+    if (!h) return '';
+    const K = Mpb.kindOf(h.kind), L = duoMyLane(), mine = h.votes[L], theirs = h.votes[1 - L], part = h.part && ((K.place.parts || []).find(p => p.id === h.part) || {}).name;
+    return `<div class="mpb-box"><div><b>Place ${part ? `the ${esc(K.name)}’s ${esc(part)}` : `your team’s ${esc(K.name)}`}</b> · tap a glowing tile. ${mine ? '<span style="color:' + duoRing(duoMySeat()).col + '">Your vote is in.</span> ' : ''}${theirs ? `<span style="color:${duoRing(Duo.mateOf(duoMySeat())).col}">Your teammate voted.</span>` : 'Waiting for your teammate.'} The same tile places it at once; two tiles: one of them when the time runs out. <span class="num" id="mpb-vote-s">${mpbClockAt.vote ? mpbLeft('vote') + ' s' : ''}</span></div></div>`;
+  }
+  function mpbPanel() { return mpbOn() ? mpbDraftHtml() + mpbVoteHtml() : ''; }
+  function wireMpbPanel() {
+    $('panel').querySelectorAll('[data-mpb-draft]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.draftPick(m, me, +b.dataset.mpbDraft)) { mpbNotice(); changed(); } }));
+  }
+  // a line in the status bar once the draft is dealt (who got what)
+  function mpbNotice() {
+    if (!mpbOn() || !m.draft || m.draft.round !== m.round || m.draft.owner[0] == null) return;
+    const k = net.code + ':' + m.draft.round;
+    if (mpbSeen === k) return;
+    mpbSeen = k;
+    const i = m.draft.owner.indexOf(me);
+    if (i >= 0) duoToastSay(`Artifact draft: your team gets ${Mpb.cardName(m.draft.cards[i])}`, 6000);
+  }
+  // the tiles the team may vote for now (cached: the 3D board redraws the marks every frame)
+  function mpbVoteTiles() {
+    const h = Mpb.voteHead(m, me);
+    if (!h) return [];
+    const key = [m.round, h.kind, h.part, Mpb.recs(m, me).length, m.armies[me].length, Game.teamArmy(m, me).length].join('|');
+    if (mpbSpotCache.key !== key || now() - mpbSpotCache.at > 400) mpbSpotCache = { key, at: now(), tiles: Mpb.spots(m, me, h.kind, h.part) };
+    return mpbSpotCache.tiles;
+  }
+  // over the board (both boards, boardMarks): the allowed tiles glow, each player's vote in their colour
+  function mpbMarks(at) {
+    if (!mpbOn() || phase !== 'deploy' || !at) return '';
+    const h = Mpb.voteHead(m, me);
+    if (!h) return '';
+    const pt = (x, y) => at(x, y).map(v => v.toFixed(1)).join(','), d = Game.TILE / 2 - 0.5;
+    const sq = (t, cls, st) => { const c = Game.tileToWorld(t.col, t.row); return `<polygon class="${cls}"${st ? ` style="${st}"` : ''} points="${pt(c.x - d, c.y - d)} ${pt(c.x + d, c.y - d)} ${pt(c.x + d, c.y + d)} ${pt(c.x - d, c.y + d)}"/>`; };
+    let html = mpbVoteTiles().map(t => sq(t, 'mpb-ok')).join('');
+    for (const L of [0, 1]) { const v = h.votes[L]; if (v) html += sq(v, 'mpb-vote', `stroke:${duoRing(Duo.seatOf(L, me)).col}`); }
+    return html;
+  }
+  // a tap on the board: a vote on an allowed tile, else a building's sheet (true: handled)
+  function mpbTap(t) {
+    if (!mpbOn() || !t) return false;
+    const h = phase === 'deploy' && Mpb.voteHead(m, me);
+    if (h && Mpb.spotOk(m, me, h.kind, h.part, t.col, t.row)) { if (editable() && Game.mpbVote(m, me, t.col, t.row)) changed(); return true; }
+    const x = Mpb.recAt(m, t.col, t.row);
+    if (x) { openMpbSheet(x.side, x.rec.key); return true; }
+    return false;
+  }
+  const MPB_SHEET = {
+    // ===== vault (page) =====
+    vault: {
+      html(side, rec, live) {
+        const v = Mpb.vaultOf(m, side), mine = side === me, L = duoMyLane(), mode0 = Mpb.vaultMode(m, side);
+        if (!v) return '';
+        const g = Mpb.golemOf(m, side), e = rec.skills.golem, log = e && e.round === m.round ? e.log : [];
+        const clicked = (lane) => log.some(x => x.lane === lane);
+        const golem = !mine ? '' : g ? `Coin Golem this round: ${g.g} gold, ${Mpb.golemSkin(g.g)}.` : clicked(L) ? 'Coin golem: waiting for your teammate.' : clicked(1 - L) ? 'Coin golem: your teammate clicked it. Click it too to summon it.' : '';
+        let pick = '';
+        if (mine && phase === 'deploy') {
+          const room = { put: Mpb.vaultRoom(m, me, 'put'), take: Mpb.vaultRoom(m, me, 'take') }, hi = Math.max(room.put, room.take, 1);
+          mpbAmt = Math.max(1, Math.min(mpbAmt, hi));
+          pick = `<div class="mpb-amt" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <button class="btn small" data-mpb-amt="-50" ${live ? '' : 'disabled'}>−50</button><button class="btn small" data-mpb-amt="-10" ${live ? '' : 'disabled'}>−10</button>
+            <b class="num" id="mpb-amt">${mpbAmt}</b>
+            <button class="btn small" data-mpb-amt="10" ${live ? '' : 'disabled'}>+10</button><button class="btn small" data-mpb-amt="50" ${live ? '' : 'disabled'}>+50</button>
+            <button class="btn small${room.put >= mpbAmt ? ' either' : ''}" id="mpb-put" ${live && room.put >= mpbAmt ? '' : 'disabled'}>Put in</button>
+            <button class="btn small${room.take >= mpbAmt ? ' either' : ''}" id="mpb-take" ${live && room.take >= mpbAmt ? '' : 'disabled'}>Take out</button></div>
+            <p class="hint" style="margin:0">You can still put in ${room.put} or take out ${room.take} this round (${Mpb.VAULT.move} a round each; ${Mpb.vaultMoved(m, me, L)} moved by you, ${Mpb.vaultMoved(m, me, 1 - L)} by your teammate).</p>`;
+        }
+        return `<p style="margin:0"><b class="num" style="color:var(--gold)">${v.gold}</b> gold inside${mine && mode0 ? ` · a ${mode0} round` : mine ? ' · no move yet this round' : ' (as the round began)'}${Mpb.skillN(rec, 'interest') ? ` · interest ${Mpb.VAULT.interest}% a round` : ''}</p>${pick}${golem ? `<p style="margin:0">${esc(golem)}</p>` : ''}`;
+      },
+      wire(root, side, rec, again) {
+        root.querySelectorAll('[data-mpb-amt]').forEach(b => b.addEventListener('click', () => { mpbAmt = Math.max(1, mpbAmt + +b.dataset.mpbAmt); again(); }));
+        if ($('mpb-put')) $('mpb-put').addEventListener('click', () => { if (editable() && Game.vaultPut(m, me, mpbAmt)) { changed(); again(); } });
+        if ($('mpb-take')) $('mpb-take').addEventListener('click', () => { if (editable() && Game.vaultTake(m, me, mpbAmt)) { changed(); again(); } });
+      },
+    },
+    // ===== treeKojja (page) =====
+    // ===== fieldHospital (page) =====
+    // ===== coalMine (page) =====
+    // ===== scorch (page) =====
+    // ===== oak (page) =====
+    // ===== factory (page) =====
+    // ===== magicLake (page) =====
+    // ===== jail (page) =====
+    // ===== school (page) =====
+    // ===== shadowDen (page) =====
+  };
+  // a building's sheet: both teammates buy its skills (whoever buys pays; only your own buy can be taken back), the
+  // opponents read it (this round's buys stay hidden from them until the fight)
+  function openMpbSheet(side, key) {
+    const rec = Mpb.recOf(m, side, key), K = rec && Mpb.kindOf(rec.kind);
+    if (!K) return;
+    const mine = side === me, live = mine && phase === 'deploy' && editable(), L = duoMyLane(), again = () => openMpbSheet(side, key);
+    const rows = K.skills.map(sk => {
+      const e = rec.skills[sk.id], log = e && e.round === m.round ? e.log : [], you = log.filter(x => x.lane === L).length, mate = log.length - you;
+      let act = '';
+      if (mine && phase === 'deploy') {
+        const why = Mpb.whyNot(m, me, key, sk.id, []);
+        act = `<button class="btn small${!why ? ' either' : ''}" data-mpb-buy="${esc(sk.id)}" ${!why && live ? '' : 'disabled'}>${why === 'have' || why === 'round' || why === 'you' || why === 'max' ? 'Bought' : 'Buy'} · ${Mpb.skillCost(m, me, key, sk.id)} gold</button>`;
+        if (live && Mpb.canUndo(m, me, key, sk.id)) act += ` <button class="btn small" data-mpb-undo="${esc(sk.id)}">Undo</button>`;
+      } else act = `<span class="hint">${sk.cost} gold</span>`;
+      const state = [e && e.n ? `bought ${e.n}×` : '', you ? `by you ×${you} this round` : '', mate ? `by your teammate ×${mate} this round` : ''].filter(Boolean).join(' · ');
+      return upRow({ name: sk.name, act, text: esc(sk.text || ''), more: esc(mpbPerText(sk) + (state ? '. ' + state : '') + (mine ? '. Whoever buys pays.' : '')) });
+    });
+    const info = K.hooks.info ? K.hooks.info(m, side, rec).filter(Boolean) : [], extra = MPB_SHEET[rec.kind];
+    const fell = rec.fell ? `<p class="hint" style="margin:0">Destroyed in round ${rec.fell}’s fight; it stands again in every fight.</p>` : '';
+    $('sheet').innerHTML = `
+      <div class="bar"><h3 id="sheet-h">${teamName(side)}’s ${esc(K.name)}</h3><button class="btn small" id="close">Close</button></div>
+      <p style="margin:0"><span class="chip" style="border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px;color:${K.color}">${esc(K.kind)}</span> ${K.hp > 0 ? `${K.hp} health · ${K.armor} armor` : 'Terrain'}${rec.round > 1 ? ` · placed in round ${rec.round}` : ''}</p>
+      <p class="role" style="margin:0">${esc(K.text)}</p>
+      ${K.downside ? `<p style="margin:0"><span style="color:var(--foe)">Downside:</span> ${esc(K.downside)}</p>` : ''}
+      ${fell}
+      ${extra ? extra.html(side, rec, live) : info.length ? `<p style="margin:0">${info.map(esc).join(' · ')}</p>` : ''}
+      ${rows.length ? `<h4 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">${mine ? 'Skills: either of you can buy' : 'Skills (this round’s buys stay hidden until the fight)'}${HOLD_HINT}</h4>${rows.join('')}` : '<p class="hint" style="margin:0">No skills yet.</p>'}`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', closeSheet);
+    const root = $('sheet');
+    root.querySelectorAll('[data-mpb-buy]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.mpbBuy(m, me, key, b.dataset.mpbBuy)) { changed(); again(); } }));
+    root.querySelectorAll('[data-mpb-undo]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.mpbUndo(m, me, key, b.dataset.mpbUndo)) { changed(); again(); } }));
+    if (extra && extra.wire) extra.wire(root, side, rec, again);
+  }
+  // the results screen: the gold artifacts and an opponent's fallen Vault paid, and the buildings' news
+  function mpbGold(sum) {
+    const out = [];
+    if (!duoOn() || !sum) return out;
+    const won = (sum.artifacts || []).filter(a => a.won === me).length;
+    if (won) out.push(`+${won * Mpb.ARTIFACT.gold} artifact${won > 1 ? 's' : ''}`);
+    for (const n of (sum.mpbNews && sum.mpbNews[1 - me]) || []) if (n.kind === 'vault' && n.bounty) out.push(`+${n.bounty} their Vault`);
+    return out;
+  }
+  function mpbResultHtml(sum) {
+    if (!duoOn() || !sum) return '';
+    const lines = [];
+    if (sum.artifacts && sum.artifacts.length) lines.push('Artifacts: ' + sum.artifacts.map(a => `${esc(Mpb.cardName(a.card))}, ${a.won === me ? 'won by your team' : a.won >= 0 ? 'won by their team' : 'nobody won it'}`).join(' · ') + '. Their cards are dealt next round.');
+    for (const sd of [me, 1 - me]) for (const n of (sum.mpbNews && sum.mpbNews[sd]) || []) {
+      if (n.kind === 'vault') lines.push(`${teamName(sd)}’s Vault was destroyed: ${n.lost} gold lost.`);
+      else if (n.text) lines.push(esc(n.text));
+    }
+    return lines.map(l => `<p class="hint" style="margin:0">${l}</p>`).join('');
   }
 
   function overlayMsg(head, text) {

@@ -658,6 +658,56 @@ const Models3D = (THREE) => {
     ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => P(cyl(0.28, 0.28, 0.16, 8), DARK, [x * 0.5, 0.28, z * 0.32], [0, 0, Math.PI / 2])),
     P(cyl(0.07, 0.07, 0.5, 5), IRON, [0.25, 1.3, 0.3])];
   BUILD.building = BUILD['building:factory']; // any other building, until it has a model of its own
+  // ---------- 2v2 buildings (src/mpb.js): one model per kind, 'mpb:<kind>' (a part: 'mpb:<kind>:<part>'; a walker
+  // with a look: 'mpb:<kind>:<look>'), drawn at their real size like towers. Kinds without one get BUILD.mpb (a plain
+  // block in the kind's colour, 'tint', with a roof in the team colour) and parts BUILD['mpb:part']. B groups add
+  // theirs in their kind's region.
+  BUILD.mpb = () => [P(box(3.2, 2.2, 3.0), 'tint', [0, 1.1, 0]), P(box(3.5, 0.5, 3.3), 'team', [0, 2.45, 0]), P(box(2.4, 0.5, 2.2), 'tint', [0, 2.95, 0]),
+    P(box(0.9, 1.3, 0.15), DARK, [0, 0.65, -1.52]), ...flagOn(3.2)];
+  BUILD['mpb:part'] = () => [P(cyl(1.1, 1.3, 0.6, 8), STONE, [0, 0.3, 0]), P(cyl(0.7, 0.8, 0.5, 8), 'team', [0, 0.8, 0]), P(cyl(0.45, 0.45, 0.25, 8), DARK, [0, 1.1, 0])];
+  // ===== vault (3D) =====
+  // The Vault: a squat iron strongroom on a stone plinth, riveted, with a band and a pennant in the team colour, a big
+  // round brass door with a turning wheel on its front (-z: toward its own side, where its team looks from) and
+  // stacks of gold coins against its walls
+  const rivets = (xs, ys, z) => xs.flatMap(x => ys.map(y => P(ball(0.09), METAL, [x, y, z])));
+  BUILD['mpb:vault'] = () => [
+    P(box(4.2, 0.45, 3.8), STONE, [0, 0.22, 0]), P(box(4.5, 0.15, 4.1), ROCK, [0, 0.05, 0]),
+    P(box(3.6, 2.4, 3.2), IRON, [0, 1.65, 0]),
+    P(box(3.75, 0.35, 3.35), 'team', [0, 2.55, 0]),
+    P(box(3.3, 0.35, 2.9), '#4C5258', [0, 3.02, 0]), P(box(2.2, 0.25, 1.9), IRON, [0, 3.32, 0]),
+    ...rivets([-1.55, 1.55], [0.75, 1.65, 2.25], -1.62),
+    P(cyl(1.05, 1.05, 0.22, 16), BRASS, [0, 1.55, -1.66], [Math.PI / 2, 0, 0]),
+    P(new THREE.TorusGeometry(1.05, 0.1, 5, 18), '#7A5A1E', [0, 1.55, -1.78]),
+    ...[0, 1, 2].map(k => P(box(1.5, 0.12, 0.1), '#5B4210', [0, 1.55, -1.82], [0, 0, k * Math.PI / 3])),
+    P(cyl(0.22, 0.22, 0.18, 8), GOLD, [0, 1.55, -1.86], [Math.PI / 2, 0, 0]),
+    P(box(0.5, 0.18, 0.18), METAL, [0.95, 0.9, -1.7]), P(box(0.5, 0.18, 0.18), METAL, [0.95, 2.2, -1.7]), // hinges
+    ...[[-2.15, 0.55, -1.1], [2.15, 0.55, 0.9], [-2.15, 0.55, 1.2]].flatMap(([x, y, z], k) => [...Array(3 + k)].map((_, j) => P(cyl(0.34, 0.34, 0.11, 10), GOLD, [x, y + j * 0.13, z]))),
+    P(cyl(0.06, 0.06, 1.6, 5), WOOD, [1.4, 4.1, 1.1]), P(box(0.05, 0.6, 0.9), 'team', [1.4, 4.55, 1.55])];
+  // ===== golem (3D) =====
+  // The Coin Golem: a hulk of stacked coins (bronze, silver or gold by the gold spent): coin-stack legs and arms, a
+  // barrel chest of big coins, a coin head with glowing eyes, a sash in the team colour; for a body of radius 1
+  const coinStack = (r, n, [x, y, z], col, edge) => [...Array(n)].map((_, k) => P(cyl(r * (k % 2 ? 0.94 : 1), r * (k % 2 ? 0.94 : 1), 0.13, 10), k % 2 ? edge : col, [x, y + k * 0.13, z]));
+  const golem = (col, edge) => () => [
+    ...coinStack(0.24, 6, [-0.3, 0.07, 0], col, edge), ...coinStack(0.24, 6, [0.3, 0.07, 0], col, edge),
+    ...[0, 1, 2, 3, 4].map(k => P(cyl(0.62 - Math.abs(k - 2) * 0.06, 0.62 - Math.abs(k - 2) * 0.06, 0.2, 12), k % 2 ? edge : col, [0, 0.95 + k * 0.2, 0])),
+    P(box(1.3, 0.16, 0.2), 'team', [0, 1.45, -0.55], [0, 0, 0.5]),
+    ...[-1, 1].flatMap(sd => [...coinStack(0.18, 5, [sd * 0.78, 1.1, 0], col, edge), P(cyl(0.28, 0.28, 0.24, 10), col, [sd * 0.8, 1.0, -0.05])]),
+    P(cyl(0.34, 0.34, 0.14, 12), col, [0, 2.1, 0], [Math.PI / 2, 0, 0]),
+    P(cyl(0.38, 0.38, 0.08, 12), edge, [0, 2.1, 0.03], [Math.PI / 2, 0, 0]),
+    P(ball(0.06), GLOW, [-0.12, 2.15, -0.08]), P(ball(0.06), GLOW, [0.12, 2.15, -0.08])];
+  BUILD['mpb:golem:bronze'] = golem('#B87333', '#7A4A22');
+  BUILD['mpb:golem:silver'] = golem('#C9CED6', '#8A929A');
+  BUILD['mpb:golem:gold'] = golem(GOLD, '#9A7418');
+  // ===== treeKojja (3D) =====
+  // ===== fieldHospital (3D) =====
+  // ===== coalMine (3D) =====
+  // ===== scorch (3D) =====
+  // ===== oak (3D) =====
+  // ===== factory (3D) =====
+  // ===== magicLake (3D) =====
+  // ===== jail (3D) =====
+  // ===== school (3D) =====
+  // ===== shadowDen (3D) =====
 
   // the Leafblade suit (an awakened Leaf Wizard): a leaf-green mech on thick legs, a glowing visor, missile pods on its
   // shoulders and two long leaf blades held out from its arms
@@ -682,6 +732,7 @@ const Models3D = (THREE) => {
     'Water Mage': 'wizard:water', 'Frost Wizard': 'wizard:frost', 'Obelisk': 'obelisk', 'Shiv': 'shiv', 'Assassin': 'assassin', 'Hellfiend': 'hellfiend' };
   const RANGED = 12; // metres: from this range on, a unit is drawn as an archer or a caster
   function kindOf(u) {
+    if (u.mpb) { const k = 'mpb:' + u.mpb + (u.mpbPart ? ':' + u.mpbPart : u.mpbSkin ? ':' + u.mpbSkin : ''); return BUILD[k] ? k : u.mpbPart ? 'mpb:part' : u.structure ? 'mpb' : 'brute'; } // a 2v2 building (src/mpb.js), or its walker
     if (u.spire) return 'spire';
     if (u.structure && u.kind === 'wall' && u.barrier) return 'stonewall';
     if (u.structure && (u.kind === 'lesser' || u.kind === 'wall' || u.kind === 'treasury' || u.kind === 'watchtower')) return u.kind;

@@ -889,6 +889,80 @@ const Render2D = (cv, view, opts = {}) => {
     if (o.hpr != null) { ctx.strokeStyle = team; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, s * 0.52, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, o.hpr)); ctx.stroke(); }
     if (o.level > 0) { ctx.fillStyle = css('--gold'); const pr = Math.max(2, s * 0.07); for (let k = 0; k < o.level; k++) { ctx.beginPath(); ctx.arc(x - s / 2 + pr + 3 + k * pr * 2.6, y - s / 2 + pr + 3, pr, 0, Math.PI * 2); ctx.fill(); } }
   }
+  // ---------- 2v2 buildings (src/mpb.js): one drawing per kind, a plain one for the rest ----------
+  // MPB_DRAW[kind](x, y, t, side, o): a building at screen (x, y), t = tile px; o: { hpr (health left in a fight, or
+  // null), time, part (a part's tile: 'exit'...), fresh }. MPB_BODY[look](x, y, r, side, u, o): a walking body of a
+  // building (the Coin Golem), drawn in place of its plain shape. B groups add their kind in its own region.
+  const MPB_DRAW = {
+    // ===== vault (2D) =====
+    // a squat iron strongroom on a stone plinth: rivets, a band in the team colour, a round brass door with its wheel,
+    // and a stack of coins at its side
+    vault(x, y, t, side, o) {
+      const s = t * 0.78, c = teamCol(side), w = s * 0.86, h = s * 0.62, x0 = x - w / 2, y0 = y - h * 0.48;
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y + h * 0.56, w * 0.6, s * 0.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#6E6A64'; ctx.fillRect(x0 - s * 0.05, y0 + h * 0.86, w + s * 0.1, h * 0.2); // plinth
+      ctx.fillStyle = '#4C5258'; ctx.strokeStyle = '#2B2F33'; ctx.lineWidth = Math.max(1, s * 0.03);
+      ctx.beginPath(); ctx.rect(x0, y0, w, h * 0.9); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = c; ctx.fillRect(x0, y0 + h * 0.08, w, h * 0.1); // the team's band
+      ctx.fillStyle = '#9AA1A8'; for (const [fx, fy] of [[0.08, 0.3], [0.92, 0.3], [0.08, 0.8], [0.92, 0.8]]) { ctx.beginPath(); ctx.arc(x0 + w * fx, y0 + h * fy, Math.max(1, s * 0.025), 0, Math.PI * 2); ctx.fill(); } // rivets
+      const dr = h * 0.3, dx = x - w * 0.08, dy = y0 + h * 0.52, turn = (o.time || 0) * 0.6;
+      ctx.fillStyle = '#C9A24A'; ctx.strokeStyle = '#7A5A1E'; ctx.lineWidth = Math.max(1, s * 0.035);
+      ctx.beginPath(); ctx.arc(dx, dy, dr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#5B4210'; ctx.lineWidth = Math.max(1, s * 0.03);
+      for (let k = 0; k < 3; k++) { const a = turn + k * Math.PI / 3; ctx.beginPath(); ctx.moveTo(dx + Math.cos(a) * dr * 0.75, dy + Math.sin(a) * dr * 0.75); ctx.lineTo(dx - Math.cos(a) * dr * 0.75, dy - Math.sin(a) * dr * 0.75); ctx.stroke(); } // the wheel
+      ctx.fillStyle = '#E6B84A'; ctx.beginPath(); ctx.arc(dx, dy, dr * 0.22, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#8A6A22'; ctx.lineWidth = 1; ctx.fillStyle = '#E6B84A';
+      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.ellipse(x + w * 0.33, y0 + h * (0.82 - k * 0.12), s * 0.09, s * 0.035, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } // coins
+    },
+    // ===== treeKojja (2D) =====
+    // ===== fieldHospital (2D) =====
+    // ===== coalMine (2D) =====
+    // ===== scorch (2D) =====
+    // ===== oak (2D) =====
+    // ===== factory (2D) =====
+    // ===== magicLake (2D) =====
+    // ===== jail (2D) =====
+    // ===== school (2D) =====
+    // ===== shadowDen (2D) =====
+  };
+  const MPB_BODY = {
+    // ===== golem (2D) =====
+    // the Coin Golem: a hulk built of stacked coins (bronze, silver or gold by the gold spent), fists of coin piles,
+    // glowing eyes; ringed in its team's colour
+    golem(x, y, r, side, u, o) {
+      const met = u.color || '#B87333', dark = u.mpbSkin === 'gold' ? '#9A7418' : u.mpbSkin === 'silver' ? '#7D848C' : '#6E3F1C', c = teamCol(side);
+      ctx.globalAlpha = o.alpha == null ? 1 : o.alpha;
+      ctx.strokeStyle = dark; ctx.lineWidth = Math.max(1, r * 0.08);
+      for (const sd of [-1, 1]) { ctx.fillStyle = met; ctx.beginPath(); ctx.arc(x + sd * r * 0.82, y + r * 0.1, r * 0.32, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } // fists
+      for (let k = 0; k < 4; k++) { ctx.fillStyle = k % 2 ? dark : met; ctx.beginPath(); ctx.ellipse(x, y + r * (0.55 - k * 0.32), r * (0.62 - Math.abs(k - 1.5) * 0.06), r * 0.22, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } // the stacked coins
+      ctx.fillStyle = '#FFE9A8'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.arc(x + sd * r * 0.2, y - r * 0.42, Math.max(1, r * 0.08), 0, Math.PI * 2); ctx.fill(); } // eyes
+      ctx.strokeStyle = c; ctx.lineWidth = Math.max(1.5, r * 0.12); ctx.beginPath(); ctx.arc(x, y, r * 1.08, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    },
+  };
+  // any kind without a drawing of its own: a block in the kind's colour with a roof band in the team colour and its
+  // initials (a part, such as a mine's exit: a small marker in the kind's colour)
+  function drawMpbPlain(kind, x, y, t, side, o) {
+    const K = (typeof Mpb !== 'undefined' && Mpb.kindOf(kind)) || { name: '?', color: '#B7AE9C' }, s = t * 0.7, c = teamCol(side);
+    if (o.part) { ctx.fillStyle = K.color; ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, s * 0.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); return; }
+    ctx.fillStyle = K.color; ctx.strokeStyle = c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.rect(x - s / 2, y - s * 0.32, s, s * 0.72); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = c; ctx.fillRect(x - s / 2, y - s * 0.42, s, s * 0.14);
+    if (t >= 22) { ctx.font = `600 ${Math.max(8, Math.round(t * 0.26))}px "IBM Plex Mono", monospace`; ctx.fillStyle = '#F4EFE3'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(K.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(), x, y + s * 0.05); }
+  }
+  function drawMpb(kind, x, y, t, side, o) {
+    (!o.part && MPB_DRAW[kind] ? MPB_DRAW[kind] : (a, b, c2, d, e, f) => drawMpbPlain(kind, a, b, c2, d, e, f))(x, y, t, side, o);
+    if (o.hpr != null) { ctx.strokeStyle = teamCol(side); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, t * 0.52, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, o.hpr)); ctx.stroke(); }
+    if (o.fresh) { ctx.strokeStyle = teamCol(side); ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.strokeRect(x - t / 2 + 1.5, y - t / 2 + 1.5, t - 3, t - 3); ctx.setLineDash([]); }
+  }
+  // both teams' buildings on the board while deploying (and after a fight)
+  function drawMpbs() {
+    if (typeof Mpb === 'undefined' || !Mpb.on(m)) return;
+    const t = tilePx();
+    for (const side of [me, foe()]) for (const rec of Mpb.recs(m, side)) for (const tl of Mpb.tilesOf(rec)) {
+      drawMpb(rec.kind, (scol(tl.col) + 0.5) * t, (srow(tl.row) + 0.5) * t, t, side, { part: tl.part || null, fresh: phase === 'deploy' && rec.round === m.round && rec.round > 1, time: performance.now() / 1000 });
+    }
+  }
   // grey smoke puffs rising from (x, y): Mechite constructs and buildings rattle and smoke
   function puffs(x, y, r, time, seed) {
     ctx.fillStyle = smokeCol;
@@ -997,6 +1071,7 @@ const Render2D = (cv, view, opts = {}) => {
     if (Game.treasuryOn(m)) drawTreasuries();
     if (phase === 'deploy') drawBwalls();
     drawBuildings();
+    drawMpbs(); // 2v2 buildings (src/mpb.js)
     // Overwatch: a squad standing in one of its side's buildings is drawn over the building (theirs as far as you can see it)
     for (const side of [me, foe()]) for (const sq of side !== me && phase === 'deploy' ? Game.foeSeen(m, side) : m.armies[side]) {
       if (Game.isRider(sq) || (side !== me && Game.hiddenFromFoe(m, sq))) continue;
@@ -1115,6 +1190,7 @@ const Render2D = (cv, view, opts = {}) => {
       if (!b.alive || !b.u.structure) continue;
       const hpr = b.hp / b.u.hp, t = tilePx();
       if (b.u.kind === 'wall') { if (b.u.barrier) drawStoneWall(PX(b.x), PY(b.y), t, b.side, hpr, false, (b.u.barrierY || 0) > b.u.barrier); else drawWallBlock(PX(b.x), PY(b.y), t, b.side, hpr); continue; }
+      if (b.u.mpb) { drawMpb(b.u.mpb, PX(b.x), PY(b.y), t, b.side, { hpr, time: bt.time(), part: b.u.mpbPart || null }); continue; } // a 2v2 building
       if (b.u.lesser) { drawLesser(PX(b.x), PY(b.y), t, b.side, b.u, hpr, false); continue; }
       if (b.u.awake) { ctx.fillStyle = '#2B2F33'; for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { ctx.beginPath(); ctx.arc(PX(b.x) + dx * t * 0.36, PY(b.y) + dy * t * 0.3, t * 0.12, 0, Math.PI * 2); ctx.fill(); } } // Core Awoken: the Mecha Tower on wheels
       drawKeep(PX(b.x), PY(b.y), t, b.side, hpr, b.u.kind, null, Game.charOf(battlePre || m, b.side));
@@ -1157,7 +1233,8 @@ const Render2D = (cv, view, opts = {}) => {
       const rattle = b.u.construct ? Math.sin(bt.time() * 47 + b.x * 3.1) * r * 0.08 : 0;
       const lk = b.mask && b.side !== me && !b.revealed ? b.mask : b.u; // a disguise, until its first attack (devtest)
       if (duo && (b.lane === 0 || b.lane === 1)) { ctx.globalAlpha = 0.9; ctx.strokeStyle = duo.ring(b.side, b.lane); ctx.lineWidth = Math.max(1.5, r * 0.22); ctx.beginPath(); ctx.arc(PX(b.x) + rattle, PY(b.y), r + Math.max(2, r * 0.35), 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1; } // 2v2: its player's colour
-      Shapes.body(ctx, lk.shape, PX(b.x) + rattle, PY(b.y), r, upOf(b.side), lk.color, c, (0.35 + 0.65 * hpr) * (b.delay > 0 ? 0.45 : 1));
+      if (b.u.mpb && MPB_BODY[b.u.mpb]) MPB_BODY[b.u.mpb](PX(b.x), PY(b.y), r, b.side, b.u, { alpha: 0.35 + 0.65 * hpr, time: bt.time() }); // a 2v2 building's walker (the Coin Golem)
+      else Shapes.body(ctx, lk.shape, PX(b.x) + rattle, PY(b.y), r, upOf(b.side), lk.color, c, (0.35 + 0.65 * hpr) * (b.delay > 0 ? 0.45 : 1));
       if (b.u.mech) bladeMark(PX(b.x) + rattle, PY(b.y), r, bt.time() * (b.lastAtk > bt.time() - 0.4 ? 14 : 1.5) + b.x); // the Leafblade suit: its blades spin as it strikes
       if (b.u.unfolded) { ctx.fillStyle = 'rgba(30,24,20,0.75)'; for (const o of [-1, 1]) ctx.fillRect(PX(b.x) + o * r * 0.45 - r * 0.15, PY(b.y) + r * 0.75, r * 0.3, r * 0.45); } // an unfolded roller: two stumpy legs
       if (b.u.roll > 0) { // a roller: a seam across the ball turns as it rolls

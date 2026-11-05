@@ -3668,7 +3668,7 @@ const Game = (() => {
   // a picked type, or the Outpost until the pick is made (a match saved without a pick past it gets the Keep)
   const towerType = (m, side) => {
     const t = m && m.towers && m.towers[side];
-    if (!m || m.round < TOWER_PICK_ROUND || needsTowerPick(m, side)) return OUTPOST;
+    if (!m || m.round < TOWER_PICK_ROUND || needsTowerPick(m, side) || (m.duoTowers && !(t && t.type))) return OUTPOST; // 2v2 (m.duoTowers): the Outpost until a tower card (src/mpb.js)
     return towerTypeById(t && t.type) || (m.factions ? factionTowers(m, side)[0] : null) || TOWER_TYPES[0];
   };
   // any tower type by id: the Outpost, the standard types, or a faction's tower (Factions mode); null if unknown
@@ -3684,7 +3684,7 @@ const Game = (() => {
     while (out.length < TOWER_OFFER) out.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);
     return out;
   }
-  const needsTowerPick = (m, side) => !!(m && m.round === TOWER_PICK_ROUND && m.towers && m.towers[side] && !m.towers[side].type);
+  const needsTowerPick = (m, side) => !!(m && !m.duoTowers && m.round === TOWER_PICK_ROUND && m.towers && m.towers[side] && !m.towers[side].type); // 2v2: no pick, the artifact draft (src/mpb.js)
   // a player who didn't pick in time gets the first type on offer (the Keep)
   function settleTowerPicks(m) { for (const sd of [0, 1]) if (needsTowerPick(m, sd)) m.towers[sd].type = towerChoices(m, sd)[0].id; }
   function setTowerType(m, side, id) {
@@ -4612,7 +4612,7 @@ const Game = (() => {
   // While deploying, the opponent's character (and Zoe's buff tiles) stays hidden until the first fight, their tower
   // pick until the fight of the pick round, and this round's altar buys, mushroom removals and new elf tower until the fight.
   const charShown = (m, viewer, deploying, side) => !!m && (side === viewer || m.round > 1 || !deploying);
-  const towerTypeShown = (m, viewer, deploying, side) => !!m && (side === viewer || m.round !== TOWER_PICK_ROUND || !deploying);
+  const towerTypeShown = (m, viewer, deploying, side) => !!m && (side === viewer || m.round !== TOWER_PICK_ROUND || !deploying || !!m.duoTowers); // 2v2: the draft is open to all
   const altarShown = (m, viewer, deploying, b) => b.side === viewer || !deploying || b.round < m.round;
   const elfOwnShown = (m, viewer, deploying, side) => side === viewer || !deploying || elfOwnOf(m, side).round < m.round;
   // a mushroom tile as the viewer sees it (null once it's removed and the viewer may know)
@@ -5485,7 +5485,13 @@ const Game = (() => {
   }
 
   const towerAt = (m, side, col, row) => !!(m.towers && m.towers[side] && m.towers[side].col === col && m.towers[side].row === row);
-  const occupied = (m, side, col, row) => towerAt(m, side, col, row) || treasuryAt(m, side, col, row) || elfOwnAt(m, side, col, row) || !!buildingAt(m, side, col, row) || teamBuildingAt(m, side, col, row) || m.armies[side].some(s => covers(m, s, col, row)) || teamArmy(m, side).some(s => covers(m, s, col, row)) || devOccupied(m, side, col, row);
+  // 2v2 buildings (MPBs, src/mpb.js registers itself with setMpb): a tile of either team's MPB (or one of its parts)
+  // is taken for both teams' squads, unless its kind leaves it open (Mpb.at)
+  let MPB = null;
+  const setMpb = (x) => { MPB = x || null; return true; };
+  const mpbApi = () => MPB;
+  const mpbAt = (m, col, row) => !!(MPB && m && m.mpb) && MPB.at(m, col, row);
+  const occupied = (m, side, col, row) => towerAt(m, side, col, row) || treasuryAt(m, side, col, row) || elfOwnAt(m, side, col, row) || !!buildingAt(m, side, col, row) || teamBuildingAt(m, side, col, row) || m.armies[side].some(s => covers(m, s, col, row)) || teamArmy(m, side).some(s => covers(m, s, col, row)) || devOccupied(m, side, col, row) || mpbAt(m, col, row);
   const needsTower = (m, side) => !!(m.towers && !m.towers[side]);
   // the tower can be placed (or moved) during round 1 only
   function placeTower(m, side, col, row) {
@@ -5574,6 +5580,7 @@ const Game = (() => {
       u = mapTuned(mp, u); // ...or tunes range and speed (Test Grid)
       const aura = isDev(m) ? auraFor(m, side, sq.col, sq.row) : null; // devtest: a building's aura
       if (aura) u = modUnit(u, aura);
+      if (MPB && m.mpb) u = MPB.squadMods(m, side, sq, u); // 2v2 buildings (src/mpb.js hooks.squadMods)
       const b = E.buildSquad(u, side, w.x, w.y, sq.id, TILE, idx, sq.level);
       if (u.glut) for (const x of b) x.glutN = glutOf(sq); // Glut it has eaten (already in its stats): it eats on from there
       if (aura) for (const x of b) x.aura = true;
@@ -5593,6 +5600,7 @@ const Game = (() => {
       if (purple) for (const x of b) x.shroom = true; // for the drifting spores effect
       if (isFlank(side, sq.col, sq.row) && (sq.round === m.round || sq.movedRound === m.round)) for (const x of b) x.delay = FLANK.delay * (ch === 'wilhelm' ? CHAR.wilhelmDelay : 1); // only in its first fight
       if (isFlank(side, sq.col, sq.row)) for (const x of b) x.march = [w.x - XOFF < 0 ? 1 : -1, 0]; // a flank squad marches in toward the middle until it spots an enemy
+      if (MPB && m.mpb) MPB.squadBodies(m, side, sq, b, u); // 2v2 buildings (hooks.squadBodies: the flank delay, a tunnel...)
       idx += b.length;
       out.push(...b);
     }
@@ -6977,7 +6985,7 @@ const Game = (() => {
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,
-    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, teamBuildings, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, AIM, canAim, setAim, clearAim, aimEnd, aimTo, resolve, aiDeploy, occupied,
+    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, teamBuildings, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, AIM, canAim, setAim, clearAim, aimEnd, aimTo, resolve, aiDeploy, occupied, mpbAt, setMpb, mpbApi,
     GRID, useGrid,
     DEV, CAT_NAMES, LESSER_SQ, WALL_SQ, setDevData, devBuilding, devPower, devSpell, isDev, towerUp, pickCat, devOffer, pickNow, needsDevPick, devPick, undoDevPick, devShown,
     lessersOf, placedLessers, unplacedLesser, lesserAt, lesserSpotOk, placeLesser, lesserUnit, auraFor, modUnit, powersOf, devGold, devDeploys,
@@ -8046,6 +8054,80 @@ const Render2D = (cv, view, opts = {}) => {
     if (o.hpr != null) { ctx.strokeStyle = team; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, s * 0.52, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, o.hpr)); ctx.stroke(); }
     if (o.level > 0) { ctx.fillStyle = css('--gold'); const pr = Math.max(2, s * 0.07); for (let k = 0; k < o.level; k++) { ctx.beginPath(); ctx.arc(x - s / 2 + pr + 3 + k * pr * 2.6, y - s / 2 + pr + 3, pr, 0, Math.PI * 2); ctx.fill(); } }
   }
+  // ---------- 2v2 buildings (src/mpb.js): one drawing per kind, a plain one for the rest ----------
+  // MPB_DRAW[kind](x, y, t, side, o): a building at screen (x, y), t = tile px; o: { hpr (health left in a fight, or
+  // null), time, part (a part's tile: 'exit'...), fresh }. MPB_BODY[look](x, y, r, side, u, o): a walking body of a
+  // building (the Coin Golem), drawn in place of its plain shape. B groups add their kind in its own region.
+  const MPB_DRAW = {
+    // ===== vault (2D) =====
+    // a squat iron strongroom on a stone plinth: rivets, a band in the team colour, a round brass door with its wheel,
+    // and a stack of coins at its side
+    vault(x, y, t, side, o) {
+      const s = t * 0.78, c = teamCol(side), w = s * 0.86, h = s * 0.62, x0 = x - w / 2, y0 = y - h * 0.48;
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y + h * 0.56, w * 0.6, s * 0.1, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#6E6A64'; ctx.fillRect(x0 - s * 0.05, y0 + h * 0.86, w + s * 0.1, h * 0.2); // plinth
+      ctx.fillStyle = '#4C5258'; ctx.strokeStyle = '#2B2F33'; ctx.lineWidth = Math.max(1, s * 0.03);
+      ctx.beginPath(); ctx.rect(x0, y0, w, h * 0.9); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = c; ctx.fillRect(x0, y0 + h * 0.08, w, h * 0.1); // the team's band
+      ctx.fillStyle = '#9AA1A8'; for (const [fx, fy] of [[0.08, 0.3], [0.92, 0.3], [0.08, 0.8], [0.92, 0.8]]) { ctx.beginPath(); ctx.arc(x0 + w * fx, y0 + h * fy, Math.max(1, s * 0.025), 0, Math.PI * 2); ctx.fill(); } // rivets
+      const dr = h * 0.3, dx = x - w * 0.08, dy = y0 + h * 0.52, turn = (o.time || 0) * 0.6;
+      ctx.fillStyle = '#C9A24A'; ctx.strokeStyle = '#7A5A1E'; ctx.lineWidth = Math.max(1, s * 0.035);
+      ctx.beginPath(); ctx.arc(dx, dy, dr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#5B4210'; ctx.lineWidth = Math.max(1, s * 0.03);
+      for (let k = 0; k < 3; k++) { const a = turn + k * Math.PI / 3; ctx.beginPath(); ctx.moveTo(dx + Math.cos(a) * dr * 0.75, dy + Math.sin(a) * dr * 0.75); ctx.lineTo(dx - Math.cos(a) * dr * 0.75, dy - Math.sin(a) * dr * 0.75); ctx.stroke(); } // the wheel
+      ctx.fillStyle = '#E6B84A'; ctx.beginPath(); ctx.arc(dx, dy, dr * 0.22, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#8A6A22'; ctx.lineWidth = 1; ctx.fillStyle = '#E6B84A';
+      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.ellipse(x + w * 0.33, y0 + h * (0.82 - k * 0.12), s * 0.09, s * 0.035, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } // coins
+    },
+    // ===== treeKojja (2D) =====
+    // ===== fieldHospital (2D) =====
+    // ===== coalMine (2D) =====
+    // ===== scorch (2D) =====
+    // ===== oak (2D) =====
+    // ===== factory (2D) =====
+    // ===== magicLake (2D) =====
+    // ===== jail (2D) =====
+    // ===== school (2D) =====
+    // ===== shadowDen (2D) =====
+  };
+  const MPB_BODY = {
+    // ===== golem (2D) =====
+    // the Coin Golem: a hulk built of stacked coins (bronze, silver or gold by the gold spent), fists of coin piles,
+    // glowing eyes; ringed in its team's colour
+    golem(x, y, r, side, u, o) {
+      const met = u.color || '#B87333', dark = u.mpbSkin === 'gold' ? '#9A7418' : u.mpbSkin === 'silver' ? '#7D848C' : '#6E3F1C', c = teamCol(side);
+      ctx.globalAlpha = o.alpha == null ? 1 : o.alpha;
+      ctx.strokeStyle = dark; ctx.lineWidth = Math.max(1, r * 0.08);
+      for (const sd of [-1, 1]) { ctx.fillStyle = met; ctx.beginPath(); ctx.arc(x + sd * r * 0.82, y + r * 0.1, r * 0.32, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } // fists
+      for (let k = 0; k < 4; k++) { ctx.fillStyle = k % 2 ? dark : met; ctx.beginPath(); ctx.ellipse(x, y + r * (0.55 - k * 0.32), r * (0.62 - Math.abs(k - 1.5) * 0.06), r * 0.22, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } // the stacked coins
+      ctx.fillStyle = '#FFE9A8'; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.arc(x + sd * r * 0.2, y - r * 0.42, Math.max(1, r * 0.08), 0, Math.PI * 2); ctx.fill(); } // eyes
+      ctx.strokeStyle = c; ctx.lineWidth = Math.max(1.5, r * 0.12); ctx.beginPath(); ctx.arc(x, y, r * 1.08, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    },
+  };
+  // any kind without a drawing of its own: a block in the kind's colour with a roof band in the team colour and its
+  // initials (a part, such as a mine's exit: a small marker in the kind's colour)
+  function drawMpbPlain(kind, x, y, t, side, o) {
+    const K = (typeof Mpb !== 'undefined' && Mpb.kindOf(kind)) || { name: '?', color: '#B7AE9C' }, s = t * 0.7, c = teamCol(side);
+    if (o.part) { ctx.fillStyle = K.color; ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, s * 0.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); return; }
+    ctx.fillStyle = K.color; ctx.strokeStyle = c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.rect(x - s / 2, y - s * 0.32, s, s * 0.72); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = c; ctx.fillRect(x - s / 2, y - s * 0.42, s, s * 0.14);
+    if (t >= 22) { ctx.font = `600 ${Math.max(8, Math.round(t * 0.26))}px "IBM Plex Mono", monospace`; ctx.fillStyle = '#F4EFE3'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(K.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(), x, y + s * 0.05); }
+  }
+  function drawMpb(kind, x, y, t, side, o) {
+    (!o.part && MPB_DRAW[kind] ? MPB_DRAW[kind] : (a, b, c2, d, e, f) => drawMpbPlain(kind, a, b, c2, d, e, f))(x, y, t, side, o);
+    if (o.hpr != null) { ctx.strokeStyle = teamCol(side); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, t * 0.52, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, o.hpr)); ctx.stroke(); }
+    if (o.fresh) { ctx.strokeStyle = teamCol(side); ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.strokeRect(x - t / 2 + 1.5, y - t / 2 + 1.5, t - 3, t - 3); ctx.setLineDash([]); }
+  }
+  // both teams' buildings on the board while deploying (and after a fight)
+  function drawMpbs() {
+    if (typeof Mpb === 'undefined' || !Mpb.on(m)) return;
+    const t = tilePx();
+    for (const side of [me, foe()]) for (const rec of Mpb.recs(m, side)) for (const tl of Mpb.tilesOf(rec)) {
+      drawMpb(rec.kind, (scol(tl.col) + 0.5) * t, (srow(tl.row) + 0.5) * t, t, side, { part: tl.part || null, fresh: phase === 'deploy' && rec.round === m.round && rec.round > 1, time: performance.now() / 1000 });
+    }
+  }
   // grey smoke puffs rising from (x, y): Mechite constructs and buildings rattle and smoke
   function puffs(x, y, r, time, seed) {
     ctx.fillStyle = smokeCol;
@@ -8154,6 +8236,7 @@ const Render2D = (cv, view, opts = {}) => {
     if (Game.treasuryOn(m)) drawTreasuries();
     if (phase === 'deploy') drawBwalls();
     drawBuildings();
+    drawMpbs(); // 2v2 buildings (src/mpb.js)
     // Overwatch: a squad standing in one of its side's buildings is drawn over the building (theirs as far as you can see it)
     for (const side of [me, foe()]) for (const sq of side !== me && phase === 'deploy' ? Game.foeSeen(m, side) : m.armies[side]) {
       if (Game.isRider(sq) || (side !== me && Game.hiddenFromFoe(m, sq))) continue;
@@ -8272,6 +8355,7 @@ const Render2D = (cv, view, opts = {}) => {
       if (!b.alive || !b.u.structure) continue;
       const hpr = b.hp / b.u.hp, t = tilePx();
       if (b.u.kind === 'wall') { if (b.u.barrier) drawStoneWall(PX(b.x), PY(b.y), t, b.side, hpr, false, (b.u.barrierY || 0) > b.u.barrier); else drawWallBlock(PX(b.x), PY(b.y), t, b.side, hpr); continue; }
+      if (b.u.mpb) { drawMpb(b.u.mpb, PX(b.x), PY(b.y), t, b.side, { hpr, time: bt.time(), part: b.u.mpbPart || null }); continue; } // a 2v2 building
       if (b.u.lesser) { drawLesser(PX(b.x), PY(b.y), t, b.side, b.u, hpr, false); continue; }
       if (b.u.awake) { ctx.fillStyle = '#2B2F33'; for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { ctx.beginPath(); ctx.arc(PX(b.x) + dx * t * 0.36, PY(b.y) + dy * t * 0.3, t * 0.12, 0, Math.PI * 2); ctx.fill(); } } // Core Awoken: the Mecha Tower on wheels
       drawKeep(PX(b.x), PY(b.y), t, b.side, hpr, b.u.kind, null, Game.charOf(battlePre || m, b.side));
@@ -8314,7 +8398,8 @@ const Render2D = (cv, view, opts = {}) => {
       const rattle = b.u.construct ? Math.sin(bt.time() * 47 + b.x * 3.1) * r * 0.08 : 0;
       const lk = b.mask && b.side !== me && !b.revealed ? b.mask : b.u; // a disguise, until its first attack (devtest)
       if (duo && (b.lane === 0 || b.lane === 1)) { ctx.globalAlpha = 0.9; ctx.strokeStyle = duo.ring(b.side, b.lane); ctx.lineWidth = Math.max(1.5, r * 0.22); ctx.beginPath(); ctx.arc(PX(b.x) + rattle, PY(b.y), r + Math.max(2, r * 0.35), 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1; } // 2v2: its player's colour
-      Shapes.body(ctx, lk.shape, PX(b.x) + rattle, PY(b.y), r, upOf(b.side), lk.color, c, (0.35 + 0.65 * hpr) * (b.delay > 0 ? 0.45 : 1));
+      if (b.u.mpb && MPB_BODY[b.u.mpb]) MPB_BODY[b.u.mpb](PX(b.x), PY(b.y), r, b.side, b.u, { alpha: 0.35 + 0.65 * hpr, time: bt.time() }); // a 2v2 building's walker (the Coin Golem)
+      else Shapes.body(ctx, lk.shape, PX(b.x) + rattle, PY(b.y), r, upOf(b.side), lk.color, c, (0.35 + 0.65 * hpr) * (b.delay > 0 ? 0.45 : 1));
       if (b.u.mech) bladeMark(PX(b.x) + rattle, PY(b.y), r, bt.time() * (b.lastAtk > bt.time() - 0.4 ? 14 : 1.5) + b.x); // the Leafblade suit: its blades spin as it strikes
       if (b.u.unfolded) { ctx.fillStyle = 'rgba(30,24,20,0.75)'; for (const o of [-1, 1]) ctx.fillRect(PX(b.x) + o * r * 0.45 - r * 0.15, PY(b.y) + r * 0.75, r * 0.3, r * 0.45); } // an unfolded roller: two stumpy legs
       if (b.u.roll > 0) { // a roller: a seam across the ball turns as it rolls
@@ -9604,6 +9689,56 @@ const Models3D = (THREE) => {
     ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => P(cyl(0.28, 0.28, 0.16, 8), DARK, [x * 0.5, 0.28, z * 0.32], [0, 0, Math.PI / 2])),
     P(cyl(0.07, 0.07, 0.5, 5), IRON, [0.25, 1.3, 0.3])];
   BUILD.building = BUILD['building:factory']; // any other building, until it has a model of its own
+  // ---------- 2v2 buildings (src/mpb.js): one model per kind, 'mpb:<kind>' (a part: 'mpb:<kind>:<part>'; a walker
+  // with a look: 'mpb:<kind>:<look>'), drawn at their real size like towers. Kinds without one get BUILD.mpb (a plain
+  // block in the kind's colour, 'tint', with a roof in the team colour) and parts BUILD['mpb:part']. B groups add
+  // theirs in their kind's region.
+  BUILD.mpb = () => [P(box(3.2, 2.2, 3.0), 'tint', [0, 1.1, 0]), P(box(3.5, 0.5, 3.3), 'team', [0, 2.45, 0]), P(box(2.4, 0.5, 2.2), 'tint', [0, 2.95, 0]),
+    P(box(0.9, 1.3, 0.15), DARK, [0, 0.65, -1.52]), ...flagOn(3.2)];
+  BUILD['mpb:part'] = () => [P(cyl(1.1, 1.3, 0.6, 8), STONE, [0, 0.3, 0]), P(cyl(0.7, 0.8, 0.5, 8), 'team', [0, 0.8, 0]), P(cyl(0.45, 0.45, 0.25, 8), DARK, [0, 1.1, 0])];
+  // ===== vault (3D) =====
+  // The Vault: a squat iron strongroom on a stone plinth, riveted, with a band and a pennant in the team colour, a big
+  // round brass door with a turning wheel on its front (-z: toward its own side, where its team looks from) and
+  // stacks of gold coins against its walls
+  const rivets = (xs, ys, z) => xs.flatMap(x => ys.map(y => P(ball(0.09), METAL, [x, y, z])));
+  BUILD['mpb:vault'] = () => [
+    P(box(4.2, 0.45, 3.8), STONE, [0, 0.22, 0]), P(box(4.5, 0.15, 4.1), ROCK, [0, 0.05, 0]),
+    P(box(3.6, 2.4, 3.2), IRON, [0, 1.65, 0]),
+    P(box(3.75, 0.35, 3.35), 'team', [0, 2.55, 0]),
+    P(box(3.3, 0.35, 2.9), '#4C5258', [0, 3.02, 0]), P(box(2.2, 0.25, 1.9), IRON, [0, 3.32, 0]),
+    ...rivets([-1.55, 1.55], [0.75, 1.65, 2.25], -1.62),
+    P(cyl(1.05, 1.05, 0.22, 16), BRASS, [0, 1.55, -1.66], [Math.PI / 2, 0, 0]),
+    P(new THREE.TorusGeometry(1.05, 0.1, 5, 18), '#7A5A1E', [0, 1.55, -1.78]),
+    ...[0, 1, 2].map(k => P(box(1.5, 0.12, 0.1), '#5B4210', [0, 1.55, -1.82], [0, 0, k * Math.PI / 3])),
+    P(cyl(0.22, 0.22, 0.18, 8), GOLD, [0, 1.55, -1.86], [Math.PI / 2, 0, 0]),
+    P(box(0.5, 0.18, 0.18), METAL, [0.95, 0.9, -1.7]), P(box(0.5, 0.18, 0.18), METAL, [0.95, 2.2, -1.7]), // hinges
+    ...[[-2.15, 0.55, -1.1], [2.15, 0.55, 0.9], [-2.15, 0.55, 1.2]].flatMap(([x, y, z], k) => [...Array(3 + k)].map((_, j) => P(cyl(0.34, 0.34, 0.11, 10), GOLD, [x, y + j * 0.13, z]))),
+    P(cyl(0.06, 0.06, 1.6, 5), WOOD, [1.4, 4.1, 1.1]), P(box(0.05, 0.6, 0.9), 'team', [1.4, 4.55, 1.55])];
+  // ===== golem (3D) =====
+  // The Coin Golem: a hulk of stacked coins (bronze, silver or gold by the gold spent): coin-stack legs and arms, a
+  // barrel chest of big coins, a coin head with glowing eyes, a sash in the team colour; for a body of radius 1
+  const coinStack = (r, n, [x, y, z], col, edge) => [...Array(n)].map((_, k) => P(cyl(r * (k % 2 ? 0.94 : 1), r * (k % 2 ? 0.94 : 1), 0.13, 10), k % 2 ? edge : col, [x, y + k * 0.13, z]));
+  const golem = (col, edge) => () => [
+    ...coinStack(0.24, 6, [-0.3, 0.07, 0], col, edge), ...coinStack(0.24, 6, [0.3, 0.07, 0], col, edge),
+    ...[0, 1, 2, 3, 4].map(k => P(cyl(0.62 - Math.abs(k - 2) * 0.06, 0.62 - Math.abs(k - 2) * 0.06, 0.2, 12), k % 2 ? edge : col, [0, 0.95 + k * 0.2, 0])),
+    P(box(1.3, 0.16, 0.2), 'team', [0, 1.45, -0.55], [0, 0, 0.5]),
+    ...[-1, 1].flatMap(sd => [...coinStack(0.18, 5, [sd * 0.78, 1.1, 0], col, edge), P(cyl(0.28, 0.28, 0.24, 10), col, [sd * 0.8, 1.0, -0.05])]),
+    P(cyl(0.34, 0.34, 0.14, 12), col, [0, 2.1, 0], [Math.PI / 2, 0, 0]),
+    P(cyl(0.38, 0.38, 0.08, 12), edge, [0, 2.1, 0.03], [Math.PI / 2, 0, 0]),
+    P(ball(0.06), GLOW, [-0.12, 2.15, -0.08]), P(ball(0.06), GLOW, [0.12, 2.15, -0.08])];
+  BUILD['mpb:golem:bronze'] = golem('#B87333', '#7A4A22');
+  BUILD['mpb:golem:silver'] = golem('#C9CED6', '#8A929A');
+  BUILD['mpb:golem:gold'] = golem(GOLD, '#9A7418');
+  // ===== treeKojja (3D) =====
+  // ===== fieldHospital (3D) =====
+  // ===== coalMine (3D) =====
+  // ===== scorch (3D) =====
+  // ===== oak (3D) =====
+  // ===== factory (3D) =====
+  // ===== magicLake (3D) =====
+  // ===== jail (3D) =====
+  // ===== school (3D) =====
+  // ===== shadowDen (3D) =====
 
   // the Leafblade suit (an awakened Leaf Wizard): a leaf-green mech on thick legs, a glowing visor, missile pods on its
   // shoulders and two long leaf blades held out from its arms
@@ -9628,6 +9763,7 @@ const Models3D = (THREE) => {
     'Water Mage': 'wizard:water', 'Frost Wizard': 'wizard:frost', 'Obelisk': 'obelisk', 'Shiv': 'shiv', 'Assassin': 'assassin', 'Hellfiend': 'hellfiend' };
   const RANGED = 12; // metres: from this range on, a unit is drawn as an archer or a caster
   function kindOf(u) {
+    if (u.mpb) { const k = 'mpb:' + u.mpb + (u.mpbPart ? ':' + u.mpbPart : u.mpbSkin ? ':' + u.mpbSkin : ''); return BUILD[k] ? k : u.mpbPart ? 'mpb:part' : u.structure ? 'mpb' : 'brute'; } // a 2v2 building (src/mpb.js), or its walker
     if (u.spire) return 'spire';
     if (u.structure && u.kind === 'wall' && u.barrier) return 'stonewall';
     if (u.structure && (u.kind === 'lesser' || u.kind === 'wall' || u.kind === 'treasury' || u.kind === 'watchtower')) return u.kind;
@@ -10703,6 +10839,12 @@ const Render3D = (THREE, el, view, opts = {}) => {
       if (!bl.built) arc(wx, wz, 3.2, gold, 0.95, bl.progress || 0, 0.07);
       if (bl.level > 0) iconRow([...Array(bl.level)].map(() => 'dot'), wx, 5.6, wz, 0.5, gold);
       if (side === me && deploying && Game.buildingReady(bl)) icon('plus', wx + camRight.x * 2.4, 4.2, wz + camRight.z * 2.4, 1.0);
+    }
+    // 2v2 buildings (src/mpb.js): both teams', each part on its own tile (models3d 'mpb:<kind>')
+    if (typeof Mpb !== 'undefined' && Mpb.on(m)) for (const side of [me, foe]) for (const rec of Mpb.recs(m, side)) for (const tl of Mpb.tilesOf(rec)) {
+      const w = Game.tileToWorld(tl.col, tl.row), u = Mpb.unitOf(m, side, rec);
+      bodies.push({ u: tl.part ? { ...u, mpbPart: tl.part } : u, side, x: w.x, y: w.y, look: 'solid', edge: Art.teamCol(side, me) });
+      if (deploying && rec.round === m.round && rec.round > 1) { const st = tileCenter(v, tl.col, tl.row); tileSq(st.c, st.r, teamColor(side, me), 0.8, 0.05, 14); }
     }
     if (v.placingBuilding && editable) for (const row of Game.zoneRows(me)) for (let c = 0; c < Game.COLS; c++) if (Game.buildingSpotOk(m, me, c, row)) { const s = tileCenter(v, c, row); tileSq(s.c, s.r, gold, 0.6, 0.06, 12); }
     if (Game.isIce(m)) for (const side of [me, foe]) {
