@@ -996,7 +996,7 @@ const Render2D = (cv, view, opts = {}) => {
     // the exit: a round shaft ringed with planks under a small winch frame with a pennant in the team colour; while
     // deploying, a dashed square round the 8 tiles nobody may deploy on (where the squads come up)
     'coalMine:exit'(x, y, t, side, o) {
-      const s = t * 0.8, c = teamCol(side);
+      const s = t * 0.95, c = teamCol(side);
       if (!o.fight) { ctx.strokeStyle = c; ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]); ctx.strokeRect(x - t * 1.5 + 2, y - t * 1.5 + 2, t * 3 - 4, t * 3 - 4); ctx.setLineDash([]); ctx.globalAlpha = 1; }
       ctx.fillStyle = '#8A5A32'; ctx.strokeStyle = '#4E3218'; ctx.lineWidth = Math.max(1, s * 0.03);
       ctx.beginPath(); ctx.ellipse(x, y + s * 0.08, s * 0.36, s * 0.28, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); // the plank rim
