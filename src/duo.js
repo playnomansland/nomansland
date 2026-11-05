@@ -348,7 +348,8 @@
     for (let guard = 0; guard < 40; guard++) {
       let did = false;
       if (M.draftOpen(lanes[0])) {
-        const t = lanes[0].draft.first, bot = seatsOf(t).find(k => D.bots[k]);
+        // only a team of two bots picks at once: a human on the team makes the pick (or the 15 s clock does)
+        const t = lanes[0].draft.first, bot = seatsOf(t).every(k => D.bots[k]) ? seatsOf(t)[0] : null;
         if (bot != null) did = sysDraft(D, t, M.botPick(lanes[0], t), SEATS[bot].lane);
       }
       if (!did) for (const sd of [0, 1]) {

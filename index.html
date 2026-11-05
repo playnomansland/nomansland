@@ -9186,7 +9186,8 @@ if (typeof module !== 'undefined') module.exports = Game;
     for (let guard = 0; guard < 40; guard++) {
       let did = false;
       if (M.draftOpen(lanes[0])) {
-        const t = lanes[0].draft.first, bot = seatsOf(t).find(k => D.bots[k]);
+        // only a team of two bots picks at once: a human on the team makes the pick (or the 15 s clock does)
+        const t = lanes[0].draft.first, bot = seatsOf(t).every(k => D.bots[k]) ? seatsOf(t)[0] : null;
         if (bot != null) did = sysDraft(D, t, M.botPick(lanes[0], t), SEATS[bot].lane);
       }
       if (!did) for (const sd of [0, 1]) {
@@ -12738,7 +12739,7 @@ Floors.floor = (() => {
   // ----- Report a bug (2026-11-04): a new post in the Discord forum #bug-reports with the game version and match id
   // filled in. The server posts it through a webhook (/account/bug, accounts.js BUG); when that's off or fails, the report
   // is copied and the Discord server opens, so it can be pasted there by hand.
-  const GAME_VERSION = '6 Nov 2026 · 9e649f4'; // src/build.js: the newest patch notes date and a hash of this page
+  const GAME_VERSION = '6 Nov 2026 · f991467'; // src/build.js: the newest patch notes date and a hash of this page
   const DISCORD_FALLBACK = 'https://discord.gg/TBpDKSBWsY';
   const bug = { draft: '', busy: false };
   // the id the server's match history uses (room.js historyInfo: <room>-<seed>), or one made the same way for other matches

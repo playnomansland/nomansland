@@ -159,7 +159,7 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
 - `m.draft = { round, cards, won, owner: [team of card 0, of card 1] (null while a pick is due), first, how: 'both' |
   'split' | 'one' | 'none', pick, done }` (`Mpb.dealDraft`, both lanes). `split` / `one`: dealt at once; `both` (one
   team won both) and `none` (a seeded coin flip): `first` picks with `Game.draftPick(m, side, idx)` (either player;
-  the first pick counts; a bot on that team picks at once, preferring a tower while it has the Outpost, then an MPB it
+  the first pick counts; a team of two bots picks at once (a human on the team picks, or the 15 s clock does), preferring a tower while it has the Outpost, then an MPB it
   hasn't got); 15 s (`Mpb.DRAFT_MS`, `D.mclock.draft`), then a seeded pick.
 - `Mpb.giveCard(m, team, card)`: a tower card sets `m.towers[team].type` (round 9 or a team that had a type: its tower
   skills, walls, mage general, tower rounds and mark go, no refund); an MPB card queues its placement vote (or the

@@ -38,7 +38,7 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ### To check with Vilhelm
 - **The 15 s of a placement vote** run from when the vote opens, not from the first vote; nobody voting gets the first allowed tile (back of the zone, middle first).
-- **A bot teammate** votes at once and switches to your tile when you vote (so it places at once); in the draft, a team with a bot picks at once (the bot prefers a tower while it has the Outpost, then a building it doesn't have).
+- **A bot teammate** votes at once and switches to your tile when you vote (so it places at once); in the draft, you make your team's pick (a team of two bots picks at once; a bot prefers a tower while it has the Outpost, then a building it doesn't have).
 - **Vault moves are counted over the round** per player (four 50s are 200), and a take round can't put; Undo all takes back only your own moves.
 - **Coin golem:** both clicks cost 100 each; the golem counts as a unit for winning the round (it walks and fights); a take-back of either click puts the gold back in the Vault. Gold put in after it was summoned stays in the Vault.
 - **Golem numbers** (coordinator's): 300 + 3 health and 30 + 0.12 hit per gold spent, armor 2 + 1 per 250 gold (at most 8), speed 4.
