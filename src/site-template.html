@@ -2038,6 +2038,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     cv.style.touchAction = phase === 'deploy' ? 'none' : ''; // so a finger can drag squads without scrolling the page
     if (board3d) wake3d(); else { board.draw(); boardMarks(); }
     if (inspect || inspectHtml) inspectCard(); // the tapped unit's card in a fight (gone once the fight is)
+    if (artTapAt || artHtml) artifactCard(); // 2v2: the tapped artifact's card (its points in a fight)
   }
   const teamCol = (side) => Art.teamCol(side, me);
   const { SHROOM_COL, CHARM_COL, GLUT_COL, armsImg } = Art;
@@ -5707,6 +5708,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function boardTap(t) {
     if (pingKind && net.duo) { duoPlacePing(t); return; } // 2v2: the ping picked in the panel
     if (phase === 'battle') { // a fight: a tap on a unit shows its card, and where its squad is walking now (intentMarks)
+      if (artifactTap(t)) return; // 2v2: an artifact's tile shows its card first (a second tap: what stands there)
       const b = t && bodyAt(t); inspect = b && b !== inspect ? b : null; inspectCard();
       watchSq = inspect && inspect.squad >= 0 && !inspect.u.structure ? { side: inspect.side, id: inspect.squad } : null;
       boardMarks(); return;
@@ -5828,6 +5830,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (elf && t.col === elf.col && (t.row === Game.ROWS / 2 - 1 || t.row === Game.ROWS / 2) && !Game.occupied(m, me, t.col, t.row)) { openMapSheet(); return; }
     // Zoe's buff tiles: a tap on an empty one says what it gives now and what it grows to
     for (const sd of [me, foe()]) if (selected === null && Game.onBuffTile(m, sd, t.col, t.row) && !Game.squadAt(m, sd, t.col, t.row) && (sd === me || charVisible(sd))) { openZoeSheet(sd); return; }
+    if (selected === null && !Game.squadAt(m, me, t.col, t.row) && artifactTap(t)) return; // 2v2: an artifact's card (a second tap: what stands there)
     const freeTile = !Game.occupied(m, me, t.col, t.row);
     if (Game.altarRound(m) && selected === null && freeTile && Math.abs(t.col - (Game.COLS - 1) / 2) < 1 && Math.abs(t.row - (Game.ROWS - 1) / 2) < 1) { openAltarSheet(); return; }
     if (Game.hailRound(m) && selected === null && freeTile && Game.hailTiles(m).some(h => h.col === t.col && h.row === t.row)) { openMapSheet(); return; }
@@ -5926,6 +5929,62 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     }
     el.style.setProperty('--c', Art.teamCol(b.side, me));
     if (html !== inspectHtml) { el.innerHTML = html; inspectHtml = html; }
+  }
+
+  // ---------- 2v2 artifacts (docs/MPB-2V2.md): a tap on an artifact's tile shows its card ----------
+  // The board state carries them in the round they stand in (m.artifacts = { round, list: [{ id, col, row, card: { type:
+  // 'tower' | 'mpb', id } }] }, src/duo.js); a fight's live points come from the battle (bt.artifacts(), in list order).
+  let artTapAt = null, artHtml = ''; // the artifact tile whose card is open ({ col, row }), and what the card shows now
+  // the artifact on tile t: { k, a (its list entry), live (the fight's, or null) }, or null
+  function artifactAt(t) {
+    const src = (bt && battlePre) || m, arts = src && src.artifacts;
+    if (!t || !arts || arts.round !== src.round || !Array.isArray(arts.list)) return null;
+    const k = arts.list.findIndex(q => q.col === t.col && q.row === t.row);
+    if (k < 0) return null;
+    const live = bt && bt.artifacts && (phase === 'battle' || phase === 'result' || phase === 'end') ? bt.artifacts()[k] || null : null;
+    return { k, a: arts.list[k], live };
+  }
+  // what an artifact's card is: { name, text, kind } (a tower type, or a building from src/mpb.js when it is loaded)
+  function artifactInfo(card) {
+    if (!card) return { name: 'Artifact', text: '', kind: '' };
+    if (card.type === 'tower') { const tt = Game.towerTypeById(card.id); return { name: tt ? tt.name : String(card.id), text: tt ? tt.text || '' : '', kind: 'Tower' }; }
+    const KS = typeof Mpb !== 'undefined' && Mpb.KINDS, K = KS && (Array.isArray(KS) ? KS.find(k => k && k.id === card.id) : KS[card.id]); // (by id, or a list of kinds)
+    return { name: K ? K.name : String(card.id), text: K ? K.text || '' : '', kind: 'Building' };
+  }
+  // a tap on tile t: opens that artifact's card (true), or closes it when it is open already (false: the tap goes on to
+  // whatever else stands there)
+  function artifactTap(t) {
+    const at = artifactAt(t);
+    if (!at) return false;
+    if (artTapAt && artTapAt.col === t.col && artTapAt.row === t.row) { artTapAt = null; artifactCard(); return false; }
+    artTapAt = { col: t.col, row: t.row };
+    artifactCard();
+    return true;
+  }
+  // the open artifact's card, top right of the board: its card's name and line, and in a fight the points; redrawn
+  // with the board (render), gone once the artifact is
+  function artifactCard() {
+    let el = $('acard');
+    const at = artTapAt && artifactAt(artTapAt);
+    if (!at) { artTapAt = null; artHtml = ''; if (el) el.remove(); return; }
+    const info = artifactInfo(at.a.card), L = at.live, team = duoOn();
+    const who = (sd) => sd === me ? (team ? 'your team' : 'you') : team ? 'their team' : foeName();
+    let score = `Hold its circle in the fight: every squad inside adds its tier a second. The first side to ${Engine.ARTIFACT.cap} locks it; more points wins it (+50 gold a player and this card).`;
+    if (L) {
+      const p = (sd) => Math.floor(L.pts[sd]);
+      score = `<span style="color:${Art.teamCol(me, me)}">${team ? 'Your team' : 'You'} ${p(me)}</span> · <span style="color:${Art.teamCol(1 - me, me)}">${team ? 'Their team' : esc(foeName())} ${p(1 - me)}</span> of ${L.cap}`
+        + (L.locked ? ` · 🔒 ${L.won >= 0 ? `won by ${esc(who(L.won))}` : 'nobody won it'}` : L.rate[me] || L.rate[1 - me] ? ` · +${L.rate[me]} / +${L.rate[1 - me]} a second` : '');
+    }
+    const html = `<div class="bh"><span style="color:#CDB8FF;display:inline-flex">◆</span><b>${esc(info.name)}</b><button class="bx" id="acard-x" aria-label="Close">✕</button></div>
+      <div class="st">Artifact · ${esc(info.kind)} card</div>${info.text ? `<div>${esc(info.text)}</div>` : ''}<div class="st">${L ? score : esc(score)}</div>`;
+    if (!el) {
+      el = document.createElement('div'); el.className = 'bcard'; el.id = 'acard'; el.setAttribute('role', 'status');
+      el.style.left = 'auto'; el.style.right = '8px';
+      el.addEventListener('click', (e) => { if (e.target.closest('#acard-x')) { artTapAt = null; artifactCard(); } });
+      $('wrap').appendChild(el); artHtml = '';
+    }
+    el.style.setProperty('--c', '#CDB8FF');
+    if (html !== artHtml) { el.innerHTML = html; artHtml = html; }
   }
 
   // ---------- marks over the board: a unit's range under the mouse, the tutorial's tiles and ring ----------

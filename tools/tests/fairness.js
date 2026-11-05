@@ -114,6 +114,42 @@ const SPOTS = [[0, 9], [3, 15], [-12, 21], [9, 27]];
   console.log(`ok  ${n} mirrored 2v2 tower falls with the portal: all exact mirrors`);
 }
 
+// 2v2 artifacts (Engine opts.artifacts): mirrored game armies (tiers from Game.bodiesFor) and artifacts mirrored front to
+// back (one on the middle line, a pair off it): an exact mirror, the middle one held evenly, the pair's points swapped
+{
+  const units = roster.units.map(u => ({ ...u, cost: u.cost / 100, skillDefs: E.SLOTS.map(k => (u.skills || [])[k] ? skill(u.skills[k]) : null) }));
+  const pick = units.map((u, i) => i).filter(i => !units[i].building && !units[i].idle);
+  let seed = 4242;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return seed / 4294967296; };
+  const N = 40;
+  let exact = 0, held = 0;
+  for (let n = 0; n < N; n++) {
+    const m = Game.createMatch(units, null, 3000 + n, 'standard');
+    m.round = 1 + Math.floor(rnd() * 2);
+    m.packages = [[], []]; m.pack = [null, null]; m.chars = [null, null];
+    const army = [], used = new Set(), k = 2 + Math.floor(rnd() * 5);
+    for (let j = 0; j < k; j++) {
+      let col, row;
+      do { col = Math.floor(rnd() * Game.COLS); row = Game.ROWS - 1 - Math.floor(rnd() * 6); } while (used.has(col + ',' + row) || (col === 8 && row === Game.ROWS - 2));
+      used.add(col + ',' + row);
+      army.push({ id: j + 1, unit: pick[Math.floor(rnd() * pick.length)], col, row, round: 1, xp: 0, level: Math.floor(rnd() * 2), cost: 1 });
+    }
+    m.armies = [army, army.map(s => ({ ...s, row: Game.ROWS - 1 - s.row }))];
+    const { g, opts } = Game.battleSetup(m);
+    const ax = (rnd() - 0.5) * 30, ay = 6 + rnd() * 12;
+    const artifacts = [{ x: (rnd() - 0.5) * 30, y: 0 }, { x: ax, y: ay, cap: 40 }, { x: ax, y: -ay, cap: 40 }];
+    const bt = E.createBattle(Game.bodiesFor(m, 0), Game.bodiesFor(m, 1), g, { ...opts, artifacts });
+    while (bt.step()) {}
+    const r = bt.result(), [c, p, q] = r.artifacts;
+    const even = c.pts[0] === c.pts[1] && c.won === -1 && p.pts[0] === q.pts[1] && p.pts[1] === q.pts[0] && p.locked === q.locked && (p.won < 0 ? q.won < 0 : q.won === 1 - p.won);
+    if (isMirror(r) && even) exact++;
+    if (c.pts[0] + p.pts[0] + q.pts[0] > 0) held++;
+  }
+  assert.ok(exact >= N * 0.95, `mirrored fights with artifacts: ${exact} of ${N} exact mirrors, points included`);
+  assert.ok(held >= N * 0.5, `the artifacts were held in ${held} of ${N}`);
+  console.log(`ok  ${N} mirrored game fights with 2v2 artifacts: ${exact} exact mirrors (points included), held in ${held}`);
+}
+
 // whole game fights on the standard map: random armies from every unit, side 1's the mirror of side 0's
 {
   const units = roster.units.map(u => ({ ...u, cost: u.cost / 100, skillDefs: E.SLOTS.map(k => (u.skills || [])[k] ? skill(u.skills[k]) : null) }));

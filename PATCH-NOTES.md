@@ -20,6 +20,26 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 6 November 2026 – 2v2: artifacts in the fight
+
+2v2 is still a developer test.
+
+- **Artifacts:** in the rounds they appear, two glowing orbs stand in no man's land, each inside a ring. Tap one to see the card it gives (a tower or a building).
+- **Holding one:** in the fight, every squad with a unit inside the ring scores its tier in points a second for its team (a tier 3 squad scores 3, however many bodies it has; summons score 1, towers and buildings nothing). Both teams score at the same time.
+- **First to 100 locks it,** and the team with more points wins it. If the fight ends before that, more points wins; a tie goes to nobody.
+- **Your units go for it:** units that come near an unlocked artifact walk into its ring. Melee units still go after enemies close by; ranged units stay inside and shoot only what they can reach from there. Once an artifact is locked, they fight as usual.
+- **The meter:** around each orb, your team's bar (blue) climbs one side and theirs (red) the other. A locked artifact turns your colour or theirs and shows a lock. Tap the orb in the fight to see the score.
+- 1v1 is unchanged.
+
+### To check with Vilhelm
+- **Points per squad, not per body:** a squad with any unit inside the ring scores its tier (otherwise a goblin swarm would outscore a giant eight to one).
+- **Ring 9 m (1.5 tiles), cap 100.** With fights lasting up to 60 s, a single tier 1 squad can't lock one on its own.
+- **"Prefer attacking" for melee** means: while an enemy is within its awareness (its range plus sight) it fights as usual, even outside the ring, and it walks back once none is.
+- **Ranged units** walk into the ring first (they shoot what's in range on the way) and then hold it; they never walk out after an enemy until it locks.
+- **Colours:** each phone shows its own team blue and the other red (as everywhere else on the board), rather than one fixed colour per team.
+
+---
+
 ## 5 November 2026 – 2v2: ride your ally's horse
 
 2v2 is still a developer test.

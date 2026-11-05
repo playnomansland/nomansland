@@ -1359,6 +1359,8 @@ const Engine = (() => {
   const PROJ_HIT_RADIUS = 1;   // a projectile hits a body within this distance of where it lands
   // A side whose tower falls is crippled for a while: it deals less damage, walks slower and takes more damage
   const TOWER_DOWN = { secs: 9, attack: 90, move: 70, taken: 50 };
+  // 2v2 artifacts (opts.artifacts, see createBattle): a circle's radius in metres (1.5 tiles) and the points that lock it
+  const ARTIFACT = { r: 9, cap: 100 };
   // Charisma (Matteo): opts.charm = [stacks by squad id or null, same for side 1]. A body of a squad with any
   // charisma that kills an enemy body (not a structure) gives its squad one more stack, up to CHARM_MAX, and one
   // stack to a friendly squad without any (the one with a body nearest the killer). A squad at CHARM_MAX is a
@@ -2331,6 +2333,82 @@ const Engine = (() => {
       obj.hold = lead >= 0 && lead === obj.lead ? obj.hold + dt : lead >= 0 ? dt : 0;
       obj.lead = lead;
       if (obj.won < 0 && lead >= 0 && obj.hold >= obj.secs - 1e-9) obj.won = lead;
+    }
+    // ----- 2v2 artifacts (opts.artifacts = [{ x, y, r, cap }] in board metres, r and cap default ARTIFACT; set only by
+    // src/duo.js, off by default: without it nothing here runs) -----
+    // Points: at the end of every tick each squad of a side with a living, fighting body inside an unlocked artifact's
+    // circle adds its tier (1-4) x dt to its side's points: per squad, not per body. Fighting: not riding in a carrier,
+    // not sheltered in a building (Overwatch), not a structure, building, wall, watchtower, drone or bot. The tier is
+    // b.tier (Game.bodiesFor sets it on every army squad's bodies from Game.tierOf); summons (bodies with b.credit,
+    // counted per squad that brought them), guards, paratroopers and anything else without one count as tier 1. Both
+    // sides tick at once; the moment either reaches cap the artifact locks: won = the side with more points (equal: -1)
+    // and the points freeze. A fight that ends first: more points wins (equal: -1), see result().
+    // Bodies soft-prioritise an unlocked artifact within their awareness (artifactMove, in the movement below).
+    const arts = opts.artifacts && opts.artifacts.length ? opts.artifacts.map(a => ({ x: +a.x, y: +a.y, r: a.r > 0 ? +a.r : ARTIFACT.r, cap: a.cap > 0 ? +a.cap : ARTIFACT.cap, pts: [0, 0], rate: [0, 0], locked: false, won: -1 })) : null;
+    const holds = (b) => b.alive && !b.boarded && !b.turning && !(b.inside && b.inside.alive) && !b.u.structure && !b.u.building && !(b.u.barrier > 0) && b.u.kind !== 'watchtower' && !b.u.aloft && !b.u.noCount;
+    const holdKey = (b) => b.credit ? 'c' + b.credit.side + ':' + b.credit.squad : 's' + b.squad;
+    const holdTier = (b) => !b.credit && b.tier >= 1 ? Math.min(4, Math.floor(b.tier)) : 1;
+    function artifactStep() {
+      for (const a of arts) {
+        if (a.locked) continue;
+        const sq = [new Map(), new Map()];
+        for (const b of all) if (holds(b) && hyp(b.x - a.x, b.y - a.y) <= a.r + 1e-9) sq[b.side].set(holdKey(b), holdTier(b));
+        for (const s of [0, 1]) { let n = 0; for (const v of sq[s].values()) n += v; a.rate[s] = n; }
+        a.pts[0] += a.rate[0] * dt; a.pts[1] += a.rate[1] * dt;
+        if (a.pts[0] >= a.cap - 1e-9 || a.pts[1] >= a.cap - 1e-9) { a.locked = true; a.won = a.pts[0] > a.pts[1] ? 0 : a.pts[1] > a.pts[0] ? 1 : -1; a.rate = [0, 0]; }
+      }
+    }
+    // as the boards (and result) see them; at the end (final) an artifact nobody locked goes to the side with more points
+    const artifactsNow = (final) => arts ? arts.map(a => ({ x: a.x, y: a.y, r: a.r, cap: a.cap, pts: a.pts.slice(), rate: a.rate.slice(), locked: a.locked,
+      won: a.locked || !final ? a.won : a.pts[0] > a.pts[1] ? 0 : a.pts[1] > a.pts[0] ? 1 : -1 })) : [];
+    // where body b stands in artifact a: one of 12 spots between a fifth and seven tenths of the radius out, picked from
+    // its place in its own side (side 1's mirrored front to back, as Spread does), so a crowd spreads over the circle; a
+    // spot in a wall or water: the next one (none: the middle)
+    function artSpot(b, a) {
+      if (b.artSpot && b.artSpot.a === a) return b.artSpot;
+      if (b.artK == null) b.artK = sides[b.side].indexOf(b);
+      const fwd = b.side === 1 ? -1 : 1;
+      let at = { a, x: a.x, y: a.y };
+      for (let j = 0; j < 12; j++) {
+        const k = b.artK + j, [dx, dy] = DIRS12[(k * 5) % 12], d = a.r * (0.2 + 0.5 * ((k * 7) % 12) / 11);
+        let x = a.x + dx * d, y = a.y + dy * d * fwd;
+        if (g.bounds) { x = Math.max(g.bounds.x0, Math.min(g.bounds.x1, x)); y = Math.max(g.bounds.y0, Math.min(g.bounds.y1, y)); }
+        if (!terBlock || !blocked(cellOf(x, y))) { at = { a, x, y }; break; }
+      }
+      return (b.artSpot = at);
+    }
+    // the movement part of a walking body's turn while an unlocked artifact is within its awareness (max(range + sight,
+    // min sight), to the circle's edge; the nearest one): true when it took care of the body's move this tick.
+    // Melee: an enemy it sees within its awareness comes first (it fights as usual, out of the circle if need be), else it
+    // walks to its spot in the circle and holds there. Ranged: it walks to its spot in the circle first, then holds
+    // inside, shooting only what it reaches from there (the attacks below); it never walks out after an enemy. Once the
+    // artifact locks: as usual.
+    function artifactMove(b, near, nd, unseen, rg) {
+      const aware = Math.max(rg + sight, minSight);
+      let a = null, ad = Infinity;
+      for (const c of arts) { if (c.locked) continue; const d = hyp(c.x - b.x, c.y - b.y); if (d - c.r <= aware && d < ad) { ad = d; a = c; } }
+      if (!a) { b.artAt = null; return false; }
+      const seen = !!near && !unseen;
+      if (rg <= AWARE.melee && seen && nd <= aware) { b.artAt = null; return false; }
+      const inReach = seen && nd <= reachTo(reachOf(b), b, near);
+      b.dashActive = false; if (g.aware2) b.goal = null;
+      if (b.artAt === a && ad <= a.r) { b.intent = inReach ? near : null; return true; } // in the circle: it holds
+      b.artAt = null;
+      const sp = artSpot(b, a), gx = sp.x - b.x, gy = sp.y - b.y, gd = hyp(gx, gy);
+      if ((ad <= a.r && (inReach || gd < 1)) || gd < 1e-6) { b.artAt = a; b.intent = inReach ? near : null; return true; }
+      const step = spd(b) * moveMul(b) * dt;
+      const [ux, uy] = steer(b, sp.x, sp.y, gx / gd, gy / gd);
+      if (b.hx === undefined) { b.hx = ux; b.hy = uy; }
+      const k = Math.min(1, TURN * dt);
+      let hx = b.hx + (ux - b.hx) * k, hy = b.hy + (uy - b.hy) * k, hl = hyp(hx, hy);
+      if (hl < 1e-6) { hx = ux; hy = uy; hl = 1; }
+      b.hx = hx / hl; b.hy = hy / hl;
+      const mv = Math.min(step, gd);
+      b.x += b.hx * mv; b.y += b.hy * mv; b.moved += mv;
+      if (b.u.windUp > 0 && mv > 0) { b.setUp = false; if (b.windTarget) { b.windTarget = null; stats[b.side].windLost++; } }
+      if (gd - mv < 1) b.artAt = a;
+      b.intent = inReach ? near : null;
+      return true;
     }
     // current range: shortsight can shrink it for a while, but never below 1 m (or the unit's own range if shorter)
     // Flow state stacks add to it
@@ -3673,6 +3751,8 @@ const Engine = (() => {
           if (b.u.windUp > 0 && mv > 0) { b.setUp = false; if (b.windTarget) { b.windTarget = null; stats[b.side].windLost++; } }
           continue;
         }
+        // 2v2 artifacts (see artifactMove): an unlocked one within its awareness pulls it in (a guard after its attacker doesn't care)
+        if (arts && b.u.speed > 0 && !b.u.structure && !b.avenge && artifactMove(b, near, nd, unseen, rg)) continue;
         let blind = unseen; // walking to an enemy it can't see
         if (g.aware2 && b.engaged && near) { const gl = goalOf(b, rg); if (gl) { near = gl; nd = gap(gl, b); blind = false; } }
         if (b.avenge) { if (b.avenge.alive && !b.avenge.hidden) { near = b.avenge; nd = gap(near, b); blind = !inSight(b, near); } else b.avenge = null; } // a guard going for its attacker
@@ -4228,6 +4308,7 @@ const Engine = (() => {
         for (const x of grp) if (x.alive) { s += x.hp; mx += x.u.hp; }
         if (mx > 0) for (const x of grp) if (x.alive) x.hp = x.u.hp * s / mx;
       }
+      if (arts) artifactStep(); // 2v2 artifacts: the tick's points, from where everyone stands once it is done
       for (const sd of downNow) cripple[sd] = towerDown.secs;
       downNow.length = 0;
       for (const s of gatesNow) if (!gates[s]) { const h = homes[1 - s]; gates[s] = { x: h.x, y: h.y, side: s, t: t + dt }; }
@@ -4278,6 +4359,7 @@ const Engine = (() => {
         score: frac[0] - frac[1],
         survivors: [aliveA, aliveB], counts: [A.length, B.length],
         stats, squads, markKill: markKill.slice(), objective: obj ? obj.won : -1,
+        ...(arts ? { artifacts: artifactsNow(true) } : {}), // 2v2 artifacts: [{ x, y, r, cap, pts, rate, locked, won }] (only with opts.artifacts)
         charm, // charisma stacks after the fight, by side and squad id (null for a side without)
         converted: [0, 1].map(k => all.filter(b => b.convert && b.side === k).length), // bodies each side won over
         // each building: still standing, seconds of building done at the end (null when it was already built), whether any was done this fight
@@ -4286,7 +4368,8 @@ const Engine = (() => {
     }
 
     return { step, frame, result, bodies: all, neutrals, mines: () => mines, pools: () => pools, portals: () => portals.filter(p => t >= p.t0 && t < p.t0 + p.secs), drops: () => drops.filter(d => !d.done).map(d => ({ side: d.side, t: d.t, r: d.r, spots: d.spots, left: Math.max(0, d.t - t) })), isOver: () => over, time: () => t, lastShots: () => shots, projectiles: () => projectiles, crippled: (side, lane) => cripple[side + 2 * (lane | 0)], gates: () => gates.filter(Boolean), gateFx: () => gateFx, charm: (side, squad) => (charm[side] && charm[side][squad]) || 0,
-      objective: () => obj && { n: obj.n.slice(), lead: obj.lead, hold: obj.hold, secs: obj.secs, won: obj.won } };
+      objective: () => obj && { n: obj.n.slice(), lead: obj.lead, hold: obj.hold, secs: obj.secs, won: obj.won },
+      artifacts: () => artifactsNow(false) }; // 2v2 artifacts as they stand ([] without opts.artifacts)
   }
 
   function matrix(units, g, onProgress, instrumentation = {}) {
@@ -4330,7 +4413,7 @@ const Engine = (() => {
     return m;
   }
 
-  return { NAV, HEIGHT, SIGHT_NEAR, POISON_SLOW, DASH_SPEED, LONE_R, WATCH_IDLE, BURN, FROST_ON, EAT_R, glutUnit, TOWER_DOWN, RULES, ruleOn, STEALTH_BACK, SKILL_SLOTS, SLOTS, SKILL_TYPES, skillParam, describeSkill, applySkills, innateUnit, fairBudget, battle, makeArmy, matrix, createBattle, buildSquad, rawStrength, squadsFor, withTraits, leveled, TRAIT_DEFAULTS, SPIN_CAP, CHARGE_RUN, TRAMPLE_RUN, BLAST_RADIUS, BLEED, POISON_HEAL, RAM_REACH, ROLL_START, ROLL_PAST, BUILD_GAP, BUILD_COOP, SITE_REACH, MINE_TRIGGER, REPAIR_SECS, LEVEL_BONUS, levelHpK, MAX_LEVEL, CHARM_MAX, CONVERT_HP, CONVERT_SQUAD };
+  return { NAV, HEIGHT, SIGHT_NEAR, POISON_SLOW, DASH_SPEED, LONE_R, WATCH_IDLE, BURN, FROST_ON, EAT_R, glutUnit, TOWER_DOWN, ARTIFACT, RULES, ruleOn, STEALTH_BACK, SKILL_SLOTS, SLOTS, SKILL_TYPES, skillParam, describeSkill, applySkills, innateUnit, fairBudget, battle, makeArmy, matrix, createBattle, buildSquad, rawStrength, squadsFor, withTraits, leveled, TRAIT_DEFAULTS, SPIN_CAP, CHARGE_RUN, TRAMPLE_RUN, BLAST_RADIUS, BLEED, POISON_HEAL, RAM_REACH, ROLL_START, ROLL_PAST, BUILD_GAP, BUILD_COOP, SITE_REACH, MINE_TRIGGER, REPAIR_SECS, LEVEL_BONUS, levelHpK, MAX_LEVEL, CHARM_MAX, CONVERT_HP, CONVERT_SQUAD };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
 
@@ -6317,6 +6400,7 @@ const Game = (() => {
       if (aura) u = modUnit(u, aura);
       const b = E.buildSquad(u, side, w.x, w.y, sq.id, TILE, idx, sq.level);
       if (u.glut) for (const x of b) x.glutN = glutOf(sq); // Glut it has eaten (already in its stats): it eats on from there
+      const tier = tierOf(m.units, sq.unit); for (const x of b) x.tier = tier; // what the squad holds a 2v2 artifact for (Engine opts.artifacts; nothing else reads it)
       if (aura) for (const x of b) x.aura = true;
       const dis = isDev(m) && m.units[sq.unit].disguise ? m.units.find(x => x.name === m.units[sq.unit].disguise) : null; // devtest: a disguise, until its first attack
       if (dis) { const mask = { name: dis.name, shape: dis.shape, color: dis.color, bodies: dis.bodies, range: dis.range }; for (const x of b) x.mask = mask; }
@@ -9978,6 +10062,62 @@ const Render2D = (cv, view, opts = {}) => {
     }
     ctx.globalAlpha = 1;
   }
+  // ---------- 2v2 artifacts (docs/MPB-2V2.md) ----------
+  // While deploying, from the board state: m.artifacts = { round, list: [{ id, col, row, card }] } in the round they stand
+  // in. In a fight, from the battle: bt.artifacts() = [{ x, y, r, cap, pts: [a, b], rate, locked, won }] (Engine
+  // opts.artifacts). Each: a glowing orb on its spot and a dashed ring as wide as its circle; in a fight a round meter
+  // round the orb: your team's bar (--you, blue) climbs the left half from the bottom, theirs (--foe, red) the right
+  // half, each to the top at the cap (both phones see their own team in blue, as for everything else on the board);
+  // locked: the ring and meter in the winner's colour (white for nobody) and a small lock over the orb.
+  const ART_COL = '#CDB8FF';
+  const artR = () => (typeof Engine !== 'undefined' && Engine.ARTIFACT ? Engine.ARTIFACT.r : 9);
+  function artifactsShown() {
+    if (bt && bt.artifacts && (phase === 'battle' || phase === 'result' || phase === 'end')) return bt.artifacts();
+    const a = m && m.artifacts;
+    if (!a || a.round !== m.round || !Array.isArray(a.list)) return [];
+    return a.list.map(q => { const w = Game.tileToWorld(q.col, q.row); return { x: w.x, y: w.y, r: artR(), cap: 0, pts: null, locked: false, won: -1 }; });
+  }
+  function drawArtifacts() {
+    const t = tilePx(), now = (typeof performance !== 'undefined' ? performance.now() : 0) / 1000;
+    for (const a of artifactsShown()) {
+      const x = PX(a.x), y = PY(a.y), col = a.locked ? (a.won >= 0 ? teamCol(a.won) : '#F4F1E6') : ART_COL;
+      ctx.strokeStyle = col; ctx.globalAlpha = a.locked ? 0.7 : 0.55; ctx.lineWidth = Math.max(1.5, t * 0.04);
+      if (!a.locked) ctx.setLineDash([t * 0.18, t * 0.12]);
+      ctx.beginPath(); ctx.arc(x, y, a.r * S, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = col; ctx.globalAlpha = 0.06; ctx.fill();
+      // the orb: a soft halo and a bright core
+      const pr = t * 0.26 * (1 + 0.06 * Math.sin(now * 3 + a.x));
+      const grd = ctx.createRadialGradient(x, y, 0, x, y, pr * 2.2);
+      grd.addColorStop(0, 'rgba(255,255,255,0.95)'); grd.addColorStop(0.35, col); grd.addColorStop(1, 'rgba(205,184,255,0)');
+      ctx.globalAlpha = a.locked ? 0.6 : 0.95; ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(x, y, pr * 2.2, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(x, y, pr * 0.45, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function artifactMeters() {
+    const t = tilePx(), R = t * 0.42, lw = Math.max(3, t * 0.09);
+    for (const a of artifactsShown()) {
+      if (!a.pts) continue;
+      const x = PX(a.x), y = PY(a.y), share = (sd) => Math.max(0, Math.min(1, a.pts[sd] / a.cap)), B = Math.PI / 2;
+      ctx.lineWidth = lw; ctx.lineCap = 'butt';
+      ctx.strokeStyle = 'rgba(8,12,14,0.75)'; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke();
+      if (a.locked) { ctx.strokeStyle = a.won >= 0 ? teamCol(a.won) : '#F4F1E6'; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke(); }
+      else {
+        const mine = share(me), theirs = share(foe());
+        if (mine > 0) { ctx.strokeStyle = teamCol(me); ctx.beginPath(); ctx.arc(x, y, R, B, B + mine * Math.PI); ctx.stroke(); } // up the left from the bottom
+        if (theirs > 0) { ctx.strokeStyle = teamCol(foe()); ctx.beginPath(); ctx.arc(x, y, R, B - theirs * Math.PI, B); ctx.stroke(); } // up the right
+        ctx.strokeStyle = 'rgba(244,241,230,0.8)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y - R - lw * 0.7); ctx.lineTo(x, y - R + lw * 0.7); ctx.stroke(); // the cap, at the top
+      }
+      if (a.locked) { // a small padlock over the orb
+        const s = Math.max(5, t * 0.13), lx = x, ly = y - R - s * 1.2;
+        ctx.fillStyle = a.won >= 0 ? teamCol(a.won) : '#F4F1E6'; ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(1.5, s * 0.28);
+        ctx.beginPath(); ctx.arc(lx, ly - s * 0.25, s * 0.5, Math.PI, 0); ctx.stroke();
+        ctx.fillRect(lx - s * 0.75, ly - s * 0.25, s * 1.5, s * 1.1);
+        ctx.fillStyle = 'rgba(8,12,14,0.85)'; ctx.fillRect(lx - s * 0.1, ly + s * 0.1, s * 0.2, s * 0.4);
+      }
+    }
+  }
   const ICE_COL = '#BFE3F5';
   // the storm band (a faint frost) and this round's hail tiles (animated during the fight)
   function drawStorm(v) {
@@ -10565,6 +10705,7 @@ const Render2D = (cv, view, opts = {}) => {
 
   function drawDeploy() {
     drawBoard();
+    drawArtifacts(); // 2v2: this round's artifacts (under the squads)
     const t = tilePx();
     if (placingBuilding && editable) { // where the building may go: any free tile of your zone
       ctx.strokeStyle = css('--gold'); ctx.globalAlpha = 0.6; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
@@ -10731,6 +10872,7 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.beginPath(); ctx.arc(PX(fx.x), PY(fx.y), tilePx() * (0.2 + age), 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     }
+    drawArtifacts(); // 2v2: the artifacts (their meters go over the bodies, below)
     // Drop paratroopers (sniper tower): until they land, a shadow on each landing spot that darkens as they come,
     // inside a dashed ring in the dropping side's colour as wide as the landing hit
     for (const d of bt.drops ? bt.drops() : []) {
@@ -10958,6 +11100,7 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.fillStyle = teamCol(p.owner.side);
       ctx.fillRect(x - 2.5, y - 2.5, 5, 5);
     }
+    artifactMeters(); // 2v2: each artifact's points
     // a fallen tower cripples its army for a few seconds
     // (a 2v2 fight: per board, bt.crippled(side, lane); the longest of the two shows)
     const cripOf = (sd) => Math.max(bt.crippled(sd, 0), bt.crippled(sd, 1) || 0);
@@ -11710,7 +11853,7 @@ Floors.floor = (() => {
   // ----- Report a bug (2026-11-04): a new post in the Discord forum #bug-reports with the game version and match id
   // filled in. The server posts it through a webhook (/account/bug, accounts.js BUG); when that's off or fails, the report
   // is copied and the Discord server opens, so it can be pasted there by hand.
-  const GAME_VERSION = '5 Nov 2026 · 97bb4a0'; // src/build.js: the newest patch notes date and a hash of this page
+  const GAME_VERSION = '6 Nov 2026 · bda7c69'; // src/build.js: the newest patch notes date and a hash of this page
   const DISCORD_FALLBACK = 'https://discord.gg/TBpDKSBWsY';
   const bug = { draft: '', busy: false };
   // the id the server's match history uses (room.js historyInfo: <room>-<seed>), or one made the same way for other matches
@@ -12331,6 +12474,7 @@ Floors.floor = (() => {
     cv.style.touchAction = phase === 'deploy' ? 'none' : ''; // so a finger can drag squads without scrolling the page
     if (board3d) wake3d(); else { board.draw(); boardMarks(); }
     if (inspect || inspectHtml) inspectCard(); // the tapped unit's card in a fight (gone once the fight is)
+    if (artTapAt || artHtml) artifactCard(); // 2v2: the tapped artifact's card (its points in a fight)
   }
   const teamCol = (side) => Art.teamCol(side, me);
   const { SHROOM_COL, CHARM_COL, GLUT_COL, armsImg } = Art;
@@ -16062,6 +16206,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function boardTap(t) {
     if (pingKind && net.duo) { duoPlacePing(t); return; } // 2v2: the ping picked in the panel
     if (phase === 'battle') { // a fight: a tap on a unit shows its card, and where its squad is walking now (intentMarks)
+      if (artifactTap(t)) return; // 2v2: an artifact's tile shows its card first (a second tap: what stands there)
       const b = t && bodyAt(t); inspect = b && b !== inspect ? b : null; inspectCard();
       watchSq = inspect && inspect.squad >= 0 && !inspect.u.structure ? { side: inspect.side, id: inspect.squad } : null;
       boardMarks(); return;
@@ -16183,6 +16328,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (elf && t.col === elf.col && (t.row === Game.ROWS / 2 - 1 || t.row === Game.ROWS / 2) && !Game.occupied(m, me, t.col, t.row)) { openMapSheet(); return; }
     // Zoe's buff tiles: a tap on an empty one says what it gives now and what it grows to
     for (const sd of [me, foe()]) if (selected === null && Game.onBuffTile(m, sd, t.col, t.row) && !Game.squadAt(m, sd, t.col, t.row) && (sd === me || charVisible(sd))) { openZoeSheet(sd); return; }
+    if (selected === null && !Game.squadAt(m, me, t.col, t.row) && artifactTap(t)) return; // 2v2: an artifact's card (a second tap: what stands there)
     const freeTile = !Game.occupied(m, me, t.col, t.row);
     if (Game.altarRound(m) && selected === null && freeTile && Math.abs(t.col - (Game.COLS - 1) / 2) < 1 && Math.abs(t.row - (Game.ROWS - 1) / 2) < 1) { openAltarSheet(); return; }
     if (Game.hailRound(m) && selected === null && freeTile && Game.hailTiles(m).some(h => h.col === t.col && h.row === t.row)) { openMapSheet(); return; }
@@ -16281,6 +16427,62 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     }
     el.style.setProperty('--c', Art.teamCol(b.side, me));
     if (html !== inspectHtml) { el.innerHTML = html; inspectHtml = html; }
+  }
+
+  // ---------- 2v2 artifacts (docs/MPB-2V2.md): a tap on an artifact's tile shows its card ----------
+  // The board state carries them in the round they stand in (m.artifacts = { round, list: [{ id, col, row, card: { type:
+  // 'tower' | 'mpb', id } }] }, src/duo.js); a fight's live points come from the battle (bt.artifacts(), in list order).
+  let artTapAt = null, artHtml = ''; // the artifact tile whose card is open ({ col, row }), and what the card shows now
+  // the artifact on tile t: { k, a (its list entry), live (the fight's, or null) }, or null
+  function artifactAt(t) {
+    const src = (bt && battlePre) || m, arts = src && src.artifacts;
+    if (!t || !arts || arts.round !== src.round || !Array.isArray(arts.list)) return null;
+    const k = arts.list.findIndex(q => q.col === t.col && q.row === t.row);
+    if (k < 0) return null;
+    const live = bt && bt.artifacts && (phase === 'battle' || phase === 'result' || phase === 'end') ? bt.artifacts()[k] || null : null;
+    return { k, a: arts.list[k], live };
+  }
+  // what an artifact's card is: { name, text, kind } (a tower type, or a building from src/mpb.js when it is loaded)
+  function artifactInfo(card) {
+    if (!card) return { name: 'Artifact', text: '', kind: '' };
+    if (card.type === 'tower') { const tt = Game.towerTypeById(card.id); return { name: tt ? tt.name : String(card.id), text: tt ? tt.text || '' : '', kind: 'Tower' }; }
+    const KS = typeof Mpb !== 'undefined' && Mpb.KINDS, K = KS && (Array.isArray(KS) ? KS.find(k => k && k.id === card.id) : KS[card.id]); // (by id, or a list of kinds)
+    return { name: K ? K.name : String(card.id), text: K ? K.text || '' : '', kind: 'Building' };
+  }
+  // a tap on tile t: opens that artifact's card (true), or closes it when it is open already (false: the tap goes on to
+  // whatever else stands there)
+  function artifactTap(t) {
+    const at = artifactAt(t);
+    if (!at) return false;
+    if (artTapAt && artTapAt.col === t.col && artTapAt.row === t.row) { artTapAt = null; artifactCard(); return false; }
+    artTapAt = { col: t.col, row: t.row };
+    artifactCard();
+    return true;
+  }
+  // the open artifact's card, top right of the board: its card's name and line, and in a fight the points; redrawn
+  // with the board (render), gone once the artifact is
+  function artifactCard() {
+    let el = $('acard');
+    const at = artTapAt && artifactAt(artTapAt);
+    if (!at) { artTapAt = null; artHtml = ''; if (el) el.remove(); return; }
+    const info = artifactInfo(at.a.card), L = at.live, team = duoOn();
+    const who = (sd) => sd === me ? (team ? 'your team' : 'you') : team ? 'their team' : foeName();
+    let score = `Hold its circle in the fight: every squad inside adds its tier a second. The first side to ${Engine.ARTIFACT.cap} locks it; more points wins it (+50 gold a player and this card).`;
+    if (L) {
+      const p = (sd) => Math.floor(L.pts[sd]);
+      score = `<span style="color:${Art.teamCol(me, me)}">${team ? 'Your team' : 'You'} ${p(me)}</span> · <span style="color:${Art.teamCol(1 - me, me)}">${team ? 'Their team' : esc(foeName())} ${p(1 - me)}</span> of ${L.cap}`
+        + (L.locked ? ` · 🔒 ${L.won >= 0 ? `won by ${esc(who(L.won))}` : 'nobody won it'}` : L.rate[me] || L.rate[1 - me] ? ` · +${L.rate[me]} / +${L.rate[1 - me]} a second` : '');
+    }
+    const html = `<div class="bh"><span style="color:#CDB8FF;display:inline-flex">◆</span><b>${esc(info.name)}</b><button class="bx" id="acard-x" aria-label="Close">✕</button></div>
+      <div class="st">Artifact · ${esc(info.kind)} card</div>${info.text ? `<div>${esc(info.text)}</div>` : ''}<div class="st">${L ? score : esc(score)}</div>`;
+    if (!el) {
+      el = document.createElement('div'); el.className = 'bcard'; el.id = 'acard'; el.setAttribute('role', 'status');
+      el.style.left = 'auto'; el.style.right = '8px';
+      el.addEventListener('click', (e) => { if (e.target.closest('#acard-x')) { artTapAt = null; artifactCard(); } });
+      $('wrap').appendChild(el); artHtml = '';
+    }
+    el.style.setProperty('--c', '#CDB8FF');
+    if (html !== artHtml) { el.innerHTML = html; artHtml = html; }
   }
 
   // ---------- marks over the board: a unit's range under the mouse, the tutorial's tiles and ring ----------
@@ -16606,7 +16808,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // It falls back to the 2D board when it can't start (no WebGL), when the phone drops the WebGL context, and when
   // fights run under 20 fps at low quality (slower fights step the quality down first), with one line on the board.
   const THREE_URL = './vendor/three.module.min.js'; // the artifact build points this at jsDelivr
-  const V3D = '3062c3e44d'; // the 3D code's version (src/build.js puts a hash of it here)
+  const V3D = '11a49f0c9e'; // the 3D code's version (src/build.js puts a hash of it here)
   const B3D_STORE = 'phone-bellum-board';
   const force2d = /[?&]board=2d\b/.test(location.search);
   const force3d = !force2d && (/[?&]board=3d\b/.test(location.search) || window.PB_FORCE3D === true);
