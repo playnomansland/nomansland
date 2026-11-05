@@ -444,6 +444,118 @@ check('the page\'s copy hashes as the server\'s after every B2 action; the oppon
   sameTeam(D, 0);
 });
 
+check('Second wind doesn\'t fire for a squad its own portal sacrificed (Ember Imps\' Summon hellfiend): it was never wiped out', () => {
+  const x = bare(31), { D } = x;
+  const h = addKind(D, 0, 'fieldHospital', { col: 10, row: 14 });
+  for (const R of D.lanes) R.m.gold[0] = 2000;
+  const ui = UI('Ember Imps'), slot = units[ui].skills.indexOf('hellfiend');
+  assert.ok(slot >= 0, 'Ember Imps have Summon hellfiend');
+  for (const R of D.lanes) { R.m.tech = R.m.tech || [{}, {}]; R.m.tech[0] = R.m.tech[0] || {}; R.m.tech[0][ui] = [0, 0, 0, 0]; R.m.tech[0][ui][slot] = 1; }
+  const imps = put(D, 0, 0, 'Ember Imps', 10, 12);
+  put(D, 0, 1, 'Brute', 10, 3);
+  assert.ok(x.act(0, 'mpbBuy', h.key, 'wind', 0, imps.id).ok);
+  const bt = battleOf(D), orig = bodiesOf(bt, 0, imps.id);
+  assert.ok(orig.length && orig[0].u.portal && orig.every(b => b.fhRevive), 'the imps have the portal and carry the mark');
+  for (let k = 0; k < 4000 && bt.step(); k++) {}
+  assert.ok(orig.some(b => b.sacrificed), 'the portal sacrificed the imps');
+  assert.ok(bt.bodies.some(b => b.side === 0 && b.u.name === 'Hellfiend'), 'the Hellfiend came out');
+  assert.ok(!bt.bodies.some(b => b.fhBack), 'no fresh imps: the revive is spent, nothing comes back');
+});
+
+check('Second wind\'s fresh bodies keep what the game put on the squad (Home ground, Mark Bounty, prey, Zoe, Glut count...)', () => {
+  const G = { ...Game.SETTINGS, bounds: { x0: -40, x1: 40, y0: -48, y1: 48 } };
+  const gobU = Engine.withTraits({ name: 'Gob', cost: 0, bodies: 3, hp: 10, hit: 0, aps: 1, range: 0, speed: 0, splash: 0 });
+  const A = Engine.buildSquad(gobU, 0, 0, -10, 1, 6, 0);
+  for (const b of A) { b.fhRevive = { x: 0, y: -20 }; b.band = { y0: -100, y1: 100, armor: 2, hpPct: 10, on: false }; b.sniperMark = 5; b.prey = true; b.zoe = true; b.glutN = 3; }
+  A.push(...Engine.buildSquad(Engine.withTraits({ name: 'Post', cost: 0, bodies: 1, hp: 1e6, hit: 0, aps: 1, range: 0, speed: 0, splash: 0 }), 0, 20, -40, 3, 6, 5)); // side 0 fights on
+  const B = Engine.buildSquad(Engine.withTraits({ name: 'Wall', cost: 0, bodies: 1, hp: 1e6, hit: 0, aps: 1, range: 0, speed: 0, splash: 0 }), 1, 0, 40, 2, 6, 10);
+  const bt = Engine.createBattle(A, B, G, { mpb: { fieldHospital: { dress: [[], []], pct: 25 } } });
+  bt.step();
+  assert.ok(A.every(b => !b.fhRevive || b.band.on), 'the originals stood in their band');
+  for (const b of A) if (b.fhRevive) { b.hp = 0; b.alive = false; }
+  let back = [];
+  for (let k = 0; k < 10 && bt.step(); k++) { back = bt.bodies.filter(b => b.fhBack); if (back.length) break; }
+  assert.strictEqual(back.length, 3, 'all three back');
+  for (const b of back) {
+    assert.ok(b.band && b.band.armor === 2 && b.band.y0 === -100 && b.band !== A[0].band, 'its own Home ground band');
+    assert.ok(b.sniperMark === 5 && b.prey === true && b.zoe === true && b.glutN === 3, 'the Mark, the prey, Zoe and the Glut count as the fight began');
+    assert.ok(near(b.u.hp, 10), 'the stats as the fight began (no band bonus baked in)');
+  }
+  bt.step();
+  assert.ok(back.every(b => b.band.on && near(b.u.hp, 11)), 'Home ground works on them');
+});
+
+check('Restoration is fixed as each tick starts: two Oaks falling on the same tick give an exact mirror', () => {
+  const G = { ...Game.SETTINGS, bounds: { x0: -40, x1: 40, y0: -48, y1: 48 } };
+  const Wu = (o) => Engine.withTraits({ cost: 0, bodies: 1, aps: 1, speed: 0, splash: 0, range: 0, hit: 0, ...o });
+  let fellTogether = 0;
+  for (const oakHp of [40, 60, 80, 100, 130, 170, 220, 300]) {
+    const sides = [0, 1].map(sd => {
+      const f = sd === 0 ? -1 : 1, out = [];
+      const add = (u, x, y, sq, idx) => { const b = Engine.buildSquad(u, sd, x, y * f, sq, 6, idx); out.push(...b); return b; };
+      add(Wu({ name: 'The Oak', hp: oakHp, structure: true, lesser: true, kind: 'mpb', mpb: 'oak' }), 0, 3, -701, 0)[0].oakRestore = 1.25;
+      add(Wu({ name: 'Shooter', hp: 5000, hit: 20, aps: 2, range: 13, defense: 'armor', defVal: 0 }), 0, 8, 1, 1);
+      add(Wu({ name: 'Mender', hp: 5000, hit: 1, aps: 20, range: 40, mend: 15 }), -20, 30, 2, 2);
+      add(Wu({ name: 'Tank', hp: 100000, hit: 0 }), -20, 32, 3, 3)[0].hp = 50000;
+      return out;
+    });
+    const bt = Engine.createBattle(sides[0], sides[1], G, { mpb: { oak: true } });
+    for (let k = 0; k < 400 && bt.step(); k++) {}
+    const tanks = bt.bodies.filter(b => b.u.name === 'Tank'), oaks = bt.bodies.filter(b => b.u.name === 'The Oak');
+    if (oaks.every(o => !o.alive) && oaks[0].diedTick === oaks[1].diedTick) fellTogether++;
+    assert.ok(tanks[0].hp > 50000 && tanks[0].hp === tanks[1].hp, `Oak health ${oakHp}: tanks ${tanks[0].hp} / ${tanks[1].hp}`);
+  }
+  assert.ok(fellTogether >= 4, 'the Oaks fell on the same tick in most cases: ' + fellTogether);
+});
+
+check('The Oak\'s Heal writes a results line: the HP bar and the results screen agree', () => {
+  const x = bare(22), { D } = x;
+  const oak = addKind(D, 0, 'oak');
+  for (const R of D.lanes) R.m.gold[0] = 1000;
+  assert.ok(x.act(0, 'mpbBuy', oak.key, 'heal').ok && x.act(1, 'mpbBuy', oak.key, 'heal').ok);
+  put(D, 0, 0, 'Goblin Swarm', 10, 12); put(D, 0, 1, 'Brute', 10, 5); put(D, 1, 1, 'Ether Golem', 13, 5);
+  D.hp = [150, 150]; for (const R of D.lanes) R.m.hp = D.hp.slice();
+  let f = null; for (let s = 0; s < 4; s++) f = Duo.setReady(D, s, true, x.T) || f;
+  for (const sm of f.summaries) {
+    const n = sm.mpbNews[0].filter(q => q.kind === 'oak' && q.healed);
+    assert.strictEqual(n.length, 1, 'one Oak line in each lane\'s results'); assert.strictEqual(n[0].healed, 10); assert.ok(/\+10 Team HP/.test(n[0].text));
+    assert.ok(!(sm.mpbNews[1] || []).some(q => q.kind === 'oak'), 'nothing for the other team');
+  }
+  assert.strictEqual(D.hp[0], Math.max(0, 150 + 10 - f.summaries[0].duo.lost[0]));
+  // at the cap: nothing gained, no line
+  const y = bare(22), o2 = addKind(y.D, 0, 'oak');
+  for (const R of y.D.lanes) R.m.gold[0] = 1000;
+  assert.ok(y.act(0, 'mpbBuy', o2.key, 'heal').ok);
+  const sums = [{}, {}], hp = [200, 200]; Mpb.teamHeal(lanesOf(y.D), hp, y.m(0).round, sums);
+  assert.deepStrictEqual(hp, [200, 200]); assert.ok(!sums[0].mpbNews, 'no line when the team is at its starting health');
+});
+
+check('Field dressing can\'t be worked out while deploying: its seed (fhSeed) is in no view, only in the fight\'s snapshots', () => {
+  let missed = 0;
+  for (let s = 0; s < 8; s++) {
+    const x = bare(60 + s), { D } = x;
+    const h = addKind(D, 0, 'fieldHospital');
+    for (const R of D.lanes) R.m.gold[0] = 2000;
+    put(D, 0, 0, 'Brute', 5, 12); put(D, 0, 0, 'Ent', 8, 12); put(D, 1, 0, 'Brute', 15, 12); put(D, 1, 0, 'Spiders', 18, 12);
+    put(D, 0, 1, 'Goblin Swarm', 10, 5);
+    const hp0 = {}; for (const b of battleOf(D).bodies) if (b.side === 0 && b.squad >= 0) hp0[b.squad] = b.u.hp;
+    assert.ok(x.act(0, 'mpbBuy', h.key, 'dress').ok);
+    for (let k = 0; k < 4; k++) assert.ok(Duo.viewFor(D, k).m.fhSeed == null, 'no seat sees it');
+    // what A1 would work out from their own view
+    const o = { mpb: {} }; Mpb.battleOpts(W(Duo.viewFor(D, 0).m), o);
+    const ids = Object.keys(hp0).map(Number).sort((a, b) => a - b), pred = ids[Math.min(ids.length - 1, Math.floor(o.mpb.fieldHospital.dress[0][0] * ids.length))];
+    let f = null; for (let k = 0; k < 4; k++) f = Duo.setReady(D, k, true, x.T) || f;
+    assert.ok(f.pres.every(p => p.fhSeed != null), 'the fight\'s snapshots carry it (the page plays the fight from them)');
+    assert.ok(D.lanes.every(R => R.m.fhSeed == null) && f.posts.every(p => p.fhSeed == null), 'gone after the fight');
+    const bt = Duo.battle(f.pres.map(W));
+    const got = [...new Set(bt.bodies.filter(b => b.side === 0 && b.squad >= 0 && b.u.hp > hp0[b.squad] * 1.2).map(b => b.squad))];
+    assert.strictEqual(got.length, 1, 'one squad dressed');
+    if (got[0] !== pred) missed++;
+  }
+  assert.ok(missed >= 2, 'the view\'s guess misses: ' + missed + ' of 8');
+  assert.ok(Mpb.KINDS.fieldHospital.skills.find(s => s.id === 'wind').pick, 'Second wind is bought with the sheet\'s squad picker (no generic Buy button)');
+});
+
 check('a full bot 2v2, rounds 1 to 10, both kinds on both teams: no exception, team state equal, views in step, playback, bots use the skills', () => {
   const used = {};
   for (let seed = 1; seed <= 3; seed++) {

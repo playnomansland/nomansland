@@ -172,7 +172,7 @@
     downside: `Destroyed: −${FH.lose} Team HP.`,
     skills: [
       { id: 'dress', name: 'Field dressing', cost: 50, costStep: 50, per: 'free', text: `A random allied squad (yours or your teammate’s) gets +${FH.dress}% health for this round’s fight. Click as often as you like.` },
-      { id: 'wind', name: 'Second wind', cost: 100, per: 'round', text: 'Pick an allied squad: the first time it is wiped out in this round’s fight, it comes back whole on the tile in front of the hospital.' },
+      { id: 'wind', name: 'Second wind', cost: 100, per: 'round', pick: true, text: 'Pick an allied squad: the first time it is wiped out in this round’s fight, it comes back whole on the tile in front of the hospital.' },
     ],
     hooks: {
       canBuy: (m, side, rec, sk, args) => sk.id !== 'wind' || fhTarget(args), // the squad: (lane, id); a squad that is gone by the fight just doesn't come back
@@ -194,7 +194,9 @@
       // Field dressing: one seeded number a click (the Engine picks the squad from all the side's squads in the fight)
       battleOpts(m, side, rec, opts) {
         const o = opts.mpb.fieldHospital || (opts.mpb.fieldHospital = { dress: [[], []], pct: FH.dress });
-        const n = fhClicks(m, rec, 'dress'), r = rng(((m.seed >>> 0) + m.round * 7919 + 4111) >>> 0); // the same numbers for both sides: a mirror is a mirror
+        // seeded from m.fhSeed (Duo.runFight sets it from the duo's seed, which no seat's view holds, just before the
+        // fight, so nobody can work the picks out while deploying; the fight's snapshots carry it), else the match's seed
+        const n = fhClicks(m, rec, 'dress'), r = rng(((m.fhSeed != null ? m.fhSeed : m.seed) >>> 0) + m.round * 7919 + 4111 >>> 0); // the same numbers for both sides: a mirror is a mirror
         for (let k = 0; k < n; k++) o.dress[side].push(r());
       },
       afterFight(lanes, side, rec, res, sums, round, hp) {
@@ -284,9 +286,12 @@
         opts.tiles = (opts.tiles || []).concat(moss.map(t => { const w = G.tileToWorld(t.col, t.row); return { x0: w.x - h, x1: w.x + h, y0: w.y - h, y1: w.y + h, type: 'mud', side, slow: OAK.slow, oak: true }; }));
       },
       // Heal: +OAK.heal Team HP a click this round, before the fight's damage (Duo.fight -> Mpb.teamHeal)
-      teamHp(lanes, side, rec, hp, round) {
+      teamHp(lanes, side, rec, hp, round, sums) {
         const e = rec.skills.heal, n = e && e.round === round ? e.log.length : 0;
-        if (n > 0 && hp[side] > 0) hp[side] = Math.min(Math.max(hp[side], TEAM_HP_CAP), hp[side] + OAK.heal * n);
+        if (!(n > 0 && hp[side] > 0)) return;
+        const was = hp[side];
+        hp[side] = Math.min(Math.max(was, TEAM_HP_CAP), was + OAK.heal * n);
+        if (sums && hp[side] > was) news(sums, side, { kind: 'oak', healed: hp[side] - was, text: `${side === 0 ? 'Team A' : 'Team B'}’s Oak: +${hp[side] - was} Team HP.` });
       },
       // the downside: the round after the Oak fell, an Ent for the opponents (side: the team it fights for)
       foeBodies(m, side, rec, ctx) {
@@ -621,10 +626,10 @@
   }
   // Team HP changes bought for round `round`'s fight (hooks.teamHp: the Oak's Heal), before the fight's damage comes
   // off (Duo.fight; the lanes may be in the next round already). hp: the shared Team HP [team A, team B], changed.
-  function teamHeal(lanes, hp, round) {
+  function teamHeal(lanes, hp, round, sums) {
     const m = lanes[0];
     if (!on(m)) return;
-    for (const side of [0, 1]) for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.teamHp) K.hooks.teamHp(lanes, side, rec, hp, round); }
+    for (const side of [0, 1]) for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.teamHp) K.hooks.teamHp(lanes, side, rec, hp, round, sums); }
   }
   // a bot's buys on its team's buildings (Duo.botTurn, in the bot's lane m, after it deployed): hooks.bot
   function bots(m, side) {

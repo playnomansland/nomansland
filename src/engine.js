@@ -817,11 +817,15 @@ const Engine = (() => {
         const k = b.hp / b.u.hp; b.u = made.get(b.u); b.hp = b.u.hp * k;
       }
     }
+    const FH_KEEP = ['band', 'sniperMark', 'marked', 'prey', 'zoe', 'shroom', 'aura', 'glutN', 'mask'];
     const fhRevives = [];
     if (fhOpt) for (const list of [A, B]) for (const b of list) if (b.fhRevive) {
       let grp = fhRevives.find(x => x.side === b.side && x.squad === b.squad);
       if (!grp) fhRevives.push(grp = { side: b.side, squad: b.squad, x: b.fhRevive.x, y: b.fhRevive.y, list: [], done: false });
       grp.list.push(b); b.fhU = b.u;
+      // what Game.bodiesFor put on the body (Home ground, Mark Bounty, Hunter's prey, Zoe, Glut...), as the fight starts
+      b.fhKeep = {};
+      for (const k of FH_KEEP) if (b[k] !== undefined) b.fhKeep[k] = b[k] && typeof b[k] === 'object' && !Array.isArray(b[k]) ? { ...b[k] } : b[k];
     }
     const all = A.concat(B);
     const sides = [A, B];
@@ -829,6 +833,7 @@ const Engine = (() => {
     // on its side is that many times as strong
     const oakOn = !!(opts.mpb && opts.mpb.oak), oaks = oakOn ? all.filter(b => b.oakRestore > 0) : [];
     const oakK = (sd) => { let k = 1; for (const b of oaks) if (b.side === sd && b.alive && b.oakRestore > k) k = b.oakRestore; return k; };
+    const oakNow = oakOn ? [oakK(0), oakK(1)] : [1, 1]; // fixed at the start of each tick (step), so who acts first on the tick an Oak falls doesn't matter
     const counts = (b) => !(b.u.structure || b.u.aloft || b.u.noCount); // what makes up a side's army (towers, drones and constructs don't)
     const stats = [
       { dealt: 0, wasted: 0, blocked: 0, missed: 0, windLost: 0, winds: 0, totalHp: A.reduce((s, b) => s + (counts(b) ? b.u.hp : 0), 0) },
@@ -943,7 +948,7 @@ const Engine = (() => {
     // to full health or saves a body just because of who went first; a body that fell meanwhile gets none
     let healLater = null;
     function heal(v, amt) {
-      if (oakOn) amt *= oakK(v.side); // the Oak's Restoration (2v2)
+      if (oakOn) amt *= oakNow[v.side]; // the Oak's Restoration (2v2)
       if (healLater) { if (amt > 0) healLater.push(v, amt * healK(v)); return; }
       if (amt > 0 && v.hp < v.u.hp) v.hp = Math.min(v.u.hp, v.hp + amt * healK(v));
     }
@@ -2432,6 +2437,7 @@ const Engine = (() => {
       shots = [];
       tick++;
       for (let k = 0; k < 4; k++) if (cripple[k] > 0) cripple[k] = Math.max(0, cripple[k] - dt);
+      if (oakOn) { oakNow[0] = oakK(0); oakNow[1] = oakK(1); } // 2v2 Oak: Restoration as the tick starts
       // map tiles under the units (checked before moving, so the tile a unit starts on always counts)
       if (tiles.length) for (const b of all) {
         if (!b.alive || b.u.structure || b.u.aloft) continue;
@@ -3164,14 +3170,17 @@ const Engine = (() => {
         for (const x of live) { x.hp = 0; x.alive = false; x.diedTick = tick; x.sacrificed = true; }
         pendingKids.push(pt.hf);
       }
-      // 2v2 Field hospital's Second wind: a marked squad all down (fallen, or won over) comes back whole, once
+      // 2v2 Field hospital's Second wind: a marked squad all down (fallen, or won over) comes back whole, once. A squad
+      // its own portal sacrificed (Summon hellfiend) wasn't wiped out: the revive is spent and nothing comes back
       for (const fr of fhRevives) {
+        if (!fr.done && fr.list.some(b => b.sacrificed)) { fr.done = true; continue; }
         if (fr.done || !fr.list.every(b => (!b.alive && !b.boarded) || b.side !== fr.side)) continue;
         fr.done = true;
         const kids = fr.list.map((b, k) => {
           const [ox, oy] = SPAWN_SPOTS[k % SPAWN_SPOTS.length], fwd = fr.side === 0 ? 1 : -1;
           const kid = newBody(b.fhU, fr.side, fr.x + ox * g.spacing * 0.6, fr.y + oy * fwd * g.spacing * 0.6, spawnNo[fr.side]++, fr.squad);
           kid.tier = b.tier; kid.lane = b.lane; kid.level = b.level; kid.fhBack = true; b.fhGone = true;
+          for (const k in b.fhKeep) { const v = b.fhKeep[k]; kid[k] = v && typeof v === 'object' && !Array.isArray(v) ? { ...v } : v; }
           return kid;
         });
         if (kids[0] && kids[0].u.link) { for (const kid of kids) kid.link = kids; groups.push(kids); }
