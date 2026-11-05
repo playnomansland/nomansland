@@ -1076,7 +1076,7 @@ const Game = (() => {
     }
     const el = elfSpot(m); // the map's elf tower stands between the two middle rows
     if (el && el.col === col && (row === ROWS / 2 - 1 || row === ROWS / 2)) return true;
-    return !!api.mpbAt(m, col, row);
+    return !!(MPB && m && m.mpb) && MPB.at(m, col, row, true); // (building tiles only: not the tiles round a Coal mine's exit)
   }
   const nearBldg = (m, side, col, row) => { for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (bldgSeen(m, side, col + dc, row + dr)) return true; return false; };
   // ui (optional): the unit being placed, for unit-specific tiles (all of a footprint's tiles must be allowed)

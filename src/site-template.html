@@ -434,6 +434,7 @@ html.dock .bar:has(> .task:not([hidden])) > .hint { display: none; }
 .mpb-card { display: grid; gap: 2px; text-align: left; white-space: normal; padding: 6px 8px; }
 .marks .mpb-ok { fill: color-mix(in srgb, var(--gold) 22%, transparent); stroke: var(--gold); stroke-width: 1.5; animation: mpbGlow 1.4s ease-in-out infinite alternate; }
 .marks .mpb-vote { fill: none; stroke-width: 4; }
+.marks .mpb-lake { fill: color-mix(in srgb, #3E8FC4 30%, transparent); stroke: #6FB6E6; stroke-width: 1.5; stroke-dasharray: 3 2; animation: mpbGlow 1.4s ease-in-out infinite alternate; } /* the Magic lake's tiles to tap */
 @keyframes mpbGlow { from { opacity: 0.45; } to { opacity: 1; } }
 .marks .range { fill: none; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 0.1 6; opacity: 0.9; }
 /* intent: where a squad means to go (arrows to the enemy squads it heads for, dashed straight ahead with nothing in sight yet), whom it attacks in a fight (small rings) */
@@ -8178,6 +8179,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       // in step? (the server's fingerprint of this side against this phone's copy; a sync puts it right)
       if (d.ok && d.h && !net.pending.length && m && phase === 'deploy' && Referee.sideHash(m, me) !== d.h) send({ t: 'sync' });
       if (!d.ok && byHand()) sfx('nope');
+      if (!d.ok && d.why === 'team' && net.duo) tickShow({ sys: 'That can’t be taken back now: your teammate’s moves rely on it, or the tile it would go back to is taken.' }); // (2v2: Duo.undoAllowed, undoAllAllowed)
       return;
     }
     if (mode === 'spec') { srvSpec(d); return; }
@@ -9034,17 +9036,16 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     // ===== oak (page) =====
     // ===== factory (page) =====
     // ===== magicLake (page) =====
-    // each player's own water tiles: the panel asks for the ones still to put down (tap a glowing tile), and a tile put
-    // down this round can be moved from its sheet the same way
+    // each player's own water tiles: the panel asks for the ones still to put down (a Put down water button, then tap a
+    // glowing blue tile: taps on the board are the lake's only while that is on), and a tile put down this round can be
+    // moved from its sheet the same way
     magicLake: {
-      pick: null, // the key of your tile being moved
+      pick: null, // the key of your tile being put down or moved
       cache: { key: '', at: 0, tiles: [] },
       todo() { return mpbOn() && phase === 'deploy' && editable() ? Mpb.kindOf('magicLake').lakeTodo(m, me, duoMyLane()) : []; },
       rec() {
-        const t = this.todo();
-        if (t.length) return t[0];
         const r = this.pick && mpbOn() && phase === 'deploy' && editable() ? Mpb.recOf(m, me, this.pick) : null;
-        return r && r.data.lane === duoMyLane() && r.round === m.round ? r : null;
+        return r && r.kind === 'magicLake' && r.data.lane === duoMyLane() && (r.col < 0 || r.round === m.round) ? r : null;
       },
       spots(r) {
         const key = [m.round, r.key, r.col, r.row, Mpb.recs(m, me).concat(Mpb.recs(m, 1 - me)).map(x => x.col + ',' + x.row).join(';'), m.armies[me].length, Game.teamArmy(m, me).length, m.armies[1 - me].length].join('|');
@@ -9052,16 +9053,20 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         return this.cache.tiles;
       },
       panel() {
-        const n = this.todo().length;
-        if (n) return `<div class="mpb-box"><div><b>Magic lake</b> · tap a glowing tile to put down your water (${n} left). Water never shuts a tile or a way off.</div></div>`;
-        return this.rec() ? `<div class="mpb-box"><div><b>Magic lake</b> · tap a glowing tile to move your water there. <button class="btn small" id="ml-cancel">Cancel</button></div></div>` : '';
+        const r = this.rec(), n = this.todo().length;
+        if (r) return `<div class="mpb-box"><div><b>Magic lake</b> · tap a glowing blue tile to ${r.col < 0 ? 'put down' : 'move'} your water${n ? ` (${n} left)` : ''}. Water never shuts a tile or a way off. <button class="btn small" id="ml-cancel">Cancel</button></div></div>`;
+        if (n) return `<div class="mpb-box"><div><b>Magic lake</b> · ${n} water tile${n > 1 ? 's' : ''} of yours to put down (else they go down on their own as the fight starts). <button class="btn small either" id="ml-put">Put down water</button></div></div>`;
+        return '';
       },
-      wirePanel(root) { const b = root.querySelector('#ml-cancel'); if (b) b.addEventListener('click', () => { this.pick = null; panelDeploy(); render(); }); },
-      marks(sq) { const r = this.rec(); return r ? this.spots(r).map(t => sq(t, 'mpb-ok')).join('') : ''; },
+      wirePanel(root) {
+        const b = root.querySelector('#ml-cancel'); if (b) b.addEventListener('click', () => { this.pick = null; panelDeploy(); render(); });
+        const p = root.querySelector('#ml-put'); if (p) p.addEventListener('click', () => { const t = this.todo()[0]; this.pick = t ? t.key : null; closeSheet(); panelDeploy(); render(); });
+      },
+      marks(sq) { const r = this.rec(); return r ? this.spots(r).map(t => sq(t, 'mpb-lake')).join('') : ''; },
       tap(t) {
         const r = this.rec();
         if (!r || !Mpb.kindOf('magicLake').lakeOk(m, me, r, t.col, t.row)) return false;
-        if (Game.mpbAct(m, me, r.key, 'place', t.col, t.row)) { this.pick = null; changed(); }
+        if (Game.mpbAct(m, me, r.key, 'place', t.col, t.row)) { const nx = this.todo()[0]; this.pick = nx ? nx.key : null; changed(); } // (the next tile to put down, if any)
         return true;
       },
       html(side, rec, live) {

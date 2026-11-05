@@ -791,7 +791,7 @@ const Engine = (() => {
       if (!e) continue;
       const hb = newBody(leveled(e.unit, lead.level), lead.side, lead.x, lead.y - (lead.side === 0 ? 1 : -1) * 2.5, escortIdx++, -1);
       hb.follow = grp; hb.healPct = e.pct; hb.credit = lead;
-      if (lead.mineT > 0) { hb.mineT = lead.mineT; hb.delay = lead.delay; } // (2v2 Coal mine: it comes through with its squad)
+      if (lead.mineT > 0) { hb.mineT = lead.mineT; hb.delay = lead.delay; hb.mineBoost = lead.mineTo && lead.mineTo.boost; } // (2v2 Coal mine: it comes through with its squad, Fresh air too)
       (lead.side === 0 ? A : B).push(hb);
     }
     // a portal in front of each squad that summons (Ember Imps' Hellfiend): the squad holds still (channel) for the
@@ -819,7 +819,7 @@ const Engine = (() => {
       const e = newBody(leveled({ ...el.unit, speed: b.u.speed }, b.level), b.side, x, y, i, -1);
       e.credit = b;
       if (b.delay) e.delay = b.delay;
-      if (b.mineT > 0) e.mineT = b.mineT; // (2v2 Coal mine: it comes through with its summoner)
+      if (b.mineT > 0) { e.mineT = b.mineT; e.mineBoost = b.mineTo && b.mineTo.boost; } // (2v2 Coal mine: it comes through with its summoner, Fresh air too)
       if (b.march) e.march = b.march.slice();
       list.push(e);
     }
@@ -1279,7 +1279,7 @@ const Engine = (() => {
     // ...and Berserkers' roars speed it up by a share
     const spd0 = (b) => ((b.poolFastT > 0 ? b.u.speed + b.poolFast : b.u.speed) + (b.kills > 0 ? b.kills * b.u.killStack.speed : 0)) * (b.roarSpd > 0 ? 1 + b.roarSpd / 100 : 1);
     // ...and a 2v2 Coal mine's boost, for a while after coming out (mineFast s left; see mineOn)
-    const spd = (b) => b.mineFast > 0 ? spd0(b) * (1 + b.mineTo.boost.speed / 100) : spd0(b);
+    const spd = (b) => b.mineFast > 0 ? spd0(b) * (1 + b.mineBoost.speed / 100) : spd0(b);
     // How far an attack reaches. Flame cones can reach further than where the unit stops (g.flameReach x range),
     // so a flamer keeps burning the enemies behind the first one without walking up to each.
     const reachOf = (b) => b.u.flame > 0 && g.flameReach > 1 ? R(b) * g.flameReach : R(b);
@@ -2461,11 +2461,11 @@ const Engine = (() => {
           b.mineT = Math.max(0, b.mineT - dt);
           if (b.mineT > 0) continue;
           if (b.mineTo && !mineFx.some(e => e.squad === b.squad && e.side === b.side)) mineFx.push({ x: b.x, y: b.y, side: b.side, squad: b.squad, t });
-          const bo = b.mineTo && b.mineTo.boost;
-          if (bo && b.alive) { b.mineFast = bo.secs; b.u = { ...b.u, bonusArmor: (b.u.bonusArmor || 0) + bo.armor }; }
+          const bo = b.mineBoost || (b.mineTo && b.mineTo.boost); // (mineBoost: a body that came with its squad: a healbot, an elemental)
+          if (bo && b.alive) { b.mineBoost = bo; b.mineFast = bo.secs; b.u = { ...b.u, bonusArmor: (b.u.bonusArmor || 0) + bo.armor }; }
         } else if (b.mineFast > 0) {
           b.mineFast = Math.max(0, b.mineFast - dt);
-          if (!(b.mineFast > 0)) b.u = { ...b.u, bonusArmor: (b.u.bonusArmor || 0) - b.mineTo.boost.armor };
+          if (!(b.mineFast > 0)) b.u = { ...b.u, bonusArmor: (b.u.bonusArmor || 0) - b.mineBoost.armor };
         }
       }
       // home ground (band = { y0, y1, armor, hpPct, on }): extra armor and health while the body stands between

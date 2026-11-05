@@ -167,25 +167,38 @@
   const COAL = { hp: 700, armor: 4, travel: 2, rise: 1.5, moveCost: 150, airCost: 200, air: { speed: 25, armor: 4, secs: 5 } };
   const exitOf = (rec) => (rec && rec.parts && rec.parts.exit) || null;
   const cheb = (c0, r0, c1, r1) => Math.max(Math.abs(c0 - c1), Math.abs(r0 - r1));
-  // the tile a squad on (col, row) comes up on, or null (not round the entrance, no exit yet, off the board)
+  // the tile a squad on (col, row) comes up on, or null (not round the entrance, no exit yet, off the board, or that
+  // tile is water or a building's: the squad stays home)
   function mineOut(m, rec, col, row) {
     const x = exitOf(rec);
     if (!x || rec.col < 0 || cheb(col, row, rec.col, rec.row) !== 1) return null;
     grid(m);
     const c = x.col + col - rec.col, r = x.row + row - rec.row;
-    return inBoard(c, r) ? { col: c, row: r } : null;
+    if (!inBoard(c, r) || G.terrainBlocks(m, c, r) || buildingTiles(m).some(t => t.col === c && t.row === r)) return null;
+    return { col: c, row: r };
   }
-  // may the exit be moved to (col, row) (Dig a new exit)? No man's land (not flank tiles) as before, or a flank tile of
-  // the enemy's half; a free tile (its old tile and the tiles round it don't count: the exit leaves them)
-  function exitMoveOk(m, side, rec, col, row) {
+  // may the exit stand on (col, row), as this player sees the board (squads the opponents put down this round don't
+  // count: a refusal would show where they are)? Its own tile and the tiles round it don't count: the exit leaves them
+  function exitFree(m, side, rec, col, row) {
     const x = exitOf(rec);
     if (!on(m) || !x || !Number.isInteger(col) || !Number.isInteger(row)) return false;
     grid(m);
-    if (!inBoard(col, row) || (x.col === col && x.row === row)) return false;
-    if (!(nmlOk(col, row) || G.isFlank(side, col, row)) || G.terrainBlocks(m, col, row)) return false;
+    if (!inBoard(col, row) || G.terrainBlocks(m, col, row)) return false;
     delete rec.parts.exit;
-    try { return !taken(m, side, col, row); } finally { rec.parts.exit = x; }
+    try { return !seenTaken(m, side, col, row); } finally { rec.parts.exit = x; }
   }
+  // may the exit be moved to (col, row) (Dig a new exit)? No man's land (not flank tiles) as before, or a flank tile of
+  // the enemy's half; a free tile
+  function exitMoveOk(m, side, rec, col, row) {
+    const x = exitOf(rec);
+    if (!x || (x.col === col && x.row === row)) return false;
+    grid(m);
+    if (!(nmlOk(col, row) || G.isFlank(side, col, row))) return false;
+    return exitFree(m, side, rec, col, row);
+  }
+  // may Dig a new exit (or Undo all) put the exit back on its old tile? Only while that tile is still free (no water, no
+  // other exit or building, no squad of the team's) – else the take-back is refused
+  const exitBackOk = (m, side, rec, t) => !t || exitFree(m, side, rec, t.col, t.row);
   function exitSpots(m, side, rec) {
     const out = [];
     if (!on(m)) return out;
@@ -202,7 +215,7 @@
       { id: 'shaft', name: 'Dig a new exit', cost: COAL.moveCost, per: 'match', text: 'Move the exit once, to any tile of no man’s land or a flank tile of the enemy’s half.' },
       { id: 'air', name: 'Fresh air', cost: COAL.airCost, per: 'match', text: `Squads coming up the mine move ${COAL.air.speed}% faster and have +${COAL.air.armor} armor for ${COAL.air.secs} s.` },
     ],
-    COAL, mineOut, exitMoveOk, exitSpots, canMoveExit,
+    COAL, mineOut, exitMoveOk, exitBackOk, exitSpots, canMoveExit,
     hooks: {
       // the 8 tiles round the exit: no squad of either team (Game.occupied through Mpb.at)
       blocks(m, side, rec, col, row) { const x = exitOf(rec); return !!x && cheb(col, row, x.col, x.row) === 1; },
@@ -216,7 +229,10 @@
         for (const x of list) x.mineTo = { x: b.x, y: b.y, dx: b.x - a.x, dy: b.y - a.y, h: G.TILE / 2, t: COAL.travel, rise: COAL.rise, boost: air };
       },
       canBuy: (m, side, rec) => !!exitOf(rec),
-      // Dig a new exit taken back the round it was bought: the exit goes back too
+      // Dig a new exit taken back the round it was bought: the exit goes back too (refused once its old tile is taken)
+      canUndo: (m, side, rec, id) => id !== 'shaft' || !(rec.data.moved === m.round && rec.data.from) || exitBackOk(m, side, rec, rec.data.from),
+      // Undo all would put the exit back where it stood (restoreOk: was = the record as it would be again)
+      restoreOk(m, side, rec, was) { const a = exitOf(rec), b = exitOf(was); return !b || (a && a.col === b.col && a.row === b.row) || exitBackOk(m, side, rec, b); },
       unbuy(m, side, rec, sk) { if (sk.id === 'shaft' && rec.data.moved === m.round && rec.data.from) { rec.parts.exit = { ...rec.data.from }; rec.data.moved = 0; rec.data.from = null; } },
       canAct: (m, side, rec, action, args) => action === 'exit' && canMoveExit(m, side, rec) && exitMoveOk(m, side, rec, args[0], args[1]),
       act(m, side, rec, action, args, lane) {
@@ -265,9 +281,11 @@
 
   // ===== magicLake =====
   // Terrain, not a building: each player of the team puts down LAKE.tiles water tiles (their own, no vote: Game.mpbAct
-  // 'place') on the team's own zone (not the enemy's flank tiles) or anywhere in no man's land (not flank tiles), never
-  // on a squad or building, and never so that some tile can no longer be walked to (lakeFree: the board's walkable
-  // tiles stay one area). A tile not put down by the fight goes on the first allowed tile (hooks.settle). Water is the
+  // 'place') anywhere on the team's own zone or in no man's land (flank tiles too), never on a squad or building (as
+  // the player sees the board: the opponents' squads of this round don't count, so a refusal gives nothing away), and
+  // never so that some tile can no longer be walked to (lakeFree: the board's walkable tiles stay one area). As the
+  // fight starts (hooks.settle) a tile not put down yet, or one put down this round on a squad or building the player
+  // couldn't see, goes on the first tile allowed with everything known. Water is the
   // game's water (Game.terrainBlocks, via Mpb.terrainAt; the Engine's terrain): shot over, not walked on, nobody can
   // be deployed on it; it can't be destroyed. Each tile is a record of its own (rec.data.lane: whose), so its skills
   // are its own. Waterspirits allowal: the team walks on that tile LAKE.slow % slower and regains LAKE.regen % health
@@ -304,16 +322,22 @@
     }
     return n === open;
   }
-  // may this player put lake tile rec on (col, row)? (their own tile, not down yet or put down this round)
-  function lakeOk(m, side, rec, col, row) {
+  // the team's own zone or no man's land, any column
+  const lakeWhere = (side, col, row) => inBoard(col, row) && (G.inZone(side, row) || G.inNoMans(row));
+  // may this player put lake tile rec on (col, row)? (their own tile, not down yet or put down this round.) strict: with
+  // the squads the player can't see too (the fight's start, hooks.settle)
+  function lakeOk(m, side, rec, col, row, strict) {
     if (!on(m) || !rec || rec.kind !== 'magicLake' || rec.data.lane !== laneOf(m) || !(rec.col < 0 || rec.round === m.round)) return false;
+    if (!Number.isInteger(col) || !Number.isInteger(row)) return false;
+    grid(m);
+    if (!lakeWhere(side, col, row)) return false;
     const was = { col: rec.col, row: rec.row };
     rec.col = -1; rec.row = -1; // (a tile being moved: its old tile is dry for the check)
-    try { return spotOk(m, side, 'magicLake', null, col, row); } finally { rec.col = was.col; rec.row = was.row; }
+    try { return !G.terrainBlocks(m, col, row) && !(strict ? taken : seenTaken)(m, side, col, row) && lakeFree(m, col, row); } finally { rec.col = was.col; rec.row = was.row; }
   }
   // where lake tile rec may go, best first: no man's land on the team's own half (the rows nearest its zone first),
   // then the rest of no man's land, then the zone (its front first); each player toward the columns of their own half
-  function lakeSpots(m, side, rec) {
+  function lakeSpots(m, side, rec, strict) {
     const out = [];
     if (!on(m) || !rec) return out;
     const { COLS, ROWS } = grid(m), was = { col: rec.col, row: rec.row };
@@ -321,7 +345,7 @@
     try {
       lakeWet = Uint8Array.from({ length: COLS * ROWS }, (_, i) => G.terrainBlocks(m, i % COLS, Math.floor(i / COLS)) ? 1 : 0);
       rec.col = was.col; rec.row = was.row;
-      for (let row = 0; row < ROWS; row++) for (let col = 0; col < COLS; col++) if (lakeOk(m, side, rec, col, row)) out.push({ col, row });
+      for (let row = 0; row < ROWS; row++) for (let col = 0; col < COLS; col++) if (lakeOk(m, side, rec, col, row, strict)) out.push({ col, row });
     } finally { lakeWet = null; rec.col = was.col; rec.row = was.row; }
     const half = (rec.data.lane === 1 ? 3 : 1) * COLS / 4 - 0.5, own = (r) => side === 0 ? r >= ROWS / 2 : r < ROWS / 2;
     const band = (t) => G.inNoMans(t.row) ? (own(t.row) ? 0 : 1) : 2, back = (t) => side === 0 ? ROWS - 1 - t.row : t.row;
@@ -357,20 +381,21 @@
         rec.data.lane = laneOf(m);
         for (const L of [0, 1]) for (let k = lakeRecs(m, side).filter(r => r.data.lane === L).length; k < LAKE.tiles; k++) addRec(m, side, 'magicLake', -1, -1).data.lane = L;
       },
-      spotOk: (m, side, part, col, row) => lakeFree(m, col, row),
+      spotOk: (m, side, part, col, row) => lakeFree(m, col, row), // (a lake by a placement vote, never in a real match)
       // (for the boards: its look shows its skills)
       unit: (m, side, rec) => E.withTraits({ name: 'Magic lake', cost: 0, bodies: 1, hp: 1, hit: 0, aps: 1, range: 0, speed: 0, splash: 0, shape: 'square', color: '#3E8FC4',
         structure: true, lesser: true, kind: 'mpb', mpb: 'magicLake', level: 0, ...(lakeSkin(rec) ? { mpbSkin: lakeSkin(rec) } : {}) }),
       canBuy: (m, side, rec) => rec.col >= 0,
       canAct: (m, side, rec, action, args) => action === 'place' && lakeOk(m, side, rec, args[0], args[1]),
       act(m, side, rec, action, args) { rec.col = args[0]; rec.row = args[1]; rec.round = m.round; return true; },
-      // a tile nobody put down by the fight: on the first tile its player could have put it
+      // as the fight starts: a tile nobody put down, or one put down this round on an opponent's squad (or building) its
+      // player couldn't see (either lane), goes on the first tile its player could have put it, everything known
       settle(lanes, side, rec) {
         const m = lanes[0];
-        if (rec.col >= 0) return;
+        if (rec.col >= 0 && !(rec.round === m.round && lanes.some(L => G.squadAt(L, 1 - side, rec.col, rec.row) || G.buildingAt(L, 1 - side, rec.col, rec.row)))) return;
         const was = m.duoLane;
         m.duoLane = rec.data.lane;
-        const t = lakeSpots(m, side, rec)[0];
+        const t = lakeSpots(m, side, rec, true)[0];
         m.duoLane = was;
         if (t) { rec.col = t.col; rec.row = t.row; rec.round = m.round; }
       },
@@ -466,14 +491,16 @@
   // Game.mpbAt: a tile no squad of either team may take (a kind's place.open leaves its tiles free, for its own rules;
   // place.terrain: terrain, see terrainAt), or one a kind's hooks.blocks(m, side, rec, col, row) keeps free (the tiles
   // round a Coal mine's exit)
-  function at(m, col, row) {
+  // (only: building tiles alone, not the tiles a kind keeps free: Game.bldgSeen, the Assassin's 'next to a building')
+  function at(m, col, row, only) {
     const x = recAt(m, col, row);
     if (x) { const pl = (kindOf(x.rec.kind) || {}).place || {}; if (!pl.open && !pl.terrain) return true; }
+    if (only) return false;
     for (const side of [0, 1]) for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.blocks && K.hooks.blocks(m, side, rec, col, row)) return true; }
     return false;
   }
   // Game.terrainBlocks: a tile of a kind that is terrain (place.terrain: the Magic lake's water), either team
-  const terrainAt = (m, col, row) => { const x = on(m) && recAt(m, col, row); return !!x && !!((kindOf(x.rec.kind) || {}).place || {}).terrain; };
+  const terrainAt = (m, col, row) => on(m) && [0, 1].some(side => recs(m, side).some(rec => !!((kindOf(rec.kind) || {}).place || {}).terrain && tilesOf(rec).some(t => t.col === col && t.row === row)));
 
   // the starting state of a 2v2 lane: both Vaults, no votes (Duo.start, in both lanes)
   function init(m, lane) {
@@ -514,6 +541,9 @@
   const spaced = (m, col, row) => buildingTiles(m).every(t => Math.max(Math.abs(t.col - col), Math.abs(t.row - row)) >= SPACING);
   // no squad (either team, either lane), tower, building or MPB on it
   const taken = (m, side, col, row) => G.occupied(m, side, col, row) || G.occupied(m, 1 - side, col, row) || G.enemyHolds(m, side, col, row) || !!recAt(m, col, row);
+  // the same, as team `side`'s player sees the board while deploying: the opponents' squads and buildings only once
+  // they may be seen (a refusal never shows where a hidden one stands; the Coal mine's exit, the Magic lake)
+  const seenTaken = (m, side, col, row) => G.occupied(m, side, col, row) || G.bldgSeen(m, side, col, row) || G.enemyHolds(m, side, col, row) || !!recAt(m, col, row);
   const placeOf = (kindId, part) => { const K = kindOf(kindId); if (!K) return null; return part ? (K.place.parts || []).find(p => p.id === part) || null : K.place; };
   // may team `side` put building kind (or its part) on this tile?
   function spotOk(m, side, kindId, part, col, row) {
@@ -610,8 +640,24 @@
     if (K.hooks.bought) K.hooks.bought(m, side, rec, sk, args, L);
     return true;
   }
-  // a player takes back their own last click of skill id this round (never the teammate's: their gold)
-  const canUndo = (m, side, key, id) => { const rec = recOf(m, side, key); return !!rec && thisRound(m, rec.skills[id]).some(e => e.lane === laneOf(m)) && !m.over; };
+  // a player takes back their own last click of skill id this round (never the teammate's: their gold; hooks.canUndo
+  // (m, side, rec, id): a kind may refuse, the Coal mine's exit can't go back to a tile taken since)
+  const canUndo = (m, side, key, id) => { const rec = recOf(m, side, key), K = rec && kindOf(rec.kind); return !!rec && thisRound(m, rec.skills[id]).some(e => e.lane === laneOf(m)) && !m.over && !(K && K.hooks.canUndo && !K.hooks.canUndo(m, side, rec, id)); };
+  // Undo all (Duo): may team `side`'s buildings go back to how they would be again (sc: the rebuilt copy)? Each of
+  // this player's clicks this round must be one they could take back, and each kind's hooks.restoreOk(m, side, rec,
+  // was) agree (the Coal mine: its exit back on a tile still free). m: the player's lane as it stands.
+  function undoAllOk(m, side, sc) {
+    if (!on(m)) return true;
+    const L = laneOf(m);
+    for (const rec of recs(m, side)) {
+      const K = kindOf(rec.kind);
+      if (!K) continue;
+      for (const id of Object.keys(rec.skills)) if (thisRound(m, rec.skills[id]).some(e => e.lane === L) && K.hooks.canUndo && !K.hooks.canUndo(m, side, rec, id)) return false;
+      const was = sc && recOf(sc, side, rec.key);
+      if (was && K.hooks.restoreOk && !K.hooks.restoreOk(m, side, rec, was)) return false;
+    }
+    return true;
+  }
   function mpbUndo(m, side, key, id) {
     if (!canUndo(m, side, key, id)) return false;
     const rec = recOf(m, side, key), e = rec.skills[id], L = laneOf(m), sk = skillOf(rec.kind, id);
@@ -855,7 +901,7 @@
     def, kindOf, recs, recOf, has, skillOf, skillN, addRec, tilesOf, recAt, at, terrainAt, botTurn, settle, init,
     interior, spaced, spotOk, spots, autoSpot,
     voteQueue, voteHead, queue, placeHead, mpbVote, voteResult,
-    skillCost, whyNot, canBuy, mpbBuy, canUndo, mpbUndo, mpbAct,
+    skillCost, whyNot, canBuy, mpbBuy, canUndo, undoAllOk, mpbUndo, mpbAct, seenTaken,
     vaultOf, vaultRec, vaultMode, vaultMoved, vaultRoom, canVault, vaultPut, vaultTake, golemOf, golemUnit, golemSkin,
     hide, unitOf, squadOf, extraOf, indexOf, isSquad, bodies, battleOpts, squadMods, squadBodies, news, afterFight, roundStart,
     cardPool, cardName, cardText, rollArtifacts, artifactsFor,

@@ -273,7 +273,9 @@ check('magic lake: 2 tiles for each player; each puts down only their own; where
   assert.ok(!x.act(1, 'mpbAct', k0, 'place', 10, 9).ok, 'A2 can\'t put down A1\'s tile');
   assert.ok(!x.act(0, 'mpbAct', k0, 'place', sq0.col, sq0.row).ok, 'not on a squad');
   assert.ok(!x.act(0, 'mpbAct', k0, 'place', 6, 15).ok, 'not on the Vault');
-  assert.ok(!x.act(0, 'mpbAct', k0, 'place', 0, 9).ok && !x.act(0, 'mpbAct', k0, 'place', 23, 13).ok, 'not on flank tiles');
+  const r0 = Mpb.recOf(x.m(0), 0, k0);
+  for (const [c, r] of [[0, 9], [1, 10], [23, 9], [22, 7], [0, 12], [23, 13], [1, 16]]) assert.ok(ML.lakeOk(x.m(0), 0, r0, c, r), `flank tiles too (no man's land and the own zone's edge): ${c},${r}`);
+  assert.ok(!ML.lakeOk(x.m(0), 0, r0, 0, 4), 'not the enemy zone\'s flank tiles');
   assert.ok(!x.act(0, 'mpbAct', k0, 'place', 10, 3).ok, 'not in the enemy zone');
   assert.ok(x.act(0, 'mpbAct', k0, 'place', 10, 7).ok, 'no man\'s land on the enemy\'s half is fine');
   assert.ok(!x.act(0, 'mpbAct', k0b, 'place', 10, 7).ok, 'not on water');
@@ -446,6 +448,173 @@ check('hidden info and the page\'s copy: this round\'s clicks hidden, placements
   // a fight: the playback from pre is the same fight
   for (let k = 0; k < 4; k++) Duo.setReady(D, k, true, x.T);
   assert.ok(D.summary, 'fought');
+});
+
+// ===================================== review fixes =====================================
+check('coal mine: Dig a new exit can\'t be taken back once its old tile is taken (water, the other team\'s exit); a squad on the old ring doesn\'t stop it', () => {
+  // (1) A1 moves the exit, A2 puts water on the old exit tile: A1's take-back is refused (page and server)
+  const x = match(331), { D } = x;
+  const key = addMine(D, 0, 11, 15, 11, 9), lk = addLake(D, 0);
+  for (const R of D.lanes) R.m.gold[0] = 1000;
+  Duo.setTeams(lanesOf(D));
+  assert.ok(x.act(0, 'mpbBuy', key, 'shaft').ok && x.act(0, 'mpbAct', key, 'exit', 14, 9).ok);
+  assert.ok(x.act(1, 'mpbAct', lk[2], 'place', 11, 9).ok, 'water on the old exit tile');
+  assert.ok(!Mpb.canUndo(W(Duo.viewFor(D, 0).m), 0, key, 'shaft'), 'the page offers no take-back');
+  assert.ok(!x.act(0, 'mpbUndo', key, 'shaft').ok && x.m(0).gold[0] === 1000 - COAL.moveCost, 'refused, the gold stays spent');
+  assert.deepStrictEqual(Mpb.recOf(x.m(1), 0, key).parts.exit, { col: 14, row: 9 });
+  assert.ok(!x.act(0, 'undoAll').ok, 'Undo all is refused too (it would put the exit back)');
+  assert.deepStrictEqual(Mpb.recOf(x.m(0), 0, key).parts.exit, { col: 14, row: 9 });
+  assert.ok(Game.terrainBlocks(x.m(0), 11, 9) && Game.terrainBlocks(x.m(1), 11, 9), 'the water stays'); sameTeam(D, 0);
+  // A2 moves the water away again: now it may be taken back
+  assert.ok(x.act(1, 'mpbAct', lk[2], 'place', 15, 13).ok && x.act(0, 'mpbUndo', key, 'shaft').ok, 'free again: taken back');
+  assert.deepStrictEqual(Mpb.recOf(x.m(1), 0, key).parts.exit, { col: 11, row: 9 }); sameTeam(D, 0);
+  // (2) the other team's exit moved onto the old exit tile
+  const y = match(332), D2 = y.D;
+  const ka = addMine(D2, 0, 11, 15, 11, 9), kb = addMine(D2, 1, 12, 2, 12, 7);
+  for (const R of D2.lanes) R.m.gold = [1000, 1000];
+  Duo.setTeams(lanesOf(D2));
+  assert.ok(y.act(0, 'mpbBuy', ka, 'shaft').ok && y.act(0, 'mpbAct', ka, 'exit', 6, 9).ok);
+  assert.ok(y.act(2, 'mpbBuy', kb, 'shaft').ok && y.act(2, 'mpbAct', kb, 'exit', 11, 9).ok, 'team B digs its exit where A\'s was');
+  assert.ok(!y.act(0, 'mpbUndo', ka, 'shaft').ok && !y.act(0, 'undoAll').ok, 'A can\'t put its exit back on B\'s');
+  assert.deepStrictEqual([Mpb.recOf(y.m(0), 0, ka).parts.exit, Mpb.recOf(y.m(0), 1, kb).parts.exit], [{ col: 6, row: 9 }, { col: 11, row: 9 }]);
+  // (3) A2 moves the exit, team B puts water on the old exit tile: A2's Undo all is refused
+  const z = match(333), D3 = z.D;
+  const kc = addMine(D3, 0, 11, 15, 11, 9), lb = addLake(D3, 1);
+  for (const R of D3.lanes) R.m.gold = [1000, 1000];
+  Duo.setTeams(lanesOf(D3));
+  assert.ok(z.act(1, 'mpbBuy', kc, 'shaft').ok && z.act(1, 'mpbAct', kc, 'exit', 6, 9).ok);
+  assert.ok(z.act(2, 'mpbAct', lb[0], 'place', 11, 9).ok, 'B1\'s water on A\'s old exit');
+  assert.ok(!z.act(1, 'undoAll').ok, 'refused');
+  assert.ok(Mpb.recOf(z.m(0), 0, kc).parts.exit.col === 6 && Game.terrainBlocks(z.m(0), 11, 9));
+  // (4) only a squad on the old exit's ring: the take-back goes through (as any exit may stand next to squads)
+  const w = match(334), D4 = w.D;
+  const kd = addMine(D4, 0, 11, 15, 11, 9);
+  for (const R of D4.lanes) R.m.gold = [2000, 2000];
+  Duo.setTeams(lanesOf(D4));
+  assert.ok(w.act(0, 'mpbBuy', kd, 'shaft').ok && w.act(0, 'mpbAct', kd, 'exit', 16, 9).ok);
+  const ui = Object.keys(w.m(1).unlocks[0]).map(Number).find(u => !w.m(1).units[u].building && w.m(1).units[u].anywhere) ;
+  if (ui != null) { assert.ok(w.act(1, 'place', ui, 12, 10).ok, 'A2 deploys an Assassin on the old ring'); }
+  assert.ok(w.act(0, 'mpbUndo', kd, 'shaft').ok, 'taken back');
+  assert.deepStrictEqual(Mpb.recOf(w.m(1), 0, kd).parts.exit, { col: 11, row: 9 }); sameTeam(D4, 0);
+});
+
+check('Undo all: refused while the teammate\'s building actions this round rely on the presser\'s (gold and tiles never lost); allowed otherwise', () => {
+  // (1) A2 puts down a tile, A1 buys Waterspirits on it, A2 presses Undo all: refused
+  const x = match(341), { D } = x;
+  const lk = addLake(D, 0);
+  for (const R of D.lanes) R.m.gold[0] = 1000;
+  for (const R of D.lanes) R.base.gold = R.m.gold.slice();
+  Duo.setTeams(lanesOf(D));
+  assert.ok(x.act(1, 'mpbAct', lk[2], 'place', 12, 13).ok && x.act(0, 'mpbBuy', lk[2], 'spirits').ok);
+  assert.strictEqual(x.m(0).gold[0], 1000 - LAKE.spiritsCost);
+  const r = x.act(1, 'undoAll');
+  assert.ok(!r.ok && r.why === 'team', 'refused (team)');
+  const t = Mpb.recOf(x.m(0), 0, lk[2]);
+  assert.ok(t.col === 12 && Mpb.skillN(t, 'spirits') === 1 && x.m(0).gold[0] === 1000 - LAKE.spiritsCost, 'the tile and A1\'s buy stay'); sameTeam(D, 0);
+  for (let k = 0; k < 4; k++) { const sd = Duo.SEATS[k].side; assert.strictEqual(Ref.sideHash(Duo.viewFor(D, k).m, sd), Ref.sideHash(D.lanes[Duo.SEATS[k].lane].m, sd), 'seat ' + k + ' in step'); }
+  // once A1 takes the buy back, A2 may undo all
+  assert.ok(x.act(0, 'mpbUndo', lk[2], 'spirits').ok && x.m(0).gold[0] === 1000);
+  assert.ok(x.act(1, 'undoAll').ok && Mpb.recOf(x.m(0), 0, lk[2]).col < 0, 'then Undo all works'); sameTeam(D, 0);
+  // (2) A2 moves the exit, A1 puts water on the old exit tile (and buys spirits on it): A2's Undo all is refused
+  const y = match(342), D2 = y.D;
+  const key = addMine(D2, 0, 11, 15, 11, 9), lk2 = addLake(D2, 0);
+  for (const R of D2.lanes) R.m.gold[0] = 1000;
+  Duo.setTeams(lanesOf(D2));
+  assert.ok(y.act(1, 'mpbBuy', key, 'shaft').ok && y.act(1, 'mpbAct', key, 'exit', 14, 9).ok);
+  assert.ok(y.act(0, 'mpbAct', lk2[0], 'place', 11, 9).ok && y.act(0, 'mpbBuy', lk2[0], 'spirits').ok);
+  assert.ok(!y.act(1, 'undoAll').ok, 'refused');
+  const t2 = Mpb.recOf(y.m(0), 0, lk2[0]);
+  assert.ok(t2.col === 11 && t2.row === 9 && Mpb.skillN(t2, 'spirits') === 1 && y.m(0).gold[0] === 1000 - LAKE.spiritsCost, 'A1\'s tile and gold safe');
+  // (3) no reliance: A2's Undo all takes back A2's own and keeps A1's
+  const z = match(343), D3 = z.D;
+  const lk3 = addLake(D3, 0);
+  for (const R of D3.lanes) R.m.gold[0] = 1000;
+  Duo.setTeams(lanesOf(D3));
+  assert.ok(z.act(0, 'mpbAct', lk3[0], 'place', 10, 13).ok && z.act(0, 'mpbBuy', lk3[0], 'spirits').ok);
+  assert.ok(z.act(1, 'mpbAct', lk3[2], 'place', 14, 13).ok && z.act(1, 'mpbBuy', lk3[2], 'elemental').ok);
+  assert.ok(Duo.undoAllAllowed(D3, 1) && z.act(1, 'undoAll').ok, 'allowed');
+  assert.ok(Mpb.recOf(z.m(0), 0, lk3[2]).col < 0 && Mpb.skillN(Mpb.recOf(z.m(0), 0, lk3[0]), 'spirits') === 1 && Mpb.recOf(z.m(1), 0, lk3[0]).col === 10, 'A2\'s go, A1\'s stay');
+  assert.strictEqual(z.m(0).gold[0], 1000 - LAKE.spiritsCost); sameTeam(D3, 0);
+});
+
+check('hidden squads: water and a new exit go where the player sees a free tile (the server never says more); water on a hidden squad moves as the fight starts', () => {
+  const x = match(351), { D } = x;
+  const key = addMine(D, 0, 11, 15, 11, 9), lk = addLake(D, 0);
+  for (const R of D.lanes) R.m.gold = [2000, 2000];
+  Duo.setTeams(lanesOf(D));
+  const ai = x.m(0).units.findIndex(u => u.anywhere);
+  assert.ok(ai >= 0, 'an Assassin in the 2v2 set');
+  for (const R of D.lanes) R.m.unlocks[1][ai] = true;
+  assert.ok(x.act(2, 'place', ai, 8, 9).ok && x.act(3, 'place', ai, 15, 8).ok, 'B1 and B2 hide Assassins in no man\'s land this round');
+  const page = (seat) => W(Duo.viewFor(D, seat).m);
+  const pm = page(0), rec = Mpb.recOf(pm, 0, lk[0]);
+  assert.ok(ML.lakeOk(pm, 0, rec, 8, 9) && ML.lakeOk(pm, 0, rec, 15, 8), 'the page sees free tiles');
+  assert.ok(Game.mpbAct(pm, 0, lk[0], 'place', 8, 9));
+  const r = x.act(0, 'mpbAct', lk[0], 'place', 8, 9);
+  assert.ok(r.ok && r.h === Ref.sideHash(pm, 0), 'the server allows it too, and hashes as the page');
+  assert.ok(x.act(0, 'mpbBuy', key, 'shaft').ok);
+  const pm1 = page(1);
+  assert.ok(CM.exitMoveOk(pm1, 0, Mpb.recOf(pm1, 0, key), 15, 8) && Game.mpbAct(pm1, 0, key, 'exit', 15, 8));
+  const r1 = x.act(1, 'mpbAct', key, 'exit', 15, 8);
+  assert.ok(r1.ok && r1.h === Ref.sideHash(pm1, 0), 'a new exit on the other lane\'s hidden Assassin: allowed on both');
+  // the fight starts: the water leaves the Assassin's tile (the first tile allowed with everything known)
+  const lanes = lanesOf(D);
+  Duo.settle(lanes);
+  const w = Mpb.recOf(lanes[0], 0, lk[0]);
+  assert.ok(!(w.col === 8 && w.row === 9) && w.col >= 0 && Game.terrainBlocks(lanes[1], w.col, w.row), `moved off the hidden squad, to ${w.col},${w.row}`);
+  assert.ok(!lanes.some(L => [0, 1].some(sd => Game.occupied(L, sd, w.col, w.row))), 'onto a free tile');
+  assert.deepStrictEqual(Mpb.recOf(lanes[0], 0, lk[0]), Mpb.recOf(lanes[1], 0, lk[0]), 'the same in both lanes');
+  // a tile put down in an earlier round never moves
+  const y = match(352), D2 = y.D, lk2 = addLake(D2, 0);
+  for (const R of D2.lanes) { const q = Mpb.recOf(R.m, 0, lk2[0]); q.col = 8; q.row = 9; q.round = R.m.round - 1; }
+  Duo.settle(lanesOf(D2));
+  assert.ok(Mpb.recOf(y.m(0), 0, lk2[0]).col === 8, 'an old tile stays');
+});
+
+check('coal mine: a squad whose tile at the exit is water or a building stays home', () => {
+  const x = match(361, [true, true, true, true]), { D } = x; clear(D);
+  const key = addMine(D, 0, 11, 15, 11, 9), lk = addLake(D, 1);
+  wet(D, 1, lk[0], 12, 8); // team B's water on the exit's ring (it may be: the ring only keeps squads off)
+  const m = x.m(0), rec = Mpb.recOf(m, 0, key);
+  assert.strictEqual(CM.mineOut(m, rec, 12, 14), null, 'the ring tile on water: no way out');
+  assert.deepStrictEqual(CM.mineOut(m, rec, 10, 14), { col: 10, row: 8 }, 'the dry one is fine');
+  const kb = addMine(D, 1, 12, 2, 10, 10); // the other team's exit on the ring tile (10, 10)
+  assert.strictEqual(CM.mineOut(x.m(0), Mpb.recOf(x.m(0), 0, key), 10, 16), null, 'a building tile (another exit): no way out');
+  void kb;
+  const a = squad(m, 0, 'Brute', 12, 14), b = squad(m, 0, 'Brute', 10, 14);
+  const bt = battleOf(D);
+  assert.ok(bodiesOf(bt, 0, a.id).every(z => !z.mineTo && !(z.mineT > 0)), 'the one over the water stays');
+  assert.ok(bodiesOf(bt, 0, b.id).every(z => z.mineT > 0), 'the other goes down');
+});
+
+check('coal mine: Fresh air also for what comes up with a squad (a Water Mage\'s elemental, a healbot)', () => {
+  const run = (name, slot, pick) => {
+    const x = match(371, [true, true, true, true]), { D } = x; clear(D);
+    const key = addMine(D, 0, 11, 15, 11, 9);
+    for (const R of D.lanes) Mpb.recOf(R.m, 0, key).skills.air = { round: 1, n: 1, by: [1, 0], log: [] };
+    const ui = x.m(0).units.findIndex(u => u.name === name);
+    for (const R of D.lanes) { R.m.tech = R.m.tech || [{}, {}]; R.m.tech[0] = R.m.tech[0] || {}; R.m.tech[0][ui] = { ...(R.m.tech[0][ui] || {}), [slot]: 1 }; }
+    const q = squad(x.m(0), 0, name, 12, 14); squad(x.m(0), 1, 'Brute', 11, 1);
+    const bt = battleOf(D), extra = bt.bodies.filter(b => b.side === 0 && pick(b) && b.credit && b.credit.squad === q.id);
+    assert.ok(extra.length > 0 && extra.every(b => b.mineT > 0), name + ': it comes through the mine with its squad');
+    const a0 = extra.map(b => b.u.bonusArmor || 0);
+    stepTo(bt, COAL.travel + 0.1);
+    extra.forEach((b, i) => assert.strictEqual((b.u.bonusArmor || 0) - a0[i], COAL.air.armor, name + ': +4 armor'));
+    assert.ok(extra.every(b => b.mineFast > 0), name + ': faster for a while');
+    stepTo(bt, COAL.travel + COAL.air.secs + 0.2);
+    extra.forEach((b, i) => assert.ok(Math.abs((b.u.bonusArmor || 0) - a0[i]) < 1e-9 && !(b.mineFast > 0), name + ': then back'));
+  };
+  run('Water Mage', 3, (b) => b.u.name === 'Water Elemental');
+  run('Mechite Guards', 2, (b) => b.u.name === 'Healbot');
+});
+
+check('the exit\'s ring keeps squads off but is no building: an Assassin may stand 2 tiles from the exit', () => {
+  const x = match(381), { D } = x;
+  addMine(D, 0, 11, 15, 11, 9);
+  Duo.setTeams(lanesOf(D));
+  const m = x.m(0), ai = m.units.findIndex(u => u.anywhere);
+  for (const t of [[13, 9], [11, 11], [13, 11]]) assert.ok(!Game.nearBldg(m, 1, t[0], t[1]) && Game.canPlaceAt(m, 1, t[0], t[1], ai), `2 tiles off: ${t}`);
+  assert.ok(Game.nearBldg(m, 1, 12, 10) && Game.occupied(m, 1, 12, 10) && !Game.spotFree(m, 1, 12, 10, ai), 'the ring itself: next to the exit and taken');
 });
 
 check('a full bot 2v2, rounds 1 to 10, with a Coal mine and a Magic lake for both teams', () => {

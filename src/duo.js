@@ -439,19 +439,46 @@
     const name = fn === 'unplaceBwall' && before && before.temp ? 'unfortify' : fn;
     D.tlog[sd].push({ lane, fn: name, a: Array.isArray(a) ? a.slice() : [] });
   }
+  // the team's part as the round began with the log's actions played again on a copy of lane `from`; ok: the entries
+  // whose action worked (a 2v2 building's: Mpb's actions say so)
+  const CHECKED = new Set(['mpbBuy', 'mpbUndo', 'mpbAct', 'vaultPut', 'vaultTake']);
+  function replayTeam(D, sd, from, log) {
+    const O = D.lanes[from].m, sc = Ref.withUnits(Ref.snapshot(O), O.units, O.matrix), ok = new Set();
+    if (D.tbase[sd]) putTeamState(sc, sd, D.tbase[sd]);
+    sc.gold[sd] = 1e9;
+    for (const e of log) {
+      const sys = e.fn.startsWith('sys:'), fn = sys ? M.SYS[e.fn.slice(4)] : G[e.fn === 'unfortify' ? 'unplaceBwall' : e.fn];
+      sc.duoLane = sys ? e.as : e.lane >= 0 ? e.lane : O.duoLane; // who voted (who paid)
+      try { if (typeof fn === 'function' && fn(sc, sd, ...e.a) !== false) ok.add(e); } catch (err) {}
+    }
+    return { sc, ok };
+  }
+  // may this seat press Undo all? (2v2 buildings) Not while one of the teammate's building actions this round relied on
+  // one of this seat's (a skill on this player's lake tile put down this round, water where the exit stood: played
+  // again without this seat's actions it no longer works, so their gold or tile would be lost), nor while the buildings
+  // can't go back (Mpb.undoAllOk: the Coal mine's exit on a tile taken since)
+  function undoAllAllowed(D, seat) {
+    const own = SEATS[seat], sd = own.side, m = D.lanes[own.lane].m;
+    if (!M.on(m)) return true;
+    const log = D.tlog[sd], mate = log.filter(e => e.lane !== own.lane);
+    if (!log.some(e => e.lane === own.lane)) return M.undoAllOk(m, sd, null);
+    const all = replayTeam(D, sd, 1 - own.lane, log), without = replayTeam(D, sd, 1 - own.lane, mate);
+    // what is left of the teammate's: a buy they took back again, an act they did again later (moved the same tile
+    // again) counts for nothing
+    const net = new Set(mate.filter(e => e.lane >= 0 && CHECKED.has(e.fn))), same = (a, b) => a.lane === b.lane && a.a[0] === b.a[0] && a.a[1] === b.a[1];
+    mate.forEach((e, i) => {
+      if (e.fn === 'mpbUndo') { const b = mate.slice(0, i).reverse().find(x => x.fn === 'mpbBuy' && net.has(x) && same(x, e)); if (b) { net.delete(b); net.delete(e); } }
+      if (e.fn === 'mpbAct') for (const x of mate.slice(0, i)) if (x.fn === 'mpbAct' && same(x, e)) net.delete(x);
+    });
+    if ([...net].some(e => all.ok.has(e) && !without.ok.has(e))) return false;
+    return M.undoAllOk(m, sd, without.sc);
+  }
   // after Undo all in one lane: the team's part is the round's start plus every team action the teammate made this
   // round and the system's (votes, placed buildings, the draft), replayed on a copy in order, in both lanes. The
   // tower type stays (only the draft sets it in 2v2).
   function rebuildTeam(D, sd, lane) {
     D.tlog[sd] = D.tlog[sd].filter(e => e.lane !== lane);
-    const O = D.lanes[1 - lane].m, sc = Ref.withUnits(Ref.snapshot(O), O.units, O.matrix);
-    if (D.tbase[sd]) putTeamState(sc, sd, D.tbase[sd]);
-    sc.gold[sd] = 1e9;
-    for (const e of D.tlog[sd]) {
-      const sys = e.fn.startsWith('sys:'), fn = sys ? M.SYS[e.fn.slice(4)] : G[e.fn === 'unfortify' ? 'unplaceBwall' : e.fn];
-      sc.duoLane = sys ? e.as : O.duoLane; // who voted (who paid: the teammate)
-      try { if (typeof fn === 'function') fn(sc, sd, ...e.a); } catch (err) {}
-    }
+    const O = D.lanes[1 - lane].m, { sc } = replayTeam(D, sd, 1 - lane, D.tlog[sd]);
     const mine = D.lanes[lane].m;
     if (mine.towers && mine.towers[sd] && O.towers && O.towers[sd]) mine.towers[sd].type = O.towers[sd].type;
     for (const m of ms(D)) copyTeam(sc, m, sd);
@@ -529,6 +556,7 @@
     if (!canAct(D, seat)) return no(D.ready[seat] ? 'ready' : 'phase');
     if (SYS_FNS.has(fn)) return sysAct(D, seat, d, now);
     if (TEAM_FNS.has(fn) && !undoAllowed(D, seat, fn, d.a)) return no('team');
+    if (fn === 'undoAll' && !undoAllAllowed(D, seat)) return no('team'); // (2v2 buildings: the teammate relied on it)
     setTeams(ms(D));
     const before = fn === 'unplaceBwall' && Array.isArray(d.a) && d.a.length === 3 ? G.bwallOn(R.m, sd, d.a[0], d.a[1], d.a[2]) : null;
     const r = Ref.act(R, sd, d, now);
@@ -632,7 +660,7 @@
     V, MAP, OFF, HP, PINGS, EMOTES, EMOTE_TEXT, SEATS, SEAT_NAMES, seatOf, mateOf, remap, unmap, laneOfId, move, teamOf, setTeam, setTeams,
     MECHITES, unitSet, TEAM_FIELDS, TEAM_FNS, SYS_FNS, copyTeam, copyAll, teamBody, settle, battle, laneResult, fight, view,
     create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, viewFor, clock, clocks, canAct, save, load, humans,
-    mpbPending, mpbTick, mpbSettle, rebuildTeam, teamState,
+    mpbPending, mpbTick, mpbSettle, rebuildTeam, undoAllAllowed, teamState,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Duo = api;
