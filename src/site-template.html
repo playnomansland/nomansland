@@ -778,6 +778,7 @@ html.pc .corner button span { display: inline; }
 /*REFEREE*/
 /*DUO*/
 /*TOUR*/
+/*EXPLOITBOT*/
 </script>
 <script>
 /*ART*/
@@ -3229,6 +3230,10 @@ html.pc .corner button span { display: inline; }
         <div class="bar"><span class="hint">${devReady() ? 'Buildings, Powers and spells on the big board.' : 'No factions yet.'}</span><button class="btn small" id="devtest-ai" ${devReady() ? '' : 'disabled'}>Factions – devtest</button></div>
         <div class="bar"><span class="hint">DEVTESTLATEGAME on Standard (with treasuries): ${Game.START_HP + Game.LATE.hp} health each, at most ${Game.LATE.cap} squads of any one tier 3 or tier 4 unit.</span><span class="btnrow"><button class="btn small" id="late-friend">vs Friend</button><button class="btn small" id="late-ai">vs AI</button></span></div>
         <div class="bar"><span class="hint">2v2: two boards side by side. Invite three players, set the teams.</span><button class="btn small" id="duo-new">2v2 lobby</button></div>
+        <div class="bar"><span class="hint">Exploit bot: the AI opponent plays one of the strongest lines the exploit lab found (docs/EXPLOITS-2026-11.md) instead of its normal self. Off is the normal AI. Applies to any match against the computer.</span>
+          <div class="seg looks" role="group" aria-label="Exploit bot">${[{ id: '', short: 'Off' }].concat(ExploitBot.TACTICS.map(t => ({ id: t.id, short: t.short || t.name.split(' ')[0] })))
+            .map(o => `<button data-xb="${o.id}" aria-pressed="${exploitTactic === (o.id || null)}">${o.short}</button>`).join('')}</div></div>
+        <div class="bar"><span class="hint" id="xb-note">${exploitBotNote()}</span></div>
         ${TEST ? `<div class="bar"><span class="hint">Level-up cost (test setting)</span><div class="seg" role="group" aria-label="Level-up cost">${[50, 75].map(c => `<button data-c="${c}" aria-pressed="${Game.CONFIG.levelCostPerTier === c}">${c} gold</button>`).join('')}</div></div>` : ''}
         <div class="bar"><span class="hint">${customSet ? `Your ${units.length} Counter Lab units` : `${units.length} built-in units`}${reportDb ? '. Matches are saved for Claude to review.' : ''}</span>
           <span class="btnrow"><button class="btn small" id="load-units">Load units</button><a class="btn small" id="lab-link" href="lab.html" style="text-decoration:none;color:inherit;display:inline-block">Counter Lab</a></span></div>
@@ -3269,6 +3274,11 @@ html.pc .corner button span { display: inline; }
     root.querySelectorAll('[data-c]').forEach(b => b.addEventListener('click', () => {
       Game.CONFIG.levelCostPerTier = +b.dataset.c;
       root.querySelectorAll('[data-c]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    }));
+    root.querySelectorAll('[data-xb]').forEach(b => b.addEventListener('click', () => { // Exploit bot: which tactic the AI plays
+      exploitTactic = b.dataset.xb || null;
+      root.querySelectorAll('[data-xb]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      if ($('xb-note')) $('xb-note').innerHTML = exploitBotNote();
     }));
     root.querySelectorAll('[data-tm]').forEach(b => b.addEventListener('click', () => {
       timerOn = b.dataset.tm === '1';
@@ -4611,7 +4621,7 @@ html.pc .corner button span { display: inline; }
 
   function startClaudeTurn() {
     claude.did = []; claude.say = ''; claude.note = ''; claude.fightWaiting = false; claude.bot = false;
-    if (claude.off) { Game.aiDeploy(m, 1); claude.bot = true; return; }
+    if (claude.off) { aiFoeDeploy(1); claude.bot = true; return; }
     const round = m.round, prompt = claudePrompt();
     claude.busy = true; claude.started = now();
     if (claude.ctl) claude.ctl.abort();
@@ -4634,7 +4644,7 @@ html.pc .corner button span { display: inline; }
         claude.off = true;
         claude.note = code === 'not_granted' ? 'Claude wasn’t allowed to play, so the bot is playing for it this match.' : 'Claude isn’t available here, so the bot is playing for it this match.';
       } else claude.note = code === 'rate_limited' ? 'Claude hit a usage limit this round, so the bot played it.' : 'Claude had trouble this round, so the bot played it.';
-      Game.aiDeploy(m, 1); claude.bot = true;
+      aiFoeDeploy(1); claude.bot = true;
     }).finally(() => {
       if (ctl !== claude.ctl) return;
       claude.busy = false;
@@ -4879,6 +4889,24 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // played with the drafted factions' units only (useSet swaps them in; restoreSet puts the player's own units back),
   // each player with their own two factions. Live: the host runs the draft; the guest sends its picks (dpick).
   let matchKind = 'standard'; // standard | factions | devtest (vs AI only): what Play vs AI / Start match / Rematch starts
+  // ---------- Exploit bot (developers only; src/exploit-bot.js) ----------
+  // The AI opponent plays one of the strongest lines the exploit lab found instead of Game.aiDeploy, so a developer
+  // can feel an exploit from the other side of the board. null = the normal AI, and that is the only thing a player
+  // without developer mode can ever get: botTactic() returns null for everyone else, and the picker is not drawn.
+  let exploitTactic = null;
+  const botTactic = () => (devMode() && exploitTactic && ExploitBot.tacticById(exploitTactic)) ? exploitTactic : null;
+  // the AI opponent's deploy turn and its level-ups: the bot's tactic if one is on, else the game's own AI
+  const aiFoeDeploy = (side) => { const t = botTactic(); return t ? ExploitBot.deploy(m, side, t) : Game.aiDeploy(m, side); };
+  const aiFoeLevel = (side) => { const t = botTactic(); return t ? ExploitBot.level(m, side, t) : Game.aiLevel(m, side); };
+  function exploitBotNote() {
+    const t = exploitTactic && ExploitBot.tacticById(exploitTactic);
+    if (!t) return 'Off: the normal AI plays as it always does.';
+    // the number shown is the one measured on the engine as it stands (ExploitBot.winRateNow); the report's own
+    // number came from before the direction-arrow change, so both are named when they differ
+    const now = t.winRateNow != null ? `beats the normal AI ${t.winRateNow}% of 30 matches` : 'not measured';
+    const then = t.measured && t.winRate != null && t.winRate !== t.winRateNow ? ` (${t.winRate}% before the 4 Nov engine change)` : '';
+    return `${esc(t.name)} — ${now}${then}. ${esc(t.blurb)}`;
+  }
   let draft = null, draftSel = null, draftTimer = 0, standardSet = null;
   const FALL = { units: FDATA.units, matrix: FDATA.matrix, skills: FDATA.skills || [] };
   const FSHAPES = Shapes.assign(FALL.units); // for showing each faction's units
@@ -5256,7 +5284,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function beginAiRound() {
     if (mode === 'tutorial') { tutRound(); enterDeploy(0); return; } // the enemy's army is set by the script; no clock
     if (mode === 'claude') { startClaudeTurn(); enterDeploy(timerOn ? deployMs() : 0); return; }
-    Game.aiDeploy(m, 1);       // the AI commits first; its new squads stay hidden until the fight
+    aiFoeDeploy(1);            // the AI commits first; its new squads stay hidden until the fight
     enterDeploy(timerOn || tourSet() ? deployMs() : 0); // a tournament match against a bot always has the clock
   }
 
@@ -5316,7 +5344,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     commitPick();
     if (mode === 'claude' && claude.busy) { if (!claude.fightWaiting) { claude.fightWaiting = true; selected = null; closeSheet(); panelDeploy(); } return; }
     closeSheet(); selected = null;
-    if (mode === 'ai' || (mode === 'claude' && claude.bot)) lastAiLevels = Game.aiLevel(m, 1); // the AI spends its level-ups now
+    if (mode === 'ai' || (mode === 'claude' && claude.bot)) lastAiLevels = aiFoeLevel(1); // the AI spends its level-ups now
     else if (mode !== 'claude') lastAiLevels = [];
     Game.ensureTower(m, 0); Game.ensureTower(m, 1);
     Game.ensurePack(m, 0); Game.ensurePack(m, 1);

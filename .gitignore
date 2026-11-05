@@ -13,5 +13,6 @@ tools/exploit/runs/**/*.json
 !tools/exploit/runs/**/*summary*.json
 !tools/exploit/runs/**/check-*.json
 !tools/exploit/runs/**/fuzz.json
+!tools/exploit/runs/**/bot-check.json
 tools/exploit/runs/**/*.jsonl
 tools/exploit/runs/**/*.log

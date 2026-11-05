@@ -8775,6 +8775,447 @@ if (typeof module !== 'undefined') module.exports = Game;
   root.Tour = api;
 })(typeof window !== 'undefined' ? window : globalThis);
 
+// ===== Exploit bot (developer only) =====
+// An AI opponent that plays one of the strongest lines the exploit lab found instead of the game's normal AI.
+// The lines, how they were measured and what each one is worth: docs/EXPLOITS-2026-11.md.
+//
+// Why it exists: the normal AI has blind spots a human will find (it never puts a long-range squad on an enemy
+// flank column, and never guards its own edge columns), so a bot that plays those lines is the quickest way to
+// feel an exploit from the other side of the board before a friend plays it against you.
+//
+// Developer only. The page only offers it in a devtest match (Game.isDev) and every tactic is off by default,
+// so a standard or ranked match is untouched. Nothing here is a cheat: every move goes through the game's own
+// functions on the match, exactly as Game.aiDeploy does, so the referee accepts the bot's moves or the bot
+// simply does not make them. (The four protocol holes in the report are NOT played by this bot; they are bugs
+// to fix, not tactics.)
+//
+//   ExploitBot.TACTICS                      the list, in the order the picker shows them
+//   ExploitBot.deploy(m, side, id, rec)     one deploy turn for `side`, playing tactic `id`
+//   ExploitBot.level(m, side, id, rec)      its level-up step at fight time
+//
+// `rec` is optional and does what Game.aiDeploy's recorder does: each move that worked is pushed as { fn, a },
+// which is what the lab harness replays to the referee (tools/exploit/lib.js).
+//
+// A tactic names its units and skills by name, not by roster index, so a tactic still means the same thing after
+// the roster changes; a unit or skill a match does not have is skipped.
+
+const ExploitBot = (() => {
+  // ---- the tactics ----
+  // Two numbers, both against the game's own normal AI over 30 paired matches (each seed played from both sides):
+  //   winRate     the search's held-out score, measured BEFORE the direction-arrow change of 2026-11-04
+  //               (seeds 905000..905014). This is the number docs/EXPLOITS-2026-11.md reports.
+  //   winRateNow  re-measured on the CURRENT engine on a third seed block (930000..930014), by
+  //               tools/exploit/bot-check.js. This is what the bot does today, so it is what the picker shows.
+  // They differ by up to 23 points. At 30 matches the noise alone is about plus or minus 18, and the two runs
+  // changed both the engine and the seeds, so the gaps are NOT evidence that the arrow change moved these lines.
+  // "measured: false" means there was no number before this bot existed.
+  const TACTICS = [
+    {
+      id: 'flank-range',
+      winRateNow: 83.3,
+      short: 'Flank',
+      name: 'Flank snipers',
+      winRate: 100,
+      measured: true,
+      blurb: 'Masses Shiv and Leaf Wizard and, from round 3, places them on your flank columns, where they shoot '
+        + 'from inside your half. The normal AI only ever flanks a fast melee unit, so it neither plays this nor '
+        + 'guards its own edge columns. Won 30 of 30 before the direction-arrow change, 25 of 30 on the engine as it '
+        + 'stands.',
+      g: {
+        core: 'script', leader: 'emile', mass: ['Shiv', 'Rogue', 'Leaf Wizard'], from: [1, 5, 1],
+        tower: 'keep', towerSkill: 3, towerSkill2: 7, skills: [], level: 'all',
+        hoardUntil: 1, tankUntil: 0, holdCap: false, loan: 'never', invest: false,
+        placement: 'corner', placeFrom3: 'flank', buyDeploy: true, moveGold: false,
+        mark: false, hunt: true, spin: false, bribe: false, mageGen: false, tround: false,
+        awaken: false, unlockBig: false, aim: false,
+      },
+    },
+    {
+      id: 'steel-flank',
+      winRateNow: 90,
+      short: 'Steel',
+      name: 'Steel Wizard flank',
+      winRate: 80,
+      measured: true,
+      blurb: 'One unit type, Steel Wizard, straight onto your flank columns from the first round, behind the Mage '
+        + 'tower, borrowing every round and levelling its weakest squads first. Loses to Flank snipers head to head '
+        + 'but beats '
+        + 'the back-line wizard lines outright.',
+      g: {
+        core: 'script', leader: 'felix', mass: ['Steel Wizard'], from: [1],
+        tower: 'mage', towerSkill: 3, towerSkill2: 5,
+        skills: [{ unit: 'Steel Wizard', skill: 'reforge', round: 3 }, { unit: 'Steel Wizard', skill: 'heavyMetal', round: 2 }],
+        level: 'early', hoardUntil: 1, tankUntil: 0, holdCap: false, loan: 'always', invest: false,
+        placement: 'flank', placeFrom3: null, buyDeploy: false, moveGold: false,
+        mark: false, hunt: true, spin: true, bribe: true, mageGen: false, tround: false,
+        awaken: false, unlockBig: true, aim: false,
+      },
+    },
+    {
+      id: 'necro-home',
+      winRateNow: 83.3,
+      short: 'Necro',
+      name: 'Necromancer home guard',
+      winRate: 73.3,
+      measured: true,
+      blurb: 'Masses Necromancer, adds Fire Mage from round 4, and keeps everything in the columns around its own '
+        + 'tower instead of pushing. Hoards through round 2, levels its best squads first, and uses Mark Bounty, '
+        + 'Hunter marks and a mage general.',
+      g: {
+        core: 'script', leader: 'enzo', mass: ['Necromancer', 'Fire Mage'], from: [1, 4],
+        tower: 'sniper', towerSkill: 0, towerSkill2: 0,
+        skills: [{ unit: 'Fire Mage', skill: 'dualFlame', round: 1 }],
+        level: 'late', hoardUntil: 2, tankUntil: 0, holdCap: false, loan: 'never', invest: false,
+        placement: 'corner', placeFrom3: 'towercol', buyDeploy: false, moveGold: false,
+        mark: true, hunt: true, spin: false, bribe: false, mageGen: true, tround: false,
+        awaken: true, unlockBig: true, aim: false,
+      },
+    },
+    {
+      id: 'wizard-back',
+      winRateNow: 40,
+      short: 'Wizards',
+      name: 'Back-line wizards',
+      winRate: 63.3,
+      measured: true,
+      blurb: 'Flame Wizard from its back rows, Slime Wizard from round 6, moving to your flanks from round 3, and '
+        + 'never levelling up at all: every coin goes into more squads. The counter to the Steel Wizard flank, and '
+        + 'it splits evenly with Flank snipers head to head, but it is the weakest of these against the AI itself.',
+      g: {
+        core: 'script', leader: 'cage', mass: ['Flame Wizard', 'Slime Wizard'], from: [1, 6],
+        tower: 'sniper', towerSkill: 0, towerSkill2: 8,
+        skills: [{ unit: 'Flame Wizard', skill: 'range', round: 4 }],
+        level: 'never', hoardUntil: 1, tankUntil: 0, holdCap: false, loan: 'never', invest: false,
+        placement: 'back', placeFrom3: 'flank', buyDeploy: true, moveGold: false,
+        mark: true, hunt: true, spin: false, bribe: true, mageGen: false, tround: true,
+        awaken: false, unlockBig: true, aim: false,
+      },
+    },
+    {
+      id: 'hoarder',
+      winRateNow: 80,
+      short: 'Hoard',
+      name: 'Hoarder',
+      winRate: 66.7,
+      measured: true,
+      blurb: 'Buys its army exactly as the normal AI would, but spends nothing until round 3, then takes the Sniper '
+        + 'tower, borrows when short and takes the Bank\'s major investment. The cap is what stops it going deeper: '
+        + 'one more hoarding round and it collapses.',
+      g: {
+        core: 'ai', leader: 'felix', mass: [], from: [],
+        tower: 'sniper', towerSkill: 4, towerSkill2: 7, skills: [], level: 'early',
+        hoardUntil: 2, tankUntil: 0, holdCap: false, loan: 'low', invest: true,
+        placement: 'front', placeFrom3: null, buyDeploy: true, moveGold: false,
+        mark: false, hunt: true, spin: true, bribe: true, mageGen: false, tround: true,
+        awaken: false, unlockBig: false, aim: false,
+      },
+    },
+    {
+      id: 'arrow-rush',
+      winRateNow: 80,
+      short: 'Arrow',
+      name: 'Arrow rush',
+      winRate: null,
+      measured: false,
+      blurb: 'Built on the direction arrows added on 2026-11-04, so it has no number from the search. Masses Brute '
+        + 'on your flank columns '
+        + 'from round 3 and points every melee squad at your tower, so they walk at it ignoring the defenders they '
+        + 'pass. Brute on the flanks alone already won 79% without an arrow, so run bot-check.js --aim-ab to see what '
+        + 'the arrow itself is worth.',
+      g: {
+        core: 'script', leader: 'emile', mass: ['Brute'], from: [1],
+        tower: 'keep', towerSkill: 3, towerSkill2: 0, skills: [], level: 'all',
+        hoardUntil: 1, tankUntil: 0, holdCap: false, loan: 'never', invest: false,
+        placement: 'front', placeFrom3: 'flank', buyDeploy: true, moveGold: false,
+        mark: false, hunt: true, spin: false, bribe: false, mageGen: false, tround: false,
+        awaken: false, unlockBig: true, aim: true,
+      },
+    },
+  ];
+
+  const tacticById = (id) => TACTICS.find(t => t.id === id) || null;
+
+  // ---- helpers ----
+  const rng = (seed) => {
+    let a = seed >>> 0;
+    return () => {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  };
+
+  // a tactic names its units; a roster without one simply drops it
+  const unitIdx = (m, name) => m.units.findIndex(u => u && u.name === name);
+  const massOf = (m, g) => {
+    const out = [];
+    (g.mass || []).forEach((name, i) => {
+      const ui = unitIdx(m, name);
+      if (ui >= 0) out.push({ ui, from: (g.from || [])[i] || 1 });
+    });
+    return out;
+  };
+  // { unit, skill, round } -> { ui, k, round }, by the skill's id on that unit
+  const skillsOf = (m, g) => {
+    const out = [];
+    for (const s of g.skills || []) {
+      const ui = unitIdx(m, s.unit);
+      if (ui < 0) continue;
+      const k = ((m.units[ui] || {}).skillDefs || []).findIndex(d => d && d.id === s.skill);
+      if (k < 0) continue;
+      out.push({ ui, k, round: s.round || 1 });
+    }
+    return out;
+  };
+
+  // the tiles this placement policy prefers, best first (the same policies the lab's scripted players use)
+  function tilesFor(m, side, ui, policy, r) {
+    const rows = Game.zoneRows(side), COLS = Game.COLS, ROWS = Game.ROWS, ZONE = Game.ZONE;
+    const mid = (COLS - 1) / 2;
+    const out = [];
+    const add = (col, row) => { if (col >= 0 && col < COLS && row >= 0 && row < ROWS) out.push({ col, row }); };
+    const cols = Array.from({ length: COLS }, (_, c) => c);
+    if (policy === 'flank' && Game.flankOpen(m)) for (const t of Game.flankTiles(side)) add(t.col, t.row);
+    if (policy === 'forward') { // no man's land: only a unit with Forward planting may stand there
+      const half = ROWS / 2;
+      const nml = side === 0
+        ? Array.from({ length: half - ZONE }, (_, i) => ROWS - ZONE - 1 - i)
+        : Array.from({ length: half - ZONE }, (_, i) => ZONE + i);
+      for (const row of nml) for (const col of cols) add(col, row);
+    }
+    if (policy === 'corner') {
+      const col0 = r() < 0.5 ? 0 : COLS - 1;
+      for (const row of rows) for (let d = 0; d < COLS; d++) add(col0 === 0 ? d : COLS - 1 - d, row);
+    }
+    if (policy === 'towercol') {
+      const t = m.towers && m.towers[side];
+      const c0 = t ? t.col : Math.round(mid);
+      for (const row of rows) for (const col of cols.slice().sort((a, b) => Math.abs(a - c0) - Math.abs(b - c0))) add(col, row);
+    }
+    if (policy === 'spread') {
+      for (const row of rows) for (const col of cols.slice().sort((a, b) => Math.abs(b - mid) - Math.abs(a - mid))) add(col, row);
+    }
+    if (policy === 'back') for (const row of rows.slice().reverse()) for (const col of cols) add(col, row);
+    // 'front', and the fallback for every policy: front rows first, middle columns first
+    for (const row of rows) for (const col of cols.slice().sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid))) add(col, row);
+    return out;
+  }
+
+  // ---- one deploy turn ----
+  function deploy(m, side, id, rec) {
+    const t = tacticById(id);
+    if (!t) return rec || [];
+    const acts = rec || [];
+    const g = t.g;
+    const round = m.round;
+    const units = m.units;
+    const r = rng((m.seed || 0) + round * 7919 + side * 104729 + 13);
+    const call = (fn, ...a) => {
+      if (typeof Game[fn] !== 'function') return false;
+      if (Game[fn](m, side, ...a)) { acts.push({ fn, a }); return true; }
+      return false;
+    };
+    const policy = (round >= 3 && g.placeFrom3) || g.placement;
+    const placeAt = (ui) => {
+      for (const tl of tilesFor(m, side, ui, policy, r)) {
+        if (!Game.spotFree(m, side, tl.col, tl.row, ui)) continue;
+        if (!Game.canPlaceAt(m, side, tl.col, tl.row, ui)) continue;
+        if (Game.place(m, side, ui, tl.col, tl.row)) { acts.push({ fn: 'place', a: [ui, tl.col, tl.row] }); return true; }
+      }
+      return false;
+    };
+
+    // the package: the one that brings the leader we want, else the one whose units do best against the roster
+    if (Game.needsPack(m, side)) {
+      const packs = m.packages[side] || [];
+      let k = -1;
+      if (g.leader) k = packs.findIndex(p => p.char === g.leader);
+      if (k < 0) {
+        let bs = -Infinity;
+        packs.forEach((p, i) => {
+          let s = 0;
+          for (const ui of p.squads) s += m.matrix[ui].reduce((a, b) => a + b, 0) * Game.unitCostOf(units[ui]);
+          if (s > bs) { bs = s; k = i; }
+        });
+      }
+      if (k >= 0) call('choosePack', k);
+    }
+    // the tower pick (round 3): the type we want if it is offered, else the first on offer
+    if (Game.needsTowerPick(m, side)) {
+      const ch = Game.towerChoices(m, side).map(x => x.id);
+      call('setTowerType', ch.includes(g.tower) ? g.tower : ch[0]);
+    }
+
+    const tank = !!(g.tankUntil && round <= g.tankUntil);
+    const mass = massOf(m, g);
+    const costs = units.map((u, i) => Game.isOff(m, i, side) ? Infinity : Game.shopCost(m, side, i));
+    const minCost = Math.min.apply(null, costs);
+    const hoarding = round <= g.hoardUntil || tank;
+    // gold kept back for the level-ups we mean to buy at fight time
+    const reserve = () => {
+      if (g.level === 'never' || g.level === 'late' || tank) return 0;
+      let s = 0;
+      for (const sq of m.armies[side]) if (Game.isReady(m, sq)) s += Game.levelCost(units[sq.unit]);
+      return s;
+    };
+    const spare = (cost) => {
+      if (hoarding) return false;
+      const floor = g.holdCap ? Game.CARRY_CAP : 0;
+      return m.gold[side] - cost >= floor + reserve();
+    };
+
+    // economy and tower extras (every one is a legal player action; the game's own checks gate each)
+    if (!tank) {
+      if (g.loan !== 'never' && Game.canTakeLoan(m, side)) {
+        const low = m.gold[side] < Game.SQUAD_COST * 3;
+        if (g.loan === 'always' || low) call('takeLoan');
+      }
+      if (g.towerSkill && round >= g.towerSkill && Game.canBuyTowerSkill(m, side) && spare(Game.towerSkillCost(m, side))) call('buyTowerSkill');
+      if (g.invest && g.towerSkill2 && round >= g.towerSkill2 && Game.canBuyTowerSkill2(m, side) && spare(Game.towerSkill2Cost(m, side))) call('buyTowerSkill2');
+      if (g.mark && Game.canMark(m, side) && spare(Game.markCost(m, side))) {
+        const tg = m.armies[1 - side].filter(q => Game.markTarget(m, side, q.id)).sort((a, b) => (b.cost || 0) - (a.cost || 0) || a.id - b.id)[0];
+        if (tg) call('placeMark', tg.id);
+      }
+      if (g.spin) { let guard = 0; while (Game.canSpin(m, side) && spare(50) && guard++ < 3) if (!call('spin')) break; }
+      if (g.bribe) { let guard = 0; while (Game.canBribe(m, side) && spare(Game.bribeCost(m, side)) && guard++ < 3) if (!call('bribe')) break; }
+      if (g.mageGen && Game.towerPicked(m, side) && Game.towerType(m, side).id === 'mage') {
+        for (const mg of Game.MAGE_GENERALS) {
+          if (Game.canBuyMageGen(m, side, mg.id) && spare(Game.mageGenCost(m, side, mg.id))) { if (call('buyMageGen', mg.id)) break; }
+        }
+      }
+      if (g.tround) {
+        for (const x of Game.towerRounds(m, side)) {
+          if (Game.canBuyTround(m, side, x.id) && spare(Game.troundCost(m, side, x.id))) call('buyTround', x.id);
+        }
+      }
+    }
+
+    // free package squads always go down (they cost nothing and use no deployment)
+    for (const ui of Game.freeLeft(m, side)) placeAt(ui);
+
+    // Hunters mark what they may (free)
+    if (g.hunt) {
+      for (const h of m.armies[side].slice()) {
+        if (!Game.isHunter(m, h)) continue;
+        const tg = m.armies[1 - side].filter(q => Game.markTarget(m, side, q.id)).sort((a, b) => (b.cost || 0) - (a.cost || 0) || a.id - b.id)[0];
+        if (tg && Game.canHunt(m, side, h.id, tg.id)) call('huntMark', h.id, tg.id);
+      }
+    }
+
+    if (!tank) {
+      // scheduled skills for the types we mass
+      for (const s of skillsOf(m, g)) {
+        if (round < s.round) continue;
+        if (!Game.canBuySkill(m, side, s.ui, s.k)) continue;
+        if (!spare(Game.skillCost(m, s.ui, s.k, side))) continue;
+        call('buySkill', s.ui, s.k);
+      }
+      if (g.awaken) {
+        for (const sq of m.armies[side].slice().sort((a, b) => (b.level || 0) - (a.level || 0))) {
+          if (!Game.canAwaken(m, side, sq.id)) continue;
+          if (!spare(Game.awakenCost(m, sq.unit))) continue;
+          call('awaken', sq.id);
+        }
+      }
+
+      // the 50-gold move: pull the squad furthest from the front line forward
+      if (g.moveGold) {
+        const rows = Game.zoneRows(side);
+        const movable = m.armies[side].filter(q => q.round < round && Game.canMove(m, side, q));
+        const q = movable.sort((a, b) => rows.indexOf(b.row) - rows.indexOf(a.row))[0];
+        if (q && spare(50)) {
+          for (const tl of tilesFor(m, side, q.unit, policy, r)) {
+            if (!Game.spotFree(m, side, tl.col, tl.row, q.unit)) continue;
+            if (!Game.canPlaceAt(m, side, tl.col, tl.row, q.unit, true)) continue;
+            if (call('moveSquad', q.id, tl.col, tl.row)) break;
+          }
+        }
+      }
+
+      // squads: mass the chosen types, in their rounds (with an 'ai' core the game's own AI buys instead)
+      const want = g.core === 'ai' ? [] : mass.filter(x => round >= x.from).map(x => x.ui);
+      if (want.length) {
+        let guard = 0, k = 0;
+        while (guard++ < 40) {
+          if (Game.deploysLeft(m, side) <= 0) {
+            if (!g.buyDeploy || !Game.canBuyDeploy(m, side)) break;
+            if (!spare(Game.deployCost(m, side) + minCost)) break;
+            if (!call('buyDeploy')) break;
+          }
+          let bought = false;
+          for (let i = 0; i < want.length; i++) {
+            const ui = want[(k + i) % want.length];
+            if (Game.isOff(m, ui, side) || Game.capFull(m, side, ui)) continue;
+            const extra = Game.isUnlocked(m, side, ui) ? 0 : Game.unlockCost(m, ui, side);
+            if (extra && !g.unlockBig && Game.tierOf(units, ui) >= 3) continue;
+            if (!spare(Game.shopCost(m, side, ui) + extra)) continue;
+            if (extra && !call('unlock', ui)) continue;
+            if (!placeAt(ui)) continue;
+            k = (k + i + 1) % want.length; bought = true; break;
+          }
+          if (!bought) break;
+        }
+      }
+    }
+
+    // direction arrows: point every melee squad that can take one at the enemy tower (free, and kept from round
+    // to round, so this only has to fire once per squad). Added to the game on 2026-11-04; NOT measured.
+    if (g.aim && typeof Game.setAim === 'function' && typeof Game.canAim === 'function') {
+      const tw = m.towers && m.towers[1 - side];
+      if (tw) {
+        for (const sq of m.armies[side]) {
+          if (!Game.canAim(m, side, sq)) continue;
+          if (sq.aim) continue; // it already has one, and it moves with the squad
+          call('setAim', sq.id, tw.col - sq.col, tw.row - sq.row);
+        }
+      }
+    }
+
+    // with an 'ai' core the game's own AI buys the army, under this tactic's economy rule: the held gold is
+    // hidden from it so it cannot spend it (as tools/lab-hoard.js does), then put straight back.
+    if (g.core === 'ai' && !tank) {
+      const held = round <= g.hoardUntil ? m.gold[side] : (g.holdCap ? Math.min(m.gold[side], Game.CARRY_CAP) : 0);
+      m.gold[side] -= held;
+      try { Game.aiDeploy(m, side, acts); } finally { m.gold[side] += held; }
+    }
+    return acts;
+  }
+
+  // ---- the level-up step, at fight time ----
+  // Returns what Game.aiLevel returns — a list of { id, unit, level } for each level-up that worked — because the
+  // page shows that list ("… leveled up before the fight"). `rec`, when given, gets the actions instead, as
+  // Game.aiLevel's recorder does.
+  function level(m, side, id, rec) {
+    const t = tacticById(id);
+    if (!t) return [];
+    const g = t.g;
+    const done = [];
+    if (g.tankUntil && m.round <= g.tankUntil) return done;
+    if (g.core === 'ai') {
+      const held = m.round <= g.hoardUntil ? m.gold[side] : (g.holdCap ? Math.min(m.gold[side], Game.CARRY_CAP) : 0);
+      m.gold[side] -= held;
+      try { return Game.aiLevel(m, side, rec); } finally { m.gold[side] += held; }
+    }
+    if (g.level === 'never') return done;
+    const call = (fn, ...a) => { if (Game[fn](m, side, ...a)) { if (rec) rec.push({ fn, a }); return true; } return false; };
+    const ready = m.armies[side].filter(sq => Game.isReady(m, sq));
+    // 'early' takes the least-levelled squads first, 'late' the most-levelled, 'all' everything it can pay for
+    const order = g.level === 'late'
+      ? ready.slice().sort((a, b) => (b.level || 0) - (a.level || 0))
+      : ready.slice().sort((a, b) => (a.level || 0) - (b.level || 0));
+    for (const sq of order) {
+      if (m.gold[side] < Game.levelCost(m.units[sq.unit])) continue;
+      if (g.level === 'early' && m.units[sq.unit].bodies >= 8) continue; // as the AI's own 'smart' policy
+      if (call('levelUp', sq.id)) done.push({ id: sq.id, unit: sq.unit, level: sq.level });
+    }
+    return done;
+  }
+
+  return { TACTICS, tacticById, deploy, level, tilesFor };
+})();
+if (typeof module !== 'undefined') module.exports = ExploitBot;
+
 </script>
 <script>
 // ===== Shared art: the palette and the small pictures used both on the board and in the HTML panels =====
@@ -10891,7 +11332,7 @@ Floors.floor = (() => {
   // ----- Report a bug (2026-11-04): a new post in the Discord forum #bug-reports with the game version and match id
   // filled in. The server posts it through a webhook (/account/bug, accounts.js BUG); when that's off or fails, the report
   // is copied and the Discord server opens, so it can be pasted there by hand.
-  const GAME_VERSION = '4 Nov 2026 · b8c60cd'; // src/build.js: the newest patch notes date and a hash of this page
+  const GAME_VERSION = '4 Nov 2026 · 170d7a6'; // src/build.js: the newest patch notes date and a hash of this page
   const DISCORD_FALLBACK = 'https://discord.gg/TBpDKSBWsY';
   const bug = { draft: '', busy: false };
   // the id the server's match history uses (room.js historyInfo: <room>-<seed>), or one made the same way for other matches
@@ -12777,6 +13218,10 @@ Floors.floor = (() => {
         <div class="bar"><span class="hint">${devReady() ? 'Buildings, Powers and spells on the big board.' : 'No factions yet.'}</span><button class="btn small" id="devtest-ai" ${devReady() ? '' : 'disabled'}>Factions – devtest</button></div>
         <div class="bar"><span class="hint">DEVTESTLATEGAME on Standard (with treasuries): ${Game.START_HP + Game.LATE.hp} health each, at most ${Game.LATE.cap} squads of any one tier 3 or tier 4 unit.</span><span class="btnrow"><button class="btn small" id="late-friend">vs Friend</button><button class="btn small" id="late-ai">vs AI</button></span></div>
         <div class="bar"><span class="hint">2v2: two boards side by side. Invite three players, set the teams.</span><button class="btn small" id="duo-new">2v2 lobby</button></div>
+        <div class="bar"><span class="hint">Exploit bot: the AI opponent plays one of the strongest lines the exploit lab found (docs/EXPLOITS-2026-11.md) instead of its normal self. Off is the normal AI. Applies to any match against the computer.</span>
+          <div class="seg looks" role="group" aria-label="Exploit bot">${[{ id: '', short: 'Off' }].concat(ExploitBot.TACTICS.map(t => ({ id: t.id, short: t.short || t.name.split(' ')[0] })))
+            .map(o => `<button data-xb="${o.id}" aria-pressed="${exploitTactic === (o.id || null)}">${o.short}</button>`).join('')}</div></div>
+        <div class="bar"><span class="hint" id="xb-note">${exploitBotNote()}</span></div>
         ${TEST ? `<div class="bar"><span class="hint">Level-up cost (test setting)</span><div class="seg" role="group" aria-label="Level-up cost">${[50, 75].map(c => `<button data-c="${c}" aria-pressed="${Game.CONFIG.levelCostPerTier === c}">${c} gold</button>`).join('')}</div></div>` : ''}
         <div class="bar"><span class="hint">${customSet ? `Your ${units.length} Counter Lab units` : `${units.length} built-in units`}${reportDb ? '. Matches are saved for Claude to review.' : ''}</span>
           <span class="btnrow"><button class="btn small" id="load-units">Load units</button><a class="btn small" id="lab-link" href="lab.html" style="text-decoration:none;color:inherit;display:inline-block">Counter Lab</a></span></div>
@@ -12817,6 +13262,11 @@ Floors.floor = (() => {
     root.querySelectorAll('[data-c]').forEach(b => b.addEventListener('click', () => {
       Game.CONFIG.levelCostPerTier = +b.dataset.c;
       root.querySelectorAll('[data-c]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    }));
+    root.querySelectorAll('[data-xb]').forEach(b => b.addEventListener('click', () => { // Exploit bot: which tactic the AI plays
+      exploitTactic = b.dataset.xb || null;
+      root.querySelectorAll('[data-xb]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      if ($('xb-note')) $('xb-note').innerHTML = exploitBotNote();
     }));
     root.querySelectorAll('[data-tm]').forEach(b => b.addEventListener('click', () => {
       timerOn = b.dataset.tm === '1';
@@ -14159,7 +14609,7 @@ Floors.floor = (() => {
 
   function startClaudeTurn() {
     claude.did = []; claude.say = ''; claude.note = ''; claude.fightWaiting = false; claude.bot = false;
-    if (claude.off) { Game.aiDeploy(m, 1); claude.bot = true; return; }
+    if (claude.off) { aiFoeDeploy(1); claude.bot = true; return; }
     const round = m.round, prompt = claudePrompt();
     claude.busy = true; claude.started = now();
     if (claude.ctl) claude.ctl.abort();
@@ -14182,7 +14632,7 @@ Floors.floor = (() => {
         claude.off = true;
         claude.note = code === 'not_granted' ? 'Claude wasn’t allowed to play, so the bot is playing for it this match.' : 'Claude isn’t available here, so the bot is playing for it this match.';
       } else claude.note = code === 'rate_limited' ? 'Claude hit a usage limit this round, so the bot played it.' : 'Claude had trouble this round, so the bot played it.';
-      Game.aiDeploy(m, 1); claude.bot = true;
+      aiFoeDeploy(1); claude.bot = true;
     }).finally(() => {
       if (ctl !== claude.ctl) return;
       claude.busy = false;
@@ -14427,6 +14877,24 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // played with the drafted factions' units only (useSet swaps them in; restoreSet puts the player's own units back),
   // each player with their own two factions. Live: the host runs the draft; the guest sends its picks (dpick).
   let matchKind = 'standard'; // standard | factions | devtest (vs AI only): what Play vs AI / Start match / Rematch starts
+  // ---------- Exploit bot (developers only; src/exploit-bot.js) ----------
+  // The AI opponent plays one of the strongest lines the exploit lab found instead of Game.aiDeploy, so a developer
+  // can feel an exploit from the other side of the board. null = the normal AI, and that is the only thing a player
+  // without developer mode can ever get: botTactic() returns null for everyone else, and the picker is not drawn.
+  let exploitTactic = null;
+  const botTactic = () => (devMode() && exploitTactic && ExploitBot.tacticById(exploitTactic)) ? exploitTactic : null;
+  // the AI opponent's deploy turn and its level-ups: the bot's tactic if one is on, else the game's own AI
+  const aiFoeDeploy = (side) => { const t = botTactic(); return t ? ExploitBot.deploy(m, side, t) : Game.aiDeploy(m, side); };
+  const aiFoeLevel = (side) => { const t = botTactic(); return t ? ExploitBot.level(m, side, t) : Game.aiLevel(m, side); };
+  function exploitBotNote() {
+    const t = exploitTactic && ExploitBot.tacticById(exploitTactic);
+    if (!t) return 'Off: the normal AI plays as it always does.';
+    // the number shown is the one measured on the engine as it stands (ExploitBot.winRateNow); the report's own
+    // number came from before the direction-arrow change, so both are named when they differ
+    const now = t.winRateNow != null ? `beats the normal AI ${t.winRateNow}% of 30 matches` : 'not measured';
+    const then = t.measured && t.winRate != null && t.winRate !== t.winRateNow ? ` (${t.winRate}% before the 4 Nov engine change)` : '';
+    return `${esc(t.name)} — ${now}${then}. ${esc(t.blurb)}`;
+  }
   let draft = null, draftSel = null, draftTimer = 0, standardSet = null;
   const FALL = { units: FDATA.units, matrix: FDATA.matrix, skills: FDATA.skills || [] };
   const FSHAPES = Shapes.assign(FALL.units); // for showing each faction's units
@@ -14833,7 +15301,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function beginAiRound() {
     if (mode === 'tutorial') { tutRound(); enterDeploy(0); return; } // the enemy's army is set by the script; no clock
     if (mode === 'claude') { startClaudeTurn(); enterDeploy(timerOn ? deployMs() : 0); return; }
-    Game.aiDeploy(m, 1);       // the AI commits first; its new squads stay hidden until the fight
+    aiFoeDeploy(1);            // the AI commits first; its new squads stay hidden until the fight
     enterDeploy(timerOn || tourSet() ? deployMs() : 0); // a tournament match against a bot always has the clock
   }
 
@@ -14893,7 +15361,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     commitPick();
     if (mode === 'claude' && claude.busy) { if (!claude.fightWaiting) { claude.fightWaiting = true; selected = null; closeSheet(); panelDeploy(); } return; }
     closeSheet(); selected = null;
-    if (mode === 'ai' || (mode === 'claude' && claude.bot)) lastAiLevels = Game.aiLevel(m, 1); // the AI spends its level-ups now
+    if (mode === 'ai' || (mode === 'claude' && claude.bot)) lastAiLevels = aiFoeLevel(1); // the AI spends its level-ups now
     else if (mode !== 'claude') lastAiLevels = [];
     Game.ensureTower(m, 0); Game.ensureTower(m, 1);
     Game.ensurePack(m, 0); Game.ensurePack(m, 1);
@@ -15647,7 +16115,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // It falls back to the 2D board when it can't start (no WebGL), when the phone drops the WebGL context, and when
   // fights run under 20 fps at low quality (slower fights step the quality down first), with one line on the board.
   const THREE_URL = './vendor/three.module.min.js'; // the artifact build points this at jsDelivr
-  const V3D = '76b53346f8'; // the 3D code's version (src/build.js puts a hash of it here)
+  const V3D = 'ba32809ffd'; // the 3D code's version (src/build.js puts a hash of it here)
   const B3D_STORE = 'phone-bellum-board';
   const force2d = /[?&]board=2d\b/.test(location.search);
   const force3d = !force2d && (/[?&]board=3d\b/.test(location.search) || window.PB_FORCE3D === true);
