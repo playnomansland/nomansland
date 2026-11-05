@@ -726,9 +726,9 @@ const Models3D = (THREE) => {
     P(new THREE.TorusGeometry(0.17, 0.04, 4, 10), BRASS, [1.15, 2.45, -1.72]), // keys on a ring
     P(box(0.06, 0.32, 0.04), BRASS, [1.08, 2.18, -1.74], [0, 0, 0.25]), P(box(0.06, 0.28, 0.04), BRASS, [1.22, 2.2, -1.74], [0, 0, -0.3]),
     P(cyl(0.6, 0.72, 1.0, 8), '#5A5D63', [0, 3.95, 0.25]), // the lamp turret
-    P(ball(0.46), '#FFE2A0', [0, 4.7, 0.25]), // its lantern
-    ...[0, 1, 2, 3].map(k => { const a = k * Math.PI / 2; return P(box(0.1, 0.1, 0.55), DARK, [Math.sin(a) * 0.55, 4.7, 0.25 + Math.cos(a) * 0.55], [0, a, 0]); }),
-    P(cone(0.72, 0.55, 8), DARK, [0, 5.25, 0.25])];
+    P(ball(0.44), '#FFE2A0', [0, 4.78, 0.25]), // its lantern, in an open iron cage
+    ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => P(box(0.08, 0.8, 0.08), DARK, [x * 0.42, 4.82, 0.25 + z * 0.42])),
+    P(cyl(0.22, 0.78, 0.28, 8), DARK, [0, 5.34, 0.25]), P(ball(0.1), BRASS, [0, 5.55, 0.25])];
   // ===== school (3D) =====
   // The School: a little brick-red schoolhouse on a stone step: a hipped slate roof over a band in the team colour, a
   // white bell turret with a brass bell on its ridge, a green chalkboard door (with a chalk line) and a round window
