@@ -71,7 +71,7 @@ const Game = (() => {
   // a picked type, or the Outpost until the pick is made (a match saved without a pick past it gets the Keep)
   const towerType = (m, side) => {
     const t = m && m.towers && m.towers[side];
-    if (!m || m.round < TOWER_PICK_ROUND || needsTowerPick(m, side)) return OUTPOST;
+    if (!m || m.round < TOWER_PICK_ROUND || needsTowerPick(m, side) || (m.duoTowers && !(t && t.type))) return OUTPOST; // 2v2 (m.duoTowers): the Outpost until a tower card (src/mpb.js)
     return towerTypeById(t && t.type) || (m.factions ? factionTowers(m, side)[0] : null) || TOWER_TYPES[0];
   };
   // any tower type by id: the Outpost, the standard types, or a faction's tower (Factions mode); null if unknown
@@ -87,7 +87,7 @@ const Game = (() => {
     while (out.length < TOWER_OFFER) out.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);
     return out;
   }
-  const needsTowerPick = (m, side) => !!(m && m.round === TOWER_PICK_ROUND && m.towers && m.towers[side] && !m.towers[side].type);
+  const needsTowerPick = (m, side) => !!(m && !m.duoTowers && m.round === TOWER_PICK_ROUND && m.towers && m.towers[side] && !m.towers[side].type); // 2v2: no pick, the artifact draft (src/mpb.js)
   // a player who didn't pick in time gets the first type on offer (the Keep)
   function settleTowerPicks(m) { for (const sd of [0, 1]) if (needsTowerPick(m, sd)) m.towers[sd].type = towerChoices(m, sd)[0].id; }
   function setTowerType(m, side, id) {
@@ -1015,7 +1015,7 @@ const Game = (() => {
   // While deploying, the opponent's character (and Zoe's buff tiles) stays hidden until the first fight, their tower
   // pick until the fight of the pick round, and this round's altar buys, mushroom removals and new elf tower until the fight.
   const charShown = (m, viewer, deploying, side) => !!m && (side === viewer || m.round > 1 || !deploying);
-  const towerTypeShown = (m, viewer, deploying, side) => !!m && (side === viewer || m.round !== TOWER_PICK_ROUND || !deploying);
+  const towerTypeShown = (m, viewer, deploying, side) => !!m && (side === viewer || m.round !== TOWER_PICK_ROUND || !deploying || !!m.duoTowers); // 2v2: the draft is open to all
   const altarShown = (m, viewer, deploying, b) => b.side === viewer || !deploying || b.round < m.round;
   const elfOwnShown = (m, viewer, deploying, side) => side === viewer || !deploying || elfOwnOf(m, side).round < m.round;
   // a mushroom tile as the viewer sees it (null once it's removed and the viewer may know)
@@ -1888,7 +1888,13 @@ const Game = (() => {
   }
 
   const towerAt = (m, side, col, row) => !!(m.towers && m.towers[side] && m.towers[side].col === col && m.towers[side].row === row);
-  const occupied = (m, side, col, row) => towerAt(m, side, col, row) || treasuryAt(m, side, col, row) || elfOwnAt(m, side, col, row) || !!buildingAt(m, side, col, row) || teamBuildingAt(m, side, col, row) || m.armies[side].some(s => covers(m, s, col, row)) || teamArmy(m, side).some(s => covers(m, s, col, row)) || devOccupied(m, side, col, row);
+  // 2v2 buildings (MPBs, src/mpb.js registers itself with setMpb): a tile of either team's MPB (or one of its parts)
+  // is taken for both teams' squads, unless its kind leaves it open (Mpb.at)
+  let MPB = null;
+  const setMpb = (x) => { MPB = x || null; return true; };
+  const mpbApi = () => MPB;
+  const mpbAt = (m, col, row) => !!(MPB && m && m.mpb) && MPB.at(m, col, row);
+  const occupied = (m, side, col, row) => towerAt(m, side, col, row) || treasuryAt(m, side, col, row) || elfOwnAt(m, side, col, row) || !!buildingAt(m, side, col, row) || teamBuildingAt(m, side, col, row) || m.armies[side].some(s => covers(m, s, col, row)) || teamArmy(m, side).some(s => covers(m, s, col, row)) || devOccupied(m, side, col, row) || mpbAt(m, col, row);
   const needsTower = (m, side) => !!(m.towers && !m.towers[side]);
   // the tower can be placed (or moved) during round 1 only
   function placeTower(m, side, col, row) {
@@ -1977,6 +1983,7 @@ const Game = (() => {
       u = mapTuned(mp, u); // ...or tunes range and speed (Test Grid)
       const aura = isDev(m) ? auraFor(m, side, sq.col, sq.row) : null; // devtest: a building's aura
       if (aura) u = modUnit(u, aura);
+      if (MPB && m.mpb) u = MPB.squadMods(m, side, sq, u); // 2v2 buildings (src/mpb.js hooks.squadMods)
       const b = E.buildSquad(u, side, w.x, w.y, sq.id, TILE, idx, sq.level);
       if (u.glut) for (const x of b) x.glutN = glutOf(sq); // Glut it has eaten (already in its stats): it eats on from there
       if (aura) for (const x of b) x.aura = true;
@@ -1996,6 +2003,7 @@ const Game = (() => {
       if (purple) for (const x of b) x.shroom = true; // for the drifting spores effect
       if (isFlank(side, sq.col, sq.row) && (sq.round === m.round || sq.movedRound === m.round)) for (const x of b) x.delay = FLANK.delay * (ch === 'wilhelm' ? CHAR.wilhelmDelay : 1); // only in its first fight
       if (isFlank(side, sq.col, sq.row)) for (const x of b) x.march = [w.x - XOFF < 0 ? 1 : -1, 0]; // a flank squad marches in toward the middle until it spots an enemy
+      if (MPB && m.mpb) MPB.squadBodies(m, side, sq, b, u); // 2v2 buildings (hooks.squadBodies: the flank delay, a tunnel...)
       idx += b.length;
       out.push(...b);
     }
@@ -3380,7 +3388,7 @@ const Game = (() => {
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,
-    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, teamBuildings, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, AIM, canAim, setAim, clearAim, aimEnd, aimTo, resolve, aiDeploy, occupied,
+    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, teamBuildings, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, AIM, canAim, setAim, clearAim, aimEnd, aimTo, resolve, aiDeploy, occupied, mpbAt, setMpb, mpbApi,
     GRID, useGrid,
     DEV, CAT_NAMES, LESSER_SQ, WALL_SQ, setDevData, devBuilding, devPower, devSpell, isDev, towerUp, pickCat, devOffer, pickNow, needsDevPick, devPick, undoDevPick, devShown,
     lessersOf, placedLessers, unplacedLesser, lesserAt, lesserSpotOk, placeLesser, lesserUnit, auraFor, modUnit, powersOf, devGold, devDeploys,

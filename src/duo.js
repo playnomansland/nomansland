@@ -12,11 +12,14 @@
 // - m.team (Game.teamArmy / teamSeen): each lane's match carries the other lane's squads, so a teammate's squad takes
 //   its tile and the other opponent's squads hold theirs, as your own would. Their ids are moved by OFF. It also carries
 //   that lane's skills (tech) for the unit sheets; the page's ownerOf says whose any squad is (seat, name, you/mate/foe).
-// - The team's tower and treasury: lane 0's stand in the fight; lane 1's never do (same tiles, same type). Tower
-//   purchases (tower skills, walls, Fortify, mage generals) are the team's: whoever buys pays, and both lanes get it
-//   (copyTeam). Only the buyer can take back their own buy. The Bank's Major investment stays each player's own.
-// - The tower type is a vote in round 3: each player picks in their own lane; if the two differ, a human's vote beats
-//   an AI's, and between two humans a coin flip (seeded) decides. Tower buys wait until the vote is settled.
+// - The team's tower: lane 0's stands in the fight; lane 1's never does (same tile, same type). Tower purchases (tower
+//   skills, walls, Fortify, mage generals) are the team's: whoever buys pays, and both lanes get it (copyTeam). Only the
+//   buyer can take back their own buy. The Bank's Major investment stays each player's own.
+// - 2v2 buildings (src/mpb.js, docs/MPB-2V2.md, 2026-11-06): the Vault (in place of the treasury) and the MPBs are team
+//   state too (m.mpb, m.mpbVote, m.vault in TEAM_FIELDS); lane 0's stand in the fight. Rounds 2 and 8 put two artifacts
+//   in no man's land; their cards are dealt in rounds 3 and 9 (the artifact draft, which replaced the round 3 tower
+//   vote: the tower is the Outpost until a tower card comes). An MPB card opens the team's placement vote. The vote's
+//   and the draft's 15 s clocks are D.mclock.
 // - The fight: every body of both lanes on the one board (lane 1's squad ids moved by OFF). Afterwards each lane is
 //   resolved as a 1v1 round (XP, gold, streaks...); lane 1 gets the shared treasury's result too (each player is paid
 //   or raided), the tower's fall counts once, and the damage both lanes take comes off one shared team health.
@@ -28,8 +31,9 @@
   const G = (typeof Game !== 'undefined') ? Game : require('./game.js');
   const E = (typeof Engine !== 'undefined') ? Engine : require('./engine.js');
   const Ref = (typeof Referee !== 'undefined') ? Referee : require('./referee.js');
+  const M = (typeof Mpb !== 'undefined') ? Mpb : require('./mpb.js');
 
-  const V = 2;
+  const V = 3; // 3: the 2v2 buildings (2026-11-06)
   const MAP = 'duo';                 // the 2v2 board (Game.TEAM_MAPS)
   const OFF = 1000000;               // lane 1's squad ids inside the fight (and the other lane's squads in m.team) are moved by this
   const HP = 2 * G.START_HP;         // each team's shared health (two lanes take damage every round)
@@ -78,10 +82,14 @@
   }
 
   // ----- the team's tower: what is shared, and copying it from one lane to the other -----
-  const TEAM_FIELDS = ['towerSkill', 'towerSkill2', 'bwalls', 'mageGen', 'tround'];
-  const TEAM_FNS = new Set(['buyTowerSkill', 'undoTowerSkill', 'buyTowerSkill2', 'undoTowerSkill2', 'fortify', 'placeBwall', 'unplaceBwall', 'buyMageGen', 'undoMageGen', 'buyTround', 'undoTround']);
+  // (mpb, mpbVote, vault: the 2v2 buildings, src/mpb.js)
+  const TEAM_FIELDS = ['towerSkill', 'towerSkill2', 'bwalls', 'mageGen', 'tround', 'mpb', 'mpbVote', 'vault'];
+  const TEAM_FNS = new Set(['buyTowerSkill', 'undoTowerSkill', 'buyTowerSkill2', 'undoTowerSkill2', 'fortify', 'placeBwall', 'unplaceBwall', 'buyMageGen', 'undoMageGen', 'buyTround', 'undoTround',
+    'mpbBuy', 'mpbUndo', 'mpbAct', 'vaultPut', 'vaultTake']);
+  // the team's actions Duo handles itself (both lanes at once, logged as the system's so Undo all keeps them)
+  const SYS_FNS = new Set(['mpbVote', 'draftPick']);
   const isBank = (m, sd) => G.towerType(m, sd).id === 'bank';
-  const BLANK = { towerSkill: 0, towerSkill2: 0, bwalls: [], mageGen: null, tround: {} };
+  const BLANK = { towerSkill: 0, towerSkill2: 0, bwalls: [], mageGen: null, tround: {}, mpb: [], mpbVote: [], vault: null };
   const getF = (m, f, sd) => m[f] ? m[f][sd] : BLANK[f];
   function setF(m, f, sd, v) { if (!m[f]) m[f] = [BLANK[f], BLANK[f]].map(x => JSON.parse(JSON.stringify(x))); m[f][sd] = v == null ? v : JSON.parse(JSON.stringify(v)); }
   // the tower part of side sd from src to dst (the Bank's Major investment is each player's own: it pays them back)
@@ -90,6 +98,12 @@
   }
   const teamState = (m, sd) => JSON.parse(JSON.stringify(Object.fromEntries(TEAM_FIELDS.map(f => [f, getF(m, f, sd)]))));
   function putTeamState(m, sd, st) { for (const f of TEAM_FIELDS) { if (f === 'towerSkill2' && isBank(m, sd)) continue; setF(m, f, sd, st[f]); } }
+  // everything both lanes share, from src to dst: both teams' parts, the tower types, the artifacts and the draft
+  function copyAll(src, dst) {
+    for (const sd of [0, 1]) { copyTeam(src, dst, sd); if (src.towers && src.towers[sd] && dst.towers && dst.towers[sd]) dst.towers[sd].type = src.towers[sd].type; }
+    dst.artifacts = src.artifacts ? JSON.parse(JSON.stringify(src.artifacts)) : null;
+    dst.draft = src.draft ? JSON.parse(JSON.stringify(src.draft)) : null;
+  }
 
   // as Referee.fight: towers, packages, tower picks and walls nobody placed are settled first (lane by lane, so lane 1's
   // package squads see lane 0's)
@@ -135,8 +149,9 @@
     return { units, matrix, skills };
   }
 
-  // the team's tower (and the paratroopers it drops), its guards, its treasury and its walls: lane 0's stand in the fight, lane 1's don't
-  const teamBody = (sq) => sq === -2 || sq === -3 || sq === -4 || sq === G.TREASURY_SQ || (sq <= G.BWALL_SQ && sq > G.BWALL_SQ - 100);
+  // the team's tower (and the paratroopers it drops), its guards, its treasury, its walls and its buildings (src/mpb.js:
+  // Mpb.SQ - k and Mpb.XSQ - ...): lane 0's stand in the fight, lane 1's don't (lane 1 never builds MPB bodies)
+  const teamBody = (sq) => sq === -2 || sq === -3 || sq === -4 || sq === G.TREASURY_SQ || (sq <= G.BWALL_SQ && sq > G.BWALL_SQ - 100) || M.isSquad(sq);
 
   // The fight of two lanes (matches with units, as they stand when it begins): a steppable Engine battle on the one
   // board. Changes nothing. Bodies carry .lane.
@@ -165,11 +180,18 @@
       const list = r.sd === 0 ? A : B, c = list.find(x => x.squad === r.carrier);
       if (c) for (const x of list) if (x.squad === r.rider) { x.boarded = true; x.alive = false; x.carrier = c; x.x = c.x; x.y = c.y; x.delay = 0; }
     }
+    // the team's buildings (src/mpb.js): lane 0 builds them, once for the team
+    for (const sd of [0, 1]) for (const b of M.bodies(lanes[0], sd)) { b.lane = 0; (sd === 0 ? A : B).push(b); }
     G.useGrid(MAP);
     const ch = charm.map(c => Object.keys(c).length ? c : null);
     // portal: where a team's tower falls, a portal to the other team's tower opens (Engine opts.portal; 2v2 only)
     const portal = { towers: [0, 1].map(sd => host[sd][-2] || null) };
-    return E.createBattle(A, B, s0.g, { tiles: s0.opts.tiles || [], strikes: s0.opts.strikes || [], neutrals: s0.opts.neutrals || [], charm: ch, terrain: s0.opts.terrain || null, objective: null, record: opts.record !== false, portal });
+    const o = { tiles: s0.opts.tiles || [], strikes: s0.opts.strikes || [], neutrals: s0.opts.neutrals || [], charm: ch, terrain: s0.opts.terrain || null, objective: null, record: opts.record !== false, portal };
+    const art = M.artifactsFor(lanes[0]); // rounds 2 and 8: the two artifacts (Engine opts.artifacts)
+    if (art) o.artifacts = art;
+    M.battleOpts(lanes[0], o); // what the buildings add (o.mpb and the rest)
+    G.useGrid(MAP);
+    return E.createBattle(A, B, s0.g, o);
   }
 
   // lane L's share of a fight's result, in that lane's own squad ids (as Game.resolve wants it). The winner and
@@ -217,6 +239,11 @@
       return sm;
     });
     for (const sd of [0, 1]) hp[sd] = Math.max(0, hp[sd] - lost[sd]);
+    // the buildings: fell, their afterFight (Team HP, gold, next-round effects), the artifacts' winners; lane 0's team
+    // state goes to lane 1
+    M.afterFight(lanes, res, summaries, hp);
+    for (const sd of [0, 1]) hp[sd] = Math.max(0, hp[sd]);
+    copyAll(lanes[0], lanes[1]);
     const over = hp[0] <= 0 || hp[1] <= 0, winner = hp[0] > 0 ? 0 : hp[1] > 0 ? 1 : -1;
     const towerFell = (summaries[0].towerFell || [false, false]).slice();
     lanes.forEach((m, L) => {
@@ -243,8 +270,9 @@
   // D: { v, settings, phase: 'lobby' | 'deploy' | 'result' | 'end', lanes: [R, R] (Referee lanes), bots: [b x4],
   //      hp: [team A, team B], ready, nextReady, rematch, away: [x4], deadline, held, summary: [lane 0's, lane 1's],
   //      fights, seed, forfeit (the seat that left, or null),
-  //      tbase: [team A's tower part as the round began, team B's], tlog: [[{ lane, fn, a }, ...] this round, x2],
-  //      vote: [{ round, votes: [lane 0's, lane 1's], type, flip } | null, x2] (the round 3 tower vote) }
+  //      tbase: [team A's team part as the round began, team B's], tlog: [[{ lane, fn, a, as }, ...] this round, x2]
+  //      (lane -1: the system's: a placement vote, a placed building, a draft pick; fn 'sys:<Mpb.SYS name>'),
+  //      mclock: { vote: [{ key, until } | null, x2] (the team's placement vote), draft: until | 0 } }
   // A seat's actions go through its lane's Referee (the very same checks as 1v1); the clock, Ready and the fight are
   // the whole match's. Times are passed in (now).
   const AWAY_MAX_MS = Ref.AWAY_MAX_MS, GRACE_MS = Ref.GRACE_MS, MIN_LEFT_MS = 10000;
@@ -254,13 +282,13 @@
     s.map = MAP; s.noChars = true;
     return { v: V, settings: s, phase: 'lobby', lanes: [null, null], bots: [false, false, false, false], hp: [HP, HP],
       ready: [false, false, false, false], nextReady: [false, false, false, false], rematch: [false, false, false, false],
-      away: [0, 0, 0, 0], deadline: 0, held: 0, summary: null, fights: 0, seed: 0, forfeit: null, tbase: [null, null], tlog: [[], []], vote: [null, null] };
+      away: [0, 0, 0, 0], deadline: 0, held: 0, summary: null, fights: 0, seed: 0, forfeit: null, tbase: [null, null], tlog: [[], []], mclock: { vote: [null, null], draft: 0 } };
   }
   const laneOf = (D, seat) => D.lanes[SEATS[seat].lane];
   const ms = (D) => D.lanes.map(R => R.m);
   const deployMsOf = (D) => (D.lanes[0].m.round === 1 ? D.settings.deploy1 : D.settings.deploy) * 1000;
   const humans = (D) => [0, 1, 2, 3].filter(k => !D.bots[k]);
-  const picksPending = (D) => humans(D).some(k => G.needsTowerPick(laneOf(D, k).m, SEATS[k].side));
+  const picksPending = (D) => humans(D).some(k => G.needsTowerPick(laneOf(D, k).m, SEATS[k].side)) || mpbPending(D); // the draft and placement votes hold the clock too
   const someoneAway = (D, now) => humans(D).some(k => D.away[k] && now - D.away[k] < AWAY_MAX_MS);
   // each lane's own referee state follows the match's (its act checks phase, Ready and the deadline)
   function mirror(D) {
@@ -279,29 +307,108 @@
     mirror(D);
   }
 
-  // ----- the tower vote (round 3) -----
-  const voteOpen = (D, sd) => ms(D).some(m => G.needsTowerPick(m, sd));
-  // both players of team sd have picked: one type for both lanes. A human's vote beats an AI's; two humans: a coin flip.
-  // Returns true when a lane's type was changed.
-  function settleVote(D, sd) {
-    const [a, b] = ms(D);
-    if (a.round !== G.TOWER_PICK_ROUND || voteOpen(D, sd) || !a.towers[sd] || !b.towers[sd]) return false;
-    if (D.vote[sd] && D.vote[sd].round === a.round) return false;
-    const votes = [a.towers[sd].type, b.towers[sd].type], bots = [D.bots[seatOf(0, sd)], D.bots[seatOf(1, sd)]];
-    let win = 0, flip = false;
-    if (votes[0] !== votes[1]) {
-      if (bots[0] !== bots[1]) win = bots[0] ? 1 : 0;
-      else { flip = true; win = (D.seed + a.round * 7919 + sd * 104729) % 2; }
+  // ----- the 2v2 buildings: the artifact draft and the placement votes (src/mpb.js), their clocks (D.mclock) -----
+  const mpbPending = (D) => { const m = D.lanes[0] && D.lanes[0].m; return !!m && (M.draftOpen(m) || [0, 1].some(sd => !!M.voteHead(m, sd))); };
+  const seatsOf = (sd) => [seatOf(0, sd), seatOf(1, sd)];
+  // a system action on team sd's part in lane L (as: whose vote), then the same part in the other lane; logged
+  function sysApply(D, sd, fn, a, L = 0) {
+    const lanes = ms(D);
+    setTeams(lanes);
+    if (!M.SYS[fn](lanes[L], sd, ...a)) return false;
+    copyTeam(lanes[L], lanes[1 - L], sd);
+    D.tlog[sd].push({ lane: -1, fn: 'sys:' + fn, a: a.slice(), as: L });
+    return true;
+  }
+  // the draft's pick (team `team` takes card idx; in lane L), then the other lane
+  function sysDraft(D, team, idx, L = 0) {
+    const lanes = ms(D);
+    if (!G.draftPick(lanes[L], team, idx)) return false;
+    const O = lanes[1 - L];
+    O.draft = JSON.parse(JSON.stringify({ ...lanes[L].draft, done: false }));
+    M.applyDraft(O);
+    for (const sd of [0, 1]) D.tlog[sd].push({ lane: -1, fn: 'sys:draft', a: lanes[L].draft.owner.slice(), as: L });
+    return true;
+  }
+  const mrand = (D, k) => M.rng((D.seed + D.lanes[0].m.round * 7919 + k * 104729) >>> 0)();
+  // the clocks: 15 s for each building at the head of a team's queue, 15 s for the draft's pick
+  function mpbClock(D, now) {
+    const m = D.lanes[0].m;
+    if (!D.mclock) D.mclock = { vote: [null, null], draft: 0 };
+    for (const sd of [0, 1]) {
+      const h = M.voteHead(m, sd), key = h ? [M.recs(m, sd).length, h.kind, h.part || '', h.key || ''].join('|') : '';
+      if (!key) D.mclock.vote[sd] = null;
+      else if (!D.mclock.vote[sd] || D.mclock.vote[sd].key !== key) D.mclock.vote[sd] = { key, until: now + M.VOTE_MS };
     }
-    const type = votes[win];
-    D.vote[sd] = { round: a.round, votes, type, flip };
-    let changed = false;
-    for (const m of [a, b]) if (m.towers[sd].type !== type) {
-      m.towers[sd].type = type; changed = true;
-      // as setTowerType: an extra deployment bought before the team got the Keep is now given, so it is refunded
-      while (m.extraDeploys && G.musterOn(m, sd) && m.extraDeploys[sd] > 0) { m.extraDeploys[sd]--; m.gold[sd] += G.deployCost(m, sd); }
+    if (!M.draftOpen(m)) D.mclock.draft = 0; else if (!D.mclock.draft) D.mclock.draft = now + M.DRAFT_MS;
+  }
+  // what bots do at once: the draft's pick (when the picking team has one), and a vote: the human teammate's tile if
+  // they voted, else the first allowed tile (a building with no room anywhere is lost)
+  function mpbBots(D) {
+    const lanes = ms(D);
+    for (let guard = 0; guard < 40; guard++) {
+      let did = false;
+      if (M.draftOpen(lanes[0])) {
+        const t = lanes[0].draft.first, bot = seatsOf(t).find(k => D.bots[k]);
+        if (bot != null) did = sysDraft(D, t, M.botPick(lanes[0], t), SEATS[bot].lane);
+      }
+      if (!did) for (const sd of [0, 1]) {
+        setTeams(lanes);
+        const head = M.voteHead(lanes[0], sd);
+        if (!head) continue;
+        for (const L of [0, 1]) {
+          if (!D.bots[seatOf(L, sd)]) continue;
+          const mate = head.votes[1 - L], human = mate && !D.bots[seatOf(1 - L, sd)] && M.spotOk(lanes[L], sd, head.kind, head.part, mate.col, mate.row) ? mate : null;
+          const mine = head.votes[L] && M.spotOk(lanes[L], sd, head.kind, head.part, head.votes[L].col, head.votes[L].row) ? head.votes[L] : null;
+          const want = human || mine || M.autoSpot(lanes[L], sd, head.kind, head.part);
+          if (!want) { did = sysApply(D, sd, 'drop', [], L); break; }
+          if (mine && mine.col === want.col && mine.row === want.row) continue;
+          did = sysApply(D, sd, 'vote', [want.col, want.row], L);
+          break;
+        }
+        if (did) break;
+      }
+      if (!did) break;
     }
-    return changed;
+  }
+  // a clock ran out (or the fight starts: force): the draft's seeded pick, a vote's result
+  function mpbTick(D, now, force) {
+    const lanes = ms(D), c = D.mclock || { vote: [null, null], draft: 0 };
+    let did = false;
+    if (M.draftOpen(lanes[0]) && (force || (c.draft && now >= c.draft))) {
+      const t = lanes[0].draft.first;
+      did = sysDraft(D, t, mrand(D, 11) < 0.5 ? 0 : 1, 0) || did;
+    }
+    for (const sd of [0, 1]) {
+      const v = c.vote[sd];
+      if (!M.voteHead(lanes[0], sd) || !(force || (v && now >= v.until))) continue;
+      setTeams(lanes);
+      const t = M.voteResult(lanes[0], sd, mrand(D, 13 + sd * 2 + M.recs(lanes[0], sd).length * 31));
+      did = (t ? sysApply(D, sd, 'place', [t.col, t.row], 0) : sysApply(D, sd, 'drop', [], 0)) || did;
+    }
+    return did;
+  }
+  // after anything that may have opened or changed a vote or the draft
+  function mpbAfter(D, now) { mpbBots(D); mpbClock(D, now); setTeams(ms(D)); }
+  // before the fight: nothing may stay open
+  function mpbSettle(D, now) { for (let k = 0; k < 40 && mpbPending(D); k++) { mpbTick(D, now, true); mpbBots(D); } mpbClock(D, now); }
+  // the start of a round: the buildings' roundStart, the artifacts (rounds 2 and 8), the draft (3 and 9)
+  function mpbRound(D, now) {
+    const lanes = ms(D), m = lanes[0];
+    if (!M.on(m)) return;
+    setTeams(lanes);
+    M.roundStart(lanes);
+    if (M.ARTIFACT.rounds.includes(m.round)) m.artifacts = M.rollArtifacts(m, M.rng((D.seed + m.round * 6151) >>> 0));
+    const d = M.dealDraft(m, M.rng((D.seed + m.round * 7307) >>> 0)() < 0.5 ? 0 : 1);
+    if (d) m.draft = d;
+    if (m.artifacts && m.artifacts.round < m.round) m.artifacts = null; // (the draft has their cards and winners)
+    copyAll(m, lanes[1]);
+    for (const L of lanes) M.applyDraft(L); // a deal with no pick: each team gets its card in both lanes
+    D.mclock = { vote: [null, null], draft: 0 };
+  }
+  // the clocks as a seat sees them: ms left for its team's placement vote and for the draft's pick (0: none)
+  function clocks(D, seat, now) {
+    const c = D.mclock || { vote: [null, null], draft: 0 }, v = c.vote[SEATS[seat].side];
+    return { vote: v ? Math.max(0, v.until - now) : 0, draft: c.draft ? Math.max(0, c.draft - now) : 0 };
   }
 
   // ----- tower buys: who may take one back -----
@@ -330,16 +437,21 @@
     const name = fn === 'unplaceBwall' && before && before.temp ? 'unfortify' : fn;
     D.tlog[sd].push({ lane, fn: name, a: Array.isArray(a) ? a.slice() : [] });
   }
-  // after Undo all in one lane: the team's tower part is the round's start plus every tower action the teammate made
-  // this round (replayed on a copy), in both lanes. The vote's type stays.
+  // after Undo all in one lane: the team's part is the round's start plus every team action the teammate made this
+  // round and the system's (votes, placed buildings, the draft), replayed on a copy in order, in both lanes. The
+  // tower type stays (only the draft sets it in 2v2).
   function rebuildTeam(D, sd, lane) {
     D.tlog[sd] = D.tlog[sd].filter(e => e.lane !== lane);
     const O = D.lanes[1 - lane].m, sc = Ref.withUnits(Ref.snapshot(O), O.units, O.matrix);
     if (D.tbase[sd]) putTeamState(sc, sd, D.tbase[sd]);
     sc.gold[sd] = 1e9;
-    for (const e of D.tlog[sd]) { const fn = e.fn === 'unfortify' ? 'unplaceBwall' : e.fn; try { if (typeof G[fn] === 'function') G[fn](sc, sd, ...e.a); } catch (err) {} }
-    const mine = D.lanes[lane].m, v = D.vote[sd];
-    if (v && v.round === mine.round && mine.towers && mine.towers[sd]) mine.towers[sd].type = v.type; // should Undo all have put this lane's own vote back
+    for (const e of D.tlog[sd]) {
+      const sys = e.fn.startsWith('sys:'), fn = sys ? M.SYS[e.fn.slice(4)] : G[e.fn === 'unfortify' ? 'unplaceBwall' : e.fn];
+      sc.duoLane = sys ? e.as : O.duoLane; // who voted (who paid: the teammate)
+      try { if (typeof fn === 'function') fn(sc, sd, ...e.a); } catch (err) {}
+    }
+    const mine = D.lanes[lane].m;
+    if (mine.towers && mine.towers[sd] && O.towers && O.towers[sd]) mine.towers[sd].type = O.towers[sd].type;
     for (const m of ms(D)) copyTeam(sc, m, sd);
   }
 
@@ -355,12 +467,12 @@
   function beginRound(D, now) {
     D.phase = 'deploy';
     D.ready = D.bots.slice(); D.nextReady = [false, false, false, false]; D.rematch = [false, false, false, false];
-    for (const R of D.lanes) {
-      R.round = R.m.round; R.nextReady = [false, false]; R.rematch = [false, false]; R.undo = [null, null];
-      R.base = { gold: R.m.gold.slice(), nextId: R.m.nextId.slice() };
-    }
+    for (const R of D.lanes) { R.round = R.m.round; R.nextReady = [false, false]; R.rematch = [false, false]; R.undo = [null, null]; }
+    D.tlog = [[], []];
+    mpbRound(D, now); // the buildings' round start, the artifacts, the draft
+    for (const R of D.lanes) R.base = { gold: R.m.gold.slice(), nextId: R.m.nextId.slice() };
     for (let k = 0; k < 4; k++) if (D.bots[k]) botTurn(D, k);
-    for (const sd of [0, 1]) settleVote(D, sd);
+    mpbAfter(D, now); // bots pick and vote at once
     setTeams(ms(D));
     D.tbase = [0, 1].map(sd => teamState(D.lanes[0].m, sd)); D.tlog = [[], []];
     D.deadline = 0; D.held = deployMsOf(D);
@@ -379,21 +491,37 @@
     });
     D.hp = [HP, HP];
     for (const R of D.lanes) R.m.hp = D.hp.slice();
-    const offer = [0, 1].map(sd => G.towerChoices(D.lanes[0].m, sd).map(x => x.id)); // teammates vote between the same towers
-    for (const R of D.lanes) R.m.towerOffer = offer.map(o => o.slice());
-    D.summary = null; D.fights = 0; D.forfeit = null; D.vote = [null, null];
+    D.lanes.forEach((R, L) => M.init(R.m, L)); // the Vaults, no tower pick (the artifact draft instead), who is who
+    D.summary = null; D.fights = 0; D.forfeit = null; D.mclock = { vote: [null, null], draft: 0 };
     beginRound(D, now);
     return true;
   }
   const canAct = (D, seat) => D.phase === 'deploy' && !D.ready[seat] && !D.lanes[0].m.over;
+  // a placement vote or the draft's pick: both lanes at once (Referee.act's checks: the action's number, the clock,
+  // its arguments)
+  function sysAct(D, seat, d, now) {
+    const own = SEATS[seat], R = D.lanes[own.lane], sd = own.side, fn = d.fn;
+    const seq = Number.isInteger(d.seq) ? d.seq : 0;
+    if (seq <= R.seq[sd]) return { ok: false, why: 'dup' };
+    R.seq[sd] = seq;
+    if (D.deadline && now > D.deadline + GRACE_MS) return { ok: false, why: 'time' };
+    const args = Ref.cleanArgs(fn, d.a);
+    if (!args) return { ok: false, why: 'bad' };
+    setTeams(ms(D));
+    const ok = fn === 'mpbVote' ? sysApply(D, sd, 'vote', args, own.lane) : sysDraft(D, sd, args[0], own.lane);
+    if (!ok) { clock(D, now); return { ok: false, why: 'rules' }; }
+    mpbAfter(D, now);
+    clock(D, now);
+    return { ok: true, h: Ref.sideHash(R.m, sd), team: true };
+  }
   // one action from a seat (as Referee.act: { seq, fn, a }). Returns { ok, h, why, team } (team: something else on
-  // the team changed too: the vote was settled, or a tower buy went to the teammate's lane).
+  // the team changed too: a tower or building buy went to the teammate's lane, a vote, the draft).
   function act(D, seat, d, now) {
     const own = SEATS[seat], R = D.lanes[own.lane], O = D.lanes[1 - own.lane], sd = own.side, fn = d && d.fn;
     mirror(D);
     const no = (why) => { const seq = Number.isInteger(d && d.seq) ? d.seq : 0; if (seq > R.seq[sd]) R.seq[sd] = seq; return { ok: false, why }; };
     if (!canAct(D, seat)) return no(D.ready[seat] ? 'ready' : 'phase');
-    if (TEAM_FNS.has(fn) && voteOpen(D, sd)) return no('vote');
+    if (SYS_FNS.has(fn)) return sysAct(D, seat, d, now);
     if (TEAM_FNS.has(fn) && !undoAllowed(D, seat, fn, d.a)) return no('team');
     setTeams(ms(D));
     const before = fn === 'unplaceBwall' && Array.isArray(d.a) && d.a.length === 3 ? G.bwallOn(R.m, sd, d.a[0], d.a[1], d.a[2]) : null;
@@ -401,10 +529,9 @@
     let team = false;
     if (r.ok) {
       if (TEAM_FNS.has(fn)) { logTeam(D, sd, own.lane, fn, d.a, before && { ...before }); copyTeam(R.m, O.m, sd); team = true; }
-      else if (fn === 'setTowerType') team = settleVote(D, sd) || !G.needsTowerPick(O.m, sd);
       else if (fn === 'undoAll') { rebuildTeam(D, sd, own.lane); team = true; }
-      setTeams(ms(D));
-      r.h = Ref.sideHash(R.m, sd); // this lane may have changed again (the vote, the team's tower)
+      mpbAfter(D, now); // a building's action may have opened a vote (bots vote at once)
+      r.h = Ref.sideHash(R.m, sd); // this lane may have changed again (the team's part)
     }
     clock(D, now); // a tower pick may let the clock start (Referee.act only looks at its own lane)
     return { ...r, team };
@@ -418,7 +545,7 @@
     if (D.phase !== 'deploy') return null;
     for (let k = 0; k < 4; k++) if (D.bots[k]) { setTeam(ms(D), SEATS[k].lane); G.aiLevel(laneOf(D, k).m, SEATS[k].side); }
     for (const m of ms(D)) G.settleTowerPicks(m);
-    for (const sd of [0, 1]) settleVote(D, sd);
+    mpbSettle(D, now); // a draft pick or a placement vote still open: settled now
     const f = fight(ms(D), D.hp);
     setTeams(ms(D));
     D.fights++;
@@ -433,6 +560,7 @@
   }
   function tick(D, now) {
     if (D.phase === 'deploy') {
+      mpbTick(D, now); mpbAfter(D, now); // a vote's or the draft's 15 s ran out (or one just opened: bots vote, its clock starts)
       clock(D, now);
       if (D.deadline && now >= D.deadline + GRACE_MS) return runFight(D, now);
     }
@@ -441,8 +569,11 @@
   function due(D, now) {
     if (D.phase !== 'deploy') return 0;
     if (D.deadline) return D.deadline + GRACE_MS;
-    const left = humans(D).filter(k => D.away[k]).map(k => D.away[k] + AWAY_MAX_MS).filter(t => t > now);
-    return left.length ? Math.min(...left) + 50 : 0;
+    const left = humans(D).filter(k => D.away[k]).map(k => D.away[k] + AWAY_MAX_MS).filter(t => t > now).map(t => t + 50);
+    const c = D.mclock || { vote: [], draft: 0 };
+    for (const v of c.vote) if (v) left.push(v.until); // a placement vote's 15 s
+    if (c.draft) left.push(c.draft);                   // the draft's pick
+    return left.length ? Math.min(...left) : 0;
   }
   function next(D, seat, round, now) {
     if (D.phase !== 'result' || !D.summary || round !== D.summary[0].round) return false;
@@ -474,13 +605,13 @@
     return false;
   }
   // what one seat sees: its own lane as in 1v1 (m), with the other lane in it as this seat's team may see it (m.team:
-  // the teammate's squads all, the other opponent's as an opponent sees them while deploying; vote: the teammate's
-  // tower vote while the vote is open)
+  // the teammate's squads all, the other opponent's as an opponent sees them while deploying). The team's buildings,
+  // placement votes (both players' tiles) and Vault are in m (team state); the opponents' buildings without this
+  // round's skills, votes and Vault moves (Referee.hide -> Mpb.hide). The clocks: clocks(D, seat, now).
   function viewFor(D, seat) {
     const own = SEATS[seat], R = D.lanes[own.lane], O = D.lanes[1 - own.lane], deploy = D.phase === 'deploy';
     const v = Ref.view(R.m, own.side, deploy, R.base), o = Ref.view(O.m, own.side, deploy, O.base);
     v.team = teamOf(o, own.lane);
-    if (O.m.round === G.TOWER_PICK_ROUND && O.m.towers && O.m.towers[own.side]) v.team.vote = O.m.towers[own.side].type || null;
     return { m: v };
   }
   const save = (D) => ({ ...D, lanes: D.lanes.map(R => R ? Ref.save(R) : null) });
@@ -493,8 +624,9 @@
 
   const api = {
     V, MAP, OFF, HP, PINGS, EMOTES, EMOTE_TEXT, SEATS, SEAT_NAMES, seatOf, mateOf, remap, unmap, laneOfId, move, teamOf, setTeam, setTeams,
-    MECHITES, unitSet, TEAM_FIELDS, TEAM_FNS, copyTeam, teamBody, settle, battle, laneResult, fight, view,
-    create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, viewFor, clock, canAct, save, load, humans, settleVote, voteOpen,
+    MECHITES, unitSet, TEAM_FIELDS, TEAM_FNS, SYS_FNS, copyTeam, copyAll, teamBody, settle, battle, laneResult, fight, view,
+    create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, viewFor, clock, clocks, canAct, save, load, humans,
+    mpbPending, mpbTick, mpbSettle, rebuildTeam, teamState,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Duo = api;

@@ -1,6 +1,6 @@
 // A 2v2 match (developer test, 2026-11-02; one shared board since 2026-11-03): one Durable Object per code
 // (/duo/<CODE>). The rules are src/duo.js (two lanes on one board, each a 1v1 match through the same Referee checks,
-// a shared tower and treasury per team); this file is the plumbing: sockets, seats, the lobby, storage and the clock
+// a shared tower and Vault per team, the 2v2 buildings of src/mpb.js); this file is the plumbing: sockets, seats, the lobby, storage and the clock
 // (alarms).
 //
 // Who is who
@@ -24,7 +24,8 @@
 //               roomset { pub, spectate: false, chat }, team { team } (only the other lane changed: m.team),
 //               sync / status / fight as in a 1v1 room (server/src/room.js) for the seat's own lane (sync's m carries
 //               m.team, the other lane as this seat may see it), plus duo ({ seat, lane, names, here, bots, hp, ready,
-//               nextReady, vote }) and, in fight, duo.pres (both lanes before the fight, for the playback).
+//               nextReady, clock: { vote, draft } ms left for the team's placement vote and the artifact draft (src/mpb.js) })
+//               and, in fight, duo.pres (both lanes before the fight, for the playback).
 import { DurableObject } from 'cloudflare:workers';
 import Ref from '../../src/referee.js';
 import Duo from '../../src/duo.js';
@@ -147,8 +148,9 @@ export class DuoRoom extends DurableObject {
     };
   }
   duoInfo(seat, here) {
-    const D = this.D, sd = Duo.SEATS[seat].side;
-    return { seat, lane: Duo.SEATS[seat].lane, names: this.names(), here, bots: D.bots, hp: D.hp, ready: D.ready, nextReady: D.nextReady, vote: (D.vote && D.vote[sd]) || null };
+    const D = this.D;
+    // clock: ms left for the team's placement vote and the artifact draft's pick (src/mpb.js; 0: none open)
+    return { seat, lane: Duo.SEATS[seat].lane, names: this.names(), here, bots: D.bots, hp: D.hp, ready: D.ready, nextReady: D.nextReady, clock: D.lanes[0] ? Duo.clocks(D, seat, Date.now()) : null };
   }
   push(opts = {}) {
     for (const s of this.sockets(opts.gone)) {
@@ -156,7 +158,7 @@ export class DuoRoom extends DurableObject {
       const msg = this.syncMsg(s, opts.gone);
       // the other lane (m.team) goes on its own ('team'), so a teammate's change doesn't resend this phone's own lane
       const team = msg.m ? msg.m.team : undefined, tk = team === undefined ? '' : Ref.fnv(JSON.stringify(team));
-      const key = Ref.fnv(JSON.stringify({ ...msg, remaining: 0, ack: 0, held: 0, m: msg.m ? { ...msg.m, team: null } : msg.m }));
+      const key = Ref.fnv(JSON.stringify({ ...msg, remaining: 0, ack: 0, held: 0, m: msg.m ? { ...msg.m, team: null } : msg.m, duo: msg.duo ? { ...msg.duo, clock: null } : msg.duo }));
       if (s === opts.skip) { this.sent.set(s, key); this.teamSent.set(s, tk); continue; }
       if (opts.force || this.sent.get(s) !== key) { this.sent.set(s, key); this.teamSent.set(s, tk); this.send(s, msg); continue; }
       if (tk && this.teamSent.get(s) !== tk) { this.teamSent.set(s, tk); this.send(s, { t: 'team', team }); }

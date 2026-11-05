@@ -6,7 +6,7 @@
 //  - direction arrows (sq.aim): the teammate's reach m.team, the opponents' never while deploying; so do skills (m.team.tech)
 //  - whole matches with four bots: no two squads of a team on one tile, one tower type per team, shared health,
 //    the same result when played back from pre
-//  - the refereed match D: no leaders, the tower vote, shared tower buys (only the buyer takes one back), Undo all,
+//  - the refereed match D: no leaders, no tower vote (the artifact draft since 2026-11-06), shared tower buys (only the buyer takes one back), Undo all,
 //    what each seat sees, Ready, forfeit, rematch, save / load, the clock
 //  - the tower portal: opens where a tower fell, the team that took it goes through once and comes out at its own
 //    tower; never in 1v1
@@ -18,6 +18,7 @@ const Game = require('../../src/game.js');
 const Engine = require('../../src/engine.js');
 const Ref = require('../../src/referee.js');
 const Duo = require('../../src/duo.js');
+const Mpb = require('../../src/mpb.js');
 const demo = require('../../src/demo-units.json'), F = require('../../src/faction-units.json');
 const { units, matrix } = require('../../server/src/prepare-units.cjs')(Engine, Duo.unitSet(demo, F));
 
@@ -126,38 +127,29 @@ function toRound3(seed, bots = [false, false, false, false]) {
     for (let k = 0; k < 4; k++) Duo.next(D, k, D.summary[0].round, T);
   }
   assert.strictEqual(D.lanes[0].m.round, Game.TOWER_PICK_ROUND);
+  Duo.mpbSettle(D, T); // the artifact draft and any placement vote (2026-11-06): settled at once
   return { D, T };
 }
 
-check('the tower vote: same pick, coin flip, a human beats the AI', () => {
-  { const { D, T } = toRound3(5);
-    const ch = Game.towerChoices(D.lanes[0].m, 0).map(x => x.id);
-    assert.ok(!Duo.act(D, 0, { seq: 10, fn: 'buyTowerSkill', a: [] }, T).ok, 'no tower buys before the vote');
-    assert.ok(Duo.act(D, 0, { seq: 11, fn: 'setTowerType', a: [ch[0]] }, T).ok);
-    assert.ok(Duo.viewFor(D, 1).m.team.vote === ch[0], 'the teammate sees the vote');
-    assert.ok(!Duo.viewFor(D, 2).m.team.vote, 'the other team doesn\'t');
-    const ch1 = Game.towerChoices(D.lanes[1].m, 0).map(x => x.id), other = ch1.find(id => id !== ch[0]) || ch1[0];
-    const r = Duo.act(D, 1, { seq: 11, fn: 'setTowerType', a: [other] }, T);
-    assert.ok(r.ok);
-    const v = D.vote[0];
-    assert.ok(v && v.flip === (other !== ch[0]) && [ch[0], other].includes(v.type));
-    assert.strictEqual(D.lanes[0].m.towers[0].type, v.type); assert.strictEqual(D.lanes[1].m.towers[0].type, v.type);
-    assert.strictEqual(r.h, Ref.sideHash(D.lanes[1].m, 0), 'the fingerprint is the settled lane\'s');
+// (2026-11-06) the round 3 tower vote is gone from 2v2: the artifact draft (src/mpb.js, tools/tests/mpb.js) gives
+// towers now, and a team keeps the Outpost until a tower card comes
+check('no tower vote in 2v2: no pick, no offer, the Outpost until a tower card', () => {
+  const { D, T } = toRound3(5);
+  for (const R of D.lanes) for (const sd of [0, 1]) {
+    assert.ok(!Game.needsTowerPick(R.m, sd), 'no tower pick');
+    assert.ok(!R.m.towerOffer, 'no tower offer');
+    if (!R.m.towers[sd].type) assert.strictEqual(Game.towerType(R.m, sd).id, 'outpost');
   }
-  { const { D, T } = toRound3(6, [false, true, true, true]); // seat 1 (A2) is the AI: it voted at the round's start
-    const botVote = D.lanes[1].m.towers[0].type, mine = Game.towerChoices(D.lanes[0].m, 0).map(x => x.id).find(id => id !== botVote);
-    assert.ok(Duo.act(D, 0, { seq: 11, fn: 'setTowerType', a: [mine] }, T).ok);
-    assert.strictEqual(D.lanes[1].m.towers[0].type, mine, 'the human\'s vote wins');
-    assert.strictEqual(D.vote[0].flip, false);
-  }
+  assert.ok(!Duo.act(D, 0, { seq: 10, fn: 'setTowerType', a: ['keep'] }, T).ok, 'setTowerType refused');
+  assert.ok(!('settleVote' in Duo) && !D.vote, 'the vote is gone');
 });
 
 check('shared tower buys: both lanes get it, only the buyer takes it back, Undo all', () => {
   const { D, T } = toRound3(7);
   const [a, b] = D.lanes.map(R => R.m);
-  const pick = (sd) => (Game.towerChoices(a, sd).find(x => x.skill) || Game.towerChoices(a, sd)[0]).id;
-  for (let k = 0; k < 4; k++) { const st = Duo.SEATS[k]; Duo.act(D, k, { seq: 20, fn: 'setTowerType', a: [pick(st.side)] }, T); }
-  assert.strictEqual(a.towers[0].type, pick(0)); assert.strictEqual(b.towers[0].type, pick(0));
+  // (2026-11-06: no tower vote in 2v2) team A gets a tower card with a skill, in both lanes, as the draft gives it
+  for (const m of [a, b]) Mpb.giveCard(m, 0, { type: 'tower', id: 'keep' });
+  assert.strictEqual(a.towers[0].type, 'keep'); assert.strictEqual(b.towers[0].type, 'keep');
   assert.ok(Game.towerType(a, 0).skill, 'a tower with a skill on offer (seed)');
   const g0 = a.gold[0], g1 = b.gold[0];
   assert.ok(Duo.act(D, 0, { seq: 21, fn: 'buyTowerSkill', a: [] }, T).ok, 'A1 buys Guards');
@@ -629,8 +621,7 @@ check('the teammate\'s horse: a bot teammate sells or moves it, nothing breaks',
       T += 1000;
       for (const R of D.lanes) for (const sd of [0, 1]) for (const q of R.m.armies[sd]) if (Game.isRider(q)) assert.ok(Game.carrierOf(R.m, sd, q), 'every rider has its carrier');
       assert.strictEqual(clashes(D.lanes.map(R => R.m)), 0);
-      if (Game.needsTowerPick(m0, 0)) assert.ok(Duo.act(D, 0, { seq: seq++, fn: 'setTowerType', a: [Game.towerChoices(m0, 0)[0].id] }, T).ok, 'A1 votes');
-      const f = Duo.tick(D, T + 200000);
+      const f = Duo.tick(D, T + 200000) || Duo.tick(D, T + 400000); // (a placement vote A1 left to its 15 s holds the clock until the first tick)
       assert.ok(f);
       const bt = Duo.battle(f.pres.map(W)); while (bt.step()) {}
       assert.strictEqual(bt.result().winner, f.summaries[0].duo.winner, 'playback: same winner');

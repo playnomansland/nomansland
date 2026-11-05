@@ -42,6 +42,9 @@
     buyElfOwn: 'ii', undoElfOwn: '', removeShroom: 'ii', undoRemoveShroom: 'ii',
     setAim: 'idd', clearAim: 'i',
     buyBuilding: 'iiii', buyBuildingSkill: 'xs', undoBuildingSkill: 'x', levelBuilding: 'x', undoLevelBuilding: 'x',
+    // 2v2 buildings (src/mpb.js; only a 2v2 lane has m.mpb): a building's skill, its take-back, a kind's own action,
+    // the placement vote, the Vault, the artifact draft
+    mpbBuy: 'ss?xxx', mpbUndo: 'ss', mpbAct: 'ss?xxx', mpbVote: 'ii', vaultPut: 'i', vaultTake: 'i', draftPick: 'i',
   };
   const okNat = (v) => Number.isInteger(v) && v >= 0 && v < 1e6; // negative indices never reach the rules (2026-11-05)
   const okArg = (k, v) => k === 'i' ? okNat(v)
@@ -88,7 +91,7 @@
       if (s.pack) s.pack[h] = null;
     } else if (s.slots && s.slots[h]) delete s.slots[h][round]; // this round's spins
     if (s.sold) s.sold[h] = []; // (they are in s.armies[h] now)
-    if (round === G.TOWER_PICK_ROUND && s.towers && s.towers[h]) delete s.towers[h].type; // the tower pick
+    if (round === G.TOWER_PICK_ROUND && s.towers && s.towers[h] && !s.duoTowers) delete s.towers[h].type; // the tower pick (2v2: the draft is open to all)
     if (s.bribe) s.bribe[h] = G.bribeList(s, h).filter(r => r !== round);
     if (s.elfOwn && s.elfOwn[h] && s.elfOwn[h].round === round) s.elfOwn[h] = null;
     if (s.bwalls && s.bwalls[h]) s.bwalls[h] = s.bwalls[h].filter(w => w.round !== round);
@@ -106,6 +109,7 @@
     if (s.extraDeploys) s.extraDeploys[h] = 0;
     if (s.buildings && s.buildings[h]) s.buildings[h] = s.buildings[h].filter(b => b.round !== round).map(b => { const n = (b.levels && b.levels[round]) | 0; if (!n) return b; const levels = { ...b.levels }; delete levels[round]; return { ...b, level: b.level - n, levels }; });
     if (s.bskill) s.bskill[h] = {};
+    if (s.mpb && G.mpbApi && G.mpbApi()) G.mpbApi().hide(s, h); // 2v2 buildings: this round's skills, the placement vote, the Vault's moves
     if (base && base.gold && s.gold) s.gold[h] = base.gold[h]; // what they have left would tell what they bought
     if (base && base.nextId && s.nextId) s.nextId[h] = base.nextId[h];
     return s;
