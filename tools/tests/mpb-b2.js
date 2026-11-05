@@ -259,7 +259,7 @@ check('The Oak: Restoration ×1.25 on its team\'s regen while it stands, ×1.5 w
     assert.ok(near(r, foe.u.hp * 0.04 * dt), 'the opponents\' regen is plain'); }
 });
 
-check('Restoration on the Engine\'s other heals (lifesteal, mending, healbot, water healing): ×1.25', () => {
+check('Restoration on the Engine\'s other heals (mending, water healing: every heal goes through the Engine\'s heal()): ×1.25', () => {
   const G = { ...Game.SETTINGS, bounds: { x0: -40, x1: 40, y0: -40, y1: 40 } };
   const oakU = Engine.withTraits({ name: 'The Oak', cost: 0, bodies: 1, hp: 1200, hit: 0, aps: 1, range: 0, speed: 0, splash: 0, structure: true, lesser: true, kind: 'mpb', mpb: 'oak' });
   // one healer and one wounded ally on side 0, a dummy far away on side 1; the healed amount with and without the Oak
