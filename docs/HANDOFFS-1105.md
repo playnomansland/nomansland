@@ -10,7 +10,7 @@ Vilhelm's list from 5 November, split into groups that separate Claude Code sess
 | D – 2v2 view: sheets, owners, rings, team stats, pings, tower/treasury spots | `docs/HANDOFF-DUO-VIEW.md` | Claude Code | now |
 | E1 – 2v2 gameplay: portal, Mechites | `docs/HANDOFF-DUO-PLAY.md` | Claude Code | now |
 | E2 – 2v2: units into an ally's horse | `docs/HANDOFF-DUO-HORSE.md` | Claude Code | after D is on main |
-| G – Free-for-all "Fia med knuff" | `docs/HANDOFF-FFA.md` | Claude Code (design first) | now (design only) |
+| G – Free-for-all "Fia med knuff" | `docs/HANDOFF-FFA.md` | Claude Code (design first) | design done (`docs/FFA.md`); build waits for Vilhelm's answers |
 
 ## Rules for every group
 

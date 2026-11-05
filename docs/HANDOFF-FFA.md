@@ -6,6 +6,8 @@ Vilhelm: a free-for-all mode with a "Fia med knuff" style map: a centre square a
 
 This is a new mode, not a map. The game today has exactly two sides everywhere: the engine (side 0 / 1, `1 - side` for "the enemy"), match state (`m.armies[2]`, gold, towers...), hidden info (Referee.hide), the board rotation, the server rooms. 2v2 got around that by running two 1v1 lanes in one fight (`src/duo.js`); four players who all fight each other don't fit that trick. So phase 1 is a design doc, reviewed by Vilhelm, before code.
 
+**Status (5 November 2026): phase 1 done.** The design is in `docs/FFA.md`, with Vilhelm's questions at the end. Wait for his answers before phase 2+ (the doc's build order starts with the engine's N sides).
+
 ## Phase 1: write docs/FFA.md (no game code)
 
 Read first: `src/duo.js` header and `claude/duo-2v2.md` (how 2v2 shares one fight), `src/engine.js` (where it assumes two sides: grep `1 - `, `side === 0`, `sides`, `cripple`), `src/referee.js` (view/hide), `server/src/duo.js` (a 4-seat room), README "Maps".
