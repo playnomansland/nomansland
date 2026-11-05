@@ -125,7 +125,7 @@ const SPOTS = [[0, 9], [3, 15], [-12, 21], [9, 27]];
   for (let n = 0; n < N; n++) {
     const m = Game.createMatch(units, null, 1000 + n, 'standard');
     m.round = 1 + Math.floor(rnd() * 2); // (from round 3 the towers differ: each side's pick)
-    m.packages = [[], []]; m.pack = [null, null]; m.chars = [null, null];
+    m.packages = [[], []]; m.pack = [null, null]; m.chars = [null, null]; m.draft = null; // no leaders (and no leader draft: it would hand the sides different ones)
     const army = [], used = new Set(), k = 2 + Math.floor(rnd() * 5);
     for (let j = 0; j < k; j++) {
       let col, row;
@@ -154,7 +154,7 @@ const SPOTS = [[0, 9], [3, 15], [-12, 21], [9, 27]];
   for (let n = 0; n < N; n++) {
     const m = Game.createMatch(units, null, 2000 + n, 'standard');
     m.round = Game.TOWER_PICK_ROUND; m.towers[0].type = m.towers[1].type = 'sniper'; m.gold = [5000, 5000];
-    m.packages = [[], []]; m.pack = [null, null]; m.chars = [null, null];
+    m.packages = [[], []]; m.pack = [null, null]; m.chars = [null, null]; m.draft = null; // no leaders (and no leader draft: it would hand the sides different ones)
     assert.ok(Game.buyTowerSkill2(m, 0) && Game.buyTowerSkill2(m, 1), 'paratroopers bought');
     const tc = m.towers[0], army = [], used = new Set([tc.col + ',' + tc.row]), k = 1 + Math.floor(rnd() * 4);
     for (let j = 0; j < k; j++) {
