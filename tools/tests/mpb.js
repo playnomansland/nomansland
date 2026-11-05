@@ -46,7 +46,7 @@ function playTo(x, round, hook) {
     if (hook) hook(D);
     for (let k = 0; k < 4; k++) Duo.next(D, k, D.summary[0].round, x.T);
   }
-  assert.strictEqual(D.lanes[0].m.round, round, 'reached round ' + round);
+  if (D.phase !== 'end') assert.strictEqual(D.lanes[0].m.round, round, 'reached round ' + round); // (a match may end first: callers look at D.phase)
 }
 const sameTeam = (D, sd) => { for (const f of ['mpb', 'mpbVote', 'vault']) assert.deepStrictEqual(D.lanes[0].m[f][sd], D.lanes[1].m[f][sd], 'team ' + sd + ' ' + f + ' the same in both lanes'); };
 
