@@ -138,6 +138,23 @@ const shot = async (p, name) => { if (process.env.PB_SHOTS) await p.screenshot({
     await shot(host, 'mpb-sheet');
     await closeSheet(host);
   } else ok(true, 'no building for team A this round (its card: ' + JSON.stringify(d) + ')');
+  // every kind's sheet opens, for its own team and for the other (review 2026-11-06: the Shadow Den's threw for its
+  // own team). Records added on this page only, at the end of the test.
+  const sheetBad = await host.evaluate(() => {
+    const { m } = window.__pb(), out = [];
+    for (const id of Object.keys(Mpb.KINDS)) for (const sd of [0, 1]) {
+      const t = Mpb.autoSpot(m, sd, id, null) || { col: 2 + Object.keys(Mpb.KINDS).indexOf(id), row: sd ? 2 : 15 };
+      const rec = Mpb.addRec(m, sd, id, t.col, t.row);
+      try {
+        window.__pbSheet(sd, rec.key);
+        const txt = document.getElementById('sheet').textContent;
+        if (!txt.includes(Mpb.KINDS[id].name.replace(/^The /, '')) || !txt.includes(sd === window.__pb().me ? 'Your team' : 'Their team')) out.push(id + ' side ' + sd + ': not its sheet');
+      } catch (e) { out.push(id + ' side ' + sd + ': ' + e.message); }
+    }
+    const c = document.getElementById('close'); if (c) c.click();
+    return out;
+  });
+  ok(!sheetBad.length, 'every kind\'s sheet opens for both teams' + (sheetBad.length ? ': ' + sheetBad.join('; ') : ''));
   await b.close();
   if (fails) { console.log(`\n${fails} failed`); process.exit(1); }
   console.log('\nall passed');

@@ -241,11 +241,15 @@ export class DuoRoom extends DurableObject {
       }
       case 'act': {
         if (inLobby) return;
+        const clk = () => JSON.stringify([D.deadline, D.held, D.lanes[0] ? Duo.clocks(D, seat, now) : null]);
+        const was = clk();
         const res = Duo.act(D, seat, d, now);
         this.send(ws, { t: 'ack', seq: Number.isInteger(d.seq) ? d.seq : 0, ok: res.ok, h: res.h || null, why: res.why || null });
         if (!res.ok) { this.sent.delete(ws); this.send(ws, this.syncMsg(ws)); if (res.why !== 'time') await this.save(); return; }
         await this.save();
         this.push({ skip: ws }); // the others' views (the teammate's m.team, a shared tower buy, the vote) and the clock
+        if (d.fn === 'undoAll') { this.send(ws, this.syncMsg(ws)); return; } // 2v2 Undo all: the team's part as the server rebuilt it (the page keeps its own until then)
+        if (clk() !== was) this.send(ws, this.statusMsg(ws, this.here())); // the actor's own action opened or closed a vote (or the draft): their clock too
         return;
       }
       case 'ready': {
@@ -291,13 +295,13 @@ export class DuoRoom extends DurableObject {
     const D = this.D, now = Date.now();
     if (!D || !D.lanes[0]) return this.push({ gone, force: true });
     const here = this.here(gone);
-    for (const s of this.sockets(gone)) {
-      const a = this.att(s);
-      if (a.role !== 'p') continue;
-      const own = Duo.SEATS[a.seat], pair = (arr) => [arr[Duo.seatOf(own.lane, 0)], arr[Duo.seatOf(own.lane, 1)]];
-      this.send(s, { t: 'status', ready: pair(D.ready), nextReady: pair(D.nextReady), rematch: pair(D.rematch), here: pair(here.map((h, k) => h || D.bots[k])),
-        remaining: Duo.remainingFor(D, a.seat, now), held: Duo.heldFor(D, a.seat), phase: D.phase, duo: this.duoInfo(a.seat, here) });
-    }
+    for (const s of this.sockets(gone)) if (this.att(s).role === 'p') this.send(s, this.statusMsg(s, here));
+  }
+  // one player's 'status': Ready, who is here, the clock (theirs: Duo.remainingFor / heldFor, duo.clock)
+  statusMsg(s, here) {
+    const D = this.D, now = Date.now(), a = this.att(s), own = Duo.SEATS[a.seat], pair = (arr) => [arr[Duo.seatOf(own.lane, 0)], arr[Duo.seatOf(own.lane, 1)]];
+    return { t: 'status', ready: pair(D.ready), nextReady: pair(D.nextReady), rematch: pair(D.rematch), here: pair(here.map((h, k) => h || D.bots[k])),
+      remaining: Duo.remainingFor(D, a.seat, now), held: Duo.heldFor(D, a.seat), phase: D.phase, duo: this.duoInfo(a.seat, here) };
   }
   welcome(seat) {
     const own = Duo.SEATS[seat], R = this.D && this.D.lanes[own.lane];
