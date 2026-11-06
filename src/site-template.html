@@ -420,8 +420,17 @@ html.dock .bar:has(> .task:not([hidden])) > .hint { display: none; }
 /* 2v2: a colour per player (Art.DUO_RING): a dot by a name, the sheet's owner line, the HUD legend, the team stats */
 .duo-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: 0; box-shadow: 0 0 0 1.5px rgba(10, 14, 16, 0.85); flex: none; }
 .owner-line { font-weight: 600; display: inline-flex; align-items: center; }
-.duo-legend { display: inline-flex; align-items: center; gap: 2px 8px; flex-wrap: wrap; min-width: 0; }
-.duo-legend > span { display: inline-flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 11em; }
+.duo-legend { display: inline-flex; align-items: center; gap: 2px 8px; flex-wrap: wrap; min-width: 0; max-width: 100%; }
+/* (each name is cut short with an ellipsis rather than run over the team's HP or the buttons: a narrow phone, 375 px) */
+.duo-legend > span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: min(11em, 100%); min-width: 0; }
+.side .lbl > :has(> .duo-legend) { flex: 1 1 0; min-width: 0; display: flex; }
+.side.foe .lbl > :has(> .duo-legend) { justify-content: flex-end; }
+.side.foe .duo-legend { justify-content: flex-end; }
+.side .lbl:has(.duo-legend) > .num { flex: none; }
+/* a result card taller than the board on a phone (2v2 building news): it takes the screen down to the bottom, and its
+   buttons stay in view at the bottom while the rest scrolls (fitOverlay) */
+html.dock .overlay.tall { position: fixed; z-index: 5; top: var(--wrap-top, 0px); left: 6px; right: 6px; bottom: 6px; border-radius: 6px; }
+html.dock .overlay.tall > .card > .btnrow:last-child { position: sticky; bottom: -16px; padding: 8px 0 16px; background: rgb(13, 19, 21); box-shadow: 0 -10px 12px rgb(13, 19, 21); width: 100%; justify-content: center; }
 .stats-mode { display: flex; margin: 0 0 6px; }
 .stats-mode button { flex: 1; }
 .duo-tot { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; margin: -2px 0 6px; }
@@ -1947,6 +1956,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     }
     if (on !== was || h !== boardH || fight !== wasFight || wide !== wasWide) { boardH = h; size(); render(); } // the board changed size: draw it again (3D too)
     boardMarks();
+    fitOverlay();
   }
   // the X on the task line: stop placing that unit (or the Move, the Charisma, the elf tower)
   function stopTask() {
@@ -2194,7 +2204,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
         }
         if (mode !== 'guest' && mode !== 'spec' && mode !== 'net' && left <= (mode === 'host' ? -500 : 0)) runFight();
         else if ((mode === 'guest' || mode === 'net') && left <= 0 && !timeUp) { commitPick(); timeUp = true; selected = null; closeSheet(); sendSide(); panelDeploy(); render(); }
-      } else if (el) { el.textContent = mpbOn() && (Mpb.draftOpen(m) || Mpb.voteQueue(m, me).some(e => !e.skill) || mpbClockAt.vote > now() || mpbClockAt.draft > now()) ? 'placing' : !(m && m.duoTowers) && (heldMs || ((mode === 'guest' || mode === 'net') && net.connected && m && m.round === Game.TOWER_PICK_ROUND)) ? 'picking towers' : solo() ? '' : 'paused'; el.classList.remove('low'); } // (2v2 towers, m.duoTowers: no tower pick; 'placing': my team's own queue, or the draft: the other team's queue in my view is only as it was queued, Mpb.hide, so it can't tell)
+      } else if (el) { el.textContent = !(m && m.duoTowers) && (heldMs || ((mode === 'guest' || mode === 'net') && net.connected && m && m.round === Game.TOWER_PICK_ROUND)) ? 'picking towers' : solo() ? '' : 'paused'; el.classList.remove('low'); } // (2v2 towers, m.duoTowers: no tower pick; the 2v2 votes and the draft never hold the clock, src/duo.js: only a player away does)
     }
     if ((phase === 'result' || phase === 'end') && resultShownAt) {
       const left = resultShownAt + nextSecs() * 1000 - t;
@@ -2954,8 +2964,17 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
   function overlay(html) {
     if (typeof syncHome === 'function' && home.screen) syncHome();
     const o = $('overlay'); clearTimeout(peekTimer); o.classList.remove('peek');
-    if (!html) { o.hidden = true; o.innerHTML = ''; return; }
+    if (!html) { o.hidden = true; o.innerHTML = ''; fitOverlay(); return; }
     o.hidden = false; o.innerHTML = html;
+    fitOverlay();
+  }
+  // a card taller than the board on a phone (html.dock: a result with 2v2 building news): the overlay takes the screen
+  // from the board's top down (.overlay.tall), so its buttons ('Next round') are always in view
+  function fitOverlay() {
+    const o = $('overlay'), w = $('wrap'), root = document.documentElement, card = o.firstElementChild;
+    const tall = root.classList.contains('dock') && !o.hidden && !!card && card.offsetHeight + 32 > w.clientHeight;
+    if (tall) root.style.setProperty('--wrap-top', Math.max(0, Math.round(w.getBoundingClientRect().top)) + 'px');
+    o.classList.toggle('tall', tall);
   }
 
   function showStart() {
@@ -8976,10 +8995,13 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const sq = (t, cls, st) => { const c = Game.tileToWorld(t.col, t.row); return `<polygon class="${cls}"${st ? ` style="${st}"` : ''} points="${pt(c.x - d, c.y - d)} ${pt(c.x + d, c.y - d)} ${pt(c.x + d, c.y + d)} ${pt(c.x - d, c.y + d)}"/>`; };
     const own = Object.values(MPB_SHEET).map(x => x.marks ? x.marks(sq) : '').join('');
     const h = Mpb.voteEntry(m, me, duoMyLane()); // (a one-player placement: only its own player's)
-    if (!h) return own;
+    // the Shadow Den's Insider information: the watched team's votes too, in their players' colours, dashed
+    const fh = Mpb.watching(m, me) && Mpb.voteHead(m, 1 - me);
+    const theirs = fh ? [0, 1].map(L => fh.votes && fh.votes[L] ? sq(fh.votes[L], 'mpb-vote foe', `stroke:${duoRing(Duo.seatOf(L, 1 - me)).col};stroke-dasharray:3 2`) : '').join('') : '';
+    if (!h) return own + theirs;
     let html = own + mpbVoteTiles().map(t => sq(t, 'mpb-ok')).join('');
     for (const L of [0, 1]) { const v = h.votes[L]; if (v) html += sq(v, 'mpb-vote', `stroke:${duoRing(Duo.seatOf(L, me)).col}`); }
-    return html;
+    return html + theirs;
   }
   // a kind's pick on the board (its sheet's "tap one on the board": the Jail's squad, the School's squad or tile):
   // (t) => true when the tap was its (then nothing else happens)
