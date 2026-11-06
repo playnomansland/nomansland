@@ -22,6 +22,16 @@ Branch: everything lands on `claude/exciting-meitner-889u3z` (merged there by th
   Outpost until a tower card comes (maybe never). In round 9 a tower card replaces the current type; that tower's
   bought tower skills go with it (no refund — to check with Vilhelm).
 
+- **Hidden until the fight** (Vilhelm, 6 Nov: "They should be hidden until the fight just like everything else in the
+  game"; "if things are placed on the same tile, they find another spot close to it"): every building placement and
+  board change a team makes this round (a building by the vote, the clock or a bot; the Coal mine's entrance and exit;
+  both Scorch turrets; a grown Tree kojja; Magic lake tiles put down or moved; Dig a new exit) is hidden from both
+  opponents, in both lanes, until the fight, exactly as this round's squads are: they keep seeing the board as the round
+  began (the exit on its old tile, with its old ring). Teammates see everything at once; the fight shows everything;
+  buildings of earlier rounds stay seen. As the fight starts, everything known, what then meets is settled: the newer
+  of two things on one tile (or the one whose own rule only full knowledge shows broken) moves to the nearest tile its
+  own rules allow (see "Hidden until the fight" under Architecture). Nothing is called off or paid back.
+
 ## Claude's readings (flag in PATCH-NOTES "To check with Vilhelm")
 
 - Holding points: each **squad** with at least one living, fighting body inside an artifact's circle adds its **tier**
@@ -38,8 +48,20 @@ Branch: everything lands on `claude/exciting-meitner-889u3z` (merged there by th
 - An Assassin placed in the enemy zone or on a flank tile stands still the flank delay (`FLANK.delay`, 3 s) in its first
   fight, as a flank squad does (the Shadow Den removes that). Enemy squads placed this round are hidden, so an Assassin
   may share a tile with one; as the fight starts the one put there later moves to the nearest tile it may stand on
-  (Vilhelm, 6 Nov: "if things are placed on the same tile, they find another spot close to it"; `Duo.unstack`, and
-  `Mpb.unclash` for a building voted onto a hidden squad).
+  (Vilhelm, 6 Nov: "if things are placed on the same tile, they find another spot close to it"; `Duo.settleBoard`).
+- Hidden until the fight, readings: (a) a rule only one side's thing has (the Assassin's "not on or next to a
+  building", a building's 2-tile room, "no squad or building on the 8 tiles round an exit", a lake tile never shutting
+  a tile off, a wall never on water) is checked again as the fight starts with everything known; the thing whose rule
+  is broken moves (even when it was there first), the newer one when both broke one (the same tile). Only what was
+  put down, placed or moved this round moves: the rest was seen by all. (b) The vote and the draft stay open to all
+  (the artifact's card says which building the team got) but never the tile chosen or the tile votes; the shared
+  deploy clock still waits for a vote and starts again once both teams' are done, so the opponents learn when, never
+  where. (c) Every deploy check is judged as the acting team sees the board (the page holds that view; the server
+  judges in `Mpb.asSeen`), so a refusal never shows a hidden thing, and page and server always agree. Also: a moved
+  building goes, when it can, to the nearest tile where nothing else then breaks a rule (so an Oak voted onto a
+  hidden Assassin lands 2 tiles off, not next to it, and the Assassin stays); a Cog Builder's Factory never moves (the
+  other thing does); a thing with no room anywhere stays, and the other one moves instead if it can; neither can: both
+  stay. Insider information (the Shadow Den) shows squads only, never this round's buildings.
 
 ## Architecture (contracts every group codes against; as built by group F, 6 Nov)
 
@@ -104,9 +126,10 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
     several tiles...); `info(m, side, rec)` → short plain lines for the generic sheet.
   - Hooks added after the integration review (6 Nov): `clear(lanes, side, rec, res, sums, round)` → squads a fall takes
     off the board, run for every building before any `afterFight` (the Den's Shadowhands); `clashOk(m, side, rec, part,
-    col, row)` → where a tile (or part) may go when it stands on a hidden enemy squad as the fight starts (`Mpb.unclash`;
+    col, row)` → where a tile (or part) may go when it must move as the fight starts (`Mpb.moveTile`, `Mpb.unclash`;
     default `spotOk(..., strict)`; the Coal mine's moved exit). `spotOk`'s 7th argument `strict`: with everything known
-    (else as the team sees the board, `seenTaken`).
+    (else as the team sees the board, `seenTaken`). `seen(rec, round)` (6 Nov) → the record as the opponents see it
+    while deploying (`Mpb.seenList`: this round's board change undone, a copy).
   - Hooks the B groups added (all default off: a kind without them changes nothing; integrated 6 Nov):
     - Take-backs: `canUndo(m, side, rec, id, lane)` → false refuses a take-back (`Mpb.canUndo`; B1 the Tree kojja's
       Nest while a squad is in it, Grow once the new kojja has a skill; B3 Dig a new exit once the old tile is taken).
@@ -152,8 +175,60 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
     that player acts on (the head, or their own in the run of one-player entries at the head), `Mpb.placeEntry` places
     it; `Duo.mpbClock` keys a one-player head by its lane. A queue entry with `skill: true` (queued by a skill click) is
     hidden from the opponents.
-- Opponents' view: `Mpb.hide(s, h)` (from `Referee.hide`): this round's clicks taken out of `n`/`by`, the team's votes
-  blanked, then each kind's `hide`. Records themselves are seen as soon as they are placed (the draft is public).
+- Opponents' view: `Mpb.hide(s, h)` (from `Referee.hide`): this round's clicks taken out of `n`/`by`, then each kind's
+  `hide`, then this round's placements (`Mpb.seenList`, below); the team's queue is `m.mpbSeen[h]` (what was queued
+  in the open, the draft's cards) with the votes blanked.
+
+### Hidden until the fight (6 Nov, Vilhelm: "They should be hidden until the fight just like everything else")
+
+- Markers on the records (team state, so the team sees them; only the round matters): `rec.placed = round` (a
+  building `Mpb.placeEntry` placed: the vote, the clock, a bot, a one-player placement, a grown kojja, both Scorch
+  turrets), `rec.pplaced[part] = round` (a part placed onto an older record), `rec.down = round` (a Magic lake tile
+  put down or moved), `rec.data.moved = round` (Dig a new exit: `data.from` the old tile).
+- `Mpb.seenList(list, round)`: side's records as the other team sees them while deploying: a record placed this
+  round is left out, a part placed this round is left out, and a kind's `hooks.seen(rec, round)` gives the record as
+  the round began (`coalMine`: the exit back on `data.from`, no `moved` / `from` / `by` keys, also none after a
+  take-back's 0 / null; `magicLake`: a tile `down` this round is not down, col -1, no `down` key). Records changed are
+  copies. The opponents' view is then byte-identical before and after any placement (the server's sync goes only when
+  a view changes, so even its timing tells nothing). `addRec`'s key: the list's length + 1, but a record the opponents
+  see at once (a lake tile from the card, a kojja standing for the other team) leaves this round's hidden placements
+  out of the count, so no gap in the keys tells of one.
+- `m.mpbSeen = [[entry, ...], x2]` (team state, `Duo.TEAM_FIELDS`): the queue as the opponents see it: what
+  `Mpb.queue` added in the open (not a skill's `skill: true` entry, not a part's), never taken off by a placement;
+  reset each round start (`Mpb.roundStart`).
+- Seen mode: `Mpb.asSeen(side, fn)` runs fn with the board's tile functions (`recAt`, `at`, `terrainAt`,
+  `buildingTiles` through `Mpb.tileRecs`, and so `Game.occupied` / `mpbAt`, `terrainBlocks`, `bldgSeen`, `spotOk`,
+  `lakeOk` / `lakeFree`, `exitFree` / `exitMoveOk`, `canPlaceAt`...) counting the other team's records as `seenList`
+  gives them (cached per list while it runs; the other team's Cog Builder's Factories only from earlier rounds). The
+  server (src/duo.js) wraps every deploy-time action in it for the acting team: `Duo.act` (`Ref.act`), `sysAct` /
+  `sysApply` (votes), `mpbBots` and `mpbTick` (bots' votes, the clock's result, per team), `botTurn`, `undoAllAllowed`
+  and `rebuildTeam` (Undo all's replays; the presser's squad moved by `relocate(..., seen)` counts the other team only
+  as seen: `Game.enemyHolds` / `bldgSeen`). The page needs nothing: its view already is that board. Outside it (the
+  round's start, the artifacts' roll, the fight's start) everything is as it stands.
+- Stamps (server only, in D, never in a view): `D.stamp[seat][id]` (squads) and `D.bstamp[team]['<key>|<part>']`
+  (building tiles, parts, lake tiles; a Bastion wall `'w|col,row,edge'`) = `{ c, r, n }`, all on the one counter
+  `D.stampN`, noted after every action, sys action and tick (`Duo.stampAll`); n is 0 for what stood as the round began
+  and for a thing back on its round-start tile (`D.stamp0`, `D.bstamp0`, set in `beginRound` after the bots' turns).
+- The fight's start: `Duo.runFight` → `mpbSettle` (open votes placed, as the team sees the board) → `stampAll` →
+  **`Duo.settleBoard(D)`** → `fight`. settleBoard: Magic lake tiles nobody put down go down first (`Mpb.settleLakes`,
+  everything known); then, until nothing is broken (at most 160 moves), `Duo.things` (squads, Cog Builder's
+  Factories, `Mpb.boardTiles`: every building tile and part with `fresh` = the other team doesn't see it there, lake
+  tiles, Bastion walls) and `Duo.conflicts`: `breaks(X, Y)` = 'same' (one tile), 'ring' (on a tile round a Coal mine's
+  exit), 'near' (an Assassin on or next to a building tile or Factory), 'room' (a building with spacing within 2 tiles
+  of another building), 'water' (a wall on water), plus 'shut' (a fresh lake tile that, with all the water known,
+  shuts a tile off: `lakeFree`). Two things of one team count only for two squads (Undo all) or a thing this settle
+  moved. The mover: the breaker (it must be fresh, or moved by the settle; a squad in a 'same' with another squad
+  always may, as `unstack`); both broke it: the newer (bigger n), then the one out of its own zone, then `RANK` (squad,
+  part, building, water, wall), then `mrand(D, 17 + guard)` with the pair in a fixed order. The newest mover goes first.
+  It moves with its kind's rules, everything known: a squad `relocate` (its placement rules as a move, nothing on the
+  tile in either lane; an Assassin also off the other team's Factories), a building tile or part `Mpb.moveTile`
+  (`spotOk` strict, or `hooks.clashOk`; preferring a tile where no other fresh thing then breaks a rule: not next to
+  an Assassin, not in another's room, no fresh thing in a moved exit's ring), a lake tile `lakeSpots` strict, a wall the
+  nearest edge of the same way round `bwallSpotOk` allows. It keeps its stamp. No tile: it stays, and the other one
+  moves instead if it can. `D.settled` logs the moves (tests). Then `Duo.settle` → `Mpb.settle` (`unclash`, the lake's
+  `settle`) finds nothing left; they stay as the fallback for a fight without D (node tests' `Duo.settle`).
+- The server (server/src/duo.js): a sync goes to a phone only when its view changed, and a 'status' only when its
+  clock did (`clockNews`, after an act and after an alarm's tick; the alarm no longer forces a sync to all four).
 - Placement: `Mpb.spotOk(m, side, kind, part, col, row, strict)` (as the team sees the board unless strict), `Mpb.spots(...)` (all allowed tiles, back of the zone and
   middle first), `Mpb.autoSpot(...)` (the first). `Game.mpbAt(m, col, row)` (in `Game.occupied`): every MPB tile and
   part is taken for both teams' squads (unless `place.open`). A kind that lets squads in (garrison, School) uses
@@ -253,7 +328,9 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
 4. Player actions: skills through `Game.mpbBuy` (+ `bought` / `unbuy` / `canBuy`), anything else through
    `Game.mpbAct` (`canAct` / `act`); both are already in `Referee.ACTIONS` and `Duo.TEAM_FNS`. Never add a new
    top-level action unless it can't be one of these.
-5. Hidden info: `hide(s, h, rec)` for whatever the opponents mustn't see while deploying.
+5. Hidden info: `hide(s, h, rec)` for whatever the opponents mustn't see while deploying. A placement through the vote
+   or `Mpb.queue` is hidden by the framework (`rec.placed`); a kind whose action changes the board some other way gives
+   `seen(rec, round)` (the record as the round began, a copy) so both the view and the server's seen mode hide it.
    Take-backs: `canUndo` when a take-back would leave something wrong (a squad on the building's tile, gold stuck);
    Undo all goes through the same rule.
 6. Look: `MPB_DRAW.<kind>` in src/render2d.js, `BUILD['mpb:<kind>']` in src/models3d.js (art direction:
