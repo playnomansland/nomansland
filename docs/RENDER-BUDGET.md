@@ -107,6 +107,27 @@ Units are **instanced already**. `placeBodies()` in `src/render3d.js` groups bod
 - In the worst fight, 13 unit models make 39 draw calls for 173 bodies. The whole frame is 78 calls in the main pass (`renderer.info.render.calls`), 92 in Meadow.
 - With shadows on (quality High and Medium), every unit mesh is drawn a second time into the shadow map. `renderer.info.render` doesn't count that pass, because three.js resets it after the shadows are drawn. So on High and Medium **a unit's real vertex cost is about 2× its triangles**. The per-body numbers below already allow for this, since the stress test runs with shadows on.
 
+**Draw calls by model kind in the worst fight** (match 700017, round 11, at its peak of 173 bodies; all solid, no stealthed or glass bodies. Each of those looks would be another `kind#look` group with its own calls):
+
+| Model kind | Bodies | Parts | Calls (main pass) | Tris/body | Tris |
+|---|---|---|---|---|---|
+| goblin | 60 | tint + team + fixed | 3 | 136 | 8,160 |
+| skeleton | 32 | tint + team + fixed | 3 | 220 | 7,040 |
+| slimeshot | 30 | tint + team + fixed | 3 | 112 | 3,360 |
+| flier | 20 | tint + team + fixed | 3 | 88 | 1,760 |
+| wizard:fire | 7 | tint + team + fixed | 3 | 140 | 980 |
+| wizard:earth | 7 | tint + team + fixed | 3 | 150 | 1,050 |
+| spider | 6 | tint + team + fixed | 3 | 296 | 1,776 |
+| meteor | 5 | tint + team + fixed | 3 | 224 | 1,120 |
+| wizard:slime | 2 | tint + team + fixed | 3 | 140 | 280 |
+| wizard:leaf | 1 | tint + team + fixed | 3 | 154 | 154 |
+| sniper | 1 | tint + team + fixed | 3 | 192 | 192 |
+| brute | 1 | tint + team + fixed | 3 | 140 | 140 |
+| wizard:steel | 1 | tint + team + fixed | 3 | 138 | 138 |
+| **13 kinds** | **173** | | **39** | | **26,150** |
+
+So 60 goblins cost the same 3 calls as 1 Brute. The other calls in the frame (78 on PC in the fight's own look; 92 on PC and 95 on the iPhone in Meadow) are structures (3 a model kind), scenery (instanced models, impostor cards, plants), the ground, rings, the sprite layer, beams, flame fans and projectiles. With shadows on, every unit group is drawn again in the shadow pass (39 more calls here), and `renderer.info` counts neither those calls nor their triangles. The stress page's test model keeps 3 parts, so its call counts match the real models'.
+
 **Draw calls are not the limit.** 78 calls is low for a phone (95 on the iPhone in Meadow, at every step), and adding bodies doesn't add calls. The budget is in triangles (vertices), and on a phone at 2× pixel ratio, in fill rate. Merging further (all unit models into one mesh) would save about 30 draw calls and wouldn't raise the triangle budget. Nothing to build here (step 7).
 
 ## 4. Stress test on the iPhone
@@ -114,6 +135,8 @@ Units are **instanced already**. `placeBodies()` in `src/render3d.js` groups bod
 **Page:** https://playnomansland.github.io/tools/tri-budget/stress.html (dev only: nothing in the game links to it, and it changes nothing in the game). Locally: serve the repo and open `/tools/tri-budget/stress.html`.
 
 What it does: it plays the worst fight from step 2 (`worst-fight.json`) on the real 3D board, with the real towers and effects, in the Meadow look (the most scenery, 279k triangles). The first 4 fight-seconds play on a loop at the game's speed (1.5×), so the board stays near its peak (about 155 bodies on average, never under 106) and full of shots. Every unit model is swapped for a test body with a set number of triangles (three spheres, split 60/30/10 over the tint, fixed and team parts like a real model, so the draw calls stay the same). Towers and buildings keep their own models. **Run sweep** steps through total unit triangles (the game's own models, then 50k, 100k, 200k, 400k and 800k at 173 bodies). Each step warms up for 3 s and is measured for 10 s. The page then shows average fps, the 95th and 99th percentile frame times, the worst frame, frames over 20 ms, frame triangles, draw calls, scenery triangles and bodies. **Copy results** puts the table on the clipboard.
+
+**Settings for every measurement in this doc:** quality **High**, pixel ratio **2** (the canvas at 2 pixels per CSS pixel; both phones are DPR 3, and High caps it at 2), **shadows on** (PCFSoftShadowMap, 2048), MSAA on, strategic view. "Frame tris" and "calls" are `renderer.info.render.triangles` and `.calls`: the main pass only, not the shadow pass. The stress page prints quality and pixel ratio in its header line. Medium (1.5×, shadows) and Low (1×, no shadows) weren't measured, since High already held 60 at every step. Run them with `?q=medium` / `?q=low`.
 
 A step **holds 60** when it averages ≥ 57 fps with the 95th percentile frame at ≤ 20 ms. It **holds 30** at ≥ 29 fps with ≤ 40 ms.
 
