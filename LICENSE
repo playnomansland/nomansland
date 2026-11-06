@@ -1,0 +1,32 @@
+No Mans Land (Phone Bellum)
+Copyright (c) 2026 Vilhelm (GitHub: snetendare). All rights reserved.
+
+This repository is public so that the game can be hosted and played. Being
+public does not make it open source, and no licence is granted.
+
+Unless you have written permission from the copyright holder, you may not
+copy, modify, distribute, host, publish, sell, sublicense or make derivative
+works of any part of this repository, in whole or in part. This covers the
+source code, the server code, the built game pages, the art, 3D models,
+pictures, music, sound effects, text, and the game's unit, skill and balance
+design as written here.
+
+What you may do:
+- Play the game at its official address.
+- View the files in your browser or on GitHub, and fork the repository on
+  GitHub, only as far as GitHub's Terms of Service require.
+
+Third-party parts
+-----------------
+These parts are not covered by the notice above. Each keeps its own licence:
+
+- three.js 0.180.0 (vendor/three.*.min.js): MIT licence, Copyright (c) 2010-2025 three.js authors.
+- PeerJS 1.5.4 (peerjs.min.js): MIT licence, Copyright (c) 2015 Michelle Bu and Eric Zhang.
+- KayKit Dungeon Pack by Kay Lousberg (used in src/kaykit3d.js): CC0.
+- Stylized Nature MegaKit by Quaternius (used in models/scenery.bin): CC0.
+- Mobile Controls icons by Kenney (menu music player): CC0.
+- Fonts loaded from Google Fonts (Bangers, Chakra Petch, IBM Plex Sans,
+  IBM Plex Mono): SIL Open Font License 1.1.
+
+For permission or questions, contact the copyright holder through GitHub
+(https://github.com/snetendare).

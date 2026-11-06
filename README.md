@@ -313,3 +313,7 @@ Still to come: the Rollers' "ent" form, the faction's trait and its own tower (t
 
 Leader `otto` (All units only). `Game.SLOT` holds the numbers: 50 gold a spin, 3 a round, odds skull/shoe/coin 12%, goblin 3%, chest 1%. Outcomes come from `slotOutcome(m, side, round, k)` (seeded by the match, side, round and spin number), so both phones agree; `slotReels` gives the three symbols shown. `spin()` applies a spin here (gold, health floored at 1, the goblin squad: `gift: true`, level 1, unlocked, not counted as a deployment, can't be taken back). Horseshoes (since 2026-11-03) give, at random, +1 deployment or +1 free move every round for the rest of the match (`shoeKind`, `shoePerks`, `shoePerk`; the spin's record keeps `shoe`: 'deploy', 'move' or 'gold'); one of each at most, so the next horseshoe gives the other, and with both it pays `SLOT.shoeGold` (200). The host's `takeSpins` works out the same perks. Multiplayer: the guest sends `slots` (its spin count) and the host replays them with `takeSpins` for the health cost; the host's round 1 spins are hidden like its leader. A spin resets Undo all. Bot and Claude opponent: `aiSlots`. UI: `openSlots` / `doSpin` / `foeSlotNews` in `src/site-template.html`. Tests: `tools/tests/otto.js` (headless), `tools/tests/otto-ui.js` (browser).
 
+
+## Licence
+
+All rights reserved: see [LICENSE](LICENSE). The repository is public only so the game can be hosted. Third-party parts (three.js, PeerJS, the CC0 model and icon packs, Google Fonts) keep their own licences, listed in the same file.

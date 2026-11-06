@@ -20,6 +20,14 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 6 November 2026 – A licence for the game
+
+Nothing changes in the game.
+
+- **The repository now has a `LICENSE` file:** No Mans Land is all rights reserved. The code is public only so the game can be hosted; copying, rehosting or reusing the code, art, music or design needs permission. Third-party parts (three.js, PeerJS, the CC0 model and icon packs, Google Fonts) keep their own licences, listed in the file.
+
+---
+
 ## 6 November 2026 – Developers: a triangle budget for 3D unit models
 
 Nothing changes in the game.
