@@ -25,7 +25,8 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 Nothing changes in the game.
 
 - **How many triangles a unit model may have**, measured instead of guessed: `docs/RENDER-BUDGET.md`. Every model's triangle count, the biggest board in 40 AI matches (173 bodies in round 11), and how the 3D board draws units. Units are instanced already, so the limit is triangles, not draw calls.
-- **A stress test page for phones** (developers only, nothing links to it): `tools/tri-budget/stress.html` plays that biggest fight with test models of a set size and measures the frame rate at each size. The final per-model numbers come from running it on an iPhone.
+- **A stress test page for phones** (developers only, nothing links to it): `tools/tri-budget/stress.html` plays that biggest fight with test models of a set size and measures the frame rate at each size.
+- **Measured on Vilhelm's iPhone:** that fight held 60 fps even with 30× today's unit triangles (714k), so unit models have plenty of room. The budget: 500,000 triangles for all units on the board, at most 2,890 a body (or by squad size: up to 4,600 a body for single units, down to 990 for a 12-body swarm). No model today comes close.
 - Tools in `tools/tri-budget/`: `count.js` (triangles per model and squad), `worst.js` (the biggest board in a Balance Lab batch).
 
 ---

@@ -1,6 +1,6 @@
 # Render budget: triangles for unit models on the 3D board
 
-**Status (2026-11-06): measured on PC, waiting for the iPhone sweep.** Steps 1–3 below are measured. The stress page for step 4 is live, and the budget in step 5 is a formula until Vilhelm's iPhone numbers come in. Those numbers then go into the tables marked *pending*.
+**Status (2026-11-06): done.** Measured on PC (steps 1–3) and on Vilhelm's iPhone (step 4). **Budget: 500,000 triangles for all unit models on the board; 2,890 triangles per body as the absolute ceiling; or by squad size, from 4,600 a body for a single-body unit down to 990 for a 12-body swarm.** No model today is over it.
 
 Until now the only rule was the Model Forge's Game check: a warning above 1,400 triangles per model, and "try to stay under about 1,000". That number was a guess, and it was per body, so it said nothing about a full board. This doc replaces it with a total for the board and a per-body ceiling taken from it.
 
@@ -107,7 +107,7 @@ Units are **instanced already**. `placeBodies()` in `src/render3d.js` groups bod
 - In the worst fight, 13 unit models make 39 draw calls for 173 bodies. The whole frame is 78 calls in the main pass (`renderer.info.render.calls`), 92 in Meadow.
 - With shadows on (quality High and Medium), every unit mesh is drawn a second time into the shadow map. `renderer.info.render` doesn't count that pass, because three.js resets it after the shadows are drawn. So on High and Medium **a unit's real vertex cost is about 2× its triangles**. The per-body numbers below already allow for this, since the stress test runs with shadows on.
 
-**Draw calls are not the limit.** 78 calls is low for a phone, and adding bodies doesn't add calls. The budget is in triangles (vertices), and on a phone at 2× pixel ratio, in fill rate. Merging further (all unit models into one mesh) would save about 30 draw calls and wouldn't raise the triangle budget. Nothing to build here (step 7).
+**Draw calls are not the limit.** 78 calls is low for a phone (95 on the iPhone in Meadow, at every step), and adding bodies doesn't add calls. The budget is in triangles (vertices), and on a phone at 2× pixel ratio, in fill rate. Merging further (all unit models into one mesh) would save about 30 draw calls and wouldn't raise the triangle budget. Nothing to build here (step 7).
 
 ## 4. Stress test on the iPhone
 
@@ -121,40 +121,58 @@ URL options: `q=high|medium|low` (default High, the game's default), `view=0..3`
 
 PC check (Windows, Chrome, 390 × 844 at 3× DPR, High, so 2× pixels, the fight's own look): every step held 60. With the game's models the frame was 196k triangles. At 800k unit triangles (4,624 a body) the frame was 970k and still above 120 fps. A PC tells nothing about the phone, so this only shows the page works.
 
-### iPhone results — *pending*
+### iPhone results
 
-Vilhelm's iPhone, quality High, strategic view, Meadow: *(paste the copied table here)*
+Vilhelm's iPhone (428 × 926 screen, DPR 3, iOS 18.7 Safari), 2026-11-06. Settings: quality High (2× pixels, shadows on), strategic view, Meadow look, the worst fight looping (about 155 bodies on average, never under 106), 3 s warm-up and 10 s measured for each step. The sweep ran in two parts, 09:00 and 09:03.
 
-| Level | Tris/body | Unit tris | fps | p95 ms | Holds |
-|---|---|---|---|---|---|
-| game models | – | ~23k | | | |
-| 50k | 288 | | | | |
-| 100k | 566 | | | | |
-| 200k | 1,164 | | | | |
-| 400k | 2,332 | | | | |
-| 800k | 4,624 | | | | |
+| Level | Tris/body | Unit tris | fps | p95 ms | p99 ms | Worst ms | > 20 ms | Frame tris | Calls | Holds |
+|---|---|---|---|---|---|---|---|---|---|---|
+| game models | – | ~23k | 59.5 | 19 | 20 | 66 | 1% | 351k | 95 | 60 |
+| 50k | 288 | 45k | 59.3 | 19 | 21 | 67 | 1% | 375k | 95 | 60 |
+| 100k | 566 | 87k | 59.4 | 20 | 23 | 65 | 2% | 423k | 95 | 60 |
+| 150k | 874 | 135k | 59.4 | 20 | 21 | 66 | 2% | 476k | 95 | 60 |
+| 200k | 1,164 | 180k | 58.8 | 20 | 29 | 69 | 4% | 526k | 95 | 60 |
+| 400k | 2,332 | 361k | 59.1 | 19 | 21 | 73 | 1% | 728k | 95 | 60 |
+| 800k | 4,624 | **714k** | 59.1 | 19 | 21 | 77 | 2% | **1,125k** | 95 | 60 |
 
-## 5. Budget — *pending the iPhone numbers*
+What it shows:
 
-The formula, once T60 is known (the highest unit-triangle total that holds 60 fps on the iPhone):
+- **Every step held 60 fps**, up to 714k unit triangles (4,624 a body) and a 1.1 M-triangle frame. With shadows on, the GPU drew about twice that, so roughly 1.4 M unit triangles. The sweep didn't find where 60 breaks, and it didn't get anywhere near 30, so **T60 ≥ 714k** is a measured floor, not the exact limit.
+- **Unit triangles are not what limits this phone.** Frame times barely moved from the game's own models to 30× more unit triangles: the 95th percentile frame stayed at 19–20 ms and 1–4% of frames went over 20 ms at every step, the game's own models included. Those occasional slow frames come from something else: pixels (2× resolution, MSAA, MeshStandardMaterial), scenery or frame pacing. `docs/PERFORMANCE.md` (T1–T3, T7) is where to look for them.
+- Each step was 10 s on a cool phone. A whole match on a warm phone may throttle. The 30% headroom in the budget is there partly for that.
+- 30 fps: not reached in this sweep (all ≥ 58.8 fps). A higher sweep (`?levels=1600,3200`) would find the limits, but the budget below doesn't need them.
 
-- **Board total for unit models** = 0.7 × T60. The 30% headroom is for effects, projectiles, scenery and the UI. The sweep already runs with the heaviest scenery (Meadow) and this fight's effects, so in practice the 30% is margin for 2v2, new effects and older iPhones.
-- **Per-body ceiling** = 0.7 × T60 / 173. Any model under this fits even if every body on the worst board wore it.
-- **Per-squad guide** = 0.7 × T60 / 42 (the worst board had 42 squads). Divide by the squad's bodies to get its triangles per body. This gives a 12-body swarm a twelfth of a single giant's per-body allowance. It holds for any mix of squads, as long as there are no more than 42.
-- **Skins**: a skin replaces one unit's model for every squad of that unit one player owns, so it uses the same per-squad guide as the unit, and a skin on a swarm unit uses the swarm's per-body number. Leaders have no 3D model today. If one gets one (one body a side), it can take the single-body number.
+## 5. Budget
 
-| | Formula | Value |
+T60 = 714k unit triangles (the highest total measured, which still held 60 fps).
+
+- **Board total for unit models: 500,000 triangles** (0.7 × 714k). The 30% headroom covers effects, projectiles, scenery and the UI on top of what the sweep already had (the heaviest scenery and a full fight's effects), plus a warm phone, 2v2 and new effects. The **whole frame** at T60 was 1.1 M triangles in the main pass.
+- **Absolute per-body ceiling: 2,890 triangles** (500k ÷ 173). Any model under this fits even if every body on the worst board wears it. For the Model Forge, this is the one number to check against when it doesn't know the squad size.
+- **Per squad: 11,900 triangles** (500k ÷ 42, the most squads on one board). A squad's triangles per body = 11,900 ÷ its bodies, capped at 4,600 (the biggest body measured). This holds for any mix, as long as there are no more than 42 squads.
+
+| Bodies in the squad | Max triangles a body | Examples today (tris/body now) |
 |---|---|---|
-| Board total (unit models) | 0.7 × T60 | *pending* |
-| Whole frame at T60 | from the sweep | *pending* |
-| Per-body ceiling (absolute) | 0.7 × T60 / 173 | *pending* |
-| Per squad | 0.7 × T60 / 42 | *pending* |
-| 1-body unit / skin | per squad | *pending* |
-| 2–3 bodies | per squad / bodies | *pending* |
-| 6–8 bodies | per squad / bodies | *pending* |
-| 10–12 bodies | per squad / bodies | *pending* |
+| 1 | 4,600 | Brute 140, Obelisk 776, War Mammoth 464, the wizards 134–162 |
+| 2 | 4,600 | Ent 228, Rogue 144, Wisps 88 |
+| 3 | 3,900 | Shiv 160 |
+| 4 | 2,900 | Ember Imps 88 |
+| 6 | 1,950 | Spiders 296 |
+| 8 | 1,450 | Skeleton Archers 220 |
+| 10 | 1,150 | Slimeshots 112 |
+| 12 | 990 | Goblin Swarm 136 |
 
-**Models over the budget:** *pending.* Every model today is under 1,000 triangles a body, and the biggest squad is 1,776.
+**By tier**, from today's roster: tier 1 has the big swarms (Goblin Swarm 12, Skeleton Archers 8), so it takes the tightest per-body numbers (990–1,450). Tier 2 has Spiders and Slimeshots (1,150–1,950 a body), and its single-body units get 4,600. Tiers 3 and 4 are single bodies apart from the 2-body Rogue, so they get 4,600. Go by the squad's bodies, not its tier: a squad's bodies fix its share.
+
+**Skins and leaders:** a skin replaces a unit's model for every squad of that unit, so it follows the same line as the unit's body count: up to 4,600 for a single-body unit's skin (Brute, Golem, Fire Mage), the swarm's number for a swarm skin (Gold Spiders: 1,950). Leaders have no 3D model today. If one gets one (one body a side), it can take 4,600 too. Nothing above 4,600 a body was measured, so going over that needs another stress run first.
+
+**Spawned bodies** (Necromancer skeletons, goblins from Spawn) were in the measured fights. A unit that spawns many bodies should count them in its squad's bodies.
+
+**Models over the budget: none.** The biggest body today is obelisk:eye at 904 triangles (a 1-body unit, allowed 4,600), and the biggest squad is Spiders at 1,776 (allowed 11,900). The Model Forge saves (Fire Mage 351, Leaf Wizard 327, Gold Spiders 280) are all well under. Today's game uses about 5% of the unit budget (26k of 500k on the worst board).
+
+**For the Model Forge's Game check** (it lives in the claude.ai artifact): replace "warn above 1,400, try to stay under about 1,000" with:
+- warn above **2,890** a body when the squad size isn't known;
+- when it is known, warn above **min(4,600, 11,900 ÷ bodies)** (the table above);
+- always warn above **4,600** (bigger than anything measured on the iPhone).
 
 ## 6. Notes for later (not built)
 
