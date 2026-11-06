@@ -16,7 +16,8 @@
 //  - Waterspirits (50, per tile): the team walks on it, 30% slower, +5% health a second on it; the enemy can't
 //  - Become Water elemental (200, per tile): a Water Elemental (a level 2 Water Mage's) on the tile every fight
 //  - no downside: never a fight body to destroy; mirror: both teams' lakes heal alike
-//  Both: hidden info (this round's clicks; placements are public), the page's copy hashing as the server's after every
+//  Both: hidden info (this round's clicks, and since 6 Nov this round's placements too: a lake tile put down, an exit
+//  dug, until the fight; tools/tests/mpb-hidden.js has the rest), the page's copy hashing as the server's after every
 //  action, a full bot 2v2 to round 10 with both kinds in for both teams.
 // Run: node tools/tests/mpb-b3.js
 const assert = require('assert');
@@ -209,7 +210,7 @@ check('coal mine: Dig a new exit (150): one move, flank tiles too, taken back wi
   assert.deepStrictEqual(Mpb.recOf(x.m(0), 0, key).parts.exit, { col: 1, row: 7 });
   assert.ok(Game.occupied(x.m(0), 1, 2, 6) && !Game.occupied(x.m(0), 1, 12, 9), 'the blocked tiles moved with it');
   assert.ok(!x.act(0, 'mpbAct', key, 'exit', 12, 8).ok, 'only once');
-  assert.deepStrictEqual(Duo.viewFor(D, 2).m.mpb[0].find(q => q.key === key).parts.exit, { col: 1, row: 7 }, 'the opponents see the new exit (as any placed building)');
+  assert.deepStrictEqual(Duo.viewFor(D, 2).m.mpb[0].find(q => q.key === key).parts.exit, { col: 11, row: 9 }, 'the opponents still see the old exit until the fight (hidden as every placement this round)');
   assert.ok(!Duo.viewFor(D, 2).m.mpb[0].find(q => q.key === key).skills.shaft, 'but not this round\'s skill');
   assert.ok(x.act(0, 'mpbUndo', key, 'shaft').ok, 'A1 takes the skill back');
   assert.deepStrictEqual(Mpb.recOf(x.m(1), 0, key).parts.exit, { col: 11, row: 9 }, 'the exit goes back'); sameTeam(D, 0);
@@ -408,7 +409,7 @@ check('magic lake: mirrored lakes with Waterspirits heal both teams alike', () =
 });
 
 // ===================================== both =====================================
-check('hidden info and the page\'s copy: this round\'s clicks hidden, placements public, hashes as the server after every action', () => {
+check('hidden info and the page\'s copy: this round\'s clicks and placements hidden, hashes as the server after every action', () => {
   const x = match(321), { D } = x;
   const key = addMine(D, 0, 11, 15, 11, 9), lakes = addLake(D, 0);
   for (const R of D.lanes) R.m.gold[0] = 2000;
@@ -433,11 +434,11 @@ check('hidden info and the page\'s copy: this round\'s clicks hidden, placements
   assert.ok(try1(0, 'mpbBuy', key, 'air').ok);
   assert.ok(try1(1, 'mpbBuy', key, 'shaft').ok && try1(0, 'mpbAct', key, 'exit', 12, 8).ok);
   assert.ok(try1(0, 'mpbUndo', lakes[0], 'elemental').ok);
-  // the opponents: this round's clicks hidden; water and the exit as they are
+  // the opponents: this round's clicks hidden, and the water put down and the exit dug this round too (until the fight)
   const v = Duo.viewFor(D, 2).m;
   for (const k of [lakes[2], lakes[0], key]) assert.deepStrictEqual(Mpb.recOf(v, 0, k).skills, {}, 'B1 doesn\'t see this round\'s skills of ' + k);
-  assert.ok(Game.terrainBlocks(v, 15, 9) && Game.terrainBlocks(v, 9, 9), 'but sees the water (it is the board)');
-  assert.deepStrictEqual(Mpb.recOf(v, 0, key).parts.exit, { col: 12, row: 8 });
+  assert.ok(!Game.terrainBlocks(v, 15, 9) && !Game.terrainBlocks(v, 9, 9), 'nor the water put down this round');
+  assert.deepStrictEqual(Mpb.recOf(v, 0, key).parts.exit, { col: 11, row: 9 }, 'the exit where it stood as the round began');
   assert.ok(Mpb.recOf(Duo.viewFor(D, 1).m, 0, lakes[2]).skills.spirits, 'the teammate sees it');
   // Undo all: A1's own actions go (their tiles back to not down), A2's stay
   assert.ok(x.act(0, 'undoAll').ok);
@@ -468,24 +469,25 @@ check('coal mine: Dig a new exit can\'t be taken back once its old tile is taken
   // A2 moves the water away again: now it may be taken back
   assert.ok(x.act(1, 'mpbAct', lk[2], 'place', 15, 13).ok && x.act(0, 'mpbUndo', key, 'shaft').ok, 'free again: taken back');
   assert.deepStrictEqual(Mpb.recOf(x.m(1), 0, key).parts.exit, { col: 11, row: 9 }); sameTeam(D, 0);
-  // (2) the other team's exit moved onto the old exit tile
+  // (2) the other team can't take the old exit tile: until the fight it still sees A's exit there (a dug exit is hidden
+  // like every placement this round), so A's take-back is never blocked by the other team
   const y = match(332), D2 = y.D;
   const ka = addMine(D2, 0, 11, 15, 11, 9), kb = addMine(D2, 1, 12, 2, 12, 7);
   for (const R of D2.lanes) R.m.gold = [1000, 1000];
   Duo.setTeams(lanesOf(D2));
   assert.ok(y.act(0, 'mpbBuy', ka, 'shaft').ok && y.act(0, 'mpbAct', ka, 'exit', 6, 9).ok);
-  assert.ok(y.act(2, 'mpbBuy', kb, 'shaft').ok && y.act(2, 'mpbAct', kb, 'exit', 11, 9).ok, 'team B digs its exit where A\'s was');
-  assert.ok(!y.act(0, 'mpbUndo', ka, 'shaft').ok && !y.act(0, 'undoAll').ok, 'A can\'t put its exit back on B\'s');
-  assert.deepStrictEqual([Mpb.recOf(y.m(0), 0, ka).parts.exit, Mpb.recOf(y.m(0), 1, kb).parts.exit], [{ col: 6, row: 9 }, { col: 11, row: 9 }]);
-  // (3) A2 moves the exit, team B puts water on the old exit tile: A2's Undo all is refused
+  assert.ok(y.act(2, 'mpbBuy', kb, 'shaft').ok && !y.act(2, 'mpbAct', kb, 'exit', 11, 9).ok, 'team B can\'t dig its exit where A\'s stands as far as B knows');
+  assert.ok(y.act(0, 'mpbUndo', ka, 'shaft').ok, 'A puts its exit back');
+  assert.deepStrictEqual([Mpb.recOf(y.m(0), 0, ka).parts.exit, Mpb.recOf(y.m(0), 1, kb).parts.exit], [{ col: 11, row: 9 }, { col: 12, row: 7 }]);
+  // (3) A2 moves the exit, team B can't put water on the old exit tile (for B the exit is still there): A2's Undo all goes through
   const z = match(333), D3 = z.D;
   const kc = addMine(D3, 0, 11, 15, 11, 9), lb = addLake(D3, 1);
   for (const R of D3.lanes) R.m.gold = [1000, 1000];
   Duo.setTeams(lanesOf(D3));
   assert.ok(z.act(1, 'mpbBuy', kc, 'shaft').ok && z.act(1, 'mpbAct', kc, 'exit', 6, 9).ok);
-  assert.ok(z.act(2, 'mpbAct', lb[0], 'place', 11, 9).ok, 'B1\'s water on A\'s old exit');
-  assert.ok(!z.act(1, 'undoAll').ok, 'refused');
-  assert.ok(Mpb.recOf(z.m(0), 0, kc).parts.exit.col === 6 && Game.terrainBlocks(z.m(0), 11, 9));
+  assert.ok(!z.act(2, 'mpbAct', lb[0], 'place', 11, 9).ok, 'B1 can\'t put water on A\'s old exit (it sees the exit there)');
+  assert.ok(z.act(1, 'undoAll').ok, 'A2\'s Undo all puts the exit back');
+  assert.ok(Mpb.recOf(z.m(0), 0, kc).parts.exit.col === 11 && !Game.terrainBlocks(z.m(0), 11, 9));
   // (4) only a squad on the old exit's ring: the take-back goes through (as any exit may stand next to squads)
   const w = match(334), D4 = w.D;
   const kd = addMine(D4, 0, 11, 15, 11, 9);

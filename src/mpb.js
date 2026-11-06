@@ -223,7 +223,7 @@
         return spots(m, side, 'treeKojja', null).length > 0;
       },
       // (the queue entry is hidden from the opponents as the click is: Mpb.hide drops entries with `skill`)
-      bought(m, side, rec, sk, args, lane) { if (sk.id === 'grow') { queue(m, side, 'treeKojja', null, null, lane); const q = voteQueue(m, side); q[q.length - 1].skill = true; } },
+      bought(m, side, rec, sk, args, lane) { if (sk.id === 'grow') queue(m, side, 'treeKojja', null, null, lane, true); },
       // no take-back of Nest while a squad stands in the kojja (it would be left on a building's tile; as Overwatch,
       // game.js), nor of Grow once someone bought a skill on the new kojja (that gold would be stuck on it)
       canUndo(m, side, rec, id, lane) {
@@ -475,6 +475,15 @@
         rec.data.from = { ...exitOf(rec) }; rec.data.moved = m.round; rec.data.by = lane;
         rec.parts.exit = { col: args[0], row: args[1] };
         return true;
+      },
+      // the opponents (Mpb.seenList): an exit dug this round still stands on its old tile (its old ring too) until the
+      // fight, and the record has no dig keys (as when the round began: none, not 0/null after a take-back)
+      seen(rec, round) {
+        const d = rec.data || {}, dug = d.moved === round && d.from;
+        if (!dug && (d.moved || !('moved' in d || 'from' in d || 'by' in d))) return rec;
+        const data = { ...d };
+        delete data.moved; delete data.from; delete data.by;
+        return { ...rec, parts: dug ? { ...rec.parts, exit: { col: d.from.col, row: d.from.row } } : rec.parts, data };
       },
       // bots: now and then one of the squads they put down this round goes round the entrance (down the mine), Fresh
       // air when they have gold to spare, and sometimes a new exit nearer the enemy
@@ -805,7 +814,10 @@
         structure: true, lesser: true, kind: 'mpb', mpb: 'magicLake', level: 0, ...(lakeSkin(rec) ? { mpbSkin: lakeSkin(rec) } : {}) }),
       canBuy: (m, side, rec) => rec.col >= 0,
       canAct: (m, side, rec, action, args) => action === 'place' && lakeOk(m, side, rec, args[0], args[1]),
-      act(m, side, rec, action, args) { rec.col = args[0]; rec.row = args[1]; rec.round = m.round; return true; },
+      // (rec.down: put down by its player this round, so hidden from the opponents until the fight: hooks.seen)
+      act(m, side, rec, action, args) { rec.col = args[0]; rec.row = args[1]; rec.round = m.round; rec.down = m.round; return true; },
+      // the opponents (Mpb.seenList): a tile put down (or moved) this round is not down yet for them until the fight
+      seen(rec, round) { if (rec.down !== round) return rec; const { down, ...r } = rec; return rec.col >= 0 ? { ...r, col: -1, row: -1 } : r; },
       // as the fight starts: a tile nobody put down, or one put down this round on an opponent's squad (or building) its
       // player couldn't see (either lane), goes on the first tile its player could have put it, everything known
       settle(lanes, side, rec) {
@@ -1476,14 +1488,64 @@
   const skillOf = (kindId, id) => ((kindOf(kindId) || {}).skills || []).find(s => s.id === id) || null;
   const skillN = (rec, id) => (rec && rec.skills[id] ? rec.skills[id].n : 0);
   const thisRound = (m, e) => (e && e.round === m.round ? e.log : []);
-  // a new building of kind on a tile (the caller checked the tile)
-  function addRec(m, side, kindId, col, row) {
+  // a new building of kind on a tile (the caller checked the tile). placed: put down by the team this round (a
+  // placement: Mpb.placeEntry), so hidden from the opponents until the fight (rec.placed = the round, Mpb.seenList).
+  // Its key is the kind's short name and a number: the list's length + 1; a record the opponents see at once (a Magic
+  // lake's tiles from the card, a kojja standing for the other team) leaves out this round's hidden placements, so
+  // its key is the one it would have had without them (a gap would tell them one was made)
+  function addRec(m, side, kindId, col, row, placed) {
     if (!m.mpb) m.mpb = [[], []];
     const K = kindOf(kindId), list = m.mpb[side];
-    const rec = { key: K.short + (list.length + 1), kind: kindId, col, row, parts: {}, round: m.round, fell: 0, skills: {}, data: {} };
+    let n = (placed ? list.length : list.filter(r => r.placed !== m.round).length) + 1;
+    while (list.some(r => r.key === K.short + n)) n++;
+    const rec = { key: K.short + n, kind: kindId, col, row, parts: {}, round: m.round, fell: 0, skills: {}, data: {} };
+    if (placed) rec.placed = m.round;
     list.push(rec);
     if (K.hooks.placed) K.hooks.placed(m, side, rec);
     return rec;
+  }
+  // ----- this round's placements, as the opponents see them (Vilhelm, 6 Nov: "They should be hidden until the fight
+  // just like everything else in the game") -----
+  // Side's records as the other team sees them while deploying: a building placed this round isn't there (rec.placed;
+  // also a part placed this round onto an older one: rec.pplaced[part]), and a kind's hooks.seen(rec, round) gives the
+  // record as it stood when the round began (the Coal mine's exit dug this round on its old tile, a Magic lake tile put
+  // down this round not down yet). The records changed are copies; the list is a new one. Mpb.hide (the opponents'
+  // view) and the server's seen mode (asSeen: the deploy checks as the acting team sees the board) both use it.
+  function seenList(list, round) {
+    const out = [];
+    for (let rec of list) {
+      if (rec.placed === round) continue;
+      if (rec.pplaced) {
+        const pp = { ...rec.pplaced }, parts = { ...rec.parts };
+        for (const p of Object.keys(pp)) if (pp[p] === round) { delete pp[p]; delete parts[p]; }
+        rec = { ...rec, parts };
+        if (Object.keys(pp).length) rec.pplaced = pp; else delete rec.pplaced;
+      }
+      const K = kindOf(rec.kind);
+      if (K && K.hooks.seen) rec = K.hooks.seen(rec, round);
+      out.push(rec);
+    }
+    return out;
+  }
+  // Seen mode (the server, src/duo.js): while asSeen(side, fn) runs, the board's tiles (recAt, at, terrainAt,
+  // buildingTiles: Game.occupied, terrainBlocks, bldgSeen...) count the other team's buildings only as that team's
+  // player sees them (seenList), so the server judges a deploy action exactly as the player's page does (it holds that
+  // view) and a refusal never shows a hidden building. Outside it (the fight's start, the round's start, the page)
+  // everything is as it stands. Nested calls are fine (the bots of the other team vote inside a player's action).
+  let SEE = null, seenCache = new WeakMap();
+  function asSeen(side, fn) {
+    const was = SEE;
+    SEE = side === 0 || side === 1 ? side : null; seenCache = new WeakMap();
+    try { return fn(); } finally { SEE = was; seenCache = new WeakMap(); }
+  }
+  const seeing = () => SEE;
+  // side's records for the board's tiles: as they stand, or (seen mode, the other team's) as seenList gives them
+  function tileRecs(m, side) {
+    const list = recs(m, side);
+    if (SEE !== 1 - side || !list.length) return list;
+    let c = seenCache.get(list);
+    if (!c || c.round !== m.round) { c = { round: m.round, list: seenList(list, m.round) }; seenCache.set(list, c); }
+    return c.list;
   }
   // every tile a building takes, with its part ('' for the building itself; none while it isn't placed yet: col < 0,
   // the Magic lake's tiles before their player puts them down). A record with rec.away (set by its kind: a Tree kojja
@@ -1491,7 +1553,7 @@
   const tilesOf = (rec) => rec.away ? [] : (rec.col >= 0 ? [{ col: rec.col, row: rec.row, part: '' }] : []).concat(Object.entries(rec.parts || {}).map(([p, t]) => ({ col: t.col, row: t.row, part: p })));
   // the building (and part) on a tile, either side: { side, rec, part } or null
   function recAt(m, col, row) {
-    for (const side of [0, 1]) for (const rec of recs(m, side)) for (const t of tilesOf(rec)) if (t.col === col && t.row === row) return { side, rec, part: t.part };
+    for (const side of [0, 1]) for (const rec of tileRecs(m, side)) for (const t of tilesOf(rec)) if (t.col === col && t.row === row) return { side, rec, part: t.part };
     return null;
   }
   // Game.mpbAt: a tile no squad of either team may take (a kind's place.open leaves its tiles free, for its own rules;
@@ -1502,16 +1564,16 @@
     const x = recAt(m, col, row);
     if (x) { const pl = (kindOf(x.rec.kind) || {}).place || {}; if (!pl.open && !pl.terrain) return true; }
     if (only) return false;
-    for (const side of [0, 1]) for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.blocks && K.hooks.blocks(m, side, rec, col, row)) return true; }
+    for (const side of [0, 1]) for (const rec of tileRecs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.blocks && K.hooks.blocks(m, side, rec, col, row)) return true; }
     return false;
   }
   // Game.terrainBlocks: a tile of a kind that is terrain (place.terrain: the Magic lake's water), either team
-  const terrainAt = (m, col, row) => on(m) && [0, 1].some(side => recs(m, side).some(rec => !!((kindOf(rec.kind) || {}).place || {}).terrain && tilesOf(rec).some(t => t.col === col && t.row === row)));
+  const terrainAt = (m, col, row) => on(m) && [0, 1].some(side => tileRecs(m, side).some(rec => !!((kindOf(rec.kind) || {}).place || {}).terrain && tilesOf(rec).some(t => t.col === col && t.row === row)));
 
   // the starting state of a 2v2 lane: both Vaults, no votes (Duo.start, in both lanes)
   function init(m, lane) {
     m.duoLane = lane; m.duoTowers = true;
-    m.mpb = [[], []]; m.mpbVote = [[], []];
+    m.mpb = [[], []]; m.mpbVote = [[], []]; m.mpbSeen = [[], []];
     m.vault = [0, 1].map(() => ({ gold: 0, mode: null, moved: [0, 0], round: m.round, start: 0 }));
     for (const side of [0, 1]) addRec(m, side, 'vault', VAULT_SPOT[side].col, VAULT_SPOT[side].row);
     m.artifacts = null; m.draft = null;
@@ -1539,8 +1601,9 @@
     for (const sd of [0, 1]) {
       const t = (m.towers && m.towers[sd]) || G.towerSpot(m, sd);
       if (t) out.push({ col: t.col, row: t.row });
-      for (const r of recs(m, sd)) if (!((kindOf(r.kind) || {}).place || {}).terrain) out.push(...tilesOf(r)); // (terrain isn't a building)
-      for (const b of G.buildingsOf(m, sd).concat(G.teamBuildings(m, sd))) out.push({ col: b.col, row: b.row });
+      for (const r of tileRecs(m, sd)) if (!((kindOf(r.kind) || {}).place || {}).terrain) out.push(...tilesOf(r)); // (terrain isn't a building)
+      // (seen mode: the other team's Cog Builder's Factories only from earlier rounds, as Referee.hide shows them)
+      for (const b of G.buildingsOf(m, sd).concat(G.teamBuildings(m, sd))) if (SEE !== 1 - sd || b.round < m.round) out.push({ col: b.col, row: b.row });
     }
     return out;
   }
@@ -1615,6 +1678,58 @@
     }
   }
 
+  // ----- the fight's start with everything known (Duo.settleBoard: what was hidden meets) -----
+  // side's building tiles: { sd, rec, part ('' the building itself), col, row, id (rec.key|part), fresh (the other team
+  // doesn't see it there: placed, put down or moved this round, seenList), terrain (a Magic lake tile), spacing (its
+  // kind's 2-tile room), ring: [[col, row]] the tiles round it no squad or building may take (hooks.blocks: the Coal
+  // mine's exit) }
+  function boardTiles(m, side) {
+    const out = [];
+    if (!on(m)) return out;
+    const { COLS, ROWS } = grid(m), seen = new Set();
+    for (const r of seenList(recs(m, side), m.round)) for (const t of tilesOf(r)) seen.add(r.key + '|' + t.part + '@' + t.col + ',' + t.row);
+    for (const rec of recs(m, side)) {
+      const K = kindOf(rec.kind);
+      if (!K) continue;
+      const blocked = [];
+      if (K.hooks.blocks) for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (K.hooks.blocks(m, side, rec, c, r)) blocked.push([c, r]);
+      for (const t of tilesOf(rec)) {
+        const pl = placeOf(rec.kind, t.part || null) || {};
+        out.push({ sd: side, rec, part: t.part, col: t.col, row: t.row, id: rec.key + '|' + t.part, fresh: !seen.has(rec.key + '|' + t.part + '@' + t.col + ',' + t.row),
+          terrain: !!K.place.terrain, spacing: pl.spacing !== false && !K.place.terrain, fixed: K.place.where === 'fixed',
+          ring: blocked.filter(([c, r]) => cheb(c, r, t.col, t.row) === 1) });
+      }
+    }
+    return out;
+  }
+  // a building tile (or part, or Magic lake tile) of side's to the nearest tile its kind may stand on with everything
+  // known (spotOk strict, a kind's hooks.clashOk, a lake tile's lakeSpots strict); prefer(col, row) (optional): the
+  // tiles to take first when there are any (Duo: where nothing else would have to move then). Returns the tile or null
+  // (no room anywhere: it stays). lanes[0]'s record (Duo copies it to lane 1).
+  function moveTile(lanes, side, rec, part, prefer) {
+    const m = lanes[0], K = kindOf(rec.kind);
+    if (!on(m) || !K || K.place.where === 'fixed' || rec.away) return null;
+    const { COLS, ROWS } = grid(m), from = part ? rec.parts[part] : { col: rec.col, row: rec.row };
+    if (!from) return null;
+    let all = [];
+    if (K.place.terrain) {
+      const was = m.duoLane;
+      m.duoLane = rec.data.lane;
+      try { all = lakeSpots(m, side, rec, true); } finally { m.duoLane = was; }
+    } else {
+      const was = part ? rec.parts[part] : null;
+      if (part) delete rec.parts[part]; else rec.away = true; // (its own tile doesn't count while it looks)
+      try {
+        for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (K.hooks.clashOk ? K.hooks.clashOk(m, side, rec, part || null, c, r) : spotOk(m, side, rec.kind, part || null, c, r, true)) all.push({ col: c, row: r });
+      } finally { if (part) rec.parts[part] = was; else delete rec.away; }
+    }
+    all = all.filter(t => !(t.col === from.col && t.row === from.row));
+    const to = (prefer && nearestOf(all.filter(t => prefer(t.col, t.row)), from.col, from.row)) || nearestOf(all, from.col, from.row);
+    if (!to) return null;
+    if (part) rec.parts[part] = to; else { rec.col = to.col; rec.row = to.row; }
+    return to;
+  }
+
   // =====================================================================
   // The placement vote (team state m.mpbVote; its 15 s clock is in D)
   // =====================================================================
@@ -1627,8 +1742,19 @@
     for (let i = 0; i < q.length; i++) { const e = q[i]; if (e.lane == null) return i === 0 ? e : null; if (e.lane === L) return e; }
     return null;
   }
-  // lane (optional, 0 or 1): only that player places it, at once, with no vote (Scorch turrets, a Tree kojja's Grow)
-  const queue = (m, side, kindId, part, key, lane) => { if (!m.mpbVote) m.mpbVote = [[], []]; const e = { kind: kindId, part: part || null, key: key || null, votes: [null, null] }; if (lane === 0 || lane === 1) e.lane = lane; m.mpbVote[side].push(e); };
+  // lane (optional, 0 or 1): only that player places it, at once, with no vote (Scorch turrets, a Tree kojja's Grow).
+  // skill: queued by a skill click (a Tree kojja's Grow: hidden from the opponents as the click is).
+  // m.mpbSeen (team state): the queue as the opponents see it this round: the entries queued in the open (the draft's
+  // cards), never a skill's, never a part's (it comes once a building is placed), and never taken off by a placement
+  // (where and when the team placed it shows in the fight). Mpb.hide gives it to the opponents as the team's queue.
+  function queue(m, side, kindId, part, key, lane, skill) {
+    if (!m.mpbVote) m.mpbVote = [[], []];
+    const e = { kind: kindId, part: part || null, key: key || null, votes: [null, null] };
+    if (lane === 0 || lane === 1) e.lane = lane;
+    if (skill) e.skill = true;
+    m.mpbVote[side].push(e);
+    if (!e.part && !skill) { if (!m.mpbSeen) m.mpbSeen = [[], []]; m.mpbSeen[side].push(clone(e)); }
+  }
   // the head of the queue goes on (col, row): a new building (its parts are voted on next), or a part of one
   const placeHead = (m, side, col, row) => placeEntry(m, side, voteHead(m, side), col, row);
   // an entry of the queue (the head, or a one-player placement: voteEntry) goes on (col, row)
@@ -1636,8 +1762,12 @@
     const q = voteQueue(m, side), i = head ? q.indexOf(head) : -1;
     if (i < 0) return null;
     q.splice(i, 1);
-    if (head.part) { const rec = recOf(m, side, head.key); if (rec) rec.parts[head.part] = { col, row }; return rec; }
-    const rec = addRec(m, side, head.kind, col, row);
+    if (head.part) {
+      const rec = recOf(m, side, head.key);
+      if (rec) { rec.parts[head.part] = { col, row }; if (rec.placed !== m.round) rec.pplaced = { ...(rec.pplaced || {}), [head.part]: m.round }; } // (hidden as a new building is: seenList)
+      return rec;
+    }
+    const rec = addRec(m, side, head.kind, col, row, true); // (rec.placed: hidden from the opponents until the fight)
     if (head.lane != null) rec.data.lane = head.lane; // whose it is (placed by one player alone)
     q.splice(i, 0, ...((kindOf(head.kind).place.parts) || []).map(p => ({ kind: head.kind, part: p.id, key: rec.key, votes: [null, null] })));
     return rec;
@@ -1765,9 +1895,12 @@
       if (K && K.hooks.hide && K.hooks.hide(s, h, rec) === false) drop.add(rec); // (false: not seen at all)
     }
     if (drop.size) s.mpb[h] = s.mpb[h].filter(r => !drop.has(r));
+    s.mpb[h] = seenList(s.mpb[h], s.round); // this round's placements: as the round began (after the kinds' hooks: the School puts its squad back first)
     if (s.mpbVote && s.mpbVote[h]) {
-      s.mpbVote[h] = s.mpbVote[h].filter(e => !e.skill); // queued by a skill click this round (hidden as the click is)
-      for (const e of s.mpbVote[h]) e.votes = [null, null];
+      // the queue as queued in the open (m.mpbSeen: the draft's cards; a placement never takes one off, a skill's never
+      // shows); without it (an older match), the queue without what a skill click queued
+      const pub = s.mpbSeen && s.mpbSeen[h];
+      s.mpbVote[h] = (pub ? clone(pub) : s.mpbVote[h].filter(e => !e.skill)).map(e => ({ ...e, votes: [null, null] }));
     }
     return s;
   }
@@ -1897,6 +2030,13 @@
     unclash(lanes); // a building on a squad its team couldn't see: the nearest tile it may stand on
     for (const side of [0, 1]) for (const rec of recs(m, side).slice()) { const K = kindOf(rec.kind); if (K && K.hooks.settle) K.hooks.settle(lanes, side, rec); }
   }
+  // the Magic lake tiles nobody put down go down now, on the first tile their player could have put them, everything
+  // known (Duo.settleBoard, before the fight's same-tile check: they are the newest things on the board)
+  function settleLakes(lanes) {
+    const m = lanes[0];
+    if (!on(m)) return;
+    for (const side of [0, 1]) for (const rec of lakeRecs(m, side)) if (rec.col < 0) KINDS.magicLake.hooks.settle(lanes, side, rec);
+  }
   // after Undo all (Duo.rebuildTeam): the team's part was replayed, a lane's squads put back; a kind whose record and
   // squads must agree puts them right (hooks.reconcile(lanes, side, rec), lanes[0]'s record; then copied to lane 1)
   function reconcile(lanes) {
@@ -1917,6 +2057,7 @@
   function roundStart(lanes) {
     const m = lanes[0];
     if (!on(m)) return;
+    m.mpbSeen = [0, 1].map(sd => voteQueue(m, sd).filter(e => !e.part && !e.skill).map(e => ({ ...clone(e), votes: [null, null] }))); // (none: every vote is settled before a fight)
     for (const side of [0, 1]) for (const rec of recs(m, side)) for (const id of Object.keys(rec.skills)) { const e = rec.skills[id]; if (e.round !== m.round) e.log = []; }
     for (const side of [0, 1]) for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.roundStart) K.hooks.roundStart(lanes, side, rec); }
   }
@@ -2035,7 +2176,8 @@
     SQ, XSQ, VOTE_MS, DRAFT_MS, SPACING, ARTIFACT, DRAFT_ROUNDS, VAULT_SPOT, PER, VAULT, GOLEM, KINDS, SYS,
     KOJJA, SCORCH, kojjaUnit, scorchUnit,
     def, kindOf, recs, recOf, has, skillOf, skillN, addRec, tilesOf, recAt, at, terrainAt, settle, init,
-    interior, spaced, spotOk, spots, autoSpot, nearestOf, unclash,
+    interior, spaced, spotOk, spots, autoSpot, nearestOf, unclash, placeOf, buildingTiles,
+    seenList, asSeen, seeing, tileRecs, boardTiles, moveTile, settleLakes,
     voteQueue, voteHead, voteEntry, queue, placeHead, placeEntry, mpbVote, voteResult,
     skillCost, whyNot, canBuy, mpbBuy, canUndo, undoAllOk, mpbUndo, mpbAct, seenTaken,
     vaultOf, vaultRec, vaultMode, vaultMoved, vaultRoom, canVault, vaultPut, vaultTake, golemOf, golemUnit, golemSkin,

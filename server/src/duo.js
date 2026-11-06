@@ -241,15 +241,14 @@ export class DuoRoom extends DurableObject {
       }
       case 'act': {
         if (inLobby) return;
-        const clk = () => JSON.stringify([D.deadline, D.held, D.lanes[0] ? Duo.clocks(D, seat, now) : null]);
-        const was = clk();
+        const was = this.clocks(now);
         const res = Duo.act(D, seat, d, now);
         this.send(ws, { t: 'ack', seq: Number.isInteger(d.seq) ? d.seq : 0, ok: res.ok, h: res.h || null, why: res.why || null });
         if (!res.ok) { this.sent.delete(ws); this.send(ws, this.syncMsg(ws)); if (res.why !== 'time') await this.save(); return; }
         await this.save();
-        this.push({ skip: ws }); // the others' views (the teammate's m.team, a shared tower buy, the vote) and the clock
-        if (d.fn === 'undoAll') { this.send(ws, this.syncMsg(ws)); return; } // 2v2 Undo all: the team's part as the server rebuilt it (the page keeps its own until then)
-        if (clk() !== was) this.send(ws, this.statusMsg(ws, this.here())); // the actor's own action opened or closed a vote (or the draft): their clock too
+        this.push({ skip: ws }); // the others' views (the teammate's m.team, a shared tower buy, the vote)
+        if (d.fn === 'undoAll') this.send(ws, this.syncMsg(ws)); // 2v2 Undo all: the team's part as the server rebuilt it (the page keeps its own until then)
+        this.clockNews(was, now, d.fn === 'undoAll' ? ws : null); // whose clock this changed (a vote or the draft opened or closed): theirs
         return;
       }
       case 'ready': {
@@ -289,6 +288,19 @@ export class DuoRoom extends DurableObject {
   team(seat, msg) {
     const sd = Duo.SEATS[seat].side, text = JSON.stringify(msg);
     for (const s of this.sockets()) { const a = this.att(s); if (a.role === 'p' && Duo.SEATS[a.seat].side === sd) this.send(s, text); }
+  }
+  // each seat's clock as its phone shows it (the deploy clock, held or running, and its team's vote and the draft's)
+  clocks(now) { const D = this.D; return [0, 1, 2, 3].map((k) => D && D.lanes[0] ? JSON.stringify([D.phase, Duo.remainingFor(D, k, now), Duo.heldFor(D, k), Duo.clocks(D, k, now)]) : ''); }
+  // a 'status' to each phone whose clock changed since `was` (clocks()). The other team's placements are hidden until the
+  // fight (src/mpb.js), so their view, and the sync, stays the same: only the shared deploy clock, starting again once
+  // both teams' votes are done, reaches them (when, never where: docs/MPB-2V2.md). skip: a phone sent a sync just now.
+  clockNews(was, now, skip) {
+    const cur = this.clocks(now), here = this.here();
+    for (const s of this.sockets()) {
+      const a = this.att(s);
+      if (a.role !== 'p' || s === skip || cur[a.seat] === was[a.seat]) continue;
+      this.send(s, this.statusMsg(s, here));
+    }
   }
   // the status line of each seat's lane (Ready ticks, the clock)
   status(gone) {
@@ -379,9 +391,12 @@ export class DuoRoom extends DurableObject {
       return;
     }
     if (D && D.lanes[0] && Duo.due(D, now)) {
+      const was = this.clocks(now);
       const f = Duo.tick(D, now);
       await this.save();
-      if (f) this.broadcastFight(f); else this.push({ force: true });
+      // (no forced sync to all: a team's vote running out, or a hidden Grow's 15 s, must not reach the other team as a
+      // message; each phone gets what changed for it: a sync if its view did, a status if its clock did)
+      if (f) this.broadcastFight(f); else { this.push(); this.clockNews(was, now); }
       if (f) this.report();
       return;
     }

@@ -84,14 +84,14 @@
   }
 
   // ----- the team's tower: what is shared, and copying it from one lane to the other -----
-  // (mpb, mpbVote, vault: the 2v2 buildings, src/mpb.js)
-  const TEAM_FIELDS = ['towerSkill', 'towerSkill2', 'bwalls', 'mageGen', 'tround', 'mpb', 'mpbVote', 'vault'];
+  // (mpb, mpbVote, mpbSeen, vault: the 2v2 buildings, src/mpb.js)
+  const TEAM_FIELDS = ['towerSkill', 'towerSkill2', 'bwalls', 'mageGen', 'tround', 'mpb', 'mpbVote', 'mpbSeen', 'vault'];
   const TEAM_FNS = new Set(['buyTowerSkill', 'undoTowerSkill', 'buyTowerSkill2', 'undoTowerSkill2', 'fortify', 'placeBwall', 'unplaceBwall', 'buyMageGen', 'undoMageGen', 'buyTround', 'undoTround',
     'mpbBuy', 'mpbUndo', 'mpbAct', 'vaultPut', 'vaultTake']);
   // the team's actions Duo handles itself (both lanes at once, logged as the system's so Undo all keeps them)
   const SYS_FNS = new Set(['mpbVote', 'draftPick']);
   const isBank = (m, sd) => G.towerType(m, sd).id === 'bank';
-  const BLANK = { towerSkill: 0, towerSkill2: 0, bwalls: [], mageGen: null, tround: {}, mpb: [], mpbVote: [], vault: null };
+  const BLANK = { towerSkill: 0, towerSkill2: 0, bwalls: [], mageGen: null, tround: {}, mpb: [], mpbVote: [], mpbSeen: [], vault: null };
   const getF = (m, f, sd) => m[f] ? m[f][sd] : BLANK[f];
   function setF(m, f, sd, v) { if (!m[f]) m[f] = [BLANK[f], BLANK[f]].map(x => JSON.parse(JSON.stringify(x))); m[f][sd] = v == null ? v : JSON.parse(JSON.stringify(v)); }
   // the tower part of side sd from src to dst (the Bank's Major investment is each player's own: it pays them back)
@@ -164,13 +164,17 @@
   const overlap = (ma, a, mb, b) => { const B = covering(mb, b); return covering(ma, a).some(([c, r]) => B.some(([c2, r2]) => c === c2 && r === r2)); };
   // squad q of side sd in lanes[L] to the nearest tile it may be deployed on (its own placement rules, as a move) with
   // nothing on it in either lane; riders in it go along (the teammate's follow: setTeams). Returns the tile, or null.
-  // seen: the opponents still see it where it stood until the fight (as Game.moveSquad's free move; while deploying)
-  function relocate(lanes, L, sd, q, seen) {
+  // seen: while deploying (a teammate's Undo all): the opponents still see it where it stood until the fight (as
+  // Game.moveSquad's free move), and the other team's things count only as this team sees them (their squads put down
+  // this round don't, nor their buildings placed this round: Mpb.asSeen), so the tile it lands on gives nothing away
+  // (the fight's start puts right what then meets: settleBoard). ok(col, row) (optional): also needed of every tile.
+  function relocate(lanes, L, sd, q, seen, ok) {
     setTeams(lanes);
     const m = lanes[L], arr = m.armies[sd], i = arr.indexOf(q), ui = q.unit;
     G.useGrid(m);
     const COLS = G.COLS, ROWS = G.ROWS;
-    const clear = (c, r) => G.blockOf(m, ui, c, r).every(([cc, rr]) => cc >= 0 && cc < COLS && rr >= 0 && rr < ROWS && !G.occupied(m, sd, cc, rr) && !G.occupied(m, 1 - sd, cc, rr) && !G.terrainBlocks(m, cc, rr));
+    const foe = seen ? (cc, rr) => G.enemyHolds(m, sd, cc, rr) || G.bldgSeen(m, sd, cc, rr) : (cc, rr) => G.occupied(m, 1 - sd, cc, rr);
+    const clear = (c, r) => G.blockOf(m, ui, c, r).every(([cc, rr]) => cc >= 0 && cc < COLS && rr >= 0 && rr < ROWS && !G.occupied(m, sd, cc, rr) && !foe(cc, rr) && !G.terrainBlocks(m, cc, rr) && (!ok || ok(cc, rr)));
     let best = null;
     arr.splice(i, 1); // (its own tiles don't count while it looks)
     try {
@@ -211,17 +215,199 @@
       if (!relocate(lanes, mover.L, mover.sd, mover.q)) return; // (no room at all: they stay)
     }
   }
+  // ----- the fight's start, everything known: what was hidden meets (Vilhelm, 6 Nov: "They should be hidden until the
+  // fight just like everything else in the game"; "if things are placed on the same tile, they find another spot close
+  // to it"). docs/MPB-2V2.md "Hidden until the fight". -----
+  // The things on the board (as each lane stands): squads (not riders, not one held in a building), Cog Builder's
+  // Factories, the teams' building tiles and parts, Magic lake tiles and Bastion walls. fresh: put down, placed or
+  // moved this round (the other team couldn't see it there); n: its stamp (the newer, the bigger).
+  const RANK = { sq: 0, part: 1, b: 2, w: 3, wall: 4, fac: 9 }; // a tie: the squad moves first, then a part, a building, water, a wall
+  function things(D, lanes) {
+    const m = lanes[0], round = m.round, out = [];
+    lanes.forEach((L, li) => {
+      for (const sd of [0, 1]) {
+        for (const q of L.armies[sd] || []) {
+          if (G.isRider(q) || G.mpbHeld(q)) continue;
+          out.push({ t: 'sq', id: 's' + li + ':' + sd + ':' + q.id, L: li, sd, q, col: q.col, row: q.row, tiles: G.blockOf(L, q.unit, q.col, q.row),
+            n: stampOf(D, seatOf(li, sd), q.id), fresh: q.round === round || !!(q.from && q.movedRound === round), any: G.anywhere(L, q.unit), rank: RANK.sq });
+        }
+        for (const b of G.buildingsOf(L, sd)) out.push({ t: 'fac', id: 'f' + li + ':' + sd + ':' + b.id, L: li, sd, col: b.col, row: b.row, tiles: [[b.col, b.row]], n: 0, fresh: b.round === round, rank: RANK.fac });
+      }
+    });
+    for (const sd of [0, 1]) {
+      for (const x of M.boardTiles(m, sd)) out.push({ ...x, t: x.terrain ? 'w' : 'b', id: 'b' + sd + ':' + x.id, key: x.id, tiles: [[x.col, x.row]], n: bstampOf(D, sd, x.id), rank: x.terrain ? RANK.w : x.part ? RANK.part : RANK.b });
+      for (const w of (m.bwalls && m.bwalls[sd]) || []) {
+        const key = 'w|' + w.col + ',' + w.row + ',' + w.edge;
+        out.push({ t: 'wall', id: 'w' + sd + ':' + key, key, sd, w, col: w.col, row: w.row, tiles: [[w.col, w.row]], n: bstampOf(D, sd, key), fresh: w.round === round, rank: RANK.wall });
+      }
+    }
+    return out;
+  }
+  const hits = (A, B) => A.some(([c, r]) => B.some(([c2, r2]) => c === c2 && r === r2));
+  const within = (A, B, d) => A.some(([c, r]) => B.some(([c2, r2]) => Math.max(Math.abs(c - c2), Math.abs(r - r2)) <= d));
+  const solid = (Y) => Y.t === 'b' || Y.t === 'fac'; // a building's tile (not water, not a wall)
+  // does X break one of its own placement rules because of Y, everything known? 'same' (one tile: Y breaks it too),
+  // 'ring' (on a tile round a Coal mine's exit), 'near' (an Assassin on or next to a building), 'room' (a building
+  // within 2 tiles of another), 'water' (a wall on water); null: no
+  function breaks(X, Y) {
+    if (X === Y || (X.rec && Y.rec && X.rec === Y.rec)) return null;
+    if (X.t === 'wall') return Y.t === 'w' && hits(X.tiles, Y.tiles) ? 'water' : null;
+    if (Y.t === 'wall') return null;
+    if (hits(X.tiles, Y.tiles)) return X.t === 'fac' && Y.t === 'fac' ? null : 'same';
+    if (X.t !== 'fac' && Y.ring && Y.ring.length && hits(X.tiles, Y.ring)) return 'ring';
+    if (X.t === 'sq' && X.any && solid(Y) && within(X.tiles, Y.tiles, 1)) return 'near';
+    if (X.t === 'b' && X.spacing && solid(Y) && within(X.tiles, Y.tiles, M.SPACING - 1)) return 'room';
+    return null;
+  }
+  // every rule broken now: { X (it breaks it), Y (because of it; null: the water shuts a tile off), why }. Two things
+  // of one team never meet (teammates see each other's at once), but for two squads (a teammate's Undo all) and
+  // for a thing this settle moved
+  function conflicts(lanes, all, moved) {
+    const out = [], m = lanes[0];
+    for (const X of all) for (const Y of all) {
+      const why = X !== Y && breaks(X, Y);
+      if (!why) continue;
+      if (X.sd === Y.sd && !(X.t === 'sq' && Y.t === 'sq') && !moved.has(X.id) && !moved.has(Y.id)) continue;
+      out.push({ X, Y, why });
+    }
+    // water that, with all the water known, shuts a tile or a way off (two teams' tiles put down this round together)
+    for (const X of all) {
+      if (X.t !== 'w' || !(X.fresh || moved.has(X.id))) continue;
+      const rec = X.rec, was = { col: rec.col, row: rec.row };
+      rec.col = -1; rec.row = -1;
+      let ok = true;
+      try { ok = M.KINDS.magicLake.lakeFree(m, was.col, was.row); } finally { rec.col = was.col; rec.row = was.row; }
+      if (!ok) out.push({ X, Y: null, why: 'shut' });
+    }
+    return out;
+  }
+  // The settle (Duo.runFight, before the fight): Magic lake tiles nobody put down go down first (everything known, so
+  // they meet nothing), then until nothing is broken: of every rule broken, the thing that broke it moves to the
+  // nearest tile its own kind's rules allow, everything known; both broke it (one tile): the newer moves (the same
+  // stamp: the one outside its own zone, then a squad before a part, a building, water, a wall, then a seeded coin no
+  // view holds). Of all that must move, the newest moves first. Nothing is called off or paid back. Only what was put
+  // down, placed or moved this round moves (the rest was seen by all: the other thing moves). A Cog Builder's Factory
+  // never moves (the other thing does). A thing with no tile anywhere stays, and the other one moves instead if it can
+  // (one tile); neither can: both stay. A moved thing keeps its stamp. A building is moved, if it can be, to a tile
+  // where nothing else then breaks a rule (an Assassin next to it, the room round another building, a squad round an
+  // exit, a wall under water).
+  function settleBoard(D) {
+    const lanes = ms(D), m = lanes[0];
+    setTeams(lanes);
+    G.useGrid(m);
+    if (M.on(m)) { M.settleLakes(lanes); for (const sd of [0, 1]) { copyTeam(lanes[0], lanes[1], sd); bstamp(D, sd); } }
+    const moved = new Set(), stuck = new Set(), log = [];
+    // (two squads on one tile: either may move, as unstack did: an Undo all may bring back an older one)
+    const can = (Z, c) => !!Z && !stuck.has(Z.id) && Z.t !== 'fac' && !Z.fixed && (Z.fresh || moved.has(Z.id) || (c.why === 'same' && c.X.t === 'sq' && c.Y.t === 'sq'));
+    for (let guard = 0; guard < 160; guard++) {
+      setTeams(lanes);
+      G.useGrid(m);
+      const all = things(D, lanes), list = conflicts(lanes, all, moved), jobs = [];
+      for (const c of list) {
+        const both = c.Y && (c.why === 'same' || !!breaks(c.Y, c.X));
+        const xs = both ? [c.X, c.Y].filter(Z => can(Z, c)) : [c.X].filter(Z => can(Z, c));
+        if (!xs.length) continue;
+        let mover = xs[0], other = xs[1] || null;
+        if (other) {
+          const out = (Z) => !G.inZone(Z.sd, Z.row);
+          const pick = mover.n !== other.n ? (mover.n > other.n ? mover : other) : out(mover) !== out(other) ? (out(mover) ? mover : other)
+            : mover.rank !== other.rank ? (mover.rank < other.rank ? mover : other) : (mrand(D, 17 + guard) < 0.5) === (mover.id < other.id) ? mover : other; // (the coin the same whichever way round the pair was found)
+          other = pick === mover ? other : mover; mover = pick;
+        }
+        jobs.push({ mover, other, c });
+      }
+      if (!jobs.length) break;
+      jobs.sort((a, b) => b.mover.n - a.mover.n || a.mover.rank - b.mover.rank || a.mover.sd - b.mover.sd || (a.mover.id < b.mover.id ? -1 : a.mover.id > b.mover.id ? 1 : 0));
+      const job = jobs[0];
+      let to = moveThing(D, lanes, all, job.mover, moved);
+      if (!to) { stuck.add(job.mover.id); if (job.other) { to = moveThing(D, lanes, all, job.other, moved); if (!to) stuck.add(job.other.id); } }
+      log.push({ id: (to && to.id) || job.mover.id, why: job.c.why, to: to ? { col: to.col, row: to.row } : null });
+    }
+    D.settled = log; // (tests: what moved, and why)
+    for (const sd of [0, 1]) copyTeam(lanes[0], lanes[1], sd);
+    setTeams(lanes);
+  }
+  // one thing to the nearest tile its rules allow, everything known (see settleBoard). Returns { id, col, row } or null.
+  function moveThing(D, lanes, all, X, moved) {
+    const m = lanes[0];
+    let to = null, id = X.id;
+    if (X.t === 'sq') {
+      // (an Assassin: never next to a Cog Builder's Factory of the other team's, this round's too)
+      const facs = all.filter(f => f.t === 'fac' && f.sd !== X.sd);
+      to = relocate(lanes, X.L, X.sd, X.q, false, X.any ? (c, r) => !within([[c, r]], facs.flatMap(f => f.tiles), 1) : null);
+    } else if (X.t === 'b' || X.t === 'w') {
+      // first a tile where nothing else then breaks a rule because of it (everything this round, or moved now)
+      const others = all.filter(Z => Z !== X && Z.rec !== X.rec && (Z.fresh || moved.has(Z.id)));
+      const prefer = (c, r) => {
+        const ring = X.ring && X.ring.length ? [-1, 0, 1].flatMap(dr => [-1, 0, 1].map(dc => [c + dc, r + dr])).filter(([cc, rr]) => (cc !== c || rr !== r) && cc >= 0 && rr >= 0 && cc < G.COLS && rr < G.ROWS) : null;
+        const Xp = { ...X, col: c, row: r, tiles: [[c, r]], ring };
+        return !others.some(Z => breaks(Z, Xp));
+      };
+      to = M.moveTile(lanes, X.sd, X.rec, X.part || null, prefer);
+    } else if (X.t === 'wall') {
+      const list = m.bwalls[X.sd], i = list.indexOf(X.w);
+      if (i >= 0) {
+        list.splice(i, 1);
+        const ok = [];
+        try { for (let r = 0; r < G.ROWS; r++) for (let c = 0; c < G.COLS; c++) if (!(c === X.w.col && r === X.w.row) && G.bwallSpotOk(m, X.sd, c, r, X.w.edge)) ok.push({ col: c, row: r }); } finally { list.splice(i, 0, X.w); }
+        to = M.nearestOf(ok, X.w.col, X.w.row);
+        if (to) {
+          const st = D.bstamp && D.bstamp[X.sd] && D.bstamp[X.sd][X.key];
+          X.w.col = to.col; X.w.row = to.row;
+          const key = 'w|' + to.col + ',' + to.row + ',' + X.w.edge;
+          id = 'w' + X.sd + ':' + key;
+          if (st && D.bstamp) D.bstamp[X.sd][key] = { c: to.col, r: to.row, n: st.n }; // (it keeps its stamp)
+        }
+      }
+    }
+    if (!to) return null;
+    if (X.t === 'sq') { const s = D.stamp && D.stamp[seatOf(X.L, X.sd)] && D.stamp[seatOf(X.L, X.sd)][X.q.id]; if (s) D.stamp[seatOf(X.L, X.sd)][X.q.id] = { c: to.col, r: to.row, n: s.n }; }
+    else if (X.t !== 'wall') { const s = D.bstamp && D.bstamp[X.sd] && D.bstamp[X.sd][X.key]; if (s) D.bstamp[X.sd][X.key] = { c: to.col, r: to.row, n: s.n }; }
+    for (const sd of [0, 1]) copyTeam(lanes[0], lanes[1], sd);
+    setTeams(lanes);
+    moved.add(id);
+    return { id, col: to.col, row: to.row };
+  }
+
   // when each seat's squads took their tiles this round (D.stamp[seat][id] = { c, r, n }; n 0: from before the round's
-  // first action), noted after every action of the seat
+  // first action, or back on the tile it stood on then: D.stamp0), noted after every action. The team's building
+  // tiles the same (D.bstamp[team]['<key>|<part>'], a Bastion wall 'w|<col>,<row>,<edge>'; D.bstamp0), on the one
+  // counter D.stampN: so of any two things on the board the newer is known. Server only (in no view: the count would
+  // tell how many actions the other team made).
   const stampOf = (D, seat, id) => { const s = D.stamp && D.stamp[seat] && D.stamp[seat][id]; return s ? s.n : 0; };
+  const bstampOf = (D, sd, id) => { const s = D.bstamp && D.bstamp[sd] && D.bstamp[sd][id]; return s ? s.n : 0; };
+  function noteAll(prev, base0, items, base, D) {
+    const next = {};
+    for (const [id, c, r] of items) {
+      const p = prev[id], b = base0[id];
+      next[id] = p && p.c === c && p.r === r ? p : { c, r, n: base || (b && b.c === c && b.r === r) ? 0 : ++D.stampN };
+    }
+    return next;
+  }
   function stamp(D, seat, base) {
     const own = SEATS[seat], m = D.lanes[own.lane].m;
     if (!D.stamp) D.stamp = [{}, {}, {}, {}];
+    if (!D.stamp0) D.stamp0 = [{}, {}, {}, {}];
     if (!D.stampN) D.stampN = 0;
-    const map = base ? {} : D.stamp[seat] || {}, next = {};
-    for (const q of m.armies[own.side] || []) { const p = map[q.id]; next[q.id] = p && p.c === q.col && p.r === q.row ? p : { c: q.col, r: q.row, n: base ? 0 : ++D.stampN }; }
-    D.stamp[seat] = next;
+    const items = (m.armies[own.side] || []).map(q => [q.id, q.col, q.row]);
+    if (base) D.stamp0[seat] = Object.fromEntries(items.map(([id, c, r]) => [id, { c, r }]));
+    D.stamp[seat] = noteAll(base ? {} : D.stamp[seat] || {}, D.stamp0[seat] || {}, items, base, D);
+    if (base) bstamp(D, own.side, true);
   }
+  // team sd's building tiles and walls (lane 0's: team state)
+  function bstamp(D, sd, base) {
+    const m = D.lanes[0] && D.lanes[0].m;
+    if (!m) return;
+    if (!D.bstamp) D.bstamp = [{}, {}];
+    if (!D.bstamp0) D.bstamp0 = [{}, {}];
+    if (!D.stampN) D.stampN = 0;
+    const items = M.recs(m, sd).flatMap(rec => M.tilesOf(rec).map(t => [rec.key + '|' + t.part, t.col, t.row]))
+      .concat(((m.bwalls && m.bwalls[sd]) || []).map(w => ['w|' + w.col + ',' + w.row + ',' + w.edge, w.col, w.row]));
+    if (base) D.bstamp0[sd] = Object.fromEntries(items.map(([id, c, r]) => [id, { c, r }]));
+    D.bstamp[sd] = noteAll(base ? {} : D.bstamp[sd] || {}, D.bstamp0[sd] || {}, items, base, D);
+  }
+  // everything on the board, after any action (the seats in order, then the teams' buildings)
+  function stampAll(D, base) { if (!D.lanes[0]) return; for (let k = 0; k < 4; k++) stamp(D, k, base); for (const sd of [0, 1]) bstamp(D, sd, base); }
 
   // The fight of two lanes (matches with units, as they stand when it begins): a steppable Engine battle on the one
   // board. Changes nothing. Bodies carry .lane.
@@ -390,7 +576,7 @@
   function sysApply(D, sd, fn, a, L = 0) {
     const lanes = ms(D);
     setTeams(lanes);
-    if (!M.SYS[fn](lanes[L], sd, ...a)) return false;
+    if (!M.asSeen(sd, () => M.SYS[fn](lanes[L], sd, ...a))) return false; // (as team sd sees the board: Mpb.asSeen)
     copyTeam(lanes[L], lanes[1 - L], sd);
     D.tlog[sd].push({ lane: -1, fn: 'sys:' + fn, a: a.slice(), as: L });
     return true;
@@ -435,9 +621,12 @@
         for (const L of [0, 1]) {
           const head = M.voteEntry(lanes[0], sd, L); // (a building one player places alone: only their own, Mpb.queue's lane)
           if (!D.bots[seatOf(L, sd)] || !head) continue;
-          const mate = head.votes[1 - L], human = mate && !D.bots[seatOf(1 - L, sd)] && M.spotOk(lanes[L], sd, head.kind, head.part, mate.col, mate.row) ? mate : null;
-          const mine = head.votes[L] && M.spotOk(lanes[L], sd, head.kind, head.part, head.votes[L].col, head.votes[L].row) ? head.votes[L] : null;
-          const want = human || mine || M.autoSpot(lanes[L], sd, head.kind, head.part);
+          // (as the bot's team sees the board: its human teammate sees its vote, Mpb.asSeen)
+          const [human, mine, want] = M.asSeen(sd, () => {
+            const mate = head.votes[1 - L], hu = mate && !D.bots[seatOf(1 - L, sd)] && M.spotOk(lanes[L], sd, head.kind, head.part, mate.col, mate.row) ? mate : null;
+            const mi = head.votes[L] && M.spotOk(lanes[L], sd, head.kind, head.part, head.votes[L].col, head.votes[L].row) ? head.votes[L] : null;
+            return [hu, mi, hu || mi || M.autoSpot(lanes[L], sd, head.kind, head.part)];
+          });
           if (!want) { did = sysApply(D, sd, 'drop', [], L); break; }
           if (mine && mine.col === want.col && mine.row === want.row) continue;
           did = sysApply(D, sd, 'vote', [want.col, want.row], L);
@@ -460,13 +649,13 @@
       const v = c.vote[sd];
       if (!M.voteHead(lanes[0], sd) || !(force || (v && now >= v.until))) continue;
       setTeams(lanes);
-      const t = M.voteResult(lanes[0], sd, mrand(D, 13 + sd * 2 + M.recs(lanes[0], sd).length * 31));
+      const t = M.asSeen(sd, () => M.voteResult(lanes[0], sd, mrand(D, 13 + sd * 2 + M.recs(lanes[0], sd).length * 31))); // (as the team sees the board)
       did = (t ? sysApply(D, sd, 'place', [t.col, t.row], 0) : sysApply(D, sd, 'drop', [], 0)) || did;
     }
     return did;
   }
   // after anything that may have opened or changed a vote or the draft
-  function mpbAfter(D, now) { mpbBots(D); mpbClock(D, now); setTeams(ms(D)); }
+  function mpbAfter(D, now) { mpbBots(D); mpbClock(D, now); setTeams(ms(D)); stampAll(D); }
   // before the fight: nothing may stay open
   function mpbSettle(D, now) { for (let k = 0; k < 40 && mpbOpen(D); k++) { mpbTick(D, now, true); mpbBots(D); } mpbClock(D, now); }
   // the start of a round: the buildings' roundStart, the artifacts (rounds 2 and 8), the draft (3 and 9)
@@ -553,7 +742,9 @@
   // one of this seat's (a skill on this player's lake tile put down this round, water where the exit stood: played
   // again without this seat's actions it no longer works, so their gold or tile would be lost), nor while the buildings
   // can't go back (Mpb.undoAllOk: the Coal mine's exit on a tile taken since)
-  function undoAllAllowed(D, seat) {
+  // (as the team sees the board: the other team's hidden things never decide it, Mpb.asSeen)
+  function undoAllAllowed(D, seat) { return M.asSeen(SEATS[seat].side, () => undoAllAllowedSeen(D, seat)); }
+  function undoAllAllowedSeen(D, seat) {
     const own = SEATS[seat], sd = own.side, m = D.lanes[own.lane].m;
     if (!M.on(m)) return true;
     const log = D.tlog[sd], mate = log.filter(e => e.lane !== own.lane);
@@ -576,7 +767,9 @@
   // first, by the rules of a single take-back (Mpb.canUndo): so a building a click added stays in the list (taken
   // back), the records keep their keys and the teammate's buys on them still find them. A click that can't be taken
   // back (a Tree kojja's Nest with the teammate's squad in it) stays bought, and stays paid for by this player.
-  function rebuildTeam(D, sd, lane) {
+  // (as the team sees the board: the replay and the moved squad never show a hidden thing of the other team's)
+  function rebuildTeam(D, sd, lane) { return M.asSeen(sd, () => rebuildTeamSeen(D, sd, lane)); }
+  function rebuildTeamSeen(D, sd, lane) {
     setTeams(ms(D)); // this lane's squads as they stand after the undo (a take-back may look at them)
     const O = D.lanes[1 - lane].m, { sc, log, kept } = undoReplay(D, sd, lane);
     D.tlog[sd] = log;
@@ -596,7 +789,9 @@
   }
 
   // a bot's turn at the start of a round: package, tower pick and squads (it levels up when the fight begins)
-  function botTurn(D, seat) {
+  // (as the bot's team sees the board: the other team's bots of this round are hidden from it, Mpb.asSeen)
+  function botTurn(D, seat) { return M.asSeen(SEATS[seat].side, () => botTurnSeen(D, seat)); }
+  function botTurnSeen(D, seat) {
     const own = SEATS[seat], R = laneOf(D, seat), m = R.m, sd = own.side;
     setTeam(ms(D), own.lane);
     if (G.needsPack(m, sd)) G.choosePack(m, sd, Math.floor(Math.random() * m.packages[sd].length));
@@ -621,7 +816,7 @@
     mpbAfter(D, now); // bots pick and vote at once
     setTeams(ms(D));
     D.tbase = [0, 1].map(sd => teamState(D.lanes[0].m, sd)); D.tlog = [[], []];
-    for (let k = 0; k < 4; k++) stamp(D, k, true); // (everything on the board now, the bots' squads too, counts as oldest)
+    stampAll(D, true); // (everything on the board now, the bots' squads and buildings too, counts as oldest)
     D.deadline = 0; D.held = deployMsOf(D);
     clock(D, now);
   }
@@ -668,7 +863,7 @@
     const args = Ref.cleanArgs(fn, d.a);
     if (!args) return { ok: false, why: 'bad' };
     setTeams(ms(D));
-    const ok = fn === 'mpbVote' ? sysApply(D, sd, 'vote', args, own.lane) : sysDraft(D, sd, args[0], own.lane);
+    const ok = fn === 'mpbVote' ? sysApply(D, sd, 'vote', args, own.lane) : M.asSeen(sd, () => sysDraft(D, sd, args[0], own.lane));
     if (!ok) { clock(D, now); return { ok: false, why: 'rules' }; }
     mpbAfter(D, now);
     clock(D, now);
@@ -687,14 +882,16 @@
     if (fn === 'undoAll' && !undoAllAllowed(D, seat)) return no('team'); // (2v2 buildings: the teammate relied on it)
     setTeams(ms(D));
     const before = fn === 'unplaceBwall' && Array.isArray(d.a) && d.a.length === 3 ? G.bwallOn(R.m, sd, d.a[0], d.a[1], d.a[2]) : null;
-    const r = Ref.act(R, sd, d, now);
+    // judged as this seat's team sees the board (Mpb.asSeen: the other team's buildings placed this round don't count),
+    // so the page, which holds that view, gives the same answer and a refusal shows nothing hidden
+    const r = M.asSeen(sd, () => Ref.act(R, sd, d, now));
     let team = false;
     if (r.ok) {
       if (TEAM_FNS.has(fn)) { logTeam(D, sd, own.lane, fn, d.a, before && { ...before }); copyTeam(R.m, O.m, sd); team = true; }
       else if (fn === 'undoAll') { rebuildTeam(D, sd, own.lane); team = true; }
+      stampAll(D); // (what took a tile now: of two things on one tile at the fight's start the newer moves, settleBoard)
       mpbAfter(D, now); // a building's action may have opened a vote (bots vote at once)
       r.h = Ref.sideHash(R.m, sd); // this lane may have changed again (the team's part)
-      stamp(D, seat); // (which of its squads took a tile now: the newer of two on one tile moves, unstack)
     }
     clock(D, now); // a tower pick may let the clock start (Referee.act only looks at its own lane)
     return { ...r, team };
@@ -709,7 +906,8 @@
     for (let k = 0; k < 4; k++) if (D.bots[k]) { setTeam(ms(D), SEATS[k].lane); G.aiLevel(laneOf(D, k).m, SEATS[k].side); }
     for (const m of ms(D)) G.settleTowerPicks(m);
     mpbSettle(D, now); // a draft pick or a placement vote still open: settled now
-    unstack(D); // two squads on one tile: the newer moves to the nearest tile it may stand on
+    stampAll(D); // (what those placed is the newest)
+    settleBoard(D); // everything known: of two things on one tile (or a rule only now broken) the newer moves to the nearest tile it may stand on
     for (const m of ms(D)) m.fhSeed = M.rng((D.seed + m.round * 4111 + 17) >>> 0)() * 4294967296 >>> 0; // Field hospital's Field dressing picks (src/mpb.js): out of the views until the fight
     const f = fight(ms(D), D.hp);
     setTeams(ms(D));
@@ -792,7 +990,7 @@
     V, MAP, OFF, HP, PINGS, EMOTES, EMOTE_TEXT, SEATS, SEAT_NAMES, seatOf, mateOf, remap, unmap, laneOfId, move, teamOf, setTeam, setTeams,
     MECHITES, unitSet, TEAM_FIELDS, TEAM_FNS, SYS_FNS, copyTeam, copyAll, teamBody, settle, battle, laneResult, fight, view,
     create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, viewFor, clock, clocks, canAct, cutFor, remainingFor, heldFor, save, load, humans,
-    mpbPending, mpbTick, mpbSettle, rebuildTeam, undoAllAllowed, teamState, unstack, relocate, stamp,
+    mpbPending, mpbTick, mpbSettle, rebuildTeam, undoAllAllowed, teamState, unstack, relocate, stamp, stampAll, bstamp, stampOf, bstampOf, settleBoard, things, conflicts,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Duo = api;
