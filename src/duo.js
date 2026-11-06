@@ -256,19 +256,18 @@
   }
   const hits = (A, B) => A.some(([c, r]) => B.some(([c2, r2]) => c === c2 && r === r2));
   const within = (A, B, d) => A.some(([c, r]) => B.some(([c2, r2]) => Math.max(Math.abs(c - c2), Math.abs(r - r2)) <= d));
-  const solid = (Y) => Y.t === 'b' || Y.t === 'fac'; // a building's tile (not water, not a wall)
   // does X break one of its own placement rules because of Y, everything known? 'same' (one tile, or two teams' walls
-  // on one edge: Y breaks it too), 'ring' (put on a tile round a Coal mine's exit after the exit got there: one there
-  // first stays, as when the exit is dug next to a squad everyone sees), 'near' (an Assassin on or next to a building),
-  // 'room' (a building within 2 tiles of another), 'water' (a wall on water); null: no
+  // on one edge: Y breaks it too), 'water' (a wall on water); null: no. Only things on the same tile meet (Vilhelm,
+  // 6 Nov): a rule one thing has against things around it is never checked again here, so an Assassin next to a
+  // building it couldn't see, a building within 2 tiles of one it couldn't see, and a squad or building round an exit
+  // dug next to it all stay ("It stays in that spot"). A part that stays (place.parts' stays: the Coal mine's exit)
+  // never meets anything: it is just blocked ("any units that would end up on the blocked tile simply do not go
+  // through the mine to begin with")
   function breaks(X, Y) {
-    if (X === Y || (X.rec && Y.rec && X.rec === Y.rec)) return null;
+    if (X === Y || (X.rec && Y.rec && X.rec === Y.rec) || X.stays || Y.stays) return null;
     if (X.t === 'wall') return Y.t === 'w' && hits(X.tiles, Y.tiles) ? 'water' : Y.t === 'wall' && Y.sd !== X.sd && Y.edge === X.edge ? 'same' : null;
     if (Y.t === 'wall') return null;
     if (hits(X.tiles, Y.tiles)) return X.t === 'fac' && Y.t === 'fac' ? null : 'same';
-    if (X.t !== 'fac' && Y.ring && Y.ring.length && X.n > Y.n && hits(X.tiles, Y.ring)) return 'ring';
-    if (X.t === 'sq' && X.any && solid(Y) && within(X.tiles, Y.tiles, 1)) return 'near';
-    if (X.t === 'b' && X.spacing && solid(Y) && within(X.tiles, Y.tiles, M.SPACING - 1)) return 'room';
     return null;
   }
   // every rule broken now: { X (it breaks it), Y (because of it; null: the water shuts a tile off), why }. Two things
@@ -301,9 +300,11 @@
   // down, placed or moved this round moves (the rest was seen by all: the other thing moves). A Cog Builder's Factory
   // never moves (the other thing does). A thing with no tile anywhere stays, and the other one moves instead if it can
   // (one tile); neither can: both stay. A moved thing keeps its stamp. A building goes to the nearest tile its rules
-  // allow; of the tiles as near (the same ring round it), one where nothing else then breaks a rule if there is one (an
-  // Assassin next to it, the room round another building, a squad round an exit, a wall under water). The squads in a
-  // building go with it (a Nest's, a School's pupil: they stand on its tile).
+  // allow (its own rules as a normal placement: so one voted onto a hidden Assassin takes the nearest tile it may stand
+  // on, and the Assassin stays, next to it); of the tiles as near (the same ring round it), one where nothing else
+  // then stands on the same tile (a wall under water) if there is one. The squads in a building go with it (a Nest's,
+  // a School's pupil: they stand on its tile). The Coal mine's exit never moves and moves nothing (it is just blocked:
+  // the squads that would come up on a taken tile stay home, src/mpb.js coalMine).
   function settleBoard(D) {
     const lanes = ms(D), m = lanes[0];
     setTeams(lanes);
@@ -351,11 +352,7 @@
     } else if (X.t === 'b' || X.t === 'w') {
       // first a tile where nothing else then breaks a rule because of it (everything this round, or moved now)
       const others = all.filter(Z => Z !== X && Z.rec !== X.rec && (Z.fresh || moved.has(Z.id)));
-      const prefer = (c, r) => {
-        const ring = X.ring && X.ring.length ? [-1, 0, 1].flatMap(dr => [-1, 0, 1].map(dc => [c + dc, r + dr])).filter(([cc, rr]) => (cc !== c || rr !== r) && cc >= 0 && rr >= 0 && cc < G.COLS && rr < G.ROWS) : null;
-        const Xp = { ...X, col: c, row: r, tiles: [[c, r]], ring };
-        return !others.some(Z => breaks(Z, Xp));
-      };
+      const prefer = (c, r) => { const Xp = { ...X, col: c, row: r, tiles: [[c, r]] }; return !others.some(Z => breaks(Z, Xp)); };
       to = M.moveTile(lanes, X.sd, X.rec, X.part || null, prefer);
       if (to && !X.part && X.t === 'b') carry(D, lanes, X, to);
     } else if (X.t === 'wall') {
@@ -584,7 +581,10 @@
   const ms = (D) => D.lanes.map(R => R.m);
   const deployMsOf = (D) => (D.lanes[0].m.round === 1 ? D.settings.deploy1 : D.settings.deploy) * 1000;
   const humans = (D) => [0, 1, 2, 3].filter(k => !D.bots[k]);
-  const picksPending = (D) => humans(D).some(k => G.needsTowerPick(laneOf(D, k).m, SEATS[k].side)) || mpbPending(D); // the draft and placement votes hold the clock too
+  // (a 1v1-style tower pick; never in 2v2, m.duoTowers. The 2v2 draft and placement votes never hold the deploy clock:
+  // "Votes don't hold the clock, independent systems" (Vilhelm, 6 Nov). Each has its own 15 s; one still open when the
+  // deploy clock ends is settled as the fight starts, as its own clock running out would: runFight -> mpbSettle)
+  const picksPending = (D) => humans(D).some(k => G.needsTowerPick(laneOf(D, k).m, SEATS[k].side));
   const someoneAway = (D, now) => humans(D).some(k => D.away[k] && now - D.away[k] < AWAY_MAX_MS);
   // each lane's own referee state follows the match's (its act checks phase, Ready and the deadline)
   function mirror(D) {
@@ -604,8 +604,8 @@
   }
 
   // ----- the 2v2 buildings: the artifact draft and the placement votes (src/mpb.js), their clocks (D.mclock) -----
-  // (a placement a skill click queued, a Tree kojja's Grow, is hidden from the opponents: it never holds the clock, it
-  // has its own 15 s; Mpb.hide)
+  // (each has its own 15 s; none of them ever holds the shared deploy clock, so the opponents' clock never tells them
+  // anything about a team's votes. mpbPending: a public vote or the draft is open, for tests and the page's line)
   const mpbPending = (D) => { const m = D.lanes[0] && D.lanes[0].m; return !!m && (M.draftOpen(m) || [0, 1].some(sd => M.voteQueue(m, sd).some(e => !e.skill))); };
   const mpbOpen = (D) => { const m = D.lanes[0] && D.lanes[0].m; return !!m && (M.draftOpen(m) || [0, 1].some(sd => !!M.voteHead(m, sd))); }; // (anything at all still to settle before the fight)
   const seatsOf = (sd) => [seatOf(0, sd), seatOf(1, sd)];
@@ -975,8 +975,9 @@
   }
   function due(D, now) {
     if (D.phase !== 'deploy') return 0;
-    if (D.deadline) return D.deadline + GRACE_MS;
-    const left = humans(D).filter(k => D.away[k]).map(k => D.away[k] + AWAY_MAX_MS).filter(t => t > now).map(t => t + 50);
+    // (the deploy clock's end; while it is held, a player away coming back in time; and always the votes' and the
+    // draft's own 15 s, which run beside the deploy clock and never hold it)
+    const left = D.deadline ? [D.deadline + GRACE_MS] : humans(D).filter(k => D.away[k]).map(k => D.away[k] + AWAY_MAX_MS).filter(t => t > now).map(t => t + 50);
     const c = D.mclock || { vote: [], draft: 0 };
     for (const v of c.vote) if (v) left.push(v.until); // a placement vote's 15 s
     if (c.draft) left.push(c.draft);                   // the draft's pick

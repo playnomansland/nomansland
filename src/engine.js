@@ -754,14 +754,17 @@ const Engine = (() => {
     // 2v2 Coal mine (src/mpb.js coalMine; only a 2v2 fight's bodies carry mineTo, so off by default): a squad deployed
     // round a mine's entrance has mineTo = { x, y (the middle of its tile at the exit), dx, dy (from its own tile to
     // there), h (half a tile), t (travel s), rise (s it then stands, as a flank squad), boost: { speed %, armor, secs }
-    // | null }. A squad whose exit tile an enemy squad's body starts on doesn't go in. The others go down as the fight
-    // starts: they stand at the exit already, but can't be seen, hit or pushed for t s (mineT: see sheltered), then
-    // stand still rise s more (delay), then fight; with a boost they are faster and tougher for secs s from coming out.
+    // | null, ex: { x, y } the exit's own tile (optional) }. A squad whose tile at the exit, or the exit's own tile, a
+    // squad's body of either side starts on doesn't go in (it is blocked: it fights from its own tile). The others go
+    // down as the fight starts: they stand at the exit already, but can't be seen, hit or pushed for t s (mineT: see
+    // sheltered), then stand still rise s more (delay), then fight; with a boost they are faster and tougher for secs s
+    // from coming out.
     const mineOn = A.some(b => b.mineTo) || B.some(b => b.mineTo), mineFx = [];
     if (mineOn) {
-      const held = (side, mt) => (side === 0 ? B : A).some(f => f.squad >= 0 && !f.u.structure && Math.abs(f.x - mt.x) <= mt.h && Math.abs(f.y - mt.y) <= mt.h);
+      const standOn = (p, mt) => A.concat(B).some(f => f.squad >= 0 && !f.u.structure && Math.abs(f.x - p.x) <= mt.h && Math.abs(f.y - p.y) <= mt.h);
+      const held = (mt) => standOn(mt, mt) || (!!mt.ex && standOn(mt.ex, mt));
       const stay = new Set();
-      for (const b of A.concat(B)) if (b.mineTo && (b.inside || b.boarded || held(b.side, b.mineTo))) stay.add(b.side + ':' + b.squad);
+      for (const b of A.concat(B)) if (b.mineTo && (b.inside || b.boarded || held(b.mineTo))) stay.add(b.side + ':' + b.squad);
       for (const b of A.concat(B)) {
         if (!b.mineTo) continue;
         if (stay.has(b.side + ':' + b.squad)) { b.mineTo = null; continue; }

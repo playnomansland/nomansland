@@ -385,21 +385,28 @@
   // deployed on the 8 tiles round the entrance go down the mine as the fight starts and come up on the matching tile
   // round the exit (the same offset) COAL.travel s later, then stand COAL.rise s more (vulnerable, as a squad new on a
   // flank tile). No squad of either team may be deployed on the 8 tiles round the exit (hooks.blocks; enemy tiles too).
-  // A squad whose tile at the exit an enemy squad stands on as the fight starts doesn't go in (Engine: mineTo). The
-  // entrance is a structure that can be destroyed (squads already on their way still come up); the exit is a shaft on
+  // A squad whose tile at the exit is taken as the fight starts (a squad of either team: Engine mineTo; a building,
+  // water or a Bastion wall: mineOut), or whose exit tile itself is taken, doesn't go in (Vilhelm, 6 Nov: "the mine
+  // exit tiles can be blocked and any units that would end up on the blocked tile simply do not go through the mine to
+  // begin with"). So the exit and its ring never make anything move at the fight's start (place.parts' stays). Rogues,
+  // Assassins and Shadowhands of a team with a Shadow Den come up without the COAL.rise wait. The entrance is a structure that can be destroyed (squads already on their way still come up); the exit is a shaft on
   // the board, not a fight body. Skills: Dig a new exit (move it once; a flank tile of the enemy's half too), Fresh
   // air (squads coming up faster and tougher for a while).
   const COAL = { hp: 700, armor: 4, travel: 2, rise: 1.5, moveCost: 150, airCost: 200, air: { speed: 25, armor: 4, secs: 5 } };
   const exitOf = (rec) => (rec && rec.parts && rec.parts.exit) || null;
   const cheb = (c0, r0, c1, r1) => Math.max(Math.abs(c0 - c1), Math.abs(r0 - r1));
-  // the tile a squad on (col, row) comes up on, or null (not round the entrance, no exit yet, off the board, or that
-  // tile is water or a building's: the squad stays home)
+  // a tile the mine can't use as the fight starts: water, a building's tile (but the exit's own: exit), a Bastion wall
+  // of either team put up on it (squads: the Engine, mineTo's tile and ex)
+  const mineShut = (m, c, r, exit) => G.terrainBlocks(m, c, r) || buildingTiles(m).filter(t => t.col === c && t.row === r).length > (exit ? 1 : 0)
+    || [0, 1].some(sd => G.bwallsFighting(m, sd).some(w => w.col === c && w.row === r));
+  // the tile a squad on (col, row) comes up on, or null (not round the entrance, no exit yet, off the board, that tile
+  // or the exit's own is water, a building's or a wall's: the squad stays home)
   function mineOut(m, rec, col, row) {
     const x = exitOf(rec);
     if (!x || rec.col < 0 || cheb(col, row, rec.col, rec.row) !== 1) return null;
     grid(m);
     const c = x.col + col - rec.col, r = x.row + row - rec.row;
-    if (!inBoard(c, r) || G.terrainBlocks(m, c, r) || buildingTiles(m).some(t => t.col === c && t.row === r)) return null;
+    if (!inBoard(c, r) || mineShut(m, x.col, x.row, true) || mineShut(m, c, r)) return null;
     return { col: c, row: r };
   }
   // may the exit stand on (col, row), as this player sees the board (squads the opponents put down this round don't
@@ -436,9 +443,10 @@
   }
   const canMoveExit = (m, side, rec) => skillN(rec, 'shaft') > 0 && !rec.data.moved && !!exitOf(rec);
   def({ id: 'coalMine', name: 'Coal mine', short: 'cm', kind: 'technical', hp: COAL.hp, armor: COAL.armor, color: '#4A4440',
-    text: `Squads deployed on the 8 tiles round the entrance go down the mine as the fight starts and come up round the exit in no man’s land ${COAL.travel} s later (on the matching tile), then stand ${COAL.rise} s before they fight.`,
-    downside: 'No squad of either team may be deployed on the 8 tiles round its exit. A squad whose tile at the exit an enemy squad holds stays where it is.',
-    place: { where: 'interior', spacing: true, parts: [{ id: 'exit', name: 'exit', where: 'nml', spacing: false }] },
+    text: `Squads deployed on the 8 tiles round the entrance go down the mine as the fight starts and come up round the exit in no man’s land ${COAL.travel} s later (on the matching tile), then stand ${COAL.rise} s before they fight (not Rogues, Assassins or Shadowhands with a Shadow Den).`,
+    downside: 'No squad of either team may be deployed on the 8 tiles round its exit. If the exit, or the tile a squad would come up on, is taken (a squad, building, water or wall of either team), that squad doesn’t go down the mine: it fights from its own tile.',
+    // (stays: the exit never moves at the fight's start and never makes anything move: it is just blocked, Duo.settleBoard)
+    place: { where: 'interior', spacing: true, parts: [{ id: 'exit', name: 'exit', where: 'nml', spacing: false, stays: true }] },
     skills: [
       { id: 'shaft', name: 'Dig a new exit', cost: COAL.moveCost, per: 'match', text: 'Move the exit once, to any tile of no man’s land or a flank tile of the enemy’s half.' },
       { id: 'air', name: 'Fresh air', cost: COAL.airCost, per: 'match', text: `Squads coming up the mine move ${COAL.air.speed}% faster and have +${COAL.air.armor} armor for ${COAL.air.secs} s.` },
@@ -446,23 +454,20 @@
     COAL, mineOut, exitMoveOk, exitBackOk, exitSpots, canMoveExit,
     hooks: {
       spotOk: (m, side, part, col, row) => part !== 'exit' || !nearArtifact(m, col, row),
-      // the fight's start: the exit stands on a squad of the other team nobody on the team could see (Mpb.unclash): the
-      // tiles it may go to instead (a moved exit: no man's land or a flank tile of the enemy's half, as Dig a new exit)
-      clashOk(m, side, rec, part, col, row) {
-        if (part !== 'exit') return spotOk(m, side, rec.kind, part, col, row, true);
-        const dug = rec.data.moved === m.round;
-        return (nmlOk(col, row) || (dug && G.isFlank(side, col, row))) && !nearArtifact(m, col, row) && !G.terrainBlocks(m, col, row) && !taken(m, side, col, row);
-      },
       // the 8 tiles round the exit: no squad of either team (Game.occupied through Mpb.at)
       blocks(m, side, rec, col, row) { const x = exitOf(rec); return !!x && cheb(col, row, x.col, x.row) === 1; },
-      // a squad round the entrance: its bodies go down (Engine mineTo; the Engine leaves out a squad whose exit tile an enemy holds)
+      // a squad round the entrance: its bodies go down (Engine mineTo; the Engine leaves out a squad whose tile at the
+      // exit, or the exit's own tile (ex), a squad of either team stands on). Rogues, Assassins and Shadowhands of a team
+      // with a Shadow Den come up without the wait (Vilhelm, 6 Nov: "Den removes the wait for rogues, assassins etc.";
+      // the same units as the Den's no flank delay)
       squadBodies(m, side, rec, sq, list) {
         if (sq.in != null || !list.length) return; // a rider goes with its carrier
         const t = mineOut(m, rec, sq.col, sq.row);
         if (!t) return;
-        const a = G.tileToWorld(sq.col, sq.row), b = G.tileToWorld(t.col, t.row);
+        const a = G.tileToWorld(sq.col, sq.row), b = G.tileToWorld(t.col, t.row), x0 = exitOf(rec), e = G.tileToWorld(x0.col, x0.row);
         const air = skillN(rec, 'air') > 0 ? { ...COAL.air } : null;
-        for (const x of list) x.mineTo = { x: b.x, y: b.y, dx: b.x - a.x, dy: b.y - a.y, h: G.TILE / 2, t: COAL.travel, rise: COAL.rise, boost: air };
+        const rise = denOf(m, side) && denUnit(m, sq.unit) ? 0 : COAL.rise;
+        for (const x of list) x.mineTo = { x: b.x, y: b.y, dx: b.x - a.x, dy: b.y - a.y, h: G.TILE / 2, t: COAL.travel, rise, boost: air, ex: { x: e.x, y: e.y } };
       },
       canBuy: (m, side, rec) => !!exitOf(rec),
       // Dig a new exit taken back the round it was bought: the exit goes back too (refused once its old tile is taken)
@@ -1251,6 +1256,11 @@
       // the opponents don't see this round's comings and goings until the fight
       hide(s, h, rec) {
         const p = pupilOf(rec), L = laneOf(s);
+        if (watching(s, 1 - h)) { // (watched live, Insider information: who is in the School shows as it stands; not what it learns)
+          if (p && p.learn && p.learn.round === s.round) p.learn = null;
+          rec.data.was = [];
+          return;
+        }
         if (p && p.round === s.round) {
           rec.data.pupil = null;
           const q = p.lane === L && s.armies[h].find(x => x.id === p.id && x.school);
@@ -1539,10 +1549,11 @@
     try { return fn(); } finally { SEE = was; seenCache = new WeakMap(); }
   }
   const seeing = () => SEE;
-  // side's records for the board's tiles: as they stand, or (seen mode, the other team's) as seenList gives them
+  // side's records for the board's tiles: as they stand, or (seen mode, the other team's) as seenList gives them; a
+  // team the seeing one watches (the Shadow Den's Insider information: watching) as they stand, live
   function tileRecs(m, side) {
     const list = recs(m, side);
-    if (SEE !== 1 - side || !list.length) return list;
+    if (SEE !== 1 - side || !list.length || watching(m, SEE)) return list;
     let c = seenCache.get(list);
     if (!c || c.round !== m.round) { c = { round: m.round, list: seenList(list, m.round) }; seenCache.set(list, c); }
     return c.list;
@@ -1602,8 +1613,9 @@
       const t = (m.towers && m.towers[sd]) || G.towerSpot(m, sd);
       if (t) out.push({ col: t.col, row: t.row });
       for (const r of tileRecs(m, sd)) if (!((kindOf(r.kind) || {}).place || {}).terrain) out.push(...tilesOf(r)); // (terrain isn't a building)
-      // (seen mode: the other team's Cog Builder's Factories only from earlier rounds, as Referee.hide shows them)
-      for (const b of G.buildingsOf(m, sd).concat(G.teamBuildings(m, sd))) if (SEE !== 1 - sd || b.round < m.round) out.push({ col: b.col, row: b.row });
+      // (seen mode: the other team's Cog Builder's Factories only from earlier rounds, as Referee.hide shows them; all
+      // of them to a team that watches them live)
+      for (const b of G.buildingsOf(m, sd).concat(G.teamBuildings(m, sd))) if (SEE !== 1 - sd || b.round < m.round || watching(m, SEE)) out.push({ col: b.col, row: b.row });
     }
     return out;
   }
@@ -1652,7 +1664,8 @@
   // "If things are placed on the same tile, they find another spot close to it" (Vilhelm, 6 Nov). As the fight starts
   // (Mpb.settle, everything known): a building tile (or part) that stands on a squad of the other team the team
   // couldn't see when it voted (placed later than it: the building's tile was seen, the squad's wasn't) moves to the
-  // nearest tile its kind may stand on (spotOk, strict; a kind's hooks.clashOk instead: the Coal mine's moved exit).
+  // nearest tile its kind may stand on (spotOk, strict; a kind's hooks.clashOk instead). A part that stays
+  // (place.parts' stays: the Coal mine's exit) never moves: it is just blocked.
   // Terrain has its own (the Magic lake's settle). Nothing found: it stays.
   function unclash(lanes) {
     const m = lanes[0];
@@ -1661,7 +1674,7 @@
       const K = kindOf(rec.kind);
       if (!K || rec.away || K.place.terrain || K.place.where === 'fixed') continue;
       for (const t of tilesOf(rec)) {
-        if (!foeOn(lanes, side, t.col, t.row)) continue;
+        if ((placeOf(rec.kind, t.part || null) || {}).stays || !foeOn(lanes, side, t.col, t.row)) continue; // (a part that stays, the Coal mine's exit: just blocked)
         const part = t.part || null, ok = [];
         const was = part ? rec.parts[part] : null;
         if (part) delete rec.parts[part]; else rec.away = true; // (its own tile doesn't count while it looks)
@@ -1681,23 +1694,21 @@
   // ----- the fight's start with everything known (Duo.settleBoard: what was hidden meets) -----
   // side's building tiles: { sd, rec, part ('' the building itself), col, row, id (rec.key|part), fresh (the other team
   // doesn't see it there: placed, put down or moved this round, seenList), terrain (a Magic lake tile), spacing (its
-  // kind's 2-tile room), ring: [[col, row]] the tiles round it no squad or building may take (hooks.blocks: the Coal
-  // mine's exit) }
+  // kind's 2-tile room), fixed (never moves: the Vault), stays (a part that never moves and never makes anything move
+  // at the fight's start, place.parts' stays: the Coal mine's exit, just blocked) }
   function boardTiles(m, side) {
     const out = [];
     if (!on(m)) return out;
-    const { COLS, ROWS } = grid(m), seen = new Set();
+    grid(m);
+    const seen = new Set();
     for (const r of seenList(recs(m, side), m.round)) for (const t of tilesOf(r)) seen.add(r.key + '|' + t.part + '@' + t.col + ',' + t.row);
     for (const rec of recs(m, side)) {
       const K = kindOf(rec.kind);
       if (!K) continue;
-      const blocked = [];
-      if (K.hooks.blocks) for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (K.hooks.blocks(m, side, rec, c, r)) blocked.push([c, r]);
       for (const t of tilesOf(rec)) {
         const pl = placeOf(rec.kind, t.part || null) || {};
         out.push({ sd: side, rec, part: t.part, col: t.col, row: t.row, id: rec.key + '|' + t.part, fresh: !seen.has(rec.key + '|' + t.part + '@' + t.col + ',' + t.row),
-          terrain: !!K.place.terrain, spacing: pl.spacing !== false && !K.place.terrain, fixed: K.place.where === 'fixed',
-          ring: blocked.filter(([c, r]) => cheb(c, r, t.col, t.row) === 1) });
+          terrain: !!K.place.terrain, spacing: pl.spacing !== false && !K.place.terrain, fixed: K.place.where === 'fixed', stays: !!pl.stays });
       }
     }
     return out;
@@ -1757,8 +1768,8 @@
     const e = { kind: kindId, part: part || null, key: key || null, votes: [null, null] };
     if (lane === 0 || lane === 1) e.lane = lane;
     if (skill) e.skill = true;
-    // an entry queued in the open goes ahead of any a skill click queued (a hidden Grow never holds back a public vote,
-    // so the shared clock, which waits for public entries only, waits no longer for it: the opponents can't time it)
+    // an entry queued in the open goes ahead of any a skill click queued (a hidden Grow never holds back a public vote;
+    // no vote ever holds the shared deploy clock: each has its own 15 s, Duo.mpbClock)
     const q = m.mpbVote[side], k = skill ? -1 : q.findIndex(x => x.skill);
     if (k >= 0) q.splice(k, 0, e); else q.push(e);
     if (!e.part && !skill) { if (!m.mpbSeen) m.mpbSeen = [[], []]; m.mpbSeen[side].push(clone(e)); }
@@ -1886,9 +1897,13 @@
   // =====================================================================
   // What the opponents may see while deploying (Referee.hide): this round's skill clicks, the votes, a kind's hide
   // =====================================================================
+  // A team the viewers watch (the Shadow Den's Insider information, watching(s, 1 - h): Vilhelm, 6 Nov, "Should show
+  // everything") is shown live on the board: this round's placements (buildings, parts, water, a dug exit, turrets,
+  // grown kojjas) as they stand and their placement votes with both players' tiles. Their skill clicks, the kinds' own
+  // hidden picks and the Vault stay hidden (buys and gold, not the board).
   function hide(s, h) {
     if (!on(s)) return s;
-    const drop = new Set();
+    const live = watching(s, 1 - h), drop = new Set();
     for (const rec of recs(s, h)) {
       for (const id of Object.keys(rec.skills)) {
         const e = rec.skills[id], prev = e.prev;
@@ -1903,6 +1918,7 @@
       if (K && K.hooks.hide && K.hooks.hide(s, h, rec) === false) drop.add(rec); // (false: not seen at all)
     }
     if (drop.size) s.mpb[h] = s.mpb[h].filter(r => !drop.has(r));
+    if (live) return s; // (watched: the board and the votes as they stand)
     s.mpb[h] = seenList(s.mpb[h], s.round); // this round's placements: as the round began (after the kinds' hooks: the School puts its squad back first)
     if (s.mpbVote && s.mpbVote[h]) {
       // the queue as queued in the open (m.mpbSeen: the draft's cards; a placement never takes one off, a skill's never
@@ -2073,12 +2089,22 @@
   // =====================================================================
   // Artifacts (rolled by Duo at the start of rounds 2 and 8)
   // =====================================================================
-  // the cards on offer: every tower type and every MPB kind but the Vault, minus what either team has
+  // the cards an artifact may stand for: every tower type (the Outpost every team starts with isn't one) and every MPB
+  // kind but the Vault, minus the cards of this match's earlier artifacts, so the four artifacts of a match are all
+  // different (Vilhelm, 6 Nov: "No 1 MPB or tower can show up more than 1 times"). Rolled when they spawn, so what the
+  // teams already have doesn't matter: the artifact rounds decide that. The earlier cards: round 2's are in m.draft
+  // (round 3's deal keeps them until round 9's), and m.artifacts of an earlier round if it is still there.
+  function cardsUsed(m) {
+    const out = [];
+    if (m.draft && Array.isArray(m.draft.cards) && m.draft.round < m.round) out.push(...m.draft.cards);
+    if (m.artifacts && m.artifacts.round < m.round) out.push(...(m.artifacts.list || []).map(a => a.card));
+    return out.filter(Boolean);
+  }
   function cardPool(m) {
-    const towers = new Set([0, 1].map(sd => m.towers && m.towers[sd] && m.towers[sd].type).filter(Boolean));
-    const out = G.TOWER_TYPES.filter(t => !towers.has(t.id)).map(t => ({ type: 'tower', id: t.id }));
-    for (const id of Object.keys(KINDS)) if (KINDS[id].draft !== false && !has(m, 0, id) && !has(m, 1, id)) out.push({ type: 'mpb', id });
-    return out;
+    const used = new Set(cardsUsed(m).map(c => c.type + ':' + c.id));
+    const out = G.TOWER_TYPES.map(t => ({ type: 'tower', id: t.id }));
+    for (const id of Object.keys(KINDS)) if (KINDS[id].draft !== false) out.push({ type: 'mpb', id });
+    return out.filter(c => !used.has(c.type + ':' + c.id));
   }
   const cardName = (c) => !c ? '' : c.type === 'tower' ? ((G.TOWER_TYPES.find(t => t.id === c.id) || {}).name || c.id) : ((kindOf(c.id) || {}).name || c.id);
   const cardText = (c) => !c ? '' : c.type === 'tower' ? ((G.TOWER_TYPES.find(t => t.id === c.id) || {}).text || '') : ((kindOf(c.id) || {}).text || '');

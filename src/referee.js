@@ -71,6 +71,9 @@
   // those are left). Changes s; returns it.
   function hide(s, h, base) {
     const round = s.round;
+    // (2v2: a team the viewers watch live, the Shadow Den's Insider information, shows its board as it stands: this
+    // round's walls and Cog Builder's Factories too; never its gold, buys or levels)
+    const live = !!(s.mpb && G.mpbApi && G.mpbApi() && G.mpbApi().watching(s, 1 - h));
     s.armies[h] = G.foeSeen(s, h).map(q => { // a squad sold this round still shows; a squad moved this round shows on its old tile
       delete q.soldRound; delete q.outRound;
       if (q.from && q.movedRound === round) { q.col = q.from.col; q.row = q.from.row; if (q.from.in != null) q.in = q.from.in; else delete q.in; }
@@ -94,7 +97,7 @@
     if (round === G.TOWER_PICK_ROUND && s.towers && s.towers[h] && !s.duoTowers) delete s.towers[h].type; // the tower pick (2v2: the draft is open to all)
     if (s.bribe) s.bribe[h] = G.bribeList(s, h).filter(r => r !== round);
     if (s.elfOwn && s.elfOwn[h] && s.elfOwn[h].round === round) s.elfOwn[h] = null;
-    if (s.bwalls && s.bwalls[h]) s.bwalls[h] = s.bwalls[h].filter(w => w.round !== round);
+    if (s.bwalls && s.bwalls[h] && !live) s.bwalls[h] = s.bwalls[h].filter(w => w.round !== round);
     if (s.mark && s.mark[h] && s.mark[h].round === round) s.mark[h] = null;
     if (s.towerSkill && s.towerSkill[h] === round) s.towerSkill[h] = 0;
     if (s.towerSkill2 && s.towerSkill2[h] === round) s.towerSkill2[h] = 0;
@@ -107,7 +110,7 @@
     if (s.altar) s.altar = s.altar.filter(x => !(x.side === h && x.round === round));
     if (s.unlocks && s.unlocks[h]) for (const ui in s.unlocks[h]) if (s.unlocks[h][ui] === round) delete s.unlocks[h][ui];
     if (s.extraDeploys) s.extraDeploys[h] = 0;
-    if (s.buildings && s.buildings[h]) s.buildings[h] = s.buildings[h].filter(b => b.round !== round).map(b => { const n = (b.levels && b.levels[round]) | 0; if (!n) return b; const levels = { ...b.levels }; delete levels[round]; return { ...b, level: b.level - n, levels }; });
+    if (s.buildings && s.buildings[h]) s.buildings[h] = s.buildings[h].filter(b => live || b.round !== round).map(b => { const n = (b.levels && b.levels[round]) | 0; if (!n) return b; const levels = { ...b.levels }; delete levels[round]; return { ...b, level: b.level - n, levels }; });
     if (s.bskill) s.bskill[h] = {};
     if (s.mpb && G.mpbApi && G.mpbApi()) G.mpbApi().hide(s, h); // 2v2 buildings: this round's skills, the placement vote, the Vault's moves
     if (base && base.gold && s.gold) s.gold[h] = base.gold[h]; // what they have left would tell what they bought

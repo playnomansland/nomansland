@@ -11,7 +11,7 @@
 //  - the draft in rounds 3 and 9: both won / one each / one won / none won; a tower card replaces the Outpost (and in
 //    round 9 the tower with its skills); no tower vote in 2v2
 //  - the placement vote: same tile at once, two tiles -> one of them after 15 s, one vote, no vote, two votes in a row
-//    (a mine's entrance and exit), bots follow their human teammate, the deploy clock waits
+//    (a mine's entrance and exit), bots follow their human teammate, the deploy clock never waits (6 Nov)
 //  - a full bot 2v2, rounds 1 to 10, and the page's copy of each lane hashing as the server's after every action
 // Run: node tools/tests/mpb.js
 const assert = require('assert');
@@ -330,7 +330,7 @@ check('the draft: both won, one each, one won, none won', () => {
   // humans: the picking team picks (either player, the first pick counts), 15 s, then a seeded pick
   { const x = draftWith(25, [0, 0], [false, false, false, false]), { D } = x, d = x.m(0).draft;
     assert.ok(Mpb.draftOpen(x.m(0)) && d.first === 0);
-    assert.ok(Duo.mpbPending(D) && !D.deadline, 'the deploy clock waits for the draft');
+    assert.ok(Duo.mpbPending(D) && D.deadline > 0 && !D.held, 'the deploy clock runs while the draft is open (updated 6 Nov: it used to wait; "Votes don\'t hold the clock")');
     assert.ok(Duo.clocks(D, 0, x.T).draft === Mpb.DRAFT_MS && Duo.clocks(D, 3, x.T).draft === Mpb.DRAFT_MS, 'everyone sees the draft clock');
     assert.ok(!x.act(2, 'draftPick', 0).ok, 'the other team can\'t pick');
     assert.ok(x.act(1, 'draftPick', 1).ok, 'A2 picks card 1');
@@ -379,7 +379,7 @@ check('the placement vote: same tile, two tiles, one vote, none, two in a row, b
   { const x = open(51), { D } = x, m = x.m(0);
     Duo.setTeams(D.lanes.map(R => R.m));
     const [t1, t2] = Mpb.spots(m, 0, 'oak', null);
-    assert.ok(Duo.mpbPending(D) && !D.deadline && D.held > 0, 'the deploy clock waits');
+    assert.ok(Duo.mpbPending(D) && D.deadline > 0 && !D.held, 'the deploy clock runs while the vote is open (updated 6 Nov: it used to wait)');
     assert.strictEqual(Duo.clocks(D, 0, x.T).vote, Mpb.VOTE_MS); assert.strictEqual(Duo.clocks(D, 2, x.T).vote, 0, 'the other team has no vote');
     assert.ok(!x.act(0, 'mpbVote', 10, 17).ok, 'not on an edge tile');
     assert.ok(x.act(0, 'mpbVote', t1.col, t1.row).ok);
@@ -388,7 +388,7 @@ check('the placement vote: same tile, two tiles, one vote, none, two in a row, b
     assert.ok(!x.act(2, 'mpbVote', t1.col, Game.ROWS - 1 - t1.row).ok, 'the other team has nothing to vote on');
     assert.ok(x.act(1, 'mpbVote', t1.col, t1.row).ok, 'A2: the same tile');
     for (const L of [0, 1]) assert.ok(Mpb.recs(x.m(L), 0).some(r => r.kind === 'oak' && r.col === t1.col && r.row === t1.row), 'placed at once, both lanes');
-    assert.ok(!Duo.mpbPending(D) && D.deadline > 0, 'the clock runs again');
+    assert.ok(!Duo.mpbPending(D) && D.deadline > 0, 'the clock still runs');
     sameTeam(D, 0);
     assert.ok(!x.act(0, 'undoAll').ok || Mpb.recs(x.m(0), 0).some(r => r.kind === 'oak'), 'Undo all keeps a placed building'); }
   { const picks = new Set();

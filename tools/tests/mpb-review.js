@@ -260,8 +260,8 @@ check('Second wind keeps its squad\'s unit type: after an Undo all its id is a n
 });
 
 // =================================== the same tile ===================================
-// (6 Nov, "hidden until the fight": the building moves to the nearest tile its rules allow, next to it; the Assassin,
-// now next to a building, breaks its own rule and moves too; tools/tests/mpb-hidden.js)
+// (6 Nov, "hidden until the fight": the building moves to the nearest tile its rules allow, next to it; the Assassin
+// stays in that spot, next to a building now (Vilhelm's answer, 6 Nov; it used to move away too); tools/tests/mpb-hidden.js)
 check('A vote on a tile where a hidden enemy Assassin stands: the page and the server agree; at the fight the building moves close by', () => {
   const x = match(11), { D } = x;
   playTo(x, 2); rich(D);
@@ -290,12 +290,12 @@ check('A vote on a tile where a hidden enemy Assassin stands: the page and the s
     assert.ok(Mpb.interior(0, o.col, o.row), 'still inside the zone');
   }
   const a = x.m(0).armies[1].find(q => q.unit === ASS);
-  assert.ok(a && !(a.col === t.col && a.row === t.row) && !Game.nearBldg(x.m(0), 1, a.col, a.row), 'the Assassin, next to a building now, moves away (its own rule): ' + JSON.stringify(a && [a.col, a.row]));
+  assert.ok(a && a.col === t.col && a.row === t.row, 'the Assassin, next to a building now, stays: ' + JSON.stringify(a && [a.col, a.row]));
 });
 
-// (6 Nov: the exit moves to the nearest tile it may stand on, next to it; the Shadowhands was there first, so it stays
-// in the exit's ring, as next to an exit dug where everyone sees a squad)
-check('A Coal mine exit voted onto a hidden Shadowhands in no man\'s land: allowed, and it moves at the fight', () => {
+// (updated 6 Nov, Vilhelm: "the mine exit tiles can be blocked": the exit stays where it was voted, on the Shadowhands,
+// and is just blocked; it used to move next to it)
+check('A Coal mine exit voted onto a hidden Shadowhands in no man\'s land: allowed, and both stay at the fight (the exit blocked)', () => {
   const x = match(12), { D } = x;
   playTo(x, 2); rich(D);
   put(D, 1, 'shadowDen');
@@ -310,8 +310,8 @@ check('A Coal mine exit voted onto a hidden Shadowhands in no man\'s land: allow
   assert.ok(try1(x, 0, 'mpbVote', t.col, t.row).ok && x.act(1, 'mpbVote', t.col, t.row).ok, 'the exit vote passes');
   for (let k = 0; k < 4; k++) Duo.setReady(D, k, true, x.T);
   const ex = Mpb.recOf(x.m(0), 0, mk).parts.exit;
-  assert.ok(ex && !(ex.col === t.col && ex.row === t.row) && Math.max(Math.abs(ex.col - t.col), Math.abs(ex.row - t.row)) === 1, 'the exit moved next to it: ' + JSON.stringify(ex));
-  assert.ok(x.m(0).armies[1].some(q => q.unit === SH && q.col === t.col && q.row === t.row), 'the Shadowhands (there first) stays');
+  assert.ok(ex && ex.col === t.col && ex.row === t.row, 'the exit stays: ' + JSON.stringify(ex));
+  assert.ok(x.m(0).armies[1].some(q => q.unit === SH && q.col === t.col && q.row === t.row), 'the Shadowhands stays');
 });
 
 check('Two squads on one tile (a hidden Assassin, then a squad of theirs): the newer moves to the nearest tile', () => {

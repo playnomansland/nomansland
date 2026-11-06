@@ -192,12 +192,12 @@ const Game = (() => {
   // the walls that stand in this round's fight
   const bwallsFighting = (m, side) => bwallsOf(m, side).filter(w => w.temp ? w.round === m.round : towerSkill2On(m, side, 'bastion'));
   // what a viewer may see of a player's walls: their own, and the opponent's from earlier rounds while deploying
-  const bwallShown = (m, viewer, deploying, side, w) => side === viewer || !deploying || w.round < m.round;
+  const bwallShown = (m, viewer, deploying, side, w) => side === viewer || !deploying || w.round < m.round || watchedLive(m, side); // (2v2: watched live, the Shadow Den)
   const ownHalf = (side, row) => side === 0 ? row >= ROWS / 2 && row < ROWS : row >= 0 && row < ROWS / 2;
   // the other player's wall on that edge, as this player sees it: in 2v2 the server judges a deploy action as the acting
   // team sees the board (src/mpb.js asSeen), so a wall the other team put up this round (hidden, bwallShown) doesn't
   // count and a refusal shows nothing; the fight's start moves the newer of two walls on one edge (Duo.settleBoard)
-  const bwallFoe = (m, side, col, row, edge) => { const w = bwallOn(m, 1 - side, col, row, edge); return !!w && !(MPB && m && m.mpb && MPB.seeing() === side && w.round === m.round); };
+  const bwallFoe = (m, side, col, row, edge) => { const w = bwallOn(m, 1 - side, col, row, edge); return !!w && !(MPB && m && m.mpb && MPB.seeing() === side && w.round === m.round && !MPB.watching(m, side)); };
   function bwallSpotOk(m, side, col, row, edge) {
     if (!isEdge(edge) || col < 0 || col >= COLS || !ownHalf(side, row) || reserved(side, col, row) || terrainBlocks(m, col, row)) return false;
     const [dc, dr] = EDGES[edge];
@@ -1079,7 +1079,7 @@ const Game = (() => {
       if (t && t.col === col && t.row === row) return true;
       if (treasuryAt(m, s, col, row)) return true;
       const e = elfOwnOf(m, s); if (e && e.col === col && e.row === row && (own || e.round < m.round)) return true;
-      if (buildingsOf(m, s).concat(teamBuildings(m, s)).some(b => b.col === col && b.row === row && (own || b.round < m.round))) return true; // (2v2: the other lane's too)
+      if (buildingsOf(m, s).concat(teamBuildings(m, s)).some(b => b.col === col && b.row === row && (own || b.round < m.round || watchedLive(m, s)))) return true; // (2v2: the other lane's too; all of them when watched live)
       if (isDev(m) && placedLessers(m, s).some(b => b.col === col && b.row === row && (own || b.round < m.round))) return true;
       const squads = (own ? m.armies[s] : foeSeen(m, s)).concat(own ? teamArmy(m, s) : teamSeen(m, s));
       if (squads.some(q => m.units[q.unit] && m.units[q.unit].building && covers(m, q, col, row))) return true; // (a building never moves)

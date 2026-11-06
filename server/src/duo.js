@@ -292,8 +292,9 @@ export class DuoRoom extends DurableObject {
   // each seat's clock as its phone shows it (the deploy clock, held or running, and its team's vote and the draft's)
   clocks(now) { const D = this.D; return [0, 1, 2, 3].map((k) => D && D.lanes[0] ? JSON.stringify([D.phase, Duo.remainingFor(D, k, now), Duo.heldFor(D, k), Duo.clocks(D, k, now)]) : ''); }
   // a 'status' to each phone whose clock changed since `was` (clocks()). The other team's placements are hidden until the
-  // fight (src/mpb.js), so their view, and the sync, stays the same: only the shared deploy clock, starting again once
-  // both teams' votes are done, reaches them (when, never where: docs/MPB-2V2.md). skip: a phone sent a sync just now.
+  // fight (src/mpb.js), so their view, and the sync, stays the same; and no vote holds the shared deploy clock (each
+  // has its own 15 s, only the team's own phones get it: Duo.clocks), so a team's votes never reach the other team's
+  // clock either (docs/MPB-2V2.md). skip: a phone sent a sync just now.
   clockNews(was, now, skip) {
     const cur = this.clocks(now), here = this.here();
     for (const s of this.sockets()) {
