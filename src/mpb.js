@@ -716,7 +716,8 @@
   // Terrain, not a building: each player of the team puts down LAKE.tiles water tiles (their own, no vote: Game.mpbAct
   // 'place') anywhere on the team's own zone or in no man's land (flank tiles too), never on a squad or building (as
   // the player sees the board: the opponents' squads of this round don't count, so a refusal gives nothing away), and
-  // never so that some tile can no longer be walked to (lakeFree: the board's walkable tiles stay one area). As the
+  // never so that some tile can no longer be walked to (lakeFree: the board's walkable tiles stay one area), never on
+  // a Bastion wall's tile (Vilhelm, 6 Nov: "no walls on the lake"; Game.bwallTile). As the
   // fight starts (hooks.settle) a tile not put down yet, or one put down this round on a squad or building the player
   // couldn't see, goes on the first tile allowed with everything known. Water is the
   // game's water (Game.terrainBlocks, via Mpb.terrainAt; the Engine's terrain): shot over, not walked on, nobody can
@@ -758,7 +759,9 @@
   // the team's own zone or no man's land, any column
   const lakeWhere = (side, col, row) => inBoard(col, row) && (G.inZone(side, row) || G.inNoMans(row));
   // may this player put lake tile rec on (col, row)? (their own tile, not down yet or put down this round.) strict: with
-  // the squads the player can't see too (the fight's start, hooks.settle)
+  // the squads the player can't see too (the fight's start, hooks.settle). Never on a Bastion wall's tile ("no walls on
+  // the lake", Vilhelm, 6 Nov: Game.bwallTile, as the team sees the board; its own team's and the teammate's walls
+  // always count, the other team's of this round only once seen)
   function lakeOk(m, side, rec, col, row, strict) {
     if (!on(m) || !rec || rec.kind !== 'magicLake' || rec.data.lane !== laneOf(m) || !(rec.col < 0 || rec.round === m.round)) return false;
     if (!Number.isInteger(col) || !Number.isInteger(row)) return false;
@@ -766,7 +769,7 @@
     if (!lakeWhere(side, col, row)) return false;
     const was = { col: rec.col, row: rec.row };
     rec.col = -1; rec.row = -1; // (a tile being moved: its old tile is dry for the check)
-    try { return !G.terrainBlocks(m, col, row) && !(strict ? taken : seenTaken)(m, side, col, row) && lakeFree(m, col, row); } finally { rec.col = was.col; rec.row = was.row; }
+    try { return !G.terrainBlocks(m, col, row) && !(strict ? taken : seenTaken)(m, side, col, row) && !G.bwallTile(m, side, col, row) && lakeFree(m, col, row); } finally { rec.col = was.col; rec.row = was.row; }
   }
   // where lake tile rec may go, best first: no man's land on the team's own half (the rows nearest its zone first),
   // then the rest of no man's land, then the zone (its front first); each player toward the columns of their own half
@@ -814,7 +817,7 @@
         rec.data.lane = laneOf(m);
         for (const L of [0, 1]) for (let k = lakeRecs(m, side).filter(r => r.data.lane === L).length; k < LAKE.tiles; k++) addRec(m, side, 'magicLake', -1, -1).data.lane = L;
       },
-      spotOk: (m, side, part, col, row) => lakeFree(m, col, row), // (a lake by a placement vote, never in a real match)
+      spotOk: (m, side, part, col, row) => !G.bwallTile(m, side, col, row) && lakeFree(m, col, row), // (a lake by a placement vote, never in a real match)
       // (for the boards: its look shows its skills)
       unit: (m, side, rec) => E.withTraits({ name: 'Magic lake', cost: 0, bodies: 1, hp: 1, hit: 0, aps: 1, range: 0, speed: 0, splash: 0, shape: 'square', color: '#3E8FC4',
         structure: true, lesser: true, kind: 'mpb', mpb: 'magicLake', level: 0, ...(lakeSkin(rec) ? { mpbSkin: lakeSkin(rec) } : {}) }),

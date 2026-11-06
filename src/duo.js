@@ -197,9 +197,10 @@
     setTeams(lanes);
     return best;
   }
-  // before a fight (Duo.runFight): every two squads on one tile, either team, either lane: the newer moves (D.stamp: when
-  // each seat's squads last took their tiles this round; one from an earlier round or a bot's turn counts as oldest).
-  // The same age: the one outside its own zone moves, then a seeded coin.
+  // every two squads on one tile, either team, either lane (settleBoard does this and more at the fight's start): on a
+  // tile of a team's own zone that team's squad stays and the other team's moves (prioOf); elsewhere, and two of one
+  // team, the newer moves (D.stamp: when each seat's squads last took their tiles this round; one from an earlier
+  // round or a bot's turn counts as oldest). The same age: the one outside its own zone moves, then a seeded coin.
   function unstack(D) {
     const lanes = ms(D);
     setTeams(lanes);
@@ -210,8 +211,8 @@
       for (let a = 0; a < all.length && !pair; a++) for (let b = a + 1; b < all.length; b++) if (overlap(all[a].m, all[a].q, all[b].m, all[b].q)) { pair = [all[a], all[b]]; break; }
       if (!pair) return;
       const age = (x) => stampOf(D, seatOf(x.L, x.sd), x.q.id), out = (x) => !G.inZone(x.sd, x.q.row);
-      const [x, y] = pair;
-      const mover = age(x) !== age(y) ? (age(x) > age(y) ? x : y) : out(x) !== out(y) ? (out(x) ? x : y) : (mrand(D, 17 + guard) < 0.5 ? x : y);
+      const [x, y] = pair, own = prioOf({ sd: x.sd, tiles: covering(x.m, x.q) }, { sd: y.sd, tiles: covering(y.m, y.q) });
+      const mover = own >= 0 ? (x.sd === own ? y : x) : age(x) !== age(y) ? (age(x) > age(y) ? x : y) : out(x) !== out(y) ? (out(x) ? x : y) : (mrand(D, 17 + guard) < 0.5 ? x : y);
       if (!relocate(lanes, mover.L, mover.sd, mover.q)) return; // (no room at all: they stay)
     }
   }
@@ -228,6 +229,17 @@
   const hostOf = (L, sd, q) => (M.on(L) && M.recs(L, sd).find(r => !r.away && r.col === q.col && r.row === q.row && ((M.kindOf(r.kind) || {}).hooks || {}).holds && M.kindOf(r.kind).hooks.holds(L, sd, r, q.unit))) || null;
   // one Bastion wall's edge, however it is named (Game's edgeKey: a tile's s edge is the n edge of the tile below it)
   const edgeKey = (sd, w) => { const e = G.edgeOf(sd, w); return e === 's' ? `${w.col},${w.row + 1},n` : e === 'e' ? `${w.col + 1},${w.row},w` : `${w.col},${w.row},${e}`; };
+  // "You always have 'prio' in your own zone" (Vilhelm, 6 Nov): of two teams' things that meet on a tile (or a wall
+  // and the water on its tile, or two walls on one edge), the team whose own zone that tile is in (its rows, every
+  // column: the edge tiles kept as the other team's flank tiles too, they are rows of its zone) keeps its thing there,
+  // whatever their stamps; the other team's moves. Returns that team, or -1: no man's land, or two of one team (the
+  // newer moves). X, Y: { sd, tiles } (two walls: the tiles on both sides of the edge count)
+  function prioOf(X, Y) {
+    if (!X || !Y || X.sd === Y.sd) return -1;
+    const T = X.t === 'wall' && Y.t === 'wall' ? X.tiles.concat(Y.tiles) : X.tiles.filter(([c, r]) => Y.tiles.some(([c2, r2]) => c === c2 && r === r2));
+    const own = [0, 1].filter(sd => T.some(([, r]) => G.inZone(sd, r)));
+    return own.length === 1 ? own[0] : -1;
+  }
   function things(D, lanes) {
     const m = lanes[0], round = m.round, out = [], occ = {};
     lanes.forEach((L, li) => {
@@ -257,7 +269,8 @@
   const hits = (A, B) => A.some(([c, r]) => B.some(([c2, r2]) => c === c2 && r === r2));
   const within = (A, B, d) => A.some(([c, r]) => B.some(([c2, r2]) => Math.max(Math.abs(c - c2), Math.abs(r - r2)) <= d));
   // does X break one of its own placement rules because of Y, everything known? 'same' (one tile, or two teams' walls
-  // on one edge: Y breaks it too), 'water' (a wall on water); null: no. Only things on the same tile meet (Vilhelm,
+  // on one edge: Y breaks it too), 'water' (a wall and the water on its tile, either way round: Vilhelm, 6 Nov, "no
+  // walls on the lake"); null: no. Only things on the same tile meet (Vilhelm,
   // 6 Nov): a rule one thing has against things around it is never checked again here, so an Assassin next to a
   // building it couldn't see, a building within 2 tiles of one it couldn't see, and a squad or building round an exit
   // dug next to it all stay ("It stays in that spot"). A part that stays (place.parts' stays: the Coal mine's exit)
@@ -266,7 +279,7 @@
   function breaks(X, Y) {
     if (X === Y || (X.rec && Y.rec && X.rec === Y.rec) || X.stays || Y.stays) return null;
     if (X.t === 'wall') return Y.t === 'w' && hits(X.tiles, Y.tiles) ? 'water' : Y.t === 'wall' && Y.sd !== X.sd && Y.edge === X.edge ? 'same' : null;
-    if (Y.t === 'wall') return null;
+    if (Y.t === 'wall') return X.t === 'w' && hits(X.tiles, Y.tiles) ? 'water' : null; // ("no walls on the lake", 6 Nov: the water breaks it as much as the wall)
     if (hits(X.tiles, Y.tiles)) return X.t === 'fac' && Y.t === 'fac' ? null : 'same';
     return null;
   }
@@ -294,14 +307,17 @@
   }
   // The settle (Duo.runFight, before the fight): Magic lake tiles nobody put down go down first (everything known, so
   // they meet nothing), then until nothing is broken: of every rule broken, the thing that broke it moves to the
-  // nearest tile its own kind's rules allow, everything known; both broke it (one tile): the newer moves (the same
-  // stamp: the one outside its own zone, then a squad before a part, a building, water, a wall, then a coin seeded
-  // from D.secret, which no view holds). Of all that must move, the newest moves first. Nothing is called off or paid back. Only what was put
-  // down, placed or moved this round moves (the rest was seen by all: the other thing moves). A Cog Builder's Factory
+  // nearest tile its own kind's rules allow, everything known; both broke it (one tile, a wall and the water on its
+  // tile): on a tile of a team's own zone the other team's thing moves, whatever the stamps ("You always have 'prio'
+  // in your own zone", Vilhelm, 6 Nov: prioOf); elsewhere (no man's land) and between two of one team the newer
+  // moves (the same stamp: the one outside its own zone, where only a squad of a 2x2 footprint can still differ, then
+  // a squad before a part, a building, water, a wall, then a coin seeded from D.secret, which no view holds). Of all
+  // that must move, the newest moves first. Nothing is called off or paid back. Outside prio only what was put down,
+  // placed or moved this round moves (the rest was seen by all: the other thing moves). A Cog Builder's Factory
   // never moves (the other thing does). A thing with no tile anywhere stays, and the other one moves instead if it can
   // (one tile); neither can: both stay. A moved thing keeps its stamp. A building goes to the nearest tile its rules
-  // allow (its own rules as a normal placement: so one voted onto a hidden Assassin takes the nearest tile it may stand
-  // on, and the Assassin stays, next to it); of the tiles as near (the same ring round it), one where nothing else
+  // allow (its own rules as a normal placement: in no man's land, or the rare case its owner's prio can't be kept: the
+  // other team's thing has no tile anywhere); of the tiles as near (the same ring round it), one where nothing else
   // then stands on the same tile (a wall under water) if there is one. The squads in a building go with it (a Nest's,
   // a School's pupil: they stand on its tile). The Coal mine's exit never moves and moves nothing (it is just blocked:
   // the squads that would come up on a taken tile stay home, src/mpb.js coalMine).
@@ -311,14 +327,22 @@
     G.useGrid(m);
     if (M.on(m)) { M.settleLakes(lanes); for (const sd of [0, 1]) { copyTeam(lanes[0], lanes[1], sd); bstamp(D, sd); } }
     const moved = new Set(), stuck = new Set(), log = [];
-    // (two squads on one tile: either may move, as unstack did: an Undo all may bring back an older one)
-    const can = (Z, c) => !!Z && !stuck.has(Z.id) && Z.t !== 'fac' && !Z.fixed && (Z.fresh || moved.has(Z.id) || (c.why === 'same' && c.X.t === 'sq' && c.Y.t === 'sq'));
+    // (two squads on one tile: either may move, as unstack did: an Undo all may bring back an older one; the other
+    // team's thing on a team's own zone may move whatever its age: prioOf)
+    const can = (Z, c, any) => !!Z && !stuck.has(Z.id) && Z.t !== 'fac' && !Z.fixed && (any || Z.fresh || moved.has(Z.id) || (c.why === 'same' && c.X.t === 'sq' && c.Y.t === 'sq'));
     for (let guard = 0; guard < 160; guard++) {
       setTeams(lanes);
       G.useGrid(m);
       const all = things(D, lanes), list = conflicts(lanes, all, moved), jobs = [];
       for (const c of list) {
         const both = c.Y && (c.why === 'same' || !!breaks(c.Y, c.X));
+        const own = both ? prioOf(c.X, c.Y) : -1;
+        if (own >= 0) { // a team's own zone: its thing stays, the other team's moves (if that one can't go anywhere, this one moves instead)
+          const guest = c.X.sd === own ? c.Y : c.X, host = guest === c.X ? c.Y : c.X;
+          if (can(guest, c, true)) jobs.push({ mover: guest, other: can(host, c) ? host : null, c });
+          else if (can(host, c)) jobs.push({ mover: host, other: null, c });
+          continue;
+        }
         const xs = both ? [c.X, c.Y].filter(Z => can(Z, c)) : [c.X].filter(Z => can(Z, c));
         if (!xs.length) continue;
         let mover = xs[0], other = xs[1] || null;
@@ -1038,7 +1062,7 @@
     V, MAP, OFF, HP, PINGS, EMOTES, EMOTE_TEXT, SEATS, SEAT_NAMES, seatOf, mateOf, remap, unmap, laneOfId, move, teamOf, setTeam, setTeams,
     MECHITES, unitSet, TEAM_FIELDS, TEAM_FNS, SYS_FNS, copyTeam, copyAll, teamBody, settle, battle, laneResult, fight, view,
     create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, viewFor, clock, clocks, canAct, cutFor, remainingFor, heldFor, save, load, humans,
-    mpbPending, mpbTick, mpbSettle, rebuildTeam, undoAllAllowed, teamState, unstack, relocate, stamp, stampAll, bstamp, stampOf, bstampOf, settleBoard, things, conflicts,
+    mpbPending, mpbTick, mpbSettle, rebuildTeam, undoAllAllowed, teamState, unstack, relocate, stamp, stampAll, bstamp, stampOf, bstampOf, settleBoard, things, conflicts, prioOf,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Duo = api;

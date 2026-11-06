@@ -4,8 +4,9 @@
 //  2. "Votes don't hold the clock, independent systems": a placement vote or the draft never changes either team's
 //     deploy clock (second by second, with and without a vote or a pick); one still open when the deploy clock ends is
 //     settled as the fight starts, as its own 15 s running out would
-//  3. a building voted onto a hidden Assassin "should act normally": it takes the nearest tile it is allowed on, the
-//     Assassin stays
+//  3. a building voted onto a hidden Assassin "should act normally" (since answer 5, "You always have 'prio' in your
+//     own zone": the building, on its own zone, stays; the Assassin moves to the nearest tile its own rules allow;
+//     tools/tests/mpb-prio.js has the rest of answers 5 and 6)
 //  4. the Coal mine's exit and its ring never make anything move; a squad whose tile at the exit (or the exit's own
 //     tile) is taken by a squad (or any other unit standing there: the other lane's Factory, Jail guards), building,
 //     water or wall of either team doesn't go down the mine
@@ -155,23 +156,24 @@ check('1: a building within 2 tiles of the other team\'s hidden dug exit stays, 
   }
 });
 
-check('3: a building voted onto a hidden Assassin takes the nearest tile it is allowed on; the Assassin stays', () => {
+// (updated 6 Nov, answer 5 "You always have 'prio' in your own zone": the building used to take the nearest tile it
+// was allowed on, and the Assassin stayed)
+check('3 with 5: a building voted onto a hidden Assassin in its own zone stays; the Assassin moves to the nearest tile its rules allow', () => {
   for (const kind of ['oak', 'school', 'shadowDen']) {
     const x = board(203), { D } = x;
     const t = { col: 13, row: 14 };
     const ass = place(x, 2, 'Assassin', t.col, t.row);
-    // with everything known (the Assassin on t): the tiles the building may stand on, nearest to t
-    teams(D);
-    const ok = Mpb.spots(x.m(0), 0, kind, null, true);
-    assert.ok(!ok.some(s => s.col === t.col && s.row === t.row), 'not on the Assassin');
-    const near = Mpb.nearestOf(ok, t.col, t.row);
     const key = vote(x, 0, kind, t);
     const { P } = fight(x);
     const b = recIn(P[0], 0, key), a = sqIn(P, 0, 1, ass.id);
-    assert.deepStrictEqual([a.col, a.row], [t.col, t.row], kind + ': the Assassin stays');
-    assert.ok(ok.some(s => s.col === b.col && s.row === b.row), kind + ': on a tile it may stand on: ' + JSON.stringify([b.col, b.row]));
-    assert.strictEqual(cheb(b, t), cheb(near, t), kind + ': as near as any (' + JSON.stringify([b.col, b.row]) + ' vs ' + JSON.stringify(near) + ')');
-    assert.deepStrictEqual(D.settled.map(e => e.why), ['same'], kind + ': only the building moved');
+    assert.deepStrictEqual([b.col, b.row], [t.col, t.row], kind + ': the building stays');
+    assert.ok(!(a.col === t.col && a.row === t.row) && !Game.nearBldg(P[0], 1, a.col, a.row), kind + ': the Assassin moved off, not next to a building: ' + JSON.stringify([a.col, a.row]));
+    // the nearest tile its own rules allow, everything known
+    const ok = [];
+    for (let r = 0; r < Game.ROWS; r++) for (let c = 0; c < Game.COLS; c++) if (!(c === t.col && r === t.row) && Game.canPlaceAt(P[0], 1, c, r, ass.unit, true) && !Game.occupied(P[0], 1, c, r) && !Game.occupied(P[0], 0, c, r)) ok.push({ col: c, row: r });
+    const near = Mpb.nearestOf(ok.concat([{ col: a.col, row: a.row }]), t.col, t.row);
+    assert.strictEqual(cheb(a, t), cheb(near, t), kind + ': as near as any (' + JSON.stringify([a.col, a.row]) + ' vs ' + JSON.stringify(near) + ')');
+    assert.deepStrictEqual(D.settled.map(e => e.id), ['s0:1:' + ass.id], kind + ': only the Assassin moved');
   }
 });
 

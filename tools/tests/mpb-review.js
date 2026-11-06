@@ -262,7 +262,9 @@ check('Second wind keeps its squad\'s unit type: after an Undo all its id is a n
 // =================================== the same tile ===================================
 // (6 Nov, "hidden until the fight": the building moves to the nearest tile its rules allow, next to it; the Assassin
 // stays in that spot, next to a building now (Vilhelm's answer, 6 Nov; it used to move away too); tools/tests/mpb-hidden.js)
-check('A vote on a tile where a hidden enemy Assassin stands: the page and the server agree; at the fight the building moves close by', () => {
+// (updated 6 Nov, Vilhelm's answer 5 "You always have 'prio' in your own zone": the Oak stays and the Assassin moves;
+// the Oak used to move next to it)
+check('A vote on a tile where a hidden enemy Assassin stands: the page and the server agree; at the fight the Assassin moves off', () => {
   const x = match(11), { D } = x;
   playTo(x, 2); rich(D);
   const ASS = ui('Assassin');
@@ -285,12 +287,11 @@ check('A vote on a tile where a hidden enemy Assassin stands: the page and the s
   for (let k = 0; k < 4; k++) Duo.setReady(D, k, true, x.T);
   for (const L of [0, 1]) {
     const o = Mpb.recs(x.m(L), 0).find(r => r.kind === 'oak');
-    assert.ok(!(o.col === t.col && o.row === t.row), 'the Oak moved off the Assassin\'s tile (lane ' + L + ')');
-    assert.strictEqual(Math.max(Math.abs(o.col - t.col), Math.abs(o.row - t.row)), 1, 'to the nearest tile its rules allow: next to it');
-    assert.ok(Mpb.interior(0, o.col, o.row), 'still inside the zone');
+    assert.ok(o.col === t.col && o.row === t.row, 'the Oak stays where it was voted (lane ' + L + ')');
   }
   const a = x.m(0).armies[1].find(q => q.unit === ASS);
-  assert.ok(a && a.col === t.col && a.row === t.row, 'the Assassin, next to a building now, stays: ' + JSON.stringify(a && [a.col, a.row]));
+  teams(D);
+  assert.ok(a && !(a.col === t.col && a.row === t.row) && !Game.nearBldg(x.m(0), 1, a.col, a.row), 'the Assassin moved off, not next to a building: ' + JSON.stringify(a && [a.col, a.row]));
 });
 
 // (updated 6 Nov, Vilhelm: "the mine exit tiles can be blocked": the exit stays where it was voted, on the Shadowhands,
@@ -314,7 +315,8 @@ check('A Coal mine exit voted onto a hidden Shadowhands in no man\'s land: allow
   assert.ok(x.m(0).armies[1].some(q => q.unit === SH && q.col === t.col && q.row === t.row), 'the Shadowhands stays');
 });
 
-check('Two squads on one tile (a hidden Assassin, then a squad of theirs): the newer moves to the nearest tile', () => {
+// (updated 6 Nov, answer 5: on team A's zone A's squad stays whichever came first; the newer used to move)
+check('Two squads on one tile of team A\'s zone (a hidden Assassin of B\'s and a squad of A\'s, both orders): A\'s stays, the Assassin moves', () => {
   const D = Duo.create({}, units), T = 1e12;
   Duo.start(D, units, matrix, T, 7, [false, false, false, false]);
   const seq = [0, 0, 0, 0], act = (seat, fn, ...a) => Duo.act(D, seat, { seq: ++seq[seat] + 10, fn, a }, T);
@@ -327,8 +329,10 @@ check('Two squads on one tile (a hidden Assassin, then a squad of theirs): the n
   assert.ok(placed != null, 'A1 puts a squad on that very tile (they can\'t see it)');
   for (let k = 0; k < 4; k++) Duo.setReady(D, k, true, T);
   const a = m.armies[1].find(q => q.unit === ASS), b = m.armies[0].find(q => q.unit === placed && q.round === 1 && Math.max(Math.abs(q.col - 12), Math.abs(q.row - 12)) <= 1);
-  assert.deepStrictEqual([a.col, a.row], [12, 12], 'the Assassin (first there) stays');
-  assert.ok(b && !(b.col === 12 && b.row === 12), 'the newer squad stands next to it');
+  const b0 = m.armies[0].find(q => q.unit === placed && q.round === 1 && q.col === 12 && q.row === 12);
+  assert.ok(b0, 'A\'s squad (newer, on its own zone) stays');
+  assert.ok(!(a.col === 12 && a.row === 12) && Math.max(Math.abs(a.col - 12), Math.abs(a.row - 12)) === 1, 'the Assassin (first there) moves next to it: ' + JSON.stringify([a.col, a.row]));
+  void b;
   // the other way round: the squad first, then the Assassin on it
   const D2 = Duo.create({}, units);
   Duo.start(D2, units, matrix, T, 7, [false, false, false, false]);
@@ -369,6 +373,8 @@ check('A teammate\'s Undo all onto a tile taken meanwhile (a Nest too): the pres
   }
 });
 
+// (Mpb.settle alone: the fallback for a fight without the server's D, as node tests' Duo.settle. A real fight's start,
+// Duo.settleBoard, keeps the water on its team's own zone and moves the Assassin: tools/tests/mpb-prio.js)
 check('A lake tile put on a hidden squad goes to the allowed tile nearest the one chosen', () => {
   const D = Duo.create({}, units), T = 1e12;
   Duo.start(D, units, matrix, T, 7, [false, false, false, false]);

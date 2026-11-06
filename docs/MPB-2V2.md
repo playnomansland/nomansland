@@ -29,8 +29,9 @@ Branch: everything lands on `claude/exciting-meitner-889u3z` (merged there by th
   opponents, in both lanes, until the fight, exactly as this round's squads are: they keep seeing the board as the round
   began (the exit on its old tile, with its old ring). Teammates see everything at once; the fight shows everything;
   buildings of earlier rounds stay seen. As the fight starts, everything known, what then meets is settled: of two
-  things on one tile the newer moves to the nearest tile its own rules allow (see "Hidden until the fight" under
-  Architecture). Nothing is called off or paid back.
+  teams' things on one tile of a team's own zone the other team's moves (answer 5, "prio"), otherwise the newer moves,
+  to the nearest tile its own rules allow (see "Hidden until the fight" under Architecture). Nothing is called off or
+  paid back.
 - **Vilhelm's answers (6 Nov)** to the open questions of the hidden placements:
   1. An Assassin next to a building it couldn't see: "It stays in that spot." No rule a thing has against what is
      *around* it is checked again at the fight's start (the Assassin's "not next to a building", a building's 2 tiles
@@ -39,13 +40,31 @@ Branch: everything lands on `claude/exciting-meitner-889u3z` (merged there by th
      their own 15 s beside the shared deploy clock and never hold it; one still open when the deploy clock ends is
      settled as the fight starts exactly as its own clock running out would (the draft's seeded pick; the vote's two
      tiles, one tile, or the first allowed tile). Nothing a team votes changes the other team's clock.
-  3. A building voted onto a hidden Assassin "should act normally": it takes the nearest tile it may stand on, the
-     Assassin stays.
+  3. A building voted onto a hidden Assassin "should act normally" (read at first as: it takes the nearest tile it may
+     stand on, the Assassin stays; superseded by answer 5: on its own zone the building stays, the Assassin moves).
   4. The Coal mine's exit: "the mine exit tiles can be blocked and any units that would end up on the blocked tile
      simply do not go through the mine to begin with". The exit and its 8 tiles never make anything move and never
      move; a squad whose tile at the exit (or the exit's own tile) is taken as the fight starts stays home.
-  5. (Still open) a Coal mine entrance moved at the fight's start leaves the squads round it where they stood.
-  6. (Still open) Bastion walls and lake water on one tile: the wall moves.
+  5. "You always have 'prio' in your own zone, which means that putting the mine entrance gives u prio over the
+     opponents placement: His model moves and yours stays." A general rule for every same-tile clash at the fight's
+     start: on a tile of a team's own zone that team's thing always stays and the other team's moves to the nearest
+     tile its own placement rules allow, everything known (an Assassin: not on or next to a building, the flank rules
+     for a flank squad...), whatever the stamps; it keeps its stamp. Elsewhere (no man's land, nobody's zone) and
+     between two things of one team (teammates, both lanes) the newer moves, as before. "Own zone" = every tile of the
+     zone's rows (`Game.inZone`), the edge tiles that are the other team's flank tiles included: the code and the notes
+     have always called them "the edge tiles of your zone" that are *kept* for the enemy's flank squads (`reserved`:
+     a deploy rule, not whose zone it is), the Magic lake may go there, so the owner has prio there too and an enemy
+     flank squad on one moves. A Coal mine entrance is always on its own zone, so it never moves for the other team's
+     squads, and the squads round it go down the mine. Answer 4 still holds and composes: the exit never moves and
+     never moves anything (dug onto their zone's flank tile where their hidden squad stands: both stay, the exit is
+     blocked). A squad in a building stays with it (and still goes with it when it does move, `Duo.carry`).
+  6. "Lets just go with no, no walls on the lake." A Bastion wall never stands on water: a wall's tile (the one it is
+     put up from, `w.col` / `w.row`; the tile across its edge is not its tile, so a wall along a shore is fine) is
+     never a lake tile. While deploying, as the acting team sees the board: no wall on water it sees (`bwallSpotOk`:
+     `terrainBlocks`), no water on a wall it sees (`lakeOk`: `Game.bwallTile`; its own and the teammate's walls always,
+     the other team's from earlier rounds). At the fight's start a hidden wall and hidden water on one tile are a clash
+     like any other: prio on a zone tile, else the newer moves (a wall to the nearest edge the same way round, water to
+     the nearest tile it may go on). Nothing is called off or paid back.
   7. Insider information "Should show everything": the watched team's board live (buildings, parts, water, a dug exit,
      turrets, grown kojjas, walls, the vote tiles), their gold, buys and levels still hidden.
   8. The artifact cards: "No 1 MPB or tower can show up more than 1 times." Each is rolled when its artifact spawns,
@@ -71,13 +90,14 @@ Branch: everything lands on `claude/exciting-meitner-889u3z` (merged there by th
   once per match.
 - An Assassin placed in the enemy zone or on a flank tile stands still the flank delay (`FLANK.delay`, 3 s) in its first
   fight, as a flank squad does (the Shadow Den removes that). Enemy squads placed this round are hidden, so an Assassin
-  may share a tile with one; as the fight starts the one put there later moves to the nearest tile it may stand on
-  (Vilhelm, 6 Nov: "if things are placed on the same tile, they find another spot close to it"; `Duo.settleBoard`).
+  may share a tile with one; as the fight starts one of them moves to the nearest tile it may stand on (Vilhelm, 6 Nov:
+  "if things are placed on the same tile, they find another spot close to it"; `Duo.settleBoard`): on a team's own
+  zone the other team's (answer 5, prio: an Assassin in the enemy's zone is the one that moves), else the newer.
 - Hidden until the fight, readings: (a) only things on the same tile meet as the fight starts (Vilhelm's answers 1, 3
-  and 4); the newer moves. Two board-integrity rules are still checked with everything known, since the board can't
-  take them: a fresh lake tile that, with the other team's water, shuts a tile or a way off moves (the newer tile), and
-  a wall under water moves (answer 6 still open). Only what was put down, placed or moved this round moves: the rest
-  was seen by all. (b) The vote and the draft stay open to all (the artifact's card says which building the team got)
+  and 4); on a team's own zone the other team's thing moves (answer 5), else the newer. One board-integrity rule is
+  still checked with everything known, since the board can't take it: a fresh lake tile that, with the other team's
+  water, shuts a tile or a way off moves (the newer tile). A wall and the water on its tile are a same-tile clash
+  (answer 6). Outside prio only what was put down, placed or moved this round moves: the rest was seen by all. (b) The vote and the draft stay open to all (the artifact's card says which building the team got)
   but never the tile chosen or the tile votes; no vote or draft holds the deploy clock (answer 2), so the opponents
   learn neither where nor when. (c) Every deploy check is judged as the acting team sees the board (the page holds
   that view; the server judges in `Mpb.asSeen`; Bastion walls too: `Game.bwallSpotOk` leaves out the other team's
@@ -86,10 +106,10 @@ Branch: everything lands on `claude/exciting-meitner-889u3z` (merged there by th
   never holds back a public one (`Mpb.queue` puts an open entry ahead of a skill's).
   Also: a moved building goes to the nearest tile its rules allow; only among the tiles of that same ring does it
   prefer one where nothing else then stands on the same tile; a squad in a building (a Nest's, a School's pupil) goes
-  with it, the newer of the two deciding whether they move; two teams' walls on one edge: the newer moves; a Coal mine
-  entrance that moves leaves the squads round it where they stood (answer 5 open); a Cog Builder's Factory never moves
-  (the other thing does); a thing with no room anywhere stays, and the other one moves instead if it can; neither can:
-  both stay. The Coal mine's exit never moves (place.parts' `stays`): one placed or dug onto a hidden thing of the
+  with it (in its own zone it stays, prio; it moves only when the other team's thing has no tile anywhere); two teams'
+  walls on one edge (the middle line: no man's land): the newer moves; a Coal mine entrance that does move (that same
+  rare case) leaves the squads round it where they stood; a Cog Builder's Factory never moves (the other thing does);
+  a thing with no room anywhere stays, and the other one moves instead if it can; neither can: both stay. The Coal mine's exit never moves (place.parts' `stays`): one placed or dug onto a hidden thing of the
   other team's stays there, blocked. "Taken" for a mine's landing tile: a squad's body of either team (both lanes;
   own team's too), any other non-structure body that starts there (the other lane's Factory, Jail guards, a golem,
   an Ent: Engine mineOn counts every fighting body), a building tile, water, or a Bastion wall (that fights) on that tile; a taken exit tile stops every
@@ -260,21 +280,34 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
   Factories, `Mpb.boardTiles`: every building tile and part with `fresh` = the other team doesn't see it there, lake
   tiles, Bastion walls; a squad a building of its team holds on its tile, `hooks.holds`, the Nest's, is the
   building's `occ`, not a thing of its own: the building's n is the newer of the two) and `Duo.conflicts`:
-  `breaks(X, Y)` = 'same' (one tile, or two teams' walls on one physical edge), 'water' (a wall on water), plus 'shut'
+  `breaks(X, Y)` = 'same' (one tile, or two teams' walls on one physical edge), 'water' (a wall and the water on its
+  tile, either way round: answer 6), plus 'shut'
   (a fresh lake tile that, with all the water known, shuts a tile off: `lakeFree`). Nothing a thing has against what
   stands *around* it is checked again (Vilhelm, 6 Nov: the 'ring', 'near' and 'room' checks are gone), and a part that
   `stays` (the Coal mine's exit) meets nothing. Two things of one team count only for two squads (Undo all) or a thing this settle
-  moved. The mover: the breaker (it must be fresh, or moved by the settle; a squad in a 'same' with another squad
-  always may, as `unstack`); both broke it: the newer (bigger n), then the one out of its own zone, then `RANK` (squad,
-  part, building, water, wall), then `mrand(D, 17 + guard)` with the pair in a fixed order. The newest mover goes first.
+  moved. The mover, in this order: (1) **prio** (answer 5): both broke it and `Duo.prioOf(X, Y)` names a team (two
+  teams' things whose shared tile is in that team's own zone, `Game.inZone` by row, every column; two walls on one
+  edge: either wall's tile): the other team's thing moves, whatever its stamp and even if not fresh; if it can't (a Cog
+  Builder's Factory, the Vault, stuck: no tile anywhere) the owner's moves instead if it may; (2) the breaker (it must
+  be fresh, or moved by the settle; a squad in a 'same' with another squad always may, as `unstack`); (3) both broke
+  it: the newer (bigger n), then the one out of its own zone (kept: prio covers it but for a 2x2 squad partly in its
+  zone), then `RANK` (squad, part, building, water, wall), then `mrand(D, 17 + guard)` with the pair in a fixed order.
+  The newest mover goes first.
   It moves with its kind's rules, everything known: a squad `relocate` (its placement rules as a move, nothing on the
   tile in either lane; an Assassin also off the other team's Factories), a building tile or part `Mpb.moveTile`
   (`spotOk` strict, or `hooks.clashOk`; the nearest such tile, and only among the tiles of its ring one where no
   other fresh thing then breaks a rule (stands on the same tile, a wall under it); then `Duo.carry`: its `occ` and the squads it holds on its tile, `sq.school` / `sq.jailed` with its key,
-  in both lanes, go onto the new tile with their riders), a lake tile `lakeSpots` strict, a wall the
-  nearest edge of the same way round `bwallSpotOk` allows. It keeps its stamp. No tile: it stays, and the other one
-  moves instead if it can. `D.settled` logs the moves (tests). Then `Duo.settle` → `Mpb.settle` (`unclash`, the lake's
-  `settle`) finds nothing left; they stay as the fallback for a fight without D (node tests' `Duo.settle`).
+  in both lanes, go onto the new tile with their riders), a lake tile `lakeSpots` strict (never a wall's tile:
+  `Game.bwallTile`), a wall the nearest edge of the same way round `bwallSpotOk` allows (never on water:
+  `terrainBlocks`). It keeps its stamp. No tile: it stays, and the other one moves instead if it can. `D.settled` logs
+  the moves (tests; one entry per job: the one that moved, or the mover with `to: null`). Then `Duo.settle` →
+  `Mpb.settle` (`unclash`, the lake's `settle`) finds nothing left; they stay as the fallback for a fight without D
+  (node tests' `Duo.settle`; they know no prio: the building or water moves off the other team's squad).
+- So the settle order, in short: (0) lake tiles nobody put down; then per move (1) prio on a team's own zone, (2) the
+  breaker / the newer, (3) the tie order (out of its own zone, `RANK`, the coin); the newest mover first; then
+  `Duo.settle`: the walls nobody placed (`ensureBwalls`, everything known: never on water), the fallbacks
+  (`Mpb.settle`). Tests:
+  `tools/tests/mpb-prio.js` (answers 5 and 6), `mpb-hidden.js`, `mpb-answers.js`.
 - The server (server/src/duo.js): a sync goes to a phone only when its view changed, and a 'status' only when its
   clock did (`clockNews`, after an act and after an alarm's tick; the alarm no longer forces a sync to all four).
   What each phone last got (`sentKey` / `teamKey`, `mark`, `forget`) is kept in the socket's attachment as well as in
@@ -409,7 +442,7 @@ hp/armor below are the coordinator's starting numbers (groups may tune, keep the
 | Scorch turrets (`scorch`) | 450 / 2 each | each player places 1 in the team zone (own placement, no vote; spacing applies) | One Ember Imp body with Spitfire (burn), instant projectile, +10 m range, sees stealth. Not a unit (not needed to win). Downside: a turret destroyed doesn't fight the next round. Skills per turret (100 each, permanent, reset when it is destroyed): splash 5 m and +25% hit; +25% aps and +5 m; mobile (a unit: walks, must be killed to win). |
 | The Oak (`oak`) | 1200 / 3 | interior, spacing | Restoration: all healing and regen of the team +25%. Skill 50 (once a round per player): heal 5 Team HP. Skill 100 (once a round): Restoration doubled this round. Skill 200 (match): sticky moss on every tile within 3 of the Oak: enemies on it 30% slower. Downside: the round after it was destroyed, a 1-body level 3 Ent with all its skills fights for the opponents. |
 | Factory (`factory`) | as the Cog Builder's | interior, spacing | The Cog Builder's Factory as a team building: built at once, either player buys its unit of the round (the buyer owns it). |
-| Magic lake (`magicLake`) | — (terrain) | each player places 2 lake tiles anywhere on their own half or no man's land; never closing a tile or a path (check with the map's path search) | Water tiles (Game terrain water: shot over, not walked). Skill 50 (per tile, permanent) Waterspirits allowal: allies walk through it 30% slower, +5% hp/s regen on it. Skill 200 (per tile, permanent) Water elemental: the tile becomes a Water Elemental each fight (as the Water Mage's Summon water elemental). |
+| Magic lake (`magicLake`) | — (terrain) | each player places 2 lake tiles anywhere on their own half or no man's land; never closing a tile or a path (check with the map's path search), never on a Bastion wall's tile (6 Nov: "no walls on the lake") | Water tiles (Game terrain water: shot over, not walked). Skill 50 (per tile, permanent) Waterspirits allowal: allies walk through it 30% slower, +5% hp/s regen on it. Skill 200 (per tile, permanent) Water elemental: the tile becomes a Water Elemental each fight (as the Water Mage's Summon water elemental). |
 | Jail (`jail`) | 1500 / 8 | interior, spacing | Skywatch: stealthed enemies within 3 tiles are revealed (lit tiles). Skill 100 (once per player, while there is room: 2 cells, one per player): jail an enemy squad: it takes no part in any fight until the jail is destroyed. Skill 150 (once per team, permanent): 4 Keep guards stand round the jail until enemies come into their awareness. Downside: destroyed → no jail next round, jailed squads freed, and their unit types can't be jailed again this match. A jailed carrier leaves its rider behind (the rider steps out). |
 | School (`school`) | 700 / 2 | interior, spacing | Holds 1 allied squad (any player's), which doesn't fight; its player can't place another squad of that type while it is inside. Free Study: +1 level's XP each round. Skills bought for it are free but take 2 rounds to learn (it can't leave meanwhile). Skill 200 (team, permanent): double XP. Skill 300 (team, permanent): learning takes 1 round. Downside: destroyed → the bodies that destroyed it get half a level of XP; the squad inside loses all it gained inside. Tap the school → the squad's sheet (as a horse's rider). |
 | Shadow Den (`shadowDen`) | 800 / 2 | interior, spacing | Rogues, Assassins and Shadowhands: no flank delay, and no wait coming up a Coal mine (6 Nov). Recruit Shadowhands (100): Rogue at half stats, 1 body, may be placed in no man's land. +1 Shadow deployment a round per player (only for these units). Impersonate (200, once a round per player): pick an enemy tier 1-2 squad; 5 s into the fight one of its bodies becomes a Shadowhand of yours. Sabotage (100, once a round per team): pick an enemy unit type: they can't deploy it next round (big red X on their card). Insider information (350, once a round per team): next round your team sees the opponents' deployment live (their whole board, 6 Nov) and they get 15 s less; they see "You are being watched". If your Den is destroyed while it is on, they get it for free next round. Downside: destroyed → your Shadowhands are lost, no Den skills next round. |
