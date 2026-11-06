@@ -50,14 +50,19 @@ Branch: everything lands on `claude/exciting-meitner-889u3z` (merged there by th
      start: on a tile of a team's own zone that team's thing always stays and the other team's moves to the nearest
      tile its own placement rules allow, everything known (an Assassin: not on or next to a building, the flank rules
      for a flank squad...), whatever the stamps; it keeps its stamp. Elsewhere (no man's land, nobody's zone) and
-     between two things of one team (teammates, both lanes) the newer moves, as before. "Own zone" = every tile of the
-     zone's rows (`Game.inZone`), the edge tiles that are the other team's flank tiles included: the code and the notes
-     have always called them "the edge tiles of your zone" that are *kept* for the enemy's flank squads (`reserved`:
-     a deploy rule, not whose zone it is), the Magic lake may go there, so the owner has prio there too and an enemy
-     flank squad on one moves. A Coal mine entrance is always on its own zone, so it never moves for the other team's
-     squads, and the squads round it go down the mine. Answer 4 still holds and composes: the exit never moves and
-     never moves anything (dug onto their zone's flank tile where their hidden squad stands: both stay, the exit is
-     blocked). A squad in a building stays with it (and still goes with it when it does move, `Duo.carry`).
+     between two things of one team (teammates, both lanes) the newer moves, as before. "Own zone" = the tiles of the
+     zone's rows (`Game.inZone`) but the edge tiles that are the other team's flank tiles (`Game.reserved`): src/game.js
+     defines those as the enemy's ("the matching columns on your half are the enemy's and never yours", `FLANK`;
+     "reserved for them for the whole match"), which is the condition the task gave for not counting them as yours.
+     They are not the enemy's zone either, so they are nobody's zone, like their half of no man's land: the newer
+     moves (your Assassin or water there and their flank squad). (Review of 6 Nov; the first reading gave the owner
+     prio there. On the list to check with Vilhelm.) A Coal mine entrance is always on its own zone (interior: never a
+     flank tile), so it never moves for the other team's squads, and the squads round it go down the mine. Prio is
+     never undone: when the other team's thing has no tile anywhere it may go (a nearly full board; or it is a Cog
+     Builder's Factory, which never moves), both stay on the tile; the owner's thing never moves for it. Answer 4 still
+     holds and composes: the exit never moves and never moves anything (dug onto their zone's flank tile where their
+     hidden squad stands: both stay, the exit is blocked). A squad in a building stays with it (`Duo.carry` would take
+     it along if a building moved, but a building is always on its own zone, so it never does now).
   6. "Lets just go with no, no walls on the lake." A Bastion wall never stands on water: a wall's tile (the one it is
      put up from, `w.col` / `w.row`; the tile across its edge is not its tile, so a wall along a shore is fine) is
      never a lake tile. While deploying, as the acting team sees the board: no wall on water it sees (`bwallSpotOk`:
@@ -106,10 +111,11 @@ Branch: everything lands on `claude/exciting-meitner-889u3z` (merged there by th
   never holds back a public one (`Mpb.queue` puts an open entry ahead of a skill's).
   Also: a moved building goes to the nearest tile its rules allow; only among the tiles of that same ring does it
   prefer one where nothing else then stands on the same tile; a squad in a building (a Nest's, a School's pupil) goes
-  with it (in its own zone it stays, prio; it moves only when the other team's thing has no tile anywhere); two teams'
-  walls on one edge (the middle line: no man's land): the newer moves; a Coal mine entrance that does move (that same
-  rare case) leaves the squads round it where they stood; a Cog Builder's Factory never moves (the other thing does);
-  a thing with no room anywhere stays, and the other one moves instead if it can; neither can: both stay. The Coal mine's exit never moves (place.parts' `stays`): one placed or dug onto a hidden thing of the
+  with it (a building is always on its own zone, so it stays, prio); two teams'
+  walls on one edge (the middle line: no man's land): the newer moves; a Coal mine entrance never moves (prio; a moved
+  entrance would leave the squads round it where they stood); a Cog Builder's Factory never moves (outside prio the
+  other thing does; on a zone tile of the other team both stay); a thing with no room anywhere stays, and outside prio
+  the other one moves instead if it can; neither can, or prio's thing can't: both stay. The Coal mine's exit never moves (place.parts' `stays`): one placed or dug onto a hidden thing of the
   other team's stays there, blocked. "Taken" for a mine's landing tile: a squad's body of either team (both lanes;
   own team's too), any other non-structure body that starts there (the other lane's Factory, Jail guards, a golem,
   an Ent: Engine mineOn counts every fighting body), a building tile, water, or a Bastion wall (that fights) on that tile; a taken exit tile stops every
@@ -286,12 +292,13 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
   stands *around* it is checked again (Vilhelm, 6 Nov: the 'ring', 'near' and 'room' checks are gone), and a part that
   `stays` (the Coal mine's exit) meets nothing. Two things of one team count only for two squads (Undo all) or a thing this settle
   moved. The mover, in this order: (1) **prio** (answer 5): both broke it and `Duo.prioOf(X, Y)` names a team (two
-  teams' things whose shared tile is in that team's own zone, `Game.inZone` by row, every column; two walls on one
-  edge: either wall's tile): the other team's thing moves, whatever its stamp and even if not fresh; if it can't (a Cog
-  Builder's Factory, the Vault, stuck: no tile anywhere) the owner's moves instead if it may; (2) the breaker (it must
+  teams' things whose shared tile is in that team's own zone, `Game.inZone` by row and not `Game.reserved`, the other
+  team's flank tiles; two walls on one edge: either wall's tile): the other team's thing moves, whatever its stamp
+  and even if not fresh; if it can't (a Cog Builder's Factory, the Vault, stuck: no tile anywhere) both stay, the
+  owner's never moves for it; (2) the breaker (it must
   be fresh, or moved by the settle; a squad in a 'same' with another squad always may, as `unstack`); (3) both broke
-  it: the newer (bigger n), then the one out of its own zone (kept: prio covers it but for a 2x2 squad partly in its
-  zone), then `RANK` (squad, part, building, water, wall), then `mrand(D, 17 + guard)` with the pair in a fixed order.
+  it: the newer (bigger n), then the one out of its own zone (kept: prio covers most of it, not the flank tiles and a
+  2x2 squad partly in its zone), then `RANK` (squad, part, building, water, wall), then `mrand(D, 17 + guard)` with the pair in a fixed order.
   The newest mover goes first.
   It moves with its kind's rules, everything known: a squad `relocate` (its placement rules as a move, nothing on the
   tile in either lane; an Assassin also off the other team's Factories), a building tile or part `Mpb.moveTile`
@@ -299,11 +306,12 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
   other fresh thing then breaks a rule (stands on the same tile, a wall under it); then `Duo.carry`: its `occ` and the squads it holds on its tile, `sq.school` / `sq.jailed` with its key,
   in both lanes, go onto the new tile with their riders), a lake tile `lakeSpots` strict (never a wall's tile:
   `Game.bwallTile`), a wall the nearest edge of the same way round `bwallSpotOk` allows (never on water:
-  `terrainBlocks`). It keeps its stamp. No tile: it stays, and the other one moves instead if it can. `D.settled` logs
+  `terrainBlocks`). It keeps its stamp. No tile: it stays, and outside prio the other one moves instead if it can. `D.settled` logs
   the moves (tests; one entry per job: the one that moved, or the mover with `to: null`). Then `Duo.settle` →
   `Mpb.settle` (`unclash`, the lake's `settle`) finds nothing left; they stay as the fallback for a fight without D
   (node tests' `Duo.settle`; they know no prio: the building or water moves off the other team's squad).
-- So the settle order, in short: (0) lake tiles nobody put down; then per move (1) prio on a team's own zone, (2) the
+- So the settle order, in short: (0) lake tiles nobody put down; then per move (1) prio on a team's own zone (not
+  the other team's flank tiles; its thing never moves, the other one moves or, with no tile anywhere, both stay), (2) the
   breaker / the newer, (3) the tie order (out of its own zone, `RANK`, the coin); the newest mover first; then
   `Duo.settle`: the walls nobody placed (`ensureBwalls`, everything known: never on water), the fallbacks
   (`Mpb.settle`). Tests:

@@ -230,14 +230,15 @@
   // one Bastion wall's edge, however it is named (Game's edgeKey: a tile's s edge is the n edge of the tile below it)
   const edgeKey = (sd, w) => { const e = G.edgeOf(sd, w); return e === 's' ? `${w.col},${w.row + 1},n` : e === 'e' ? `${w.col + 1},${w.row},w` : `${w.col},${w.row},${e}`; };
   // "You always have 'prio' in your own zone" (Vilhelm, 6 Nov): of two teams' things that meet on a tile (or a wall
-  // and the water on its tile, or two walls on one edge), the team whose own zone that tile is in (its rows, every
-  // column: the edge tiles kept as the other team's flank tiles too, they are rows of its zone) keeps its thing there,
-  // whatever their stamps; the other team's moves. Returns that team, or -1: no man's land, or two of one team (the
-  // newer moves). X, Y: { sd, tiles } (two walls: the tiles on both sides of the edge count)
+  // and the water on its tile, or two walls on one edge), the team whose own zone that tile is in keeps its thing
+  // there, whatever their stamps; the other team's moves. Its zone is its rows but the edge tiles kept as the other
+  // team's flank tiles (Game.reserved: "the enemy's and never yours", src/game.js FLANK): those are nobody's zone,
+  // as their half of no man's land is. Returns that team, or -1: no man's land, a flank tile, or two of one team
+  // (the newer moves). X, Y: { sd, tiles } (two walls: the tiles on both sides of the edge count)
   function prioOf(X, Y) {
     if (!X || !Y || X.sd === Y.sd) return -1;
     const T = X.t === 'wall' && Y.t === 'wall' ? X.tiles.concat(Y.tiles) : X.tiles.filter(([c, r]) => Y.tiles.some(([c2, r2]) => c === c2 && r === r2));
-    const own = [0, 1].filter(sd => T.some(([, r]) => G.inZone(sd, r)));
+    const own = [0, 1].filter(sd => T.some(([c, r]) => G.inZone(sd, r) && !G.reserved(sd, c, r)));
     return own.length === 1 ? own[0] : -1;
   }
   function things(D, lanes) {
@@ -310,14 +311,14 @@
   // nearest tile its own kind's rules allow, everything known; both broke it (one tile, a wall and the water on its
   // tile): on a tile of a team's own zone the other team's thing moves, whatever the stamps ("You always have 'prio'
   // in your own zone", Vilhelm, 6 Nov: prioOf); elsewhere (no man's land) and between two of one team the newer
-  // moves (the same stamp: the one outside its own zone, where only a squad of a 2x2 footprint can still differ, then
+  // moves (the same stamp: the one outside its own zone, then
   // a squad before a part, a building, water, a wall, then a coin seeded from D.secret, which no view holds). Of all
   // that must move, the newest moves first. Nothing is called off or paid back. Outside prio only what was put down,
   // placed or moved this round moves (the rest was seen by all: the other thing moves). A Cog Builder's Factory
-  // never moves (the other thing does). A thing with no tile anywhere stays, and the other one moves instead if it can
-  // (one tile); neither can: both stay. A moved thing keeps its stamp. A building goes to the nearest tile its rules
-  // allow (its own rules as a normal placement: in no man's land, or the rare case its owner's prio can't be kept: the
-  // other team's thing has no tile anywhere); of the tiles as near (the same ring round it), one where nothing else
+  // never moves (outside prio the other thing does). A thing with no tile anywhere stays, and outside prio the other
+  // one moves instead if it can (one tile); neither can, or prio's other-team thing can't: both stay (the zone's
+  // owner's thing never moves for it). A moved thing keeps its stamp. A building goes to the nearest tile its rules
+  // allow (its own rules as a normal placement: in no man's land); of the tiles as near (the same ring round it), one where nothing else
   // then stands on the same tile (a wall under water) if there is one. The squads in a building go with it (a Nest's,
   // a School's pupil: they stand on its tile). The Coal mine's exit never moves and moves nothing (it is just blocked:
   // the squads that would come up on a taken tile stay home, src/mpb.js coalMine).
@@ -337,10 +338,9 @@
       for (const c of list) {
         const both = c.Y && (c.why === 'same' || !!breaks(c.Y, c.X));
         const own = both ? prioOf(c.X, c.Y) : -1;
-        if (own >= 0) { // a team's own zone: its thing stays, the other team's moves (if that one can't go anywhere, this one moves instead)
-          const guest = c.X.sd === own ? c.Y : c.X, host = guest === c.X ? c.Y : c.X;
-          if (can(guest, c, true)) jobs.push({ mover: guest, other: can(host, c) ? host : null, c });
-          else if (can(host, c)) jobs.push({ mover: host, other: null, c });
+        if (own >= 0) { // a team's own zone: its thing always stays, the other team's moves (it can't go anywhere: both stay)
+          const guest = c.X.sd === own ? c.Y : c.X;
+          if (can(guest, c, true)) jobs.push({ mover: guest, other: null, c });
           continue;
         }
         const xs = both ? [c.X, c.Y].filter(Z => can(Z, c)) : [c.X].filter(Z => can(Z, c));

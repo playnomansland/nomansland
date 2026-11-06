@@ -10094,8 +10094,10 @@ if (typeof module !== 'undefined') module.exports = Game;
   const seenTaken = (m, side, col, row) => G.occupied(m, side, col, row) || G.bldgSeen(m, side, col, row) || G.enemyHolds(m, side, col, row) || !!recAt(m, col, row);
   const placeOf = (kindId, part) => { const K = kindOf(kindId); if (!K) return null; return part ? (K.place.parts || []).find(p => p.id === part) || null : K.place; };
   // may team `side` put building kind (or its part) on this tile? As the team sees the board (seenTaken: the
-  // opponents' squads put down this round don't count, so page and server agree and a refusal shows nothing hidden;
-  // one found there as the fight starts makes the building move to the nearest tile it may stand on: settle, unclash).
+  // opponents' squads put down this round don't count, so page and server agree and a refusal shows nothing hidden.
+  // One found there as the fight starts is settled by Duo.settleBoard: on a tile of the building's own zone the
+  // building stays and that squad moves (prio); in no man's land the newer one moves. Only the D-less fallback,
+  // settle / unclash, used by node tests alone, always moves the building to the nearest tile it may stand on.)
   // strict: with everything known (the fight's start)
   function spotOk(m, side, kindId, part, col, row, strict) {
     if (!on(m)) return false;
@@ -10930,14 +10932,15 @@ if (typeof module !== 'undefined') module.exports = Game;
   // one Bastion wall's edge, however it is named (Game's edgeKey: a tile's s edge is the n edge of the tile below it)
   const edgeKey = (sd, w) => { const e = G.edgeOf(sd, w); return e === 's' ? `${w.col},${w.row + 1},n` : e === 'e' ? `${w.col + 1},${w.row},w` : `${w.col},${w.row},${e}`; };
   // "You always have 'prio' in your own zone" (Vilhelm, 6 Nov): of two teams' things that meet on a tile (or a wall
-  // and the water on its tile, or two walls on one edge), the team whose own zone that tile is in (its rows, every
-  // column: the edge tiles kept as the other team's flank tiles too, they are rows of its zone) keeps its thing there,
-  // whatever their stamps; the other team's moves. Returns that team, or -1: no man's land, or two of one team (the
-  // newer moves). X, Y: { sd, tiles } (two walls: the tiles on both sides of the edge count)
+  // and the water on its tile, or two walls on one edge), the team whose own zone that tile is in keeps its thing
+  // there, whatever their stamps; the other team's moves. Its zone is its rows but the edge tiles kept as the other
+  // team's flank tiles (Game.reserved: "the enemy's and never yours", src/game.js FLANK): those are nobody's zone,
+  // as their half of no man's land is. Returns that team, or -1: no man's land, a flank tile, or two of one team
+  // (the newer moves). X, Y: { sd, tiles } (two walls: the tiles on both sides of the edge count)
   function prioOf(X, Y) {
     if (!X || !Y || X.sd === Y.sd) return -1;
     const T = X.t === 'wall' && Y.t === 'wall' ? X.tiles.concat(Y.tiles) : X.tiles.filter(([c, r]) => Y.tiles.some(([c2, r2]) => c === c2 && r === r2));
-    const own = [0, 1].filter(sd => T.some(([, r]) => G.inZone(sd, r)));
+    const own = [0, 1].filter(sd => T.some(([c, r]) => G.inZone(sd, r) && !G.reserved(sd, c, r)));
     return own.length === 1 ? own[0] : -1;
   }
   function things(D, lanes) {
@@ -11010,14 +11013,14 @@ if (typeof module !== 'undefined') module.exports = Game;
   // nearest tile its own kind's rules allow, everything known; both broke it (one tile, a wall and the water on its
   // tile): on a tile of a team's own zone the other team's thing moves, whatever the stamps ("You always have 'prio'
   // in your own zone", Vilhelm, 6 Nov: prioOf); elsewhere (no man's land) and between two of one team the newer
-  // moves (the same stamp: the one outside its own zone, where only a squad of a 2x2 footprint can still differ, then
+  // moves (the same stamp: the one outside its own zone, then
   // a squad before a part, a building, water, a wall, then a coin seeded from D.secret, which no view holds). Of all
   // that must move, the newest moves first. Nothing is called off or paid back. Outside prio only what was put down,
   // placed or moved this round moves (the rest was seen by all: the other thing moves). A Cog Builder's Factory
-  // never moves (the other thing does). A thing with no tile anywhere stays, and the other one moves instead if it can
-  // (one tile); neither can: both stay. A moved thing keeps its stamp. A building goes to the nearest tile its rules
-  // allow (its own rules as a normal placement: in no man's land, or the rare case its owner's prio can't be kept: the
-  // other team's thing has no tile anywhere); of the tiles as near (the same ring round it), one where nothing else
+  // never moves (outside prio the other thing does). A thing with no tile anywhere stays, and outside prio the other
+  // one moves instead if it can (one tile); neither can, or prio's other-team thing can't: both stay (the zone's
+  // owner's thing never moves for it). A moved thing keeps its stamp. A building goes to the nearest tile its rules
+  // allow (its own rules as a normal placement: in no man's land); of the tiles as near (the same ring round it), one where nothing else
   // then stands on the same tile (a wall under water) if there is one. The squads in a building go with it (a Nest's,
   // a School's pupil: they stand on its tile). The Coal mine's exit never moves and moves nothing (it is just blocked:
   // the squads that would come up on a taken tile stay home, src/mpb.js coalMine).
@@ -11037,10 +11040,9 @@ if (typeof module !== 'undefined') module.exports = Game;
       for (const c of list) {
         const both = c.Y && (c.why === 'same' || !!breaks(c.Y, c.X));
         const own = both ? prioOf(c.X, c.Y) : -1;
-        if (own >= 0) { // a team's own zone: its thing stays, the other team's moves (if that one can't go anywhere, this one moves instead)
-          const guest = c.X.sd === own ? c.Y : c.X, host = guest === c.X ? c.Y : c.X;
-          if (can(guest, c, true)) jobs.push({ mover: guest, other: can(host, c) ? host : null, c });
-          else if (can(host, c)) jobs.push({ mover: host, other: null, c });
+        if (own >= 0) { // a team's own zone: its thing always stays, the other team's moves (it can't go anywhere: both stay)
+          const guest = c.X.sd === own ? c.Y : c.X;
+          if (can(guest, c, true)) jobs.push({ mover: guest, other: null, c });
           continue;
         }
         const xs = both ? [c.X, c.Y].filter(Z => can(Z, c)) : [c.X].filter(Z => can(Z, c));
@@ -15376,7 +15378,7 @@ Floors.floor = (() => {
   // ----- Report a bug (2026-11-04): a new post in the Discord forum #bug-reports with the game version and match id
   // filled in. The server posts it through a webhook (/account/bug, accounts.js BUG); when that's off or fails, the report
   // is copied and the Discord server opens, so it can be pasted there by hand.
-  const GAME_VERSION = '6 Nov 2026 · 2aaea68'; // src/build.js: the newest patch notes date and a hash of this page
+  const GAME_VERSION = '6 Nov 2026 · 41bf3a2'; // src/build.js: the newest patch notes date and a hash of this page
   const DISCORD_FALLBACK = 'https://discord.gg/TBpDKSBWsY';
   const bug = { draft: '', busy: false };
   // the id the server's match history uses (room.js historyInfo: <room>-<seed>), or one made the same way for other matches
@@ -20748,8 +20750,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if ($('fall-more')) $('fall-more').addEventListener('click', () => { $('fall-more').parentNode.innerHTML = `<span style="color:var(--foe)">If it falls:</span> that army deals ${D.attack}% less damage, moves ${D.move}% slower and takes ${D.taken}% more damage for ${D.secs} s.`; });
     if ($('tskill')) $('tskill').addEventListener('click', () => { if (editable() && Game.buyTowerSkill(m, me)) { changed(); openTowerSheet(me); } });
     if ($('tskill-undo')) $('tskill-undo').addEventListener('click', () => { if (editable() && Game.undoTowerSkill(m, me)) { changed(); openTowerSheet(me); } });
-    if ($('tskill2')) $('tskill2').addEventListener('click', () => { if (editable() && Game.buyTowerSkill2(m, me)) { if (Game.bwallsLeft(m, me)) { wallPlacing = true; changed(); closeSheet(); } else { changed(); openTowerSheet(me); } } });
-    if ($('bwall')) $('bwall').addEventListener('click', () => { if (editable() && Game.bwallsLeft(m, me)) { wallPlacing = true; closeSheet(); render(); hud(); panelDeploy(); } });
+    if ($('tskill2')) $('tskill2').addEventListener('click', () => { if (editable() && Game.buyTowerSkill2(m, me)) { if (Game.bwallsLeft(m, me)) { wallPlacing = true; MPB_SHEET.magicLake.pick = null; changed(); closeSheet(); } else { changed(); openTowerSheet(me); } } });
+    if ($('bwall')) $('bwall').addEventListener('click', () => { if (editable() && Game.bwallsLeft(m, me)) { wallPlacing = true; MPB_SHEET.magicLake.pick = null; closeSheet(); render(); hud(); panelDeploy(); } });
     if ($('tskill2-undo')) $('tskill2-undo').addEventListener('click', () => { if (editable() && Game.undoTowerSkill2(m, me)) { changed(); openTowerSheet(me); } });
     $('sheet').querySelectorAll('[data-mgen]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.buyMageGen(m, me, b.dataset.mgen)) { changed(); openTowerSheet(me); } }));
     if ($('tloan')) $('tloan').addEventListener('click', () => { if (editable() && Game.takeLoan(m, me)) { changed(); openTowerSheet(me); } });
@@ -23170,12 +23172,15 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       },
       wirePanel(root) {
         const b = root.querySelector('#ml-cancel'); if (b) b.addEventListener('click', () => { this.pick = null; panelDeploy(); render(); });
-        const p = root.querySelector('#ml-put'); if (p) p.addEventListener('click', () => { const t = this.todo()[0]; this.pick = t ? t.key : null; closeSheet(); panelDeploy(); render(); });
+        const p = root.querySelector('#ml-put'); if (p) p.addEventListener('click', () => { const t = this.todo()[0]; this.pick = t ? t.key : null; wallPlacing = false; selected = null; closeSheet(); panelDeploy(); render(); }); // (never with wall mode on)
       },
       marks(sq) { const r = this.rec(); return r ? this.spots(r).map(t => sq(t, 'mpb-lake')).join('') : ''; },
       tap(t) {
         const r = this.rec();
-        if (!r || !Mpb.kindOf('magicLake').lakeOk(m, me, r, t.col, t.row)) return false;
+        if (!r) return false;
+        // while this is on, every tap on the board is the lake's: a refused one does nothing else (review 6 Nov: it
+        // went on to the wall handler and took back the team's wall on that tile, a teammate's too)
+        if (!Mpb.kindOf('magicLake').lakeOk(m, me, r, t.col, t.row)) { duoToastSay(Game.bwallTile(m, me, t.col, t.row) ? 'No water on a Bastion wall' : 'Tap a glowing blue tile, or Cancel', 2500); render(); return true; }
         if (Game.mpbAct(m, me, r.key, 'place', t.col, t.row)) { const nx = this.todo()[0]; this.pick = nx ? nx.key : null; changed(); } // (the next tile to put down, if any)
         return true;
       },
@@ -23185,7 +23190,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         const btn = mine && live && rec.col >= 0 && rec.round === m.round ? `<button class="btn small either" id="ml-move">Move it</button> <span class="hint">(this round only) then tap a glowing tile</span>` : '';
         return `<p style="margin:0">${[whose].concat(info).filter(Boolean).map(esc).join(' · ')}</p>${btn ? `<p style="margin:0">${btn}</p>` : ''}`;
       },
-      wire(root, side, rec) { const b = root.querySelector('#ml-move'); if (b) b.addEventListener('click', () => { this.pick = rec.key; closeSheet(); panelDeploy(); render(); }); },
+      wire(root, side, rec) { const b = root.querySelector('#ml-move'); if (b) b.addEventListener('click', () => { this.pick = rec.key; wallPlacing = false; selected = null; closeSheet(); panelDeploy(); render(); }); },
     },
     // ===== jail (page) =====
     // who sits in it (each opens its sheet), Skywatch, and for its team the squads they may jail (a list, or a tap on the

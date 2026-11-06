@@ -138,6 +138,30 @@ const shot = async (p, name) => { if (process.env.PB_SHOTS) await p.screenshot({
     await shot(host, 'mpb-sheet');
     await closeSheet(host);
   } else ok(true, 'no building for team A this round (its card: ' + JSON.stringify(d) + ')');
+  // "No walls on the lake" (review 2026-11-06): while Put down water is on, a refused tap (a tile with the team's wall)
+  // does nothing else: it no longer drops through to the wall and takes back the teammate's wall. Set up on the
+  // teammate's page only (A1's wall this round on (13,10) n, a lake tile of A2's to put down), drawn with __pbRedraw.
+  const lk = await mate.evaluate(() => {
+    const { m, me } = window.__pb();
+    if (!m.bwalls) m.bwalls = [[], []];
+    m.bwalls[me].push({ col: 13, row: 10, edge: 'n', round: m.round });
+    const r = Mpb.addRec(m, me, 'magicLake', -1, -1); r.data.lane = Mpb.laneOf(m);
+    window.__pbRedraw();
+    return { me, key: r.key, ok: Mpb.kindOf('magicLake').lakeOk(m, me, r, 13, 10) };
+  });
+  ok(lk.me === 0 && !lk.ok, 'the teammate may not put water on the team\'s wall tile');
+  ok(await mate.evaluate(() => !!document.getElementById('ml-put')), 'the teammate\'s panel: Put down water');
+  await mate.evaluate(() => document.getElementById('ml-put').click());
+  await sleep(300);
+  ok(await mate.evaluate(() => document.querySelectorAll('#marks .mpb-lake').length > 5), 'the lake\'s tiles glow');
+  { // a tap near the north edge of (13,10): the wall's own edge
+    const bb = await mate.locator('#board').boundingBox(), C = await mate.evaluate(() => Game.COLS), R = await mate.evaluate(() => Game.ROWS);
+    await mate.mouse.click(bb.x + 13.5 * bb.width / C, bb.y + 10.08 * bb.height / R);
+  }
+  await sleep(300);
+  ok(await mate.evaluate(() => { const { m, me } = window.__pb(); return !!Game.bwallOn(m, me, 13, 10, 'n'); }), 'the refused tap left the wall standing');
+  const after = await mate.evaluate((k) => { const { m, me } = window.__pb(); return { col: Mpb.recOf(m, me, k).col, glow: document.querySelectorAll('#marks .mpb-lake').length, wallMode: /Tap a tile edge to build a wall/.test(document.body.innerText) }; }, lk.key);
+  ok(after.col < 0 && after.glow > 5 && !after.wallMode, 'no water went down, the lake pick is still on, wall mode is not: ' + JSON.stringify(after));
   // every kind's sheet opens, for its own team and for the other (review 2026-11-06: the Shadow Den's threw for its
   // own team). Records added on this page only, at the end of the test.
   const sheetBad = await host.evaluate(() => {

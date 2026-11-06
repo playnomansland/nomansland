@@ -1631,8 +1631,10 @@
   const seenTaken = (m, side, col, row) => G.occupied(m, side, col, row) || G.bldgSeen(m, side, col, row) || G.enemyHolds(m, side, col, row) || !!recAt(m, col, row);
   const placeOf = (kindId, part) => { const K = kindOf(kindId); if (!K) return null; return part ? (K.place.parts || []).find(p => p.id === part) || null : K.place; };
   // may team `side` put building kind (or its part) on this tile? As the team sees the board (seenTaken: the
-  // opponents' squads put down this round don't count, so page and server agree and a refusal shows nothing hidden;
-  // one found there as the fight starts makes the building move to the nearest tile it may stand on: settle, unclash).
+  // opponents' squads put down this round don't count, so page and server agree and a refusal shows nothing hidden.
+  // One found there as the fight starts is settled by Duo.settleBoard: on a tile of the building's own zone the
+  // building stays and that squad moves (prio); in no man's land the newer one moves. Only the D-less fallback,
+  // settle / unclash, used by node tests alone, always moves the building to the nearest tile it may stand on.)
   // strict: with everything known (the fight's start)
   function spotOk(m, side, kindId, part, col, row, strict) {
     if (!on(m)) return false;

@@ -2,9 +2,10 @@
 // docs/MPB-2V2.md answers 5 and 6):
 //  5. "You always have 'prio' in your own zone, which means that putting the mine entrance gives u prio over the
 //     opponents placement: His model moves and yours stays." At the fight's start, of two teams' things on one tile
-//     of a team's own zone (its rows, every column: the edge tiles kept as the other team's flank tiles too), that
-//     team's thing stays and the other team's moves to the nearest tile its own rules allow, whatever their stamps;
-//     in no man's land, and between two things of one team, the newer still moves. The Coal mine's exit still never
+//     of a team's own zone (its rows, but not the edge tiles kept as the other team's flank tiles: Game.reserved),
+//     that team's thing always stays and the other team's moves to the nearest tile its own rules allow, whatever
+//     their stamps (no tile for it anywhere: both stay); in no man's land, on those flank tiles, and between two
+//     things of one team, the newer still moves. The Coal mine's exit still never
 //     moves and moves nothing (it is blocked), and squads in a building go with it.
 //  6. "Lets just go with no, no walls on the lake." A Bastion wall never stands on water: no wall on water you can
 //     see, no water on a wall you can see (yours, your teammate's, theirs from earlier rounds), page and server alike;
@@ -161,22 +162,30 @@ check('5: squad and squad on a tile of a team\'s own zone: that team\'s stays, t
   }
 });
 
-check('5: an enemy flank squad on a flank tile of your zone and your Assassin there: yours stays, theirs moves (both orders, both zones)', () => {
+check('5: an enemy flank squad on a flank tile of your zone and your Assassin there: nobody\'s zone (the tile is kept for their flank squads), the newer moves (both orders, both zones)', () => {
+  // (review 6 Nov: src/game.js FLANK calls these tiles "the enemy's and never yours", Game.reserved: no prio there)
   for (const host of [0, 1]) for (const hostFirst of [true, false]) {
     const x = board(311 + host, 3), { D } = x; // (round 3: flank tiles open)
     const guest = 1 - host, t = host === 0 ? { col: 0, row: 14 } : { col: 23, row: 3 };
     Game.useGrid(x.m(0));
-    assert.ok(Game.isFlank(guest, t.col, t.row) && Game.inZone(host, t.row), 'a flank tile of team ' + guest + ' in team ' + host + '\'s zone');
+    assert.ok(Game.isFlank(guest, t.col, t.row) && Game.inZone(host, t.row) && Game.reserved(host, t.col, t.row), 'a flank tile of team ' + guest + ' in team ' + host + '\'s zone');
+    assert.strictEqual(Duo.prioOf({ sd: host, tiles: [[t.col, t.row]] }, { sd: guest, tiles: [[t.col, t.row]] }), -1, 'no prio on a flank tile');
     const hs = seatOf(0, host), gs = seatOf(1, guest);
     let h, g;
     if (hostFirst) { h = place(x, hs, 'Assassin', t.col, t.row); g = place(x, gs, 'plain', t.col, t.row); }
     else { g = place(x, gs, 'plain', t.col, t.row); h = place(x, hs, 'Assassin', t.col, t.row); }
     const why = 'team ' + host + '\'s edge, ' + (hostFirst ? 'Assassin first' : 'Assassin last');
     const { P } = fight(x);
-    assert.deepStrictEqual(at(sqIn(P, 0, host, h.id)), at(t), why + ': the owner\'s Assassin stays');
-    const G = sqIn(P, 1, guest, g.id);
-    landedNear(P, 1, guest, G, t, why + ': the flank squad');
-    assert.ok(Game.isFlank(guest, G.col, G.row) || Game.inZone(guest, G.row), why + ': on a tile a flank squad may stand on: ' + JSON.stringify(at(G)));
+    const H = sqIn(P, 0, host, h.id), G = sqIn(P, 1, guest, g.id);
+    if (hostFirst) {
+      assert.deepStrictEqual(at(H), at(t), why + ': the older Assassin stays');
+      landedNear(P, 1, guest, G, t, why + ': the newer flank squad');
+      assert.ok(Game.isFlank(guest, G.col, G.row) || Game.inZone(guest, G.row), why + ': on a tile a flank squad may stand on: ' + JSON.stringify(at(G)));
+    } else {
+      assert.deepStrictEqual(at(G), at(t), why + ': the older flank squad stays');
+      landedNear(P, 0, host, H, t, why + ': the newer Assassin');
+    }
+    assert.strictEqual(D.settled.length, 1, why + ': only one moved');
   }
 });
 
@@ -340,7 +349,7 @@ function fill(x, keep) {
   teams(x.D);
   Duo.stampAll(x.D);
 }
-check('5: no tile anywhere for the other team\'s thing: the owner\'s moves instead (a Tree kojja with its Nest squad, a School with its pupil, go together)', () => {
+check('5: no tile anywhere for the other team\'s thing: both stay, the owner\'s never moves for it (a Tree kojja with its Nest squad, a School with its pupil)', () => {
   for (const kind of ['treeKojja', 'school']) {
     const x = board(401), { D } = x, m = x.m(0), t = { col: 12, row: 14 }, u = { col: 12, row: 13 };
     const pupil = kind === 'school' ? place(x, 0, 'plain', 10, 15) : null;
@@ -358,9 +367,9 @@ check('5: no tile anywhere for the other team\'s thing: the owner\'s moves inste
     Duo.settleBoard(D);
     const rec = recIn(m, 0, key), q = m.armies[0].find(z => z.id === sq.id), a = m.armies[1].find(z => z.id === ass.id);
     assert.deepStrictEqual(at(a), at(t), kind + ': the Assassin, with no tile anywhere, stays');
-    assert.deepStrictEqual(at(rec), at(u), kind + ': the building moved instead, to the one tile left');
-    assert.deepStrictEqual(at(q), at(u), kind + ': its squad went with it');
-    assert.deepStrictEqual(D.settled, [{ id: 'b0:' + key + '|', why: 'same', to: u }], kind + ': (the Assassin tried first, found nothing; then the building moved)');
+    assert.deepStrictEqual(at(rec), at(t), kind + ': the building stays ("yours stays"), though the tile next to it is free');
+    assert.deepStrictEqual(at(q), at(t), kind + ': its squad with it');
+    assert.deepStrictEqual(D.settled, [{ id: 's0:1:' + ass.id, why: 'same', to: null }], kind + ': (the Assassin tried, found nothing; nothing else moved)');
   }
 });
 

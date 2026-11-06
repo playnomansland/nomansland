@@ -6751,8 +6751,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if ($('fall-more')) $('fall-more').addEventListener('click', () => { $('fall-more').parentNode.innerHTML = `<span style="color:var(--foe)">If it falls:</span> that army deals ${D.attack}% less damage, moves ${D.move}% slower and takes ${D.taken}% more damage for ${D.secs} s.`; });
     if ($('tskill')) $('tskill').addEventListener('click', () => { if (editable() && Game.buyTowerSkill(m, me)) { changed(); openTowerSheet(me); } });
     if ($('tskill-undo')) $('tskill-undo').addEventListener('click', () => { if (editable() && Game.undoTowerSkill(m, me)) { changed(); openTowerSheet(me); } });
-    if ($('tskill2')) $('tskill2').addEventListener('click', () => { if (editable() && Game.buyTowerSkill2(m, me)) { if (Game.bwallsLeft(m, me)) { wallPlacing = true; changed(); closeSheet(); } else { changed(); openTowerSheet(me); } } });
-    if ($('bwall')) $('bwall').addEventListener('click', () => { if (editable() && Game.bwallsLeft(m, me)) { wallPlacing = true; closeSheet(); render(); hud(); panelDeploy(); } });
+    if ($('tskill2')) $('tskill2').addEventListener('click', () => { if (editable() && Game.buyTowerSkill2(m, me)) { if (Game.bwallsLeft(m, me)) { wallPlacing = true; MPB_SHEET.magicLake.pick = null; changed(); closeSheet(); } else { changed(); openTowerSheet(me); } } });
+    if ($('bwall')) $('bwall').addEventListener('click', () => { if (editable() && Game.bwallsLeft(m, me)) { wallPlacing = true; MPB_SHEET.magicLake.pick = null; closeSheet(); render(); hud(); panelDeploy(); } });
     if ($('tskill2-undo')) $('tskill2-undo').addEventListener('click', () => { if (editable() && Game.undoTowerSkill2(m, me)) { changed(); openTowerSheet(me); } });
     $('sheet').querySelectorAll('[data-mgen]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.buyMageGen(m, me, b.dataset.mgen)) { changed(); openTowerSheet(me); } }));
     if ($('tloan')) $('tloan').addEventListener('click', () => { if (editable() && Game.takeLoan(m, me)) { changed(); openTowerSheet(me); } });
@@ -9173,12 +9173,15 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       },
       wirePanel(root) {
         const b = root.querySelector('#ml-cancel'); if (b) b.addEventListener('click', () => { this.pick = null; panelDeploy(); render(); });
-        const p = root.querySelector('#ml-put'); if (p) p.addEventListener('click', () => { const t = this.todo()[0]; this.pick = t ? t.key : null; closeSheet(); panelDeploy(); render(); });
+        const p = root.querySelector('#ml-put'); if (p) p.addEventListener('click', () => { const t = this.todo()[0]; this.pick = t ? t.key : null; wallPlacing = false; selected = null; closeSheet(); panelDeploy(); render(); }); // (never with wall mode on)
       },
       marks(sq) { const r = this.rec(); return r ? this.spots(r).map(t => sq(t, 'mpb-lake')).join('') : ''; },
       tap(t) {
         const r = this.rec();
-        if (!r || !Mpb.kindOf('magicLake').lakeOk(m, me, r, t.col, t.row)) return false;
+        if (!r) return false;
+        // while this is on, every tap on the board is the lake's: a refused one does nothing else (review 6 Nov: it
+        // went on to the wall handler and took back the team's wall on that tile, a teammate's too)
+        if (!Mpb.kindOf('magicLake').lakeOk(m, me, r, t.col, t.row)) { duoToastSay(Game.bwallTile(m, me, t.col, t.row) ? 'No water on a Bastion wall' : 'Tap a glowing blue tile, or Cancel', 2500); render(); return true; }
         if (Game.mpbAct(m, me, r.key, 'place', t.col, t.row)) { const nx = this.todo()[0]; this.pick = nx ? nx.key : null; changed(); } // (the next tile to put down, if any)
         return true;
       },
@@ -9188,7 +9191,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         const btn = mine && live && rec.col >= 0 && rec.round === m.round ? `<button class="btn small either" id="ml-move">Move it</button> <span class="hint">(this round only) then tap a glowing tile</span>` : '';
         return `<p style="margin:0">${[whose].concat(info).filter(Boolean).map(esc).join(' · ')}</p>${btn ? `<p style="margin:0">${btn}</p>` : ''}`;
       },
-      wire(root, side, rec) { const b = root.querySelector('#ml-move'); if (b) b.addEventListener('click', () => { this.pick = rec.key; closeSheet(); panelDeploy(); render(); }); },
+      wire(root, side, rec) { const b = root.querySelector('#ml-move'); if (b) b.addEventListener('click', () => { this.pick = rec.key; wallPlacing = false; selected = null; closeSheet(); panelDeploy(); render(); }); },
     },
     // ===== jail (page) =====
     // who sits in it (each opens its sheet), Skywatch, and for its team the squads they may jail (a list, or a tap on the
