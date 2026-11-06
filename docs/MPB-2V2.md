@@ -56,7 +56,7 @@ Branch: everything lands on `claude/exciting-meitner-889u3z` (merged there by th
      "reserved for them for the whole match"), which is the condition the task gave for not counting them as yours.
      They are not the enemy's zone either, so they are nobody's zone, like their half of no man's land: the newer
      moves (your Assassin or water there and their flank squad). (Review of 6 Nov; the first reading gave the owner
-     prio there. On the list to check with Vilhelm.) A Coal mine entrance is always on its own zone (interior: never a
+     prio there. Confirmed by Vilhelm, with "both stay" below.) A Coal mine entrance is always on its own zone (interior: never a
      flank tile), so it never moves for the other team's squads, and the squads round it go down the mine. Prio is
      never undone: when the other team's thing has no tile anywhere it may go (a nearly full board; or it is a Cog
      Builder's Factory, which never moves), both stay on the tile; the owner's thing never moves for it. Answer 4 still
