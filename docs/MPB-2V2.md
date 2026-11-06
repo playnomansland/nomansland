@@ -37,7 +37,9 @@ Branch: everything lands on `claude/exciting-meitner-889u3z` (merged there by th
   once per match.
 - An Assassin placed in the enemy zone or on a flank tile stands still the flank delay (`FLANK.delay`, 3 s) in its first
   fight, as a flank squad does (the Shadow Den removes that). Enemy squads placed this round are hidden, so an Assassin
-  may share a tile with one; the fight just starts them close (as with two Forward-planted Ents today).
+  may share a tile with one; as the fight starts the one put there later moves to the nearest tile it may stand on
+  (Vilhelm, 6 Nov: "if things are placed on the same tile, they find another spot close to it"; `Duo.unstack`, and
+  `Mpb.unclash` for a building voted onto a hidden squad).
 
 ## Architecture (contracts every group codes against; as built by group F, 6 Nov)
 
@@ -100,6 +102,11 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
   - `spotOk(m, side, part, col, row)` → extra placement rule; `placed(m, side, rec)` → when a record is made;
     `acquire(m, team, card)` → instead of the placement vote when the team gets the card (each player places one,
     several tiles...); `info(m, side, rec)` → short plain lines for the generic sheet.
+  - Hooks added after the integration review (6 Nov): `clear(lanes, side, rec, res, sums, round)` → squads a fall takes
+    off the board, run for every building before any `afterFight` (the Den's Shadowhands); `clashOk(m, side, rec, part,
+    col, row)` → where a tile (or part) may go when it stands on a hidden enemy squad as the fight starts (`Mpb.unclash`;
+    default `spotOk(..., strict)`; the Coal mine's moved exit). `spotOk`'s 7th argument `strict`: with everything known
+    (else as the team sees the board, `seenTaken`).
   - Hooks the B groups added (all default off: a kind without them changes nothing; integrated 6 Nov):
     - Take-backs: `canUndo(m, side, rec, id, lane)` → false refuses a take-back (`Mpb.canUndo`; B1 the Tree kojja's
       Nest while a squad is in it, Grow once the new kojja has a skill; B3 Dig a new exit once the old tile is taken).
@@ -147,7 +154,7 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
     hidden from the opponents.
 - Opponents' view: `Mpb.hide(s, h)` (from `Referee.hide`): this round's clicks taken out of `n`/`by`, the team's votes
   blanked, then each kind's `hide`. Records themselves are seen as soon as they are placed (the draft is public).
-- Placement: `Mpb.spotOk(m, side, kind, part, col, row)`, `Mpb.spots(...)` (all allowed tiles, back of the zone and
+- Placement: `Mpb.spotOk(m, side, kind, part, col, row, strict)` (as the team sees the board unless strict), `Mpb.spots(...)` (all allowed tiles, back of the zone and
   middle first), `Mpb.autoSpot(...)` (the first). `Game.mpbAt(m, col, row)` (in `Game.occupied`): every MPB tile and
   part is taken for both teams' squads (unless `place.open`). A kind that lets squads in (garrison, School) uses
   `hooks.holds` (group B1: `Game.garrisonFree` / `garrisonAt` ask `Mpb.holds`).
