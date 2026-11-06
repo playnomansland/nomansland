@@ -73,12 +73,25 @@ T7. Frame pacing. A steady 30 looks better than a frame rate jumping between 40 
 
 ## 5. Order of work
 
-1. Triangle budget task (running): per-model counts, worst-case bodies, iPhone stress results, squad budget. Also record the quality setting, draw calls and calls per model kind for each measurement.
-2. Next Claude Code session: dev flags for T1-T3, run the A/B on the iPhone with the stress page and a real round-11 fight, write the results into section 6.
+1. Triangle budget task: done (docs/RENDER-BUDGET.md, see section 6).
+2. Next Claude Code session: T0 (find the 65-77 ms hitches), then dev flags for T1-T3, run the A/B on the iPhone with the stress page and a real round-11 fight, write the results into section 6.
 3. Adopt the winners. Auto quality as default.
-4. LOD (T4) and fake AO (T5).
-5. Model Forge Game check (claude.ai chat): per-squad budget by body count, and warnings for transparent parts or more than the three material groups.
+4. Fake AO (T5). LOD (T4) only if a later measurement shows triangles matter.
+5. Model Forge Game check: per-squad budget by body count done (Forge v12). Still to add: warnings for transparent parts or more than the three material groups.
 
 ## 6. Results
 
-(empty: fill in from step 2)
+### Triangle budget (docs/RENDER-BUDGET.md, 2026-11-06)
+
+- iPhone, quality High, worst fight looping in Meadow: 60 fps held at every step up to 714k unit triangles (4,624 a body, 1.1 M in the frame). The limit wasn't found.
+- Budget: 500k unit triangles on the board, 11,900 a squad, max a body = 11,900 / bodies capped at 4,600, or 2,890 when the squad size isn't known. Today's worst board uses 26k (about 5%).
+- Draw calls aren't the limit either: 95 on the iPhone, and bodies don't add calls.
+- But 1-4% of frames go over 20 ms and the worst frame is 65-77 ms at every step, with the game's own models too. Those hitches don't come from unit triangles.
+- Model Forge Game check updated to these numbers (Forge v12).
+
+What changes in this plan:
+
+- R1 is settled by the numbers above. Spending more triangles on units is fine.
+- T4 (LOD) drops to last: triangles aren't the cost.
+- New first step, T0: find the hitches. First check the stress page itself: it restarts the fight every 4 s, so some of the worst frames may be the loop restarts and not the game. Then on the iPhone, record frame times in a real fight with Safari's timeline (Web Inspector from a Mac, or a log of every frame over 20 ms with what happened that frame: new InstancedMesh groups when a group grows (group() rebuilds with cap * 2), shader compiles when a new kind or look appears for the first time, floor repaints, garbage collection). Likely fixes: warm up every model kind and look before the fight, give groups enough room at the start, avoid per-frame allocations.
+- Then T1-T3 as planned, measured as p95/p99 and frames over 20 ms, not just average fps (the average is already 59+), and also at Medium and Low and in the closer camera views, which the budget runs didn't cover.
