@@ -110,6 +110,7 @@ Built 2026-11-02 (`server/src/accounts.js`, routes in `server/src/index.js`):
 - Second skin (2026-11-03): 'golem-aquamarine' (Aquamarine Ether Golem: sea-green crystal, crystal spires, silver bands, white core; model 'golem:aquamarine'), limited: only from inviting a friend (below). Owned = any skins row whose src isn't 'dev' ('grant' or 'invite').
 
 - Third skin (2026-11-05): 'brute-omniper' (Omni-Per Brute: chrome plating, a teal visor slit, a hydraulic power fist, a teal core, exhaust stacks, team-colour shoulder stripes; model 'brute:omniper'). Nobody owns it but developers (no SKIN_GRANTS line) until Vilhelm decides how it's earned.
+- Fourth skin (2026-11-05, made in Model Forge): 'firemage-ember' (Ember Robe Fire Mage: ember-trimmed robe in the unit colour, team-colour waist band with a fire gem, long dark red-brown hair, a flame in each hand, no staff; model 'wizard:fire:ember'). Kept for later: developers only, no SKIN_GRANTS line; the Fire Mage's own model 'wizard:fire' is unchanged.
 - One skin per unit at a time: the part of a skin id before the first '-' names its unit (brute-..., golem-...). POST /account/skin { worn: true } takes the player's other skins for that unit off (rows with worn 0), and skinsOf shows only the first worn one per unit as worn (two granted skins for one unit). The page's Shapes.useSkins already draws only the first per unit.
 - A skin's picture: `node tools/skin-pic.js <id>` renders its model (headless Chromium, vendor/three, the 3D board's lights) into img/skins/<id>.png (192x192, transparent).
 

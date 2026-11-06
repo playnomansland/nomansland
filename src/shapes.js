@@ -236,6 +236,8 @@ const Shapes = (() => {
     'golem-aquamarine': { unit: 'Ether Golem', name: 'Aquamarine', text: 'An Ether Golem cut from sea-green crystal, with crystal spires and a white-hot core.', model: 'golem:aquamarine', pic: 'img/skins/golem-aquamarine.png', limited: true },
     // 2026-11-05: nobody has it yet but developers; Vilhelm decides how it's earned. One Brute skin is worn at a time.
     'brute-omniper': { unit: 'Brute', name: 'Omni-Per', text: 'A chrome war machine with a power fist.', model: 'brute:omniper', pic: 'img/skins/brute-omniper.png' },
+    // 2026-11-05 (Model Forge): developers only, kept for later; the Fire Mage's own model is unchanged.
+    'firemage-ember': { unit: 'Fire Mage', name: 'Ember Robe', text: 'A Fire Mage in an ember-trimmed robe, a flame in each hand.', model: 'wizard:fire:ember', pic: 'img/skins/firemage-ember.png' },
   };
   let worn = [{}, {}]; // per side: unit name -> skin
   function useSkins(lists) {

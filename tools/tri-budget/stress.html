@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0D1315">
+<!-- every path below is from the repo root (the scenery loads models/scenery.bin from there too) -->
+<base href="../../">
+<title>No Mans Land · 3D stress test</title>
+<link rel="icon" href="icon.png">
+<link rel="stylesheet" href="src/game.css">
+<style>
+/* Dev-only page (docs/RENDER-BUDGET.md, step 4). Nothing in the game links here.
+   Plays the biggest fight from tools/tri-budget/worst.js (tools/tri-budget/worst-fight.json: 173 bodies, round 11) on
+   the real 3D board, with the real effects, scenery and towers, but every unit model swapped for a test model with a set
+   number of triangles. The first 4 s of the fight loop (the board is fullest then, and the shooting starts), so the body
+   count stays near its peak. A sweep steps through total unit triangles and measures the frame rate at each. */
+html, body { height: 100%; margin: 0; overflow: hidden; background: #0D1315; color: #E8E4D8; }
+#view { position: fixed; inset: 0; touch-action: none; }
+#view canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#hud { position: fixed; left: 8px; right: 8px; top: calc(8px + env(safe-area-inset-top, 0px)); z-index: 2; font: 500 12px ui-monospace, Menlo, monospace; pointer-events: none; }
+#live { display: inline-block; background: rgba(13,19,21,0.85); padding: 6px 8px; border-radius: 4px; white-space: pre; }
+#panel { position: fixed; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); z-index: 2; background: rgba(13,19,21,0.9); border-radius: 6px; padding: 8px; font: 400 12px ui-monospace, Menlo, monospace; max-height: 55vh; overflow: auto; }
+#panel .row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+#panel button { font: 600 13px system-ui, sans-serif; min-height: 36px; padding: 6px 12px; border-radius: 4px; border: 1px solid #3a4448; background: #1c2528; color: #E8E4D8; }
+#panel button.go { background: #E6B84A; color: #0D1315; border-color: #E6B84A; }
+#out { white-space: pre; overflow-x: auto; margin: 0; }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div id="hud"><span id="live">loading…</span></div>
+<div id="panel">
+  <div class="row">
+    <button class="go" id="sweep">Run sweep</button>
+    <button id="copy">Copy results</button>
+    <button id="hide">Hide</button>
+  </div>
+  <div class="row" id="levels"></div>
+  <pre id="out">Hold the phone still, screen on, not in Low Power Mode. Run sweep takes about 2 minutes. Then Copy results and paste them in the chat.</pre>
+</div>
+<script src="src/shapes.js"></script>
+<script src="src/engine.js"></script>
+<script src="src/game.js"></script>
+<script src="src/art.js"></script>
+<script src="src/render2d.js"></script>
+<script src="src/floors.js"></script>
+<script src="src/camera3d.js"></script>
+<script src="src/kaykit3d.js"></script>
+<script src="src/scenery3d.js"></script>
+<script src="src/render3d.js"></script>
+<script type="module">
+import * as THREE from './vendor/three.module.min.js';
+const $ = (id) => document.getElementById(id);
+const Q = new URLSearchParams(location.search);
+// URL options: q=high|medium|low (default high, the game's default), view=0..3 (camera level, default 0 strategic),
+// look=meadow|autumn|snow|frost|desert|own (the map's look; default meadow, the heaviest), levels=50,100,... (thousands of unit
+// triangles; 'real' = the game's own models), secs=10 (measured seconds per level), loop=4 (fight seconds looped)
+const QUALITY = Q.get('q') || 'high', VIEW = Number(Q.get('view') || 0), SECS = Number(Q.get('secs') || 10), LOOP = Number(Q.get('loop') || 4);
+const LEVELS = (Q.get('levels') || 'real,50,100,200,400,800').split(',').map(s => s === 'real' ? 'real' : Number(s) * 1000);
+const WARM = 3; // seconds before measuring (shaders, scenery impostors, geometry upload)
+
+// ---------- the fight ----------
+const W = await (await fetch('tools/tri-budget/worst-fight.json')).json();
+W.m.skin = Q.get('look') || 'meadow'; // the heaviest look (most scenery: about 280k triangles); look=own keeps the fight's own
+if (W.m.skin === 'own') W.m.skin = null;
+const PEAK = W.maxBodies; // bodies at the fight's start (both sides)
+
+// ---------- the models: the game's own, or every unit model swapped for a test body of a set triangle count ----------
+const RealModels3D = new Function(await (await fetch('src/models3d.js')).text() + '\nreturn Models3D;')();
+const STRUCT = /^tower:|^building|^lesser$|^treasury$|^watchtower$|^wall$|^stonewall$|^spire$|^spear$/;
+let perBody = 0; // 0: the game's own models
+// a sphere of about t triangles (non-indexed, as Models3D's merged parts are): 2 * w * (h - 1) triangles
+function blob(t, r, y, sy, colored, hex) {
+  const h = Math.max(3, Math.round(Math.sqrt(t / 4)) + 1), w = Math.max(3, Math.round(t / (2 * (h - 1))));
+  const g = new THREE.SphereGeometry(r, w, h).toNonIndexed(); g.deleteAttribute('uv'); g.deleteAttribute('normal');
+  g.scale(1, sy, 1); g.translate(0, y, 0);
+  if (colored) { const c = new THREE.Color(hex), n = g.getAttribute('position').count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set([c.r, c.g, c.b], i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); }
+  g.computeVertexNormals(); g.computeBoundingSphere(); g.computeBoundingBox();
+  return g;
+}
+let testParts = null;
+function makeTest(t) { // split like a typical model: 60% in the unit's colour, 30% fixed colours, 10% team colour
+  testParts = { tint: blob(t * 0.6, 0.55, 1.2, 1.1, false), fixed: blob(t * 0.3, 0.38, 0.45, 1.2, true, '#2B2F33'), team: blob(t * 0.1, 0.3, 1.95, 1, false) };
+  const c = (g) => g.getAttribute('position').count / 3;
+  return c(testParts.tint) + c(testParts.fixed) + c(testParts.team);
+}
+window.Models3D = (T) => {
+  const M = RealModels3D(T);
+  if (!perBody) return M;
+  return { ...M, parts: (kind) => STRUCT.test(kind) ? M.parts(kind) : testParts, height: (kind) => STRUCT.test(kind) ? M.height(kind) : 2.25 };
+};
+
+// ---------- the board and the loop ----------
+let board = null, bt = null, m = null, fx = [], acc = 0, sceneryReady = false;
+const DT = Game.SETTINGS.dt;
+function restart() { m = JSON.parse(JSON.stringify(W.m)); bt = Game.startBattle(m); fx = []; acc = 0; }
+function absorb() { // as src/lab3d.js: battle effects from the engine's shots
+  for (const s of bt.lastShots()) if (s[13] === 1) Art.frostBeam(fx, s);
+  else if (s[13] === 2) fx.push({ kind: 'freeze', x: s[0], y: s[1], side: s[4], age: 0, life: 0.6 });
+  else if (s[13] === 3) fx.push({ kind: 'eat', x1: s[0], y1: s[1], x2: s[2], y2: s[3], side: s[4], age: 0, life: 0.6 });
+  else if (s[12] === 1) fx.push({ kind: 'roar', x: s[0], y: s[1], r: s[5], side: s[4], age: 0, life: 0.8 });
+  else if (s[8] > 0) fx.push({ kind: 'flame', x1: s[0], y1: s[1], x2: s[2], y2: s[3], side: s[4], half: s[8], slam: s[11] === 1, spin: s[11] === 2, age: 0, life: s[11] === 1 ? 0.45 : 0.3 });
+  else if (s[10] === 1) fx.push({ kind: 'bolt', x1: s[0], y1: s[1], x2: s[2], y2: s[3], side: s[4], age: 0, life: 0.22 });
+  else fx.push({ kind: s[7] === 1 ? 'heal' : 'shot', x1: s[0], y1: s[1], x2: s[2], y2: s[3], side: s[4], age: 0, life: s[7] === 1 ? 0.35 : 0.18 });
+  for (const b of bt.bodies) if (!b.alive && !b._gone) { b._gone = true; fx.push({ kind: 'death', x: b.x, y: b.y, u: b.u, side: b.side, age: 0, life: 0.5 }); }
+}
+let actualPerBody = 0;
+function useLevel(total) {
+  if (board) { board.dispose(); $('view').innerHTML = ''; }
+  perBody = total === 'real' ? 0 : Math.max(12, Math.round(total / PEAK));
+  actualPerBody = perBody ? makeTest(perBody) : 0;
+  sceneryReady = false;
+  restart();
+  board = Render3D(THREE, $('view'), () => ({ m, me: 0, phase: 'battle', units: m.units, mode: 'ai', bt, battlePre: m, fx, selected: null, moving: null, drag: null, hoverTile: null, editable: false, placingUnit: null, placingElf: false, placingTower: false }),
+    { onInput: () => { sceneryReady = true; } });
+  board.quality(QUALITY);
+  board.size();
+  if (VIEW) board.camera.setLevel(VIEW);
+}
+new ResizeObserver(() => board && board.size()).observe($('view'));
+
+// ---------- measuring ----------
+let rec = null; // { frames: [ms], tris, calls, bodies: [] } while measuring
+const results = [];
+let last = 0, liveN = 0, liveT = 0, liveFps = 0, state = 'idle', stateT = 0, queue = [], level = null;
+function frame(ts) {
+  const ms = last ? ts - last : 16.7, dt = Math.min(0.1, ms / 1000); last = ts;
+  // the fight at the game's speed (1.5x), its first LOOP seconds over and over
+  acc += dt * 1.5;
+  let restarted = false;
+  while (acc >= DT) { acc -= DT; if (!bt.step() || bt.time() >= LOOP) { restart(); restarted = true; break; } absorb(); }
+  for (const e of fx) e.age += dt * 1.5;
+  Art.frostFollow(fx);
+  fx = fx.filter(e => e.age < e.life);
+  board.draw();
+  const info = board.info(), alive = bt.bodies.filter(b => b.alive && !b.u.structure && !b.u.building).length;
+  liveN++; liveT += ms; if (liveT >= 500) { liveFps = liveN * 1000 / liveT; liveN = 0; liveT = 0; }
+  if (rec && !restarted) { rec.frames.push(ms); rec.tris = Math.max(rec.tris, info.triangles); rec.calls = Math.max(rec.calls, info.calls); rec.bodies.push(alive); }
+  $('live').textContent = `${liveFps.toFixed(0)} fps  ${(info.triangles / 1000).toFixed(0)}k tris  ${info.calls} calls\n${alive} bodies  ${level == null ? '' : level === 'real' ? 'game models' : (level / 1000) + 'k unit tris (' + actualPerBody + '/body)'}\n${QUALITY} · ${board.pixelRatio()}x · ${state}${state === 'measuring' ? ' ' + Math.ceil(SECS - stateT) + 's' : ''}`;
+  // the sweep
+  stateT += dt;
+  if (state === 'warming' && stateT >= WARM && (sceneryReady || stateT >= WARM + 4)) { state = 'measuring'; stateT = 0; rec = { frames: [], tris: 0, calls: 0, bodies: [] }; }
+  else if (state === 'measuring' && stateT >= SECS) { finish(); next(); }
+  requestAnimationFrame(frame);
+}
+function finish() {
+  const f = rec.frames.slice().sort((a, b) => a - b), n = f.length, sum = f.reduce((a, b) => a + b, 0);
+  const p = (q) => f[Math.min(n - 1, Math.floor(n * q))];
+  const avgBodies = rec.bodies.reduce((a, b) => a + b, 0) / rec.bodies.length;
+  const r = { level, scenery: sceneryTris(), perBody: actualPerBody, unitTris: level === 'real' ? null : Math.round(actualPerBody * avgBodies), fps: 1000 * n / sum, p95: p(0.95), p99: p(0.99), worst: f[n - 1], slow: rec.frames.filter(x => x > 20).length / n, tris: rec.tris, calls: rec.calls, bodies: avgBodies, minBodies: Math.min(...rec.bodies) };
+  r.holds60 = r.fps >= 57 && r.p95 <= 20; r.holds30 = r.fps >= 29 && r.p95 <= 40;
+  results.push(r); rec = null; show();
+}
+// the scenery's triangles in the main pass (src/scenery3d.js meshes: instanced models, impostor cards, plants, snow)
+function sceneryTris() {
+  const s = board.scenery; if (!s || !s._meshes) return 0;
+  let n = 0;
+  for (const mesh of s._meshes()) {
+    if (!mesh.visible || !mesh.geometry) continue;
+    const g = mesh.geometry, all = (g.index ? g.index.count : g.getAttribute('position').count), dr = g.drawRange.count;
+    const t = Math.min(all, isFinite(dr) ? dr : all) / 3;
+    n += mesh.isInstancedMesh ? t * mesh.count : t;
+  }
+  return Math.round(n);
+}
+function next() {
+  $('levels').hidden = $('out').hidden = queue.length > 0; // the panel stays small while measuring
+  if (!queue.length) { state = 'done'; show(); return; }
+  level = queue.shift(); useLevel(level); state = 'warming'; stateT = 0;
+}
+function show() {
+  const head = `No Mans Land 3D stress · ${new Date().toISOString().slice(0, 16)}\n${navigator.userAgent}\nscreen ${screen.width}x${screen.height} dpr ${devicePixelRatio} canvas ${board.pixelRatio()}x · quality ${QUALITY} · view ${VIEW} · look ${W.m.skin || 'own'} · fight ${W.seed} r${W.round} peak ${PEAK} bodies · loop ${LOOP}s · ${SECS}s/level\n`;
+  const rows = results.map(r => [r.level === 'real' ? 'real' : (r.level / 1000) + 'k', r.perBody || '-', r.unitTris == null ? '-' : (r.unitTris / 1000).toFixed(0) + 'k', r.fps.toFixed(1), r.p95.toFixed(1), r.p99.toFixed(1), r.worst.toFixed(0), (r.slow * 100).toFixed(0) + '%', (r.tris / 1000).toFixed(0) + 'k', r.calls, (r.scenery / 1000).toFixed(0) + 'k', r.bodies.toFixed(0) + '/' + r.minBodies, r.holds60 ? '60' : r.holds30 ? '30' : '<30'].join('\t'));
+  $('out').textContent = head + ['level', 'tri/body', 'unit tris', 'fps', 'p95 ms', 'p99 ms', 'worst', '>20ms', 'frame tris', 'calls', 'scenery', 'bodies avg/min', 'holds'].join('\t') + '\n' + rows.join('\n') + (state === 'done' ? '\n(done)' : '');
+}
+$('sweep').onclick = () => { results.length = 0; queue = LEVELS.slice(); next(); };
+$('levels').hidden = false;
+$('copy').onclick = async () => { try { await navigator.clipboard.writeText($('out').textContent); $('copy').textContent = 'Copied'; } catch (e) { const r = document.createRange(); r.selectNodeContents($('out')); getSelection().removeAllRanges(); getSelection().addRange(r); $('copy').textContent = 'Selected: copy it'; } setTimeout(() => { $('copy').textContent = 'Copy results'; }, 2000); };
+$('hide').onclick = () => { const p = $('panel'); p.style.opacity = p.style.opacity === '0.15' ? '' : '0.15'; };
+// tap a level to hold it (no measuring), to look at it
+for (const L of LEVELS) { const b = document.createElement('button'); b.textContent = L === 'real' ? 'game' : (L / 1000) + 'k'; b.onclick = () => { queue = []; state = 'idle'; rec = null; level = L; useLevel(L); }; $('levels').appendChild(b); }
+level = 'real'; useLevel('real');
+requestAnimationFrame(frame);
+window.__stress = { results, get board() { return board; }, run: (lv) => { results.length = 0; queue = (lv || LEVELS).slice(); next(); }, get state() { return state; } };
+</script>
+</body>
+</html>

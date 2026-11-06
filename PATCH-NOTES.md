@@ -276,6 +276,32 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 6 November 2026 – A licence for the game
+
+Nothing changes in the game.
+
+- **The repository now has a `LICENSE` file:** No Mans Land is all rights reserved. The code is public only so the game can be hosted; copying, rehosting or reusing the code, art, music or design needs permission. Third-party parts (three.js, PeerJS, the CC0 model and icon packs, Google Fonts) keep their own licences, listed in the file.
+
+---
+
+## 6 November 2026 – Developers: a triangle budget for 3D unit models
+
+Nothing changes in the game.
+
+- **How many triangles a unit model may have**, measured instead of guessed: `docs/RENDER-BUDGET.md`. Every model's triangle count, the biggest board in 40 AI matches (173 bodies in round 11), and how the 3D board draws units. Units are instanced already, so the limit is triangles, not draw calls.
+- **A stress test page for phones** (developers only, nothing links to it): `tools/tri-budget/stress.html` plays that biggest fight with test models of a set size and measures the frame rate at each size.
+- **Measured on Vilhelm's iPhone:** that fight held 60 fps even with 30× today's unit triangles (714k), so unit models have plenty of room. The budget: 500,000 triangles for all units on the board, at most 2,890 a body (or by squad size: up to 4,600 a body for single units, down to 990 for a 12-body swarm). No model today comes close.
+- Tools in `tools/tri-budget/`: `count.js` (triangles per model and squad), `worst.js` (the biggest board in a Balance Lab batch).
+
+---
+
+## 5 November 2026 – New skin (coming later): Ember Robe Fire Mage
+
+- **Ember Robe Fire Mage:** a Fire Mage in a long robe with an ember hem, cuffs and chest stripe, a fire gem on a belt in your team colour, long dark red hair and a flame held in each hand. 3D board only (the 2D board keeps the Fire Mage's symbol). It's a cosmetic skin and the Fire Mage's normal look stays the same.
+- Nobody has it yet: it's saved for later, and how to earn it is still to be decided.
+
+---
+
 ## 5 November 2026 – 2v2: ride your ally's horse
 
 2v2 is still a developer test.

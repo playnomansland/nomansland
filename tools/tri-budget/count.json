@@ -1,0 +1,676 @@
+{
+ "models": [
+  {
+   "kind": "treasury",
+   "group": "structure",
+   "skin": null,
+   "tris": 3412
+  },
+  {
+   "kind": "obelisk:eye",
+   "group": "variant",
+   "skin": null,
+   "tris": 904
+  },
+  {
+   "kind": "brute:omniper",
+   "group": "skin",
+   "skin": "brute-omniper",
+   "tris": 816
+  },
+  {
+   "kind": "obelisk",
+   "group": "unit",
+   "skin": null,
+   "tris": 776
+  },
+  {
+   "kind": "building:altar:awake",
+   "group": "structure",
+   "skin": null,
+   "tris": 772
+  },
+  {
+   "kind": "building:altar",
+   "group": "structure",
+   "skin": null,
+   "tris": 676
+  },
+  {
+   "kind": "building:factory:awake",
+   "group": "structure",
+   "skin": null,
+   "tris": 668
+  },
+  {
+   "kind": "tower:f-mechites:awake",
+   "group": "structure",
+   "skin": null,
+   "tris": 632
+  },
+  {
+   "kind": "tower:bastion",
+   "group": "structure",
+   "skin": null,
+   "tris": 548
+  },
+  {
+   "kind": "tower:keep",
+   "group": "structure",
+   "skin": null,
+   "tris": 516
+  },
+  {
+   "kind": "brute:champion",
+   "group": "skin",
+   "skin": "brute-champion",
+   "tris": 502
+  },
+  {
+   "kind": "mammoth",
+   "group": "unit",
+   "skin": null,
+   "tris": 464
+  },
+  {
+   "kind": "tower:f-mechites",
+   "group": "structure",
+   "skin": null,
+   "tris": 448
+  },
+  {
+   "kind": "wizard:fire:ember",
+   "group": "skin",
+   "skin": "firemage-ember",
+   "tris": 399
+  },
+  {
+   "kind": "golem:aquamarine",
+   "group": "skin",
+   "skin": "golem-aquamarine",
+   "tris": 380
+  },
+  {
+   "kind": "roller",
+   "group": "unit",
+   "skin": null,
+   "tris": 364
+  },
+  {
+   "kind": "sunPriest",
+   "group": "unit",
+   "skin": null,
+   "tris": 352
+  },
+  {
+   "kind": "building:factory",
+   "group": "structure",
+   "skin": null,
+   "tris": 344
+  },
+  {
+   "kind": "building",
+   "group": "structure",
+   "skin": null,
+   "tris": 344
+  },
+  {
+   "kind": "roller:unfolded",
+   "group": "variant",
+   "skin": null,
+   "tris": 320
+  },
+  {
+   "kind": "leafmech",
+   "group": "unit",
+   "skin": null,
+   "tris": 312
+  },
+  {
+   "kind": "spider",
+   "group": "unit",
+   "skin": null,
+   "tris": 296
+  },
+  {
+   "kind": "tower:slime",
+   "group": "structure",
+   "skin": null,
+   "tris": 290
+  },
+  {
+   "kind": "cogBuilder",
+   "group": "unit",
+   "skin": null,
+   "tris": 276
+  },
+  {
+   "kind": "necro",
+   "group": "unit",
+   "skin": null,
+   "tris": 262
+  },
+  {
+   "kind": "tower:faction",
+   "group": "structure",
+   "skin": null,
+   "tris": 244
+  },
+  {
+   "kind": "truespear",
+   "group": "unit",
+   "skin": null,
+   "tris": 240
+  },
+  {
+   "kind": "hellfiend",
+   "group": "unit",
+   "skin": null,
+   "tris": 230
+  },
+  {
+   "kind": "ent",
+   "group": "unit",
+   "skin": null,
+   "tris": 228
+  },
+  {
+   "kind": "meteor",
+   "group": "unit",
+   "skin": null,
+   "tris": 224
+  },
+  {
+   "kind": "skeleton",
+   "group": "unit",
+   "skin": null,
+   "tris": 220
+  },
+  {
+   "kind": "golem",
+   "group": "unit",
+   "skin": null,
+   "tris": 220
+  },
+  {
+   "kind": "mechGuard",
+   "group": "unit",
+   "skin": null,
+   "tris": 200
+  },
+  {
+   "kind": "cogMech",
+   "group": "unit",
+   "skin": null,
+   "tris": 196
+  },
+  {
+   "kind": "tower:sniper",
+   "group": "structure",
+   "skin": null,
+   "tris": 196
+  },
+  {
+   "kind": "cogTurret:awake",
+   "group": "variant",
+   "skin": null,
+   "tris": 196
+  },
+  {
+   "kind": "sniper",
+   "group": "unit",
+   "skin": null,
+   "tris": 192
+  },
+  {
+   "kind": "wall",
+   "group": "structure",
+   "skin": null,
+   "tris": 192
+  },
+  {
+   "kind": "archer",
+   "group": "unit",
+   "skin": null,
+   "tris": 184
+  },
+  {
+   "kind": "drone",
+   "group": "unit",
+   "skin": null,
+   "tris": 184
+  },
+  {
+   "kind": "tower:bank",
+   "group": "structure",
+   "skin": null,
+   "tris": 180
+  },
+  {
+   "kind": "cogGunner",
+   "group": "unit",
+   "skin": null,
+   "tris": 168
+  },
+  {
+   "kind": "cogTurret",
+   "group": "unit",
+   "skin": null,
+   "tris": 164
+  },
+  {
+   "kind": "wizard:water",
+   "group": "unit",
+   "skin": null,
+   "tris": 162
+  },
+  {
+   "kind": "wizard:frost",
+   "group": "unit",
+   "skin": null,
+   "tris": 162
+  },
+  {
+   "kind": "shiv",
+   "group": "unit",
+   "skin": null,
+   "tris": 160
+  },
+  {
+   "kind": "assassin",
+   "group": "unit",
+   "skin": null,
+   "tris": 156
+  },
+  {
+   "kind": "cogFighter",
+   "group": "unit",
+   "skin": null,
+   "tris": 156
+  },
+  {
+   "kind": "wizard:leaf",
+   "group": "unit",
+   "skin": null,
+   "tris": 154
+  },
+  {
+   "kind": "wizard:earth",
+   "group": "unit",
+   "skin": null,
+   "tris": 150
+  },
+  {
+   "kind": "rogue",
+   "group": "unit",
+   "skin": null,
+   "tris": 144
+  },
+  {
+   "kind": "brute",
+   "group": "unit",
+   "skin": null,
+   "tris": 140
+  },
+  {
+   "kind": "wizard:fire",
+   "group": "unit",
+   "skin": null,
+   "tris": 140
+  },
+  {
+   "kind": "wizard:slime",
+   "group": "unit",
+   "skin": null,
+   "tris": 140
+  },
+  {
+   "kind": "watchtower",
+   "group": "structure",
+   "skin": null,
+   "tris": 140
+  },
+  {
+   "kind": "wizard:steel",
+   "group": "unit",
+   "skin": null,
+   "tris": 138
+  },
+  {
+   "kind": "goblin",
+   "group": "unit",
+   "skin": null,
+   "tris": 136
+  },
+  {
+   "kind": "wizard:flame",
+   "group": "unit",
+   "skin": null,
+   "tris": 134
+  },
+  {
+   "kind": "minebot",
+   "group": "unit",
+   "skin": null,
+   "tris": 132
+  },
+  {
+   "kind": "caster",
+   "group": "unit",
+   "skin": null,
+   "tris": 120
+  },
+  {
+   "kind": "soldier",
+   "group": "unit",
+   "skin": null,
+   "tris": 116
+  },
+  {
+   "kind": "slimeshot",
+   "group": "unit",
+   "skin": null,
+   "tris": 112
+  },
+  {
+   "kind": "horse",
+   "group": "unit",
+   "skin": null,
+   "tris": 108
+  },
+  {
+   "kind": "repairbot",
+   "group": "unit",
+   "skin": null,
+   "tris": 100
+  },
+  {
+   "kind": "tower:outpost",
+   "group": "structure",
+   "skin": null,
+   "tris": 96
+  },
+  {
+   "kind": "tower:mage",
+   "group": "structure",
+   "skin": null,
+   "tris": 90
+  },
+  {
+   "kind": "flier",
+   "group": "unit",
+   "skin": null,
+   "tris": 88
+  },
+  {
+   "kind": "healbot",
+   "group": "unit",
+   "skin": null,
+   "tris": 84
+  },
+  {
+   "kind": "lesser",
+   "group": "structure",
+   "skin": null,
+   "tris": 84
+  },
+  {
+   "kind": "stonewall",
+   "group": "structure",
+   "skin": null,
+   "tris": 84
+  },
+  {
+   "kind": "spire",
+   "group": "structure",
+   "skin": null,
+   "tris": 76
+  },
+  {
+   "kind": "spear",
+   "group": "projectile",
+   "skin": null,
+   "tris": 24
+  }
+ ],
+ "forge": {
+  "models/base/fire-mage.model.js": {
+   "key": "wizard:fire",
+   "tris": 351
+  },
+  "models/base/leaf-wizard.model.js": {
+   "key": "wizard:leaf",
+   "tris": 327
+  },
+  "models/skins/spiders-gold.model.js": {
+   "key": "spider:gold",
+   "tris": 280
+  }
+ },
+ "squads": [
+  {
+   "unit": "Skeleton Archers",
+   "tier": 1,
+   "kind": "skeleton",
+   "bodies": 8,
+   "trisPerBody": 220,
+   "trisPerSquad": 1760
+  },
+  {
+   "unit": "Goblin Swarm",
+   "tier": 1,
+   "kind": "goblin",
+   "bodies": 12,
+   "trisPerBody": 136,
+   "trisPerSquad": 1632
+  },
+  {
+   "unit": "Ent",
+   "tier": 1,
+   "kind": "ent",
+   "bodies": 2,
+   "trisPerBody": 228,
+   "trisPerSquad": 456
+  },
+  {
+   "unit": "Ember Imps",
+   "tier": 1,
+   "kind": "flier",
+   "bodies": 4,
+   "trisPerBody": 88,
+   "trisPerSquad": 352
+  },
+  {
+   "unit": "Sniper",
+   "tier": 1,
+   "kind": "sniper",
+   "bodies": 1,
+   "trisPerBody": 192,
+   "trisPerSquad": 192
+  },
+  {
+   "unit": "Wisps",
+   "tier": 1,
+   "kind": "flier",
+   "bodies": 2,
+   "trisPerBody": 88,
+   "trisPerSquad": 176
+  },
+  {
+   "unit": "Fire Mage",
+   "tier": 1,
+   "kind": "wizard:fire",
+   "bodies": 1,
+   "trisPerBody": 140,
+   "trisPerSquad": 140
+  },
+  {
+   "unit": "Spiders",
+   "tier": 2,
+   "kind": "spider",
+   "bodies": 6,
+   "trisPerBody": 296,
+   "trisPerSquad": 1776
+  },
+  {
+   "unit": "Slimeshots",
+   "tier": 2,
+   "kind": "slimeshot",
+   "bodies": 10,
+   "trisPerBody": 112,
+   "trisPerSquad": 1120
+  },
+  {
+   "unit": "Shiv",
+   "tier": 2,
+   "kind": "shiv",
+   "bodies": 3,
+   "trisPerBody": 160,
+   "trisPerSquad": 480
+  },
+  {
+   "unit": "Leaf Wizard",
+   "tier": 2,
+   "kind": "wizard:leaf",
+   "bodies": 1,
+   "trisPerBody": 154,
+   "trisPerSquad": 154
+  },
+  {
+   "unit": "Earth Wizard",
+   "tier": 2,
+   "kind": "wizard:earth",
+   "bodies": 1,
+   "trisPerBody": 150,
+   "trisPerSquad": 150
+  },
+  {
+   "unit": "Brute",
+   "tier": 2,
+   "kind": "brute",
+   "bodies": 1,
+   "trisPerBody": 140,
+   "trisPerSquad": 140
+  },
+  {
+   "unit": "Just a horse",
+   "tier": 2,
+   "kind": "horse",
+   "bodies": 1,
+   "trisPerBody": 108,
+   "trisPerSquad": 108
+  },
+  {
+   "unit": "Obelisk",
+   "tier": 3,
+   "kind": "obelisk",
+   "bodies": 1,
+   "trisPerBody": 776,
+   "trisPerSquad": 776
+  },
+  {
+   "unit": "Rogue",
+   "tier": 3,
+   "kind": "rogue",
+   "bodies": 2,
+   "trisPerBody": 144,
+   "trisPerSquad": 288
+  },
+  {
+   "unit": "Water Mage",
+   "tier": 3,
+   "kind": "wizard:water",
+   "bodies": 1,
+   "trisPerBody": 162,
+   "trisPerSquad": 162
+  },
+  {
+   "unit": "Frost Wizard",
+   "tier": 3,
+   "kind": "wizard:frost",
+   "bodies": 1,
+   "trisPerBody": 162,
+   "trisPerSquad": 162
+  },
+  {
+   "unit": "Slime Wizard",
+   "tier": 3,
+   "kind": "wizard:slime",
+   "bodies": 1,
+   "trisPerBody": 140,
+   "trisPerSquad": 140
+  },
+  {
+   "unit": "Steel Wizard",
+   "tier": 3,
+   "kind": "wizard:steel",
+   "bodies": 1,
+   "trisPerBody": 138,
+   "trisPerSquad": 138
+  },
+  {
+   "unit": "Flame Wizard",
+   "tier": 3,
+   "kind": "wizard:flame",
+   "bodies": 1,
+   "trisPerBody": 134,
+   "trisPerSquad": 134
+  },
+  {
+   "unit": "War Mammoth",
+   "tier": 4,
+   "kind": "mammoth",
+   "bodies": 1,
+   "trisPerBody": 464,
+   "trisPerSquad": 464
+  },
+  {
+   "unit": "Sun Priest",
+   "tier": 4,
+   "kind": "sunPriest",
+   "bodies": 1,
+   "trisPerBody": 352,
+   "trisPerSquad": 352
+  },
+  {
+   "unit": "Necromancer",
+   "tier": 4,
+   "kind": "necro",
+   "bodies": 1,
+   "trisPerBody": 262,
+   "trisPerSquad": 262
+  },
+  {
+   "unit": "Truespear",
+   "tier": 4,
+   "kind": "truespear",
+   "bodies": 1,
+   "trisPerBody": 240,
+   "trisPerSquad": 240
+  },
+  {
+   "unit": "Meteor Caller",
+   "tier": 4,
+   "kind": "meteor",
+   "bodies": 1,
+   "trisPerBody": 224,
+   "trisPerSquad": 224
+  },
+  {
+   "unit": "Ether Golem",
+   "tier": 4,
+   "kind": "golem",
+   "bodies": 1,
+   "trisPerBody": 220,
+   "trisPerSquad": 220
+  },
+  {
+   "unit": "Assassin",
+   "tier": 4,
+   "kind": "assassin",
+   "bodies": 1,
+   "trisPerBody": 156,
+   "trisPerSquad": 156
+  }
+ ]
+}
