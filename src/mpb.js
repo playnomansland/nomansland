@@ -350,8 +350,8 @@
       // Field dressing: one seeded number a click (the Engine picks the squad from all the side's squads in the fight)
       battleOpts(m, side, rec, opts) {
         const o = opts.mpb.fieldHospital || (opts.mpb.fieldHospital = { dress: [[], []], pct: FH.dress });
-        // seeded from m.fhSeed (Duo.runFight sets it from the duo's seed, which no seat's view holds, just before the
-        // fight, so nobody can work the picks out while deploying; the fight's snapshots carry it), else the match's seed
+        // seeded from m.fhSeed (Duo.runFight sets it from the duo's D.secret, which no seat's view holds, just before
+        // the fight, so nobody can work the picks out while deploying; the fight's snapshots carry it), else the match's seed
         const n = fhClicks(m, rec, 'dress'), r = rng(((m.fhSeed != null ? m.fhSeed : m.seed) >>> 0) + m.round * 7919 + 4111 >>> 0); // the same numbers for both sides: a mirror is a mirror
         for (let k = 0; k < n; k++) o.dress[side].push(r());
       },
@@ -1703,8 +1703,9 @@
     return out;
   }
   // a building tile (or part, or Magic lake tile) of side's to the nearest tile its kind may stand on with everything
-  // known (spotOk strict, a kind's hooks.clashOk, a lake tile's lakeSpots strict); prefer(col, row) (optional): the
-  // tiles to take first when there are any (Duo: where nothing else would have to move then). Returns the tile or null
+  // known (spotOk strict, a kind's hooks.clashOk, a lake tile's lakeSpots strict); prefer(col, row) (optional): of the
+  // tiles as near as the nearest allowed one (its ring), those to take first when there are any (Duo: where nothing
+  // else would have to move then). Returns the tile or null
   // (no room anywhere: it stays). lanes[0]'s record (Duo copies it to lane 1).
   function moveTile(lanes, side, rec, part, prefer) {
     const m = lanes[0], K = kindOf(rec.kind);
@@ -1724,8 +1725,12 @@
       } finally { if (part) rec.parts[part] = was; else delete rec.away; }
     }
     all = all.filter(t => !(t.col === from.col && t.row === from.row));
-    const to = (prefer && nearestOf(all.filter(t => prefer(t.col, t.row)), from.col, from.row)) || nearestOf(all, from.col, from.row);
-    if (!to) return null;
+    // the nearest tile allowed (rings round its tile, then straight-line distance); prefer only chooses among the tiles
+    // of that same ring (a building never goes further off for it)
+    const near = nearestOf(all, from.col, from.row);
+    if (!near) return null;
+    const ring = cheb(near.col, near.row, from.col, from.row);
+    const to = (prefer && nearestOf(all.filter(t => cheb(t.col, t.row, from.col, from.row) === ring && prefer(t.col, t.row)), from.col, from.row)) || near;
     if (part) rec.parts[part] = to; else { rec.col = to.col; rec.row = to.row; }
     return to;
   }
@@ -1752,7 +1757,10 @@
     const e = { kind: kindId, part: part || null, key: key || null, votes: [null, null] };
     if (lane === 0 || lane === 1) e.lane = lane;
     if (skill) e.skill = true;
-    m.mpbVote[side].push(e);
+    // an entry queued in the open goes ahead of any a skill click queued (a hidden Grow never holds back a public vote,
+    // so the shared clock, which waits for public entries only, waits no longer for it: the opponents can't time it)
+    const q = m.mpbVote[side], k = skill ? -1 : q.findIndex(x => x.skill);
+    if (k >= 0) q.splice(k, 0, e); else q.push(e);
     if (!e.part && !skill) { if (!m.mpbSeen) m.mpbSeen = [[], []]; m.mpbSeen[side].push(clone(e)); }
   }
   // the head of the queue goes on (col, row): a new building (its parts are voted on next), or a part of one

@@ -2194,7 +2194,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
         }
         if (mode !== 'guest' && mode !== 'spec' && mode !== 'net' && left <= (mode === 'host' ? -500 : 0)) runFight();
         else if ((mode === 'guest' || mode === 'net') && left <= 0 && !timeUp) { commitPick(); timeUp = true; selected = null; closeSheet(); sendSide(); panelDeploy(); render(); }
-      } else if (el) { el.textContent = mpbOn() && (Mpb.draftOpen(m) || Mpb.voteHead(m, 0) || Mpb.voteHead(m, 1) || mpbClockAt.vote > now() || mpbClockAt.draft > now()) ? 'placing' : !(m && m.duoTowers) && (heldMs || ((mode === 'guest' || mode === 'net') && net.connected && m && m.round === Game.TOWER_PICK_ROUND)) ? 'picking towers' : solo() ? '' : 'paused'; el.classList.remove('low'); } // (2v2 towers, m.duoTowers: no tower pick)
+      } else if (el) { el.textContent = mpbOn() && (Mpb.draftOpen(m) || Mpb.voteQueue(m, me).some(e => !e.skill) || mpbClockAt.vote > now() || mpbClockAt.draft > now()) ? 'placing' : !(m && m.duoTowers) && (heldMs || ((mode === 'guest' || mode === 'net') && net.connected && m && m.round === Game.TOWER_PICK_ROUND)) ? 'picking towers' : solo() ? '' : 'paused'; el.classList.remove('low'); } // (2v2 towers, m.duoTowers: no tower pick; 'placing': my team's own queue, or the draft: the other team's queue in my view is only as it was queued, Mpb.hide, so it can't tell)
     }
     if ((phase === 'result' || phase === 'end') && resultShownAt) {
       const left = resultShownAt + nextSecs() * 1000 - t;

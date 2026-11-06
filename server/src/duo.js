@@ -234,7 +234,7 @@ export class DuoRoom extends DurableObject {
         const here = this.here();
         this.meta.seats = this.meta.seats.map((p, k) => p && here[k] ? p : null);
         this.D = Duo.create(d.settings, units);
-        Duo.start(this.D, units, matrix, now, this.seed(), this.meta.seats.map((p) => !p));
+        Duo.start(this.D, units, matrix, now, this.seed(), this.meta.seats.map((p) => !p), this.seed()); // (the second: D.secret, in no view)
         await this.save(); this.push({ force: true });
         this.report();
         return;
@@ -269,7 +269,7 @@ export class DuoRoom extends DurableObject {
       }
       case 'rematch': {
         if (inLobby) return;
-        const again = Duo.rematch(D, seat, units, matrix, now, this.seed());
+        const again = Duo.rematch(D, seat, units, matrix, now, this.seed(), this.seed());
         await this.save();
         if (again) this.push({ force: true }); else this.status();
         if (again) this.report();

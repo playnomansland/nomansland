@@ -194,11 +194,15 @@ const Game = (() => {
   // what a viewer may see of a player's walls: their own, and the opponent's from earlier rounds while deploying
   const bwallShown = (m, viewer, deploying, side, w) => side === viewer || !deploying || w.round < m.round;
   const ownHalf = (side, row) => side === 0 ? row >= ROWS / 2 && row < ROWS : row >= 0 && row < ROWS / 2;
+  // the other player's wall on that edge, as this player sees it: in 2v2 the server judges a deploy action as the acting
+  // team sees the board (src/mpb.js asSeen), so a wall the other team put up this round (hidden, bwallShown) doesn't
+  // count and a refusal shows nothing; the fight's start moves the newer of two walls on one edge (Duo.settleBoard)
+  const bwallFoe = (m, side, col, row, edge) => { const w = bwallOn(m, 1 - side, col, row, edge); return !!w && !(MPB && m && m.mpb && MPB.seeing() === side && w.round === m.round); };
   function bwallSpotOk(m, side, col, row, edge) {
     if (!isEdge(edge) || col < 0 || col >= COLS || !ownHalf(side, row) || reserved(side, col, row) || terrainBlocks(m, col, row)) return false;
     const [dc, dr] = EDGES[edge];
     if (col + dc < 0 || col + dc >= COLS || row + dr < 0 || row + dr >= ROWS) return false; // not on the board's outer edge
-    if (bwallOn(m, side, col, row, edge) || bwallOn(m, 1 - side, col, row, edge)) return false;
+    if (bwallOn(m, side, col, row, edge) || bwallFoe(m, side, col, row, edge)) return false;
     const e = elfSpot(m);
     return !(e && col === e.col && (row === ROWS / 2 - 1 || row === ROWS / 2));
   }

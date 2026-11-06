@@ -50,16 +50,22 @@ Branch: everything lands on `claude/exciting-meitner-889u3z` (merged there by th
   may share a tile with one; as the fight starts the one put there later moves to the nearest tile it may stand on
   (Vilhelm, 6 Nov: "if things are placed on the same tile, they find another spot close to it"; `Duo.settleBoard`).
 - Hidden until the fight, readings: (a) a rule only one side's thing has (the Assassin's "not on or next to a
-  building", a building's 2-tile room, "no squad or building on the 8 tiles round an exit", a lake tile never shutting
+  building", a building's 2-tile room, "no squad or building on the 8 tiles round an exit" (only one put there after
+  the exit got there: one there first stays, as next to a dig everyone sees), a lake tile never shutting
   a tile off, a wall never on water) is checked again as the fight starts with everything known; the thing whose rule
   is broken moves (even when it was there first), the newer one when both broke one (the same tile). Only what was
   put down, placed or moved this round moves: the rest was seen by all. (b) The vote and the draft stay open to all
   (the artifact's card says which building the team got) but never the tile chosen or the tile votes; the shared
   deploy clock still waits for a vote and starts again once both teams' are done, so the opponents learn when, never
   where. (c) Every deploy check is judged as the acting team sees the board (the page holds that view; the server
-  judges in `Mpb.asSeen`), so a refusal never shows a hidden thing, and page and server always agree. Also: a moved
-  building goes, when it can, to the nearest tile where nothing else then breaks a rule (so an Oak voted onto a
-  hidden Assassin lands 2 tiles off, not next to it, and the Assassin stays); a Cog Builder's Factory never moves (the
+  judges in `Mpb.asSeen`; Bastion walls too: `Game.bwallSpotOk` leaves out the other team's walls of this round in
+  seen mode), so a refusal never shows a hidden thing, and page and server always agree. A hidden Grow's entry never
+  holds back a public one (`Mpb.queue` puts an open entry ahead of a skill's), so the clock waits no longer for it.
+  Also: a moved building goes to the nearest tile its rules allow; only among the tiles of that same ring does it
+  prefer one where nothing else then breaks a rule (so an Oak voted onto a hidden Assassin lands next to it, and the
+  Assassin, next to a building now, moves away); a squad in a building (a Nest's, a School's pupil) goes with it, the
+  newer of the two deciding whether they move; two teams' walls on one edge: the newer moves; a Coal mine entrance
+  that moves leaves the squads round it where they stood; a Cog Builder's Factory never moves (the
   other thing does); a thing with no room anywhere stays, and the other one moves instead if it can; neither can: both
   stay. Insider information (the Shadow Den) shows squads only, never this round's buildings.
 
@@ -158,7 +164,7 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
       team live (`Mpb.watching`, B5 Insider information; `Duo.cutFor` / `remainingFor` / `heldFor` cut its clock).
       `Game.mpbHeld(sq)` (`sq.jailed || sq.school`, B4): no move, no take-back, no carrying.
     - Bots: `bot(m, side, rec, r)` before the bot's squads (`Mpb.bots`) and `botAfter(m, side, rec, r)` after them
-      (`Mpb.botsAfter`), both from `Duo.botTurn` with one seeded stream (`D.seed`, the round, the seat); a throw is
+      (`Mpb.botsAfter`), both from `Duo.botTurn` with one seeded stream (`D.secret`, the round, the seat); a throw is
       caught (the turn goes on).
     - Sheet and view: `hide` returning `false` drops the record from the opponents' view (B1). `info(m, side, rec,
       viewer)` (B5: worded for the reader). `fellText(m, side, rec)` → the sheet's "destroyed in round N" line (B1). A
@@ -205,6 +211,10 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
   and `rebuildTeam` (Undo all's replays; the presser's squad moved by `relocate(..., seen)` counts the other team only
   as seen: `Game.enemyHolds` / `bldgSeen`). The page needs nothing: its view already is that board. Outside it (the
   round's start, the artifacts' roll, the fight's start) everything is as it stands.
+- The server's own streams (`Duo` `sec(D)`: the vote's and draft's coins, the settle's coin, the artifacts and draft
+  deals, the bots' building moves, Field dressing's `m.fhSeed`) are seeded from `D.secret`, drawn by the server
+  (`Duo.start(..., seed, bots, secret)`, `Duo.rematch(..., seed, secret)`) and in no view; `D.seed` can be worked out
+  from any lane's `m.seed`. A match without one (an older save, a test) uses `D.seed`, as before.
 - Stamps (server only, in D, never in a view): `D.stamp[seat][id]` (squads) and `D.bstamp[team]['<key>|<part>']`
   (building tiles, parts, lake tiles; a Bastion wall `'w|col,row,edge'`) = `{ c, r, n }`, all on the one counter
   `D.stampN`, noted after every action, sys action and tick (`Duo.stampAll`); n is 0 for what stood as the round began
@@ -213,8 +223,10 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
   **`Duo.settleBoard(D)`** → `fight`. settleBoard: Magic lake tiles nobody put down go down first (`Mpb.settleLakes`,
   everything known); then, until nothing is broken (at most 160 moves), `Duo.things` (squads, Cog Builder's
   Factories, `Mpb.boardTiles`: every building tile and part with `fresh` = the other team doesn't see it there, lake
-  tiles, Bastion walls) and `Duo.conflicts`: `breaks(X, Y)` = 'same' (one tile), 'ring' (on a tile round a Coal mine's
-  exit), 'near' (an Assassin on or next to a building tile or Factory), 'room' (a building with spacing within 2 tiles
+  tiles, Bastion walls; a squad a building of its team holds on its tile, `hooks.holds`, the Nest's, is the
+  building's `occ`, not a thing of its own: the building's n is the newer of the two) and `Duo.conflicts`:
+  `breaks(X, Y)` = 'same' (one tile, or two teams' walls on one physical edge), 'ring' (on a tile round a Coal mine's
+  exit, X newer than the exit tile), 'near' (an Assassin on or next to a building tile or Factory), 'room' (a building with spacing within 2 tiles
   of another building), 'water' (a wall on water), plus 'shut' (a fresh lake tile that, with all the water known,
   shuts a tile off: `lakeFree`). Two things of one team count only for two squads (Undo all) or a thing this settle
   moved. The mover: the breaker (it must be fresh, or moved by the settle; a squad in a 'same' with another squad
@@ -222,8 +234,10 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
   part, building, water, wall), then `mrand(D, 17 + guard)` with the pair in a fixed order. The newest mover goes first.
   It moves with its kind's rules, everything known: a squad `relocate` (its placement rules as a move, nothing on the
   tile in either lane; an Assassin also off the other team's Factories), a building tile or part `Mpb.moveTile`
-  (`spotOk` strict, or `hooks.clashOk`; preferring a tile where no other fresh thing then breaks a rule: not next to
-  an Assassin, not in another's room, no fresh thing in a moved exit's ring), a lake tile `lakeSpots` strict, a wall the
+  (`spotOk` strict, or `hooks.clashOk`; the nearest such tile, and only among the tiles of its ring one where no
+  other fresh thing then breaks a rule: not next to an Assassin, not in another's room, no fresh thing in a moved
+  exit's ring; then `Duo.carry`: its `occ` and the squads it holds on its tile, `sq.school` / `sq.jailed` with its key,
+  in both lanes, go onto the new tile with their riders), a lake tile `lakeSpots` strict, a wall the
   nearest edge of the same way round `bwallSpotOk` allows. It keeps its stamp. No tile: it stays, and the other one
   moves instead if it can. `D.settled` logs the moves (tests). Then `Duo.settle` → `Mpb.settle` (`unclash`, the lake's
   `settle`) finds nothing left; they stay as the fallback for a fight without D (node tests' `Duo.settle`).
@@ -270,7 +284,7 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
 
 ### Artifacts (rules side, group F; the fight part is group A's)
 
-- `Duo` rolls at the start of rounds 2 and 8 (`Mpb.rollArtifacts(m, rng)`, seeded from `D.seed` and the round):
+- `Duo` rolls at the start of rounds 2 and 8 (`Mpb.rollArtifacts(m, rng)`, seeded from `D.secret` and the round):
   `m.artifacts = { round, list: [{ id: 0|1, col, row, card: { type: 'tower'|'mpb', id }, won }] }` in both lanes (all
   four views; not hidden). The spots are point mirrors in no man's land, not flank tiles, ≥ 10 tiles apart
   (Euclidean); cards: two different ones from `Mpb.cardPool(m)` (all tower types and kinds with `draft !== false`,

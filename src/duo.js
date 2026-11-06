@@ -220,14 +220,22 @@
   // to it"). docs/MPB-2V2.md "Hidden until the fight". -----
   // The things on the board (as each lane stands): squads (not riders, not one held in a building), Cog Builder's
   // Factories, the teams' building tiles and parts, Magic lake tiles and Bastion walls. fresh: put down, placed or
-  // moved this round (the other team couldn't see it there); n: its stamp (the newer, the bigger).
+  // moved this round (the other team couldn't see it there); n: its stamp (the newer, the bigger). A squad in its
+  // team's building (a Tree kojja's Nest: hooks.holds) is no thing of its own: it goes with the building (occ), whose
+  // stamp is the newer of the two (the newest arrival on that tile), so a paid Nest is never left empty.
   const RANK = { sq: 0, part: 1, b: 2, w: 3, wall: 4, fac: 9 }; // a tie: the squad moves first, then a part, a building, water, a wall
+  // the building of side's in lane L that holds squad q (on its tile, hooks.holds), or null
+  const hostOf = (L, sd, q) => (M.on(L) && M.recs(L, sd).find(r => !r.away && r.col === q.col && r.row === q.row && ((M.kindOf(r.kind) || {}).hooks || {}).holds && M.kindOf(r.kind).hooks.holds(L, sd, r, q.unit))) || null;
+  // one Bastion wall's edge, however it is named (Game's edgeKey: a tile's s edge is the n edge of the tile below it)
+  const edgeKey = (sd, w) => { const e = G.edgeOf(sd, w); return e === 's' ? `${w.col},${w.row + 1},n` : e === 'e' ? `${w.col + 1},${w.row},w` : `${w.col},${w.row},${e}`; };
   function things(D, lanes) {
-    const m = lanes[0], round = m.round, out = [];
+    const m = lanes[0], round = m.round, out = [], occ = {};
     lanes.forEach((L, li) => {
       for (const sd of [0, 1]) {
         for (const q of L.armies[sd] || []) {
           if (G.isRider(q) || G.mpbHeld(q)) continue;
+          const host = hostOf(L, sd, q);
+          if (host) { (occ[sd + ':' + host.key] = occ[sd + ':' + host.key] || []).push({ L: li, q, n: stampOf(D, seatOf(li, sd), q.id) }); continue; }
           out.push({ t: 'sq', id: 's' + li + ':' + sd + ':' + q.id, L: li, sd, q, col: q.col, row: q.row, tiles: G.blockOf(L, q.unit, q.col, q.row),
             n: stampOf(D, seatOf(li, sd), q.id), fresh: q.round === round || !!(q.from && q.movedRound === round), any: G.anywhere(L, q.unit), rank: RANK.sq });
         }
@@ -235,10 +243,13 @@
       }
     });
     for (const sd of [0, 1]) {
-      for (const x of M.boardTiles(m, sd)) out.push({ ...x, t: x.terrain ? 'w' : 'b', id: 'b' + sd + ':' + x.id, key: x.id, tiles: [[x.col, x.row]], n: bstampOf(D, sd, x.id), rank: x.terrain ? RANK.w : x.part ? RANK.part : RANK.b });
+      for (const x of M.boardTiles(m, sd)) {
+        const o = !x.part && !x.terrain ? occ[sd + ':' + x.rec.key] || null : null, n = bstampOf(D, sd, x.id);
+        out.push({ ...x, t: x.terrain ? 'w' : 'b', id: 'b' + sd + ':' + x.id, key: x.id, tiles: [[x.col, x.row]], occ: o, n: o ? Math.max(n, ...o.map(z => z.n)) : n, rank: x.terrain ? RANK.w : x.part ? RANK.part : RANK.b });
+      }
       for (const w of (m.bwalls && m.bwalls[sd]) || []) {
         const key = 'w|' + w.col + ',' + w.row + ',' + w.edge;
-        out.push({ t: 'wall', id: 'w' + sd + ':' + key, key, sd, w, col: w.col, row: w.row, tiles: [[w.col, w.row]], n: bstampOf(D, sd, key), fresh: w.round === round, rank: RANK.wall });
+        out.push({ t: 'wall', id: 'w' + sd + ':' + key, key, sd, w, col: w.col, row: w.row, tiles: [[w.col, w.row]], edge: edgeKey(sd, w), n: bstampOf(D, sd, key), fresh: w.round === round, rank: RANK.wall });
       }
     }
     return out;
@@ -246,15 +257,16 @@
   const hits = (A, B) => A.some(([c, r]) => B.some(([c2, r2]) => c === c2 && r === r2));
   const within = (A, B, d) => A.some(([c, r]) => B.some(([c2, r2]) => Math.max(Math.abs(c - c2), Math.abs(r - r2)) <= d));
   const solid = (Y) => Y.t === 'b' || Y.t === 'fac'; // a building's tile (not water, not a wall)
-  // does X break one of its own placement rules because of Y, everything known? 'same' (one tile: Y breaks it too),
-  // 'ring' (on a tile round a Coal mine's exit), 'near' (an Assassin on or next to a building), 'room' (a building
-  // within 2 tiles of another), 'water' (a wall on water); null: no
+  // does X break one of its own placement rules because of Y, everything known? 'same' (one tile, or two teams' walls
+  // on one edge: Y breaks it too), 'ring' (put on a tile round a Coal mine's exit after the exit got there: one there
+  // first stays, as when the exit is dug next to a squad everyone sees), 'near' (an Assassin on or next to a building),
+  // 'room' (a building within 2 tiles of another), 'water' (a wall on water); null: no
   function breaks(X, Y) {
     if (X === Y || (X.rec && Y.rec && X.rec === Y.rec)) return null;
-    if (X.t === 'wall') return Y.t === 'w' && hits(X.tiles, Y.tiles) ? 'water' : null;
+    if (X.t === 'wall') return Y.t === 'w' && hits(X.tiles, Y.tiles) ? 'water' : Y.t === 'wall' && Y.sd !== X.sd && Y.edge === X.edge ? 'same' : null;
     if (Y.t === 'wall') return null;
     if (hits(X.tiles, Y.tiles)) return X.t === 'fac' && Y.t === 'fac' ? null : 'same';
-    if (X.t !== 'fac' && Y.ring && Y.ring.length && hits(X.tiles, Y.ring)) return 'ring';
+    if (X.t !== 'fac' && Y.ring && Y.ring.length && X.n > Y.n && hits(X.tiles, Y.ring)) return 'ring';
     if (X.t === 'sq' && X.any && solid(Y) && within(X.tiles, Y.tiles, 1)) return 'near';
     if (X.t === 'b' && X.spacing && solid(Y) && within(X.tiles, Y.tiles, M.SPACING - 1)) return 'room';
     return null;
@@ -284,13 +296,14 @@
   // The settle (Duo.runFight, before the fight): Magic lake tiles nobody put down go down first (everything known, so
   // they meet nothing), then until nothing is broken: of every rule broken, the thing that broke it moves to the
   // nearest tile its own kind's rules allow, everything known; both broke it (one tile): the newer moves (the same
-  // stamp: the one outside its own zone, then a squad before a part, a building, water, a wall, then a seeded coin no
-  // view holds). Of all that must move, the newest moves first. Nothing is called off or paid back. Only what was put
+  // stamp: the one outside its own zone, then a squad before a part, a building, water, a wall, then a coin seeded
+  // from D.secret, which no view holds). Of all that must move, the newest moves first. Nothing is called off or paid back. Only what was put
   // down, placed or moved this round moves (the rest was seen by all: the other thing moves). A Cog Builder's Factory
   // never moves (the other thing does). A thing with no tile anywhere stays, and the other one moves instead if it can
-  // (one tile); neither can: both stay. A moved thing keeps its stamp. A building is moved, if it can be, to a tile
-  // where nothing else then breaks a rule (an Assassin next to it, the room round another building, a squad round an
-  // exit, a wall under water).
+  // (one tile); neither can: both stay. A moved thing keeps its stamp. A building goes to the nearest tile its rules
+  // allow; of the tiles as near (the same ring round it), one where nothing else then breaks a rule if there is one (an
+  // Assassin next to it, the room round another building, a squad round an exit, a wall under water). The squads in a
+  // building go with it (a Nest's, a School's pupil: they stand on its tile).
   function settleBoard(D) {
     const lanes = ms(D), m = lanes[0];
     setTeams(lanes);
@@ -344,12 +357,14 @@
         return !others.some(Z => breaks(Z, Xp));
       };
       to = M.moveTile(lanes, X.sd, X.rec, X.part || null, prefer);
+      if (to && !X.part && X.t === 'b') carry(D, lanes, X, to);
     } else if (X.t === 'wall') {
       const list = m.bwalls[X.sd], i = list.indexOf(X.w);
       if (i >= 0) {
         list.splice(i, 1);
         const ok = [];
-        try { for (let r = 0; r < G.ROWS; r++) for (let c = 0; c < G.COLS; c++) if (!(c === X.w.col && r === X.w.row) && G.bwallSpotOk(m, X.sd, c, r, X.w.edge)) ok.push({ col: c, row: r }); } finally { list.splice(i, 0, X.w); }
+        const e = G.edgeOf(X.sd, X.w);
+        try { for (let r = 0; r < G.ROWS; r++) for (let c = 0; c < G.COLS; c++) if (!(c === X.w.col && r === X.w.row) && G.bwallSpotOk(m, X.sd, c, r, e)) ok.push({ col: c, row: r }); } finally { list.splice(i, 0, X.w); }
         to = M.nearestOf(ok, X.w.col, X.w.row);
         if (to) {
           const st = D.bstamp && D.bstamp[X.sd] && D.bstamp[X.sd][X.key];
@@ -367,6 +382,27 @@
     setTeams(lanes);
     moved.add(id);
     return { id, col: to.col, row: to.row };
+  }
+
+  // the squads standing in building X (moved to tile to): a Nest's (X.occ, with what rides in it) and those a kind holds
+  // on its tile (a School's pupil, a Jail's prisoner: sq.school / sq.jailed with the record's key), in both lanes, go
+  // onto its new tile (keeping their stamps)
+  function carry(D, lanes, X, to) {
+    const key = X.rec.key, moveQ = (li, sd, q, arr) => {
+      const was = { col: q.col, row: q.row };
+      q.col = to.col; q.row = to.row;
+      for (const x of arr) if (x !== q && x.in === q.id && x.col === was.col && x.row === was.row) { x.col = to.col; x.row = to.row; }
+      const st = D.stamp && D.stamp[seatOf(li, sd)];
+      if (st && st[q.id]) st[q.id] = { c: to.col, r: to.row, n: st[q.id].n };
+    };
+    for (const o of X.occ || []) { const arr = lanes[o.L].armies[X.sd]; if (arr.includes(o.q) && o.q.col === X.col && o.q.row === X.row) moveQ(o.L, X.sd, o.q, arr); }
+    lanes.forEach((L, li) => {
+      for (const sd of [0, 1]) for (const q of L.armies[sd] || []) {
+        const held = (q.school && sd === X.sd && q.school.key === key) || (q.jailed && q.jailed.side === X.sd && q.jailed.key === key);
+        if (held && q.col === X.col && q.row === X.row) moveQ(li, sd, q, L.armies[sd]);
+      }
+    });
+    setTeams(lanes);
   }
 
   // when each seat's squads took their tiles this round (D.stamp[seat][id] = { c, r, n }; n 0: from before the round's
@@ -528,7 +564,8 @@
   // ===================== the refereed 2v2 match (the game server keeps it) =====================
   // D: { v, settings, phase: 'lobby' | 'deploy' | 'result' | 'end', lanes: [R, R] (Referee lanes), bots: [b x4],
   //      hp: [team A, team B], ready, nextReady, rematch, away: [x4], deadline, held, summary: [lane 0's, lane 1's],
-  //      fights, seed, forfeit (the seat that left, or null),
+  //      fights, seed (the lanes' m.seed come from it: known to all), secret (the server's own streams: in no view,
+  //      sec), forfeit (the seat that left, or null),
   //      tbase: [team A's team part as the round began, team B's], tlog: [[{ lane, fn, a, as }, ...] this round, x2]
   //      (lane -1: the system's: a placement vote, a placed building, a draft pick; fn 'sys:<Mpb.SYS name>'),
   //      mclock: { vote: [{ key, until } | null, x2] (the team's placement vote), draft: until | 0 } }
@@ -591,7 +628,12 @@
     for (const sd of [0, 1]) D.tlog[sd].push({ lane: -1, fn: 'sys:draft', a: lanes[L].draft.owner.slice(), as: L });
     return true;
   }
-  const mrand = (D, k) => M.rng((D.seed + D.lanes[0].m.round * 7919 + k * 104729) >>> 0)();
+  // the server's own streams (the vote's and the draft's coins, the fight-start settle's coin, the artifacts and draft
+  // deals, the bots' building moves, Field dressing): from D.secret, which no view holds (the lanes' m.seed come from
+  // D.seed, and every seat's view has its lane's, so D.seed itself is known to all); a match without one (an older
+  // save, a test that passes none): D.seed, as before
+  const sec = (D) => (D.secret != null ? D.secret : D.seed) >>> 0;
+  const mrand = (D, k) => M.rng((sec(D) + D.lanes[0].m.round * 7919 + k * 104729) >>> 0)();
   // the clocks: 15 s for each building at the head of a team's queue, 15 s for the draft's pick
   function mpbClock(D, now) {
     const m = D.lanes[0].m;
@@ -664,8 +706,8 @@
     if (!M.on(m)) return;
     setTeams(lanes);
     M.roundStart(lanes);
-    if (M.ARTIFACT.rounds.includes(m.round)) m.artifacts = M.rollArtifacts(m, M.rng((D.seed + m.round * 6151) >>> 0));
-    const d = M.dealDraft(m, M.rng((D.seed + m.round * 7307) >>> 0)() < 0.5 ? 0 : 1);
+    if (M.ARTIFACT.rounds.includes(m.round)) m.artifacts = M.rollArtifacts(m, M.rng((sec(D) + m.round * 6151) >>> 0));
+    const d = M.dealDraft(m, M.rng((sec(D) + m.round * 7307) >>> 0)() < 0.5 ? 0 : 1);
     if (d) m.draft = d;
     if (m.artifacts && m.artifacts.round < m.round) m.artifacts = null; // (the draft has their cards and winners)
     copyAll(m, lanes[1]);
@@ -796,7 +838,7 @@
     setTeam(ms(D), own.lane);
     if (G.needsPack(m, sd)) G.choosePack(m, sd, Math.floor(Math.random() * m.packages[sd].length));
     if (G.needsTowerPick(m, sd)) { const ch = G.towerChoices(m, sd); G.setTowerType(m, sd, ch[Math.floor(Math.random() * ch.length)].id); }
-    const r = M.rng((D.seed + m.round * 3571 + seat * 131) >>> 0);
+    const r = M.rng((sec(D) + m.round * 3571 + seat * 131) >>> 0);
     M.bots(m, sd, r); // the team's buildings' skills now and then (src/mpb.js hooks.bot, before the squads)
     G.aiDeploy(m, sd);
     M.botsAfter(m, sd, r); // and those on its squads (hooks.botAfter)
@@ -820,10 +862,12 @@
     D.deadline = 0; D.held = deployMsOf(D);
     clock(D, now);
   }
-  // a new match (the lobby's Start, or a rematch). bots: the seats nobody sits in.
-  function start(D, units, matrix, now, seed, bots) {
+  // a new match (the lobby's Start, or a rematch). bots: the seats nobody sits in. secret (optional, the server draws
+  // it): the seed of the streams no player may work out while deploying (sec)
+  function start(D, units, matrix, now, seed, bots, secret) {
     if (bots) D.bots = bots.slice(0, 4).map(Boolean);
     D.seed = seed >>> 0;
+    if (secret != null) D.secret = secret >>> 0; else delete D.secret;
     D.settings = { ...D.settings, map: MAP, noChars: true };
     D.lanes = [0, 1].map(L => {
       const R = Ref.create(D.settings, units);
@@ -908,7 +952,7 @@
     mpbSettle(D, now); // a draft pick or a placement vote still open: settled now
     stampAll(D); // (what those placed is the newest)
     settleBoard(D); // everything known: of two things on one tile (or a rule only now broken) the newer moves to the nearest tile it may stand on
-    for (const m of ms(D)) m.fhSeed = M.rng((D.seed + m.round * 4111 + 17) >>> 0)() * 4294967296 >>> 0; // Field hospital's Field dressing picks (src/mpb.js): out of the views until the fight
+    for (const m of ms(D)) m.fhSeed = M.rng((sec(D) + m.round * 4111 + 17) >>> 0)() * 4294967296 >>> 0; // Field hospital's Field dressing picks (src/mpb.js): out of the views until the fight
     const f = fight(ms(D), D.hp);
     setTeams(ms(D));
     D.fights++;
@@ -944,10 +988,10 @@
     if (D.nextReady.every(Boolean)) { beginRound(D, now); return true; }
     return false;
   }
-  function rematch(D, seat, units, matrix, now, seed) {
+  function rematch(D, seat, units, matrix, now, seed, secret) {
     if (D.phase !== 'end') return false;
     D.rematch[seat] = true;
-    if (humans(D).every(k => D.rematch[k])) return start(D, units, matrix, now, seed);
+    if (humans(D).every(k => D.rematch[k])) return start(D, units, matrix, now, seed, null, secret);
     return false;
   }
   // a player leaves: their team loses

@@ -13,6 +13,9 @@
 //    room round a building and a dug exit, a Cog Builder's Factory, a wall under water, the artifacts' tiles): the
 //    newer (or the one whose own rule broke) moves to the nearest tile its rules allow; ties; no room: the other moves
 //  - the same result from a saved and loaded match; Undo all replays a vote onto a hidden tile as it was
+//  - review: a hidden Grow never holds the shared clock longer; the server's coins come from D.secret (in no view);
+//    the page's 'placing' label reads its own team's queue only; a Nest's squad and a School's pupil go with their
+//    building; Bastion walls judged as seen (page = server on every edge) and two on one edge settled (newer moves)
 // Run: node tools/tests/mpb-hidden.js
 const assert = require('assert');
 const Game = require('../../src/game.js');
@@ -299,10 +302,13 @@ check('squad and building on one tile, both orders: the newer moves to the neare
       const best = Mpb.nearestOf(ok.concat([{ col: a.col, row: a.row }]), t.col, t.row);
       assert.ok(cheb(a, t) <= cheb(best, t), order + ': as near as it may be (' + JSON.stringify([a.col, a.row]) + ')');
     } else {
-      assert.deepStrictEqual([a.col, a.row], [t.col, t.row], order + ': the Assassin stays');
-      assert.ok(cheb(oak, t) === 2 && Mpb.interior(0, oak.col, oak.row), order + ': the Oak moved 2 tiles off (next to it the Assassin would break its rule): ' + JSON.stringify([oak.col, oak.row]));
+      // the Oak (newer) to the nearest tile its rules allow: next to it (never further off to spare the Assassin); the
+      // Assassin, now next to a building, breaks its own rule (reading (a)) and moves away
+      assert.ok(cheb(oak, t) === 1 && Mpb.interior(0, oak.col, oak.row), order + ': the Oak moved next to it: ' + JSON.stringify([oak.col, oak.row]));
+      assert.ok(!Game.nearBldg(P[0], 1, a.col, a.row), order + ': the Assassin moved away from it (its own rule): ' + JSON.stringify([a.col, a.row]));
+      assert.deepStrictEqual(D.settled.map(e => e.why), ['same', 'near'], order + ': the Oak, then the Assassin');
     }
-    assert.ok(D.settled.length === 1, order + ': one thing moved');
+    if (order === 'building first') assert.ok(D.settled.length === 1, order + ': one thing moved');
   }
 });
 
@@ -425,12 +431,12 @@ check('a Scorch turret or a grown Tree kojja on a squad placed this round, both 
     if (sqFirst) { sq = place(x, 3, 'Assassin', t.col, t.row); build(); } else { build(); sq = place(x, 3, 'Assassin', t.col, t.row); }
     const { P } = fight(x);
     const b = recIn(P[0], 0, key), a = sqIn(P, 1, 1, sq.id);
-    if (sqFirst) { assert.deepStrictEqual([a.col, a.row], [t.col, t.row], kind + ', squad first: it stays'); assert.ok(cheb(b, t) >= 1 && cheb(b, a) >= 2, kind + ': the building moved (not next to the Assassin): ' + JSON.stringify([b.col, b.row])); if (kind === 'grow') assert.ok(cheb(b, recIn(P[0], 0, tk)) <= Mpb.KOJJA.grow, 'still within Grow\'s reach'); }
+    if (sqFirst) { assert.ok(cheb(b, t) === 1, kind + ', squad first: the building moved to the nearest tile: ' + JSON.stringify([b.col, b.row])); assert.ok(!Game.nearBldg(P[1], 1, a.col, a.row), kind + ': the Assassin, next to it now, moved away (its rule): ' + JSON.stringify([a.col, a.row])); if (kind === 'grow') assert.ok(cheb(b, recIn(P[0], 0, tk)) <= Mpb.KOJJA.grow, 'still within Grow\'s reach'); }
     else { assert.deepStrictEqual([b.col, b.row], [t.col, t.row], kind + ', squad last: the building stays'); assert.ok(!Game.nearBldg(P[1], 1, a.col, a.row), kind + ': the squad moved'); }
   }
 });
 
-check('a squad round an exit dug this round (a flank tile of its half), either order: the squad moves (its rule); the room round a building and the dug exit: the building moves', () => {
+check('a squad round an exit dug this round (a flank tile of its half): put there after the dig it moves (its rule), there before it stays (as next to a dig everyone sees); the room round a building and the dug exit: the building moves', () => {
   for (const sqFirst of [true, false]) {
     const x = board(47), { D } = x;
     const kb = put(D, 1, 'coalMine', { col: 11, row: 2 });
@@ -447,7 +453,8 @@ check('a squad round an exit dug this round (a flank tile of its half), either o
     const { P } = fight(x);
     const ex = recIn(P[0], 1, kb).parts.exit, q = sqIn(P, 0, 0, sq.id), oak = Mpb.recs(P[0], 0).find(r => r.kind === 'oak');
     assert.deepStrictEqual(ex, { col: 1, row: 14 }, (sqFirst ? 'squad first' : 'dug first') + ': the exit stays');
-    assert.ok(cheb(q, ex) >= 2, 'the squad left the exit\'s ring: ' + JSON.stringify([q.col, q.row]));
+    if (sqFirst) assert.deepStrictEqual([q.col, q.row], [2, 13], 'squad first: it stays in the ring (the newer exit came to it)');
+    else assert.ok(cheb(q, ex) >= 2, 'dug first: the squad left the exit\'s ring: ' + JSON.stringify([q.col, q.row]));
     assert.ok(cheb(oak, ex) >= Mpb.SPACING && Mpb.interior(0, oak.col, oak.row), 'the Oak keeps its room from the exit: ' + JSON.stringify([oak.col, oak.row]));
   }
 });
@@ -594,6 +601,127 @@ check('Undo all replays a teammate\'s placement onto a tile with a hidden thing 
   const { P } = fight(x);
   assert.deepStrictEqual(recIn(P[0], 1, kb).parts.exit, { col: 10, row: 9 }, 'B\'s (older) exit stays');
   assert.ok(cheb(recIn(P[0], 0, la.key), { col: 10, row: 9 }) >= 2, 'A2\'s water (newer) moved off it and its ring');
+});
+
+// ======================================= review (side channels, what stands in a building, walls) =======================================
+check('a hidden Grow never holds back a public vote: the opponents\' clock is held no longer than without it', () => {
+  const run = (grow) => {
+    const x = board(34), { D } = x;
+    const k = put(D, 0, 'treeKojja'); fresh(D); Duo.tick(D, T);
+    let seq = 100; const act = (seat, fn, now, ...a) => Duo.act(D, seat, { seq: ++seq, fn, a }, now);
+    if (grow) assert.ok(act(1, 'mpbBuy', T, k, 'grow').ok, 'A2 buys Grow (hidden)');
+    for (const R of D.lanes) Mpb.giveCard(R.m, 0, { type: 'mpb', id: 'oak' }); // a card queued in the open after it
+    Duo.tick(D, T);
+    assert.strictEqual(Mpb.voteHead(x.m(0), 0).kind, 'oak', 'the public card heads the queue');
+    const t = Mpb.autoSpot(x.m(0), 0, 'oak', null);
+    assert.ok(act(0, 'mpbVote', T + 1000, t.col, t.row).ok, 'A1 votes on the card at once');
+    const out = [];
+    for (const dt of [1000, Mpb.VOTE_MS - 1, Mpb.VOTE_MS + 1, 2 * Mpb.VOTE_MS + 2]) { Duo.tick(D, T + dt); out.push([Duo.remainingFor(D, 2, T + dt) > 0, Duo.heldFor(D, 2), oppKey(D, 2)]); }
+    return out;
+  };
+  assert.deepStrictEqual(run(true), run(false), 'B1\'s clock and view, second by second, the same with and without the hidden Grow');
+  // and the real draft (round 9): Grow bought while the draft is open, the drafted card still goes ahead of it
+  const q = Mpb.voteQueue({ mpbVote: [[{ kind: 'treeKojja', part: null, key: null, votes: [null, null], lane: 1, skill: true }], []] }, 0);
+  const m = { mpbVote: [q, []], mpbSeen: [[], []] };
+  Mpb.queue(m, 0, 'shadowDen');
+  assert.deepStrictEqual(m.mpbVote[0].map(e => e.kind + (e.skill ? '*' : '')), ['shadowDen', 'treeKojja*'], 'Mpb.queue: an open entry before a skill\'s');
+});
+
+check('the server\'s own coins (vote, draft, settle, artifacts, Field dressing) come from D.secret, which no view holds', () => {
+  const secret = 3141592653, seed = 5;
+  const D = Duo.create({}, units);
+  Duo.start(D, units, matrix, T, seed, [false, false, false, false], secret);
+  assert.strictEqual(D.secret, secret);
+  for (let k = 0; k < 4; k++) { const v = JSON.stringify(Duo.viewFor(D, k)); assert.ok(!v.includes(String(secret)), 'seat ' + k + '\'s view has no D.secret'); }
+  assert.strictEqual(Duo.load(copy(Duo.save(D)), units, matrix).secret, secret, 'kept through save and load');
+  // the artifacts of round 2: from the secret (the same seed, other secrets: other tiles; no secret: the seed, as before)
+  const arts = (sec) => {
+    const x = { D: Duo.create({}, units) };
+    Duo.start(x.D, units, matrix, T, seed, [false, false, false, false], sec);
+    const seq = [0, 0, 0, 0];
+    for (let k = 0; k < 4; k++) Duo.act(x.D, k, { seq: ++seq[k] + 10, fn: 'choosePack', a: [0] }, T);
+    playTo({ D: x.D }, 2);
+    return JSON.stringify(x.D.lanes[0].m.artifacts && x.D.lanes[0].m.artifacts.list);
+  };
+  const none = arts(undefined), same = arts(seed), others = [1, 2, 3].map(arts);
+  assert.strictEqual(none, same, 'no secret: the seed\'s streams, as before');
+  assert.ok(others.some(a => a !== none), 'another secret: other artifacts (not worked out from m.seed)');
+});
+
+check('the page\'s clock label reads only its own team\'s queue (the other team\'s is only as it was queued)', () => {
+  const html = require('fs').readFileSync(require('path').join(__dirname, '../../src/site-template.html'), 'utf8');
+  assert.ok(!/Mpb\.voteHead\(m, 0\) \|\| Mpb\.voteHead\(m, 1\)/.test(html), 'no label from both teams\' queues');
+  assert.ok(html.includes("Mpb.voteQueue(m, me).some(e => !e.skill)"), 'placing: my team\'s open entries');
+});
+
+check('a Nest\'s squad goes with its Tree kojja when the kojja moves (the newer of the two decides)', () => {
+  const x = board(71), { D } = x, m = x.m(0);
+  for (const R of D.lanes) Mpb.queue(R.m, 0, 'treeKojja');
+  fresh(D); Duo.tick(D, T);
+  const t = { col: 12, row: 14 };
+  const ass = place(x, 2, 'Assassin', t.col, t.row);
+  assert.ok(x.act(0, 'mpbVote', t.col, t.row).ok && x.act(1, 'mpbVote', t.col, t.row).ok, 'the kojja voted onto the hidden Assassin');
+  const key = Mpb.recs(m, 0).find(r => r.kind === 'treeKojja').key;
+  assert.ok(x.act(0, 'mpbBuy', key, 'nest').ok, 'Nest');
+  const gi = ui('Mechite Guards');
+  if (!Game.isUnlocked(m, 0, gi)) assert.ok(x.act(0, 'unlock', gi).ok);
+  assert.ok(x.act(0, 'place', gi, t.col, t.row).ok, 'a ranged squad in the Nest');
+  const sq = m.armies[0].slice(-1)[0];
+  const { P } = fight(x);
+  const k = recIn(P[0], 0, key), q = sqIn(P, 0, 0, sq.id), a = sqIn(P, 0, 1, ass.id);
+  assert.ok(cheb(k, t) === 1, 'the kojja moved next to it: ' + JSON.stringify([k.col, k.row]));
+  assert.deepStrictEqual([q.col, q.row], [k.col, k.row], 'its Nest squad went with it');
+  assert.ok(!Game.nearBldg(P[0], 1, a.col, a.row), 'the Assassin, next to it now, moved away');
+  assert.ok(!D.settled.some(e => e.id.startsWith('s0:0:')), 'the Nest squad never moved on its own');
+});
+
+check('a School\'s pupil goes with the School when it moves, and is on it the next round', () => {
+  const x = board(72), { D } = x, m = x.m(0);
+  const own = place(x, 0, 'plain', 10, 15);
+  for (const R of D.lanes) Mpb.queue(R.m, 0, 'school');
+  fresh(D); Duo.tick(D, T);
+  const t = { col: 13, row: 14 };
+  const ass = place(x, 2, 'Assassin', t.col, t.row);
+  assert.ok(x.act(0, 'mpbVote', t.col, t.row).ok && x.act(1, 'mpbVote', t.col, t.row).ok, 'the School voted onto the hidden Assassin');
+  const key = Mpb.recs(m, 0).find(r => r.kind === 'school').key;
+  assert.ok(x.act(0, 'mpbAct', key, 'enroll', own.id).ok, 'enrolled');
+  const { P } = fight(x);
+  const s = recIn(P[0], 0, key), q = sqIn(P, 0, 0, own.id);
+  assert.ok(!(s.col === t.col && s.row === t.row), 'the School (newer) moved');
+  assert.deepStrictEqual([q.col, q.row], [s.col, s.row], 'its pupil with it');
+  if (D.phase === 'result') {
+    for (let k = 0; k < 4; k++) Duo.next(D, k, D.summary[0].round, T);
+    const m2 = x.m(0), s2 = Mpb.recOf(m2, 0, key), q2 = m2.armies[0].find(z => z.id === own.id);
+    assert.ok(q2.school && q2.col === s2.col && q2.row === s2.row, 'the next round: still in it, on its tile');
+    teams(D);
+    assert.ok(!Game.occupied(m2, 0, t.col, t.row) || Game.occupied(m2, 1, t.col, t.row), 'no phantom of the pupil on the old tile');
+  }
+});
+
+check('Bastion walls: the page and the server agree on every edge (the other team\'s wall of this round doesn\'t count); two on one edge at the fight: the newer moves', () => {
+  for (const aFirst of [true, false]) {
+    const x = board(76, 4), { D } = x; // (round 4: no draft open, whose tower card would take the walls with the old tower)
+    for (const R of D.lanes) { R.m.towers[0].type = 'bastion'; R.m.towers[1].type = 'bastion'; R.m.towerSkill = [1, 1]; R.m.towerSkill2 = [1, 1]; }
+    fresh(D);
+    const A = () => assert.ok(try1(x, 0, 'placeBwall', 12, 9, 'n').ok, 'A1\'s wall on (12,9) north');
+    const B = () => assert.ok(try1(x, 2, 'placeBwall', 12, 8, 's').ok, 'B1\'s wall on (12,8) south: the same edge, A\'s hidden');
+    if (aFirst) { A(); B(); } else { B(); A(); }
+    // every edge, both opponent seats: allowed on the page as on the server
+    for (const seat of [2, 3]) {
+      const sd = Duo.SEATS[seat].side, L = Duo.SEATS[seat].lane, pv = W(Duo.viewFor(D, seat).m);
+      teams(D);
+      for (let r = 0; r < Game.ROWS; r++) for (let c = 0; c < Game.COLS; c++) for (const e of ['n', 'e', 's', 'w'])
+        assert.strictEqual(Mpb.asSeen(sd, () => Game.bwallSpotOk(x.m(L), sd, c, r, e)), Game.bwallSpotOk(pv, sd, c, r, e), 'seat ' + seat + ' ' + [c, r, e]);
+    }
+    const round = x.m(0).round;
+    for (let k = 0; k < 4; k++) Duo.setReady(D, k, true, T);
+    const ws = [0, 1].map(sd => x.m(0).bwalls[sd].find(w => w.round === round));
+    assert.ok(ws[0] && ws[1], 'both walls stand after the fight: ' + JSON.stringify(x.m(0).bwalls));
+    const [older, newer] = aFirst ? ws : [ws[1], ws[0]];
+    assert.deepStrictEqual([older.col, older.row], aFirst ? [12, 9] : [12, 8], (aFirst ? 'A' : 'B') + '\'s (older) wall stays');
+    assert.ok(!(newer.col === 12 && (newer.row === 8 || newer.row === 9)), 'the newer moved off that edge: ' + JSON.stringify(newer));
+    assert.ok(D.settled.some(e => e.why === 'same' && e.id.startsWith('w')), 'a wall clash');
+  }
 });
 
 if (fails) { console.log(`\n${fails} failed`); process.exit(1); }
