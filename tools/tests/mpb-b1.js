@@ -154,7 +154,7 @@ check('kojja: Grow once a round for the team, the buyer places it alone, take-ba
   assert.ok(x.act(0, 'mpbUndo', k1, 'grow').ok && !Mpb.voteHead(m0, 0), 'the placement is gone');
   // the clock: nobody taps: the first allowed tile after 15 s
   assert.ok(x.act(0, 'mpbBuy', k1, 'grow').ok);
-  Duo.tick(D, x.T); assert.ok(Duo.mpbPending(D) && !D.deadline, 'the deploy clock waits');
+  Duo.tick(D, x.T); assert.ok(!Duo.mpbPending(D) && Mpb.voteHead(m0, 0) && Duo.clocks(D, 0, x.T).vote > 0, 'its own 15 s; the deploy clock doesn\'t wait (hidden from the opponents, review 2026-11-06)');
   Duo.tick(D, x.T + Mpb.VOTE_MS);
   const g3 = Mpb.recs(m1, 0).filter(r => r.kind === 'treeKojja' && !r.away);
   assert.strictEqual(g3.length, 2, 'placed by the clock');

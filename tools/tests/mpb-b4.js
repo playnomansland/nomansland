@@ -155,7 +155,7 @@ check('jail: who can be jailed, one cell each, two in all, take-back, hidden unt
   assert.strictEqual(x.m(1).gold[0], g1 + 100); assert.ok(!recOf(x, 0, key).data.cells.some(c => c.by === 1), 'A2\'s cell is free');
   assert.ok(x.act(1, 'mpbBuy', key, 'jail', 0, b1.id).ok);
   // the opponents don't see this round's jailing; the teammate does
-  for (const seat of [2, 3]) assert.deepStrictEqual(Mpb.recOf(Duo.viewFor(D, seat).m, 0, key).data.cells, [], 'B' + (seat - 1) + ' doesn\'t see it yet');
+  for (const seat of [2, 3]) assert.ok(!('cells' in Mpb.recOf(Duo.viewFor(D, seat).m, 0, key).data), 'B' + (seat - 1) + ' doesn\'t see it yet (no cells key at all, as before a first jailing)');
   assert.strictEqual(Mpb.recOf(Duo.viewFor(D, 1).m, 0, key).data.cells.length, 2, 'A2 sees both');
   // the squad can still be moved by its player this round (they don't know yet), but it sits this fight out
   const bt = battleNow(D);
@@ -410,8 +410,8 @@ check('school: the kind; enroll (own squads, either player), off the board, can\
   // the opponents don't see it go in this round: they see it on its tile, the school empty
   const v = Duo.viewFor(D, 2).m, seen = v.armies[0].find(s => s.id === a1.id);
   assert.ok(seen && !seen.school && seen.col === at1.col && seen.row === at1.row, 'B1 sees it on its old tile');
-  assert.strictEqual(Mpb.recOf(v, 0, key).data.pupil, null, 'and the school empty');
-  assert.ok(Mpb.recOf(Duo.viewFor(D, 3).m, 0, key).data.pupil === null);
+  assert.ok(!('pupil' in Mpb.recOf(v, 0, key).data), 'and the school empty (no pupil key, as before a first enrolment)');
+  assert.ok(Mpb.recOf(Duo.viewFor(D, 3).m, 0, key).data.pupil === undefined);
   assert.ok(Mpb.recOf(Duo.viewFor(D, 1).m, 0, key).data.pupil.id === a1.id, 'A2 sees it');
   // it doesn't fight (a real Duo fight)
   const bt = battleNow(D);

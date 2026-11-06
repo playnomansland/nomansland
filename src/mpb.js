@@ -139,7 +139,7 @@
       hide(s, h, rec) {
         const v = vaultOf(s, h);
         if (v && v.round === s.round) { v.gold = v.start || 0; v.mode = null; v.moved = [0, 0]; }
-        if (rec.data.golem && rec.data.golem.round === s.round) rec.data.golem = null;
+        if (!rec.data.golem || rec.data.golem.round === s.round) delete rec.data.golem; // (as when the round began: no key, not null)
       },
       info(m, side, rec) {
         const v = vaultOf(m, side), g = golemOf(m, side);
@@ -251,7 +251,9 @@
       bodies(m, side, rec, ctx) { const out = ctx.main(); for (const b of out) b.mpbKey = rec.key; return out; },
       // one body inside, the rest of the squad riding in it (Engine: b.inside, b.nest; boarded bodies)
       link(m, side, rec, list) {
-        const host = list.find(b => b.mpbKey === rec.key), mine = list.filter(b => b.nestOf === rec.key);
+        const host = list.find(b => b.mpbKey === rec.key), all = list.filter(b => b.nestOf === rec.key), first = all.length ? all[0].squad : null;
+        const mine = all.filter(b => b.squad === first); // one squad only (two on the tile never share it: they fight as they are)
+        for (const b of all) if (b.squad !== first) delete b.nestOf;
         if (!host || !mine.length) return;
         for (const b of mine) if (b.inside && b.inside.u.kind === 'watchtower') { const i = list.indexOf(b.inside); if (i >= 0) list.splice(i, 1); } // (an Overwatch squad: the kojja instead of a watchtower)
         const [lead, ...rest] = mine;
@@ -315,6 +317,12 @@
   const fhFront = (rec, side) => ({ col: rec.col, row: rec.row + (side === 0 ? -1 : 1) }); // where Second wind brings a squad back (toward the enemy)
   const fhTeam = (side) => side === 0 ? 'Team A' : 'Team B';
   const fhTarget = (args) => (args[0] === 0 || args[0] === 1) && Number.isInteger(args[1]) && args[1] >= 0;
+  // the team's squad (lane, id) as this lane sees it (the teammate's in m.team), or null
+  const fhSquad = (m, side, lane, id) => lane === laneOf(m) ? (m.armies[side] || []).find(q => q.id === id) || null : ((m.team && m.team.armies && m.team.armies[side]) || []).find(q => q.id === id + LANE_OFF) || null;
+  // Second wind's target: its unit type is kept with it (u; -1: no such squad), so a squad id used again after an Undo
+  // all is no target (a squad gone by the fight just doesn't come back)
+  const fhWindOf = (m, side, lane, id) => { const q = fhSquad(m, side, lane, id); return { round: m.round, lane, id, u: q ? q.unit : -1 }; };
+  const fhPick = (m, side, args) => fhTarget(args) && (!!m.mpbReplay || !!fhSquad(m, side, args[0], args[1])); // (Undo all replays the teammate's buy as it was)
   def({ id: 'fieldHospital', name: 'Field hospital', short: 'fh', kind: 'support', hp: 600, armor: 2, color: '#E8E2D0',
     text: `Squads deployed within 1 tile: +${FH.hp}% health and ${FH.regen}% health a second in the fight. Each round your team wins with it standing: +${FH.win} Team HP. Can’t shoot.`,
     downside: `Destroyed: −${FH.lose} Team HP.`,
@@ -323,19 +331,19 @@
       { id: 'wind', name: 'Second wind', cost: 100, per: 'round', pick: true, text: 'Pick an allied squad: the first time it is wiped out in this round’s fight, it comes back whole on the tile in front of the hospital.' },
     ],
     hooks: {
-      canBuy: (m, side, rec, sk, args) => sk.id !== 'wind' || fhTarget(args), // the squad: (lane, id); a squad that is gone by the fight just doesn't come back
-      bought(m, side, rec, sk, args) { if (sk.id === 'wind') rec.data.wind = { round: m.round, lane: args[0], id: args[1] }; },
+      canBuy: (m, side, rec, sk, args) => sk.id !== 'wind' || fhPick(m, side, args), // the squad: (lane, id), one of the team's
+      bought(m, side, rec, sk, args) { if (sk.id === 'wind') rec.data.wind = fhWindOf(m, side, args[0], args[1]); },
       unbuy(m, side, rec, sk) { if (sk.id === 'wind') rec.data.wind = null; },
       // pick another squad for this round's Second wind (either of you)
-      canAct: (m, side, rec, action, args) => action === 'wind' && !!fhWind(m, rec) && fhTarget(args),
-      act(m, side, rec, action, args) { rec.data.wind = { round: m.round, lane: args[0], id: args[1] }; return true; },
+      canAct: (m, side, rec, action, args) => action === 'wind' && !!fhWind(m, rec) && fhPick(m, side, args),
+      act(m, side, rec, action, args) { rec.data.wind = fhWindOf(m, side, args[0], args[1]); return true; },
       squadMods(m, side, rec, sq, u) {
         if (!fhNear(rec, sq) || G.isRider(sq)) return u;
         return { ...u, hp: u.hp * (1 + FH.hp / 100), regen: (u.regen || 0) + FH.regen };
       },
       squadBodies(m, side, rec, sq, list) {
         const w = fhWind(m, rec);
-        if (!w || w.lane !== laneOf(m) || w.id !== sq.id) return;
+        if (!w || w.lane !== laneOf(m) || w.id !== sq.id || (w.u != null && w.u !== sq.unit)) return;
         const at = G.tileToWorld(fhFront(rec, side).col, fhFront(rec, side).row);
         for (const b of list) b.fhRevive = { x: at.x, y: at.y };
       },
@@ -357,14 +365,14 @@
           if (hp[side] > was) news(sums, side, { kind: 'fieldHospital', healed: hp[side] - was, text: `${fhTeam(side)}’s Field hospital: +${hp[side] - was} Team HP for the round won.` });
         }
       },
-      hide(s, h, rec) { if (rec.data.wind && rec.data.wind.round === s.round) rec.data.wind = null; },
+      hide(s, h, rec) { if (!rec.data.wind || rec.data.wind.round === s.round) delete rec.data.wind; }, // (no key, not null: nothing to tell apart)
       info(m, side, rec) {
         const w = fhWind(m, rec), d = fhClicks(m, rec, 'dress');
         return [d ? `Field dressing this round: ${d}×` : '', w ? `Second wind this round: squad ${w.id} of ${w.lane === laneOf(m) ? 'yours' : 'your teammate’s'}` : ''];
       },
       // a bot (Duo.botTurn): Field dressing now and then, Second wind on its dearest squad when it is rich
-      botAfter(m, side, rec) {
-        const r = rng(((m.seed >>> 0) + m.round * 131 + laneOf(m) * 17 + 5) >>> 0);
+      botAfter(m, side, rec, r0) {
+        const r = r0 || rng(((m.seed >>> 0) + m.round * 131 + laneOf(m) * 17 + 5) >>> 0); // (r0: Duo.botTurn's stream, seeded from D.seed: in no view)
         if (m.gold[side] >= 250 && r() < 0.4) mpbBuy(m, side, rec.key, 'dress');
         const best = m.armies[side].filter(q => !G.isRider(q)).sort((a, b) => (b.cost || 0) - (a.cost || 0) || a.id - b.id)[0];
         if (best && m.gold[side] >= 300 && r() < 0.3) mpbBuy(m, side, rec.key, 'wind', laneOf(m), best.id);
@@ -410,9 +418,12 @@
     const x = exitOf(rec);
     if (!x || (x.col === col && x.row === row)) return false;
     grid(m);
-    if (!(nmlOk(col, row) || G.isFlank(side, col, row))) return false;
+    if (!(nmlOk(col, row) || G.isFlank(side, col, row)) || nearArtifact(m, col, row)) return false;
     return exitFree(m, side, rec, col, row);
   }
+  // this round's artifacts (rounds 2 and 8) on or next to (col, row): no exit there (it would keep the tiles round an
+  // artifact free for one team only)
+  const nearArtifact = (m, col, row) => !!(m.artifacts && m.artifacts.round === m.round && (m.artifacts.list || []).some(a => cheb(a.col, a.row, col, row) <= 1));
   // may Dig a new exit (or Undo all) put the exit back on its old tile? Only while that tile is still free (no water, no
   // other exit or building, no squad of the team's) – else the take-back is refused
   const exitBackOk = (m, side, rec, t) => !t || exitFree(m, side, rec, t.col, t.row);
@@ -434,6 +445,14 @@
     ],
     COAL, mineOut, exitMoveOk, exitBackOk, exitSpots, canMoveExit,
     hooks: {
+      spotOk: (m, side, part, col, row) => part !== 'exit' || !nearArtifact(m, col, row),
+      // the fight's start: the exit stands on a squad of the other team nobody on the team could see (Mpb.unclash): the
+      // tiles it may go to instead (a moved exit: no man's land or a flank tile of the enemy's half, as Dig a new exit)
+      clashOk(m, side, rec, part, col, row) {
+        if (part !== 'exit') return spotOk(m, side, rec.kind, part, col, row, true);
+        const dug = rec.data.moved === m.round;
+        return (nmlOk(col, row) || (dug && G.isFlank(side, col, row))) && !nearArtifact(m, col, row) && !G.terrainBlocks(m, col, row) && !taken(m, side, col, row);
+      },
       // the 8 tiles round the exit: no squad of either team (Game.occupied through Mpb.at)
       blocks(m, side, rec, col, row) { const x = exitOf(rec); return !!x && cheb(col, row, x.col, x.row) === 1; },
       // a squad round the entrance: its bodies go down (Engine mineTo; the Engine leaves out a squad whose exit tile an enemy holds)
@@ -554,6 +573,8 @@
   const oakClicks = (m, rec, id) => { const e = rec.skills[id]; return e && e.round === m.round ? e.log.length : 0; };
   const oakRestore = (m, rec) => 1 + (oakClicks(m, rec, 'boost') > 0 ? OAK.boosted : OAK.restore) / 100;
   const oakEntDue = (m, rec) => rec.fell > 0 && m.round === rec.fell + 1;
+  // the team's health with this round's Heal clicks is at its starting health already: another Heal would do nothing
+  const oakFull = (m, side, rec) => { const hp = m.hp && m.hp[side]; return Number.isFinite(hp) && hp + OAK.heal * oakClicks(m, rec, 'heal') >= TEAM_HP_CAP; };
   // the moss: the tiles within OAK.moss of the Oak (on the board, its own tile too), once Sticky moss is bought
   function oakMossTiles(m, rec) {
     if (skillN(rec, 'moss') <= 0) return [];
@@ -580,6 +601,8 @@
       { id: 'moss', name: 'Sticky moss', cost: 200, per: 'match', text: `For good: moss on every tile within ${OAK.moss} tiles of the Oak. Enemies on it move ${OAK.slow}% slower (Berserkers can’t be slowed).` },
     ],
     hooks: {
+      // Heal only while it can still add something (it is never above the starting health); Undo all replays a buy as it was
+      canBuy: (m, side, rec, sk) => sk.id !== 'heal' || !!m.mpbReplay || !oakFull(m, side, rec),
       bodies(m, side, rec, ctx) {
         const out = ctx.main();
         for (const b of out) b.oakRestore = oakRestore(m, rec);
@@ -616,12 +639,12 @@
       },
       info(m, side, rec) {
         const k = Math.round((oakRestore(m, rec) - 1) * 100), h = oakClicks(m, rec, 'heal');
-        return [`Restoration +${k}%${k !== OAK.restore ? ' this round' : ''}`, h ? `+${h * OAK.heal} Team HP before this round’s fight` : '',
+        return [`Restoration +${k}%${k !== OAK.restore ? ' this round' : ''}`, h ? `+${h * OAK.heal} Team HP before this round’s fight` : '', oakFull(m, side, rec) ? 'Team HP is full: Heal would do nothing' : '',
           skillN(rec, 'moss') > 0 ? `Sticky moss within ${OAK.moss} tiles` : '', oakEntDue(m, rec) ? 'Destroyed last round: an Ent fights for the opponents this round' : ''];
       },
       // a bot (Duo.botTurn): Heal when the team is hurt, the moss once it is rich, Double restoration now and then
-      botAfter(m, side, rec) {
-        const r = rng(((m.seed >>> 0) + m.round * 137 + laneOf(m) * 19 + 7) >>> 0), hp = (m.hp && m.hp[side]) || 0;
+      botAfter(m, side, rec, r0) {
+        const r = r0 || rng(((m.seed >>> 0) + m.round * 137 + laneOf(m) * 19 + 7) >>> 0), hp = (m.hp && m.hp[side]) || 0;
         if (hp > 0 && hp <= TEAM_HP_CAP - 40 && m.gold[side] >= 150 && r() < 0.6) mpbBuy(m, side, rec.key, 'heal');
         if (m.gold[side] >= 300 && r() < 0.5) mpbBuy(m, side, rec.key, 'moss');
         if (m.gold[side] >= 300 && r() < 0.25) mpbBuy(m, side, rec.key, 'boost');
@@ -661,9 +684,9 @@
         }
         return out;
       },
-      info(m, side, rec) {
+      info(m, side, rec, viewer = side) {
         const now = facNow(m, rec);
-        return [facResting(m, rec) ? 'Being rebuilt this round: it makes nothing.' : now ? `This round: ${(skillOf('factory', now.id) || {}).name}` : 'Nothing bought this round', 'One unit a round for your team.'];
+        return [facResting(m, rec) ? 'Being rebuilt this round: it makes nothing.' : now ? `This round: ${(skillOf('factory', now.id) || {}).name}` : 'Nothing bought this round', viewer === side ? 'One unit a round for your team.' : 'One unit a round for their team.'];
       },
       // a bot buys one of its units most rounds when it has gold to spare
       bot(m, side, rec, r) {
@@ -790,7 +813,7 @@
         if (rec.col >= 0 && !(rec.round === m.round && lanes.some(L => G.squadAt(L, 1 - side, rec.col, rec.row) || G.buildingAt(L, 1 - side, rec.col, rec.row)))) return;
         const was = m.duoLane;
         m.duoLane = rec.data.lane;
-        const t = lakeSpots(m, side, rec, true)[0];
+        const all = lakeSpots(m, side, rec, true), t = rec.col >= 0 ? nearestOf(all, rec.col, rec.row) : all[0]; // (on a squad: the nearest tile to the one chosen)
         m.duoLane = was;
         if (t) { rec.col = t.col; rec.row = t.row; rec.round = m.round; }
       },
@@ -861,6 +884,7 @@
   const JAIL = { hp: 1500, armor: 8, cells: 2, cost: 100, guardsCost: 150, guards: 4, light: 3, guardPost: 0.75 };
   const JAIL_GUARD = { name: 'Wisps', cost: 1, bodies: 2, hp: 65, hit: 75, aps: 0.7, range: 19, speed: 4, splash: 0, projSpeed: 20 }; // as Game's Keep guards when the roster has no Wisps
   const TEAM_LETTER = ['A', 'B'];
+  const aName = (n) => (/^[AEIOU]/i.test(n) ? 'an ' : 'a ') + n; // 'an Ent', 'a Brute'
   const jailCells = (rec) => (rec && rec.data && rec.data.cells) || [];
   const jailUp = (m, rec) => !(rec.data && rec.data.down && rec.data.down === m.round);
   // squad id of lane `lane` (lanes: the two matches)
@@ -1020,19 +1044,19 @@
         rec.data.cells = cells.filter(c => {
           const q = laneSquad(lanes, c.lane, foe, c.id);
           if (!q || (q.school && !q.jailed)) { if (c.round === round && lanes[c.by]) lanes[c.by].gold[side] += JAIL.cost; return false; }
-          if (!q.jailed) { jailLock(lanes, c.lane, foe, q, side, rec, round); news(sums, side, { kind: 'jail', jailed: q.unit, text: `Team ${TEAM_LETTER[side]}’s Jail locked up a ${(lanes[c.lane].units[q.unit] || {}).name || 'squad'}.` }); }
+          if (!q.jailed) { jailLock(lanes, c.lane, foe, q, side, rec, round); news(sums, side, { kind: 'jail', jailed: q.unit, text: `Team ${TEAM_LETTER[side]}’s Jail locked up ${aName((lanes[c.lane].units[q.unit] || {}).name || 'squad')}.` }); }
           return true;
         });
       },
       // the opponents don't see this round's jailing until the fight
-      hide(s, h, rec) { if (rec.data.cells) rec.data.cells = rec.data.cells.filter(c => c.round !== s.round); },
+      hide(s, h, rec) { if (rec.data.cells) rec.data.cells = rec.data.cells.filter(c => c.round !== s.round); if (!jailCells(rec).length) delete rec.data.cells; }, // (no key when empty: a first jailing leaves no trace)
       info(m, side, rec) {
         const cells = jailCells(rec);
         return [`Skywatch${jailUp(m, rec) ? '' : ' off this round'}`, `${cells.length}/${JAIL.cells} cells taken`, (rec.data.banned || []).length ? `can’t jail again: ${rec.data.banned.map(i => (m.units[i] || {}).name).join(', ')}` : ''].filter(Boolean);
       },
       // a bot: now and then the costliest enemy squad it can see; the guards when it has gold to spare
-      bot(m, side, rec) {
-        const r = rng(((m.seed || 0) + m.round * 7121 + side * 89 + laneOf(m) * 13) >>> 0);
+      bot(m, side, rec, r0) {
+        const r = r0 || rng(((m.seed || 0) + m.round * 7121 + side * 89 + laneOf(m) * 13) >>> 0); // (r0: Duo.botTurn's stream, in no view)
         const list = jailable(m, side, rec);
         if (list.length && m.gold[side] >= JAIL.cost + 100 && r() < 0.5) {
           const worth = (q) => G.unitCostOf(m.units[q.unit]) * (1 + (q.level || 0));
@@ -1227,6 +1251,7 @@
           if (q) { q.school = w.school; q.col = rec.col; q.row = rec.row; }
         }
         rec.data.was = [];
+        if (!rec.data.pupil) delete rec.data.pupil; // (no key when empty, not null: a first enrolment leaves no trace)
       },
       info(m, side, rec) {
         const p = pupilOf(rec), sq = pupilSq(m, side, rec);
@@ -1234,8 +1259,8 @@
         return [`${(m.units[sq.unit] || {}).name} inside since round ${p.round}`, p.learn ? `learning ${((G.skillDef(m, sq.unit, p.learn.k) || {}).name) || 'a skill'}` : ''].filter(Boolean);
       },
       // a bot: sometimes puts its most experienced squad in, learns a skill, takes it out after a few rounds
-      bot(m, side, rec) {
-        const r = rng(((m.seed || 0) + m.round * 6029 + side * 97 + laneOf(m) * 17) >>> 0), L = laneOf(m), p = pupilOf(rec);
+      bot(m, side, rec, r0) {
+        const r = r0 || rng(((m.seed || 0) + m.round * 6029 + side * 97 + laneOf(m) * 17) >>> 0), L = laneOf(m), p = pupilOf(rec);
         if (!p && r() < 0.35) {
           const ok = m.armies[side].filter(q => q.round < m.round && !schoolWhy(m, side, rec, 'enroll', [q.id])).sort((a, b) => b.xp - a.xp || a.id - b.id);
           if (ok.length) mpbAct(m, side, rec.key, 'enroll', ok[0].id);
@@ -1297,10 +1322,12 @@
   // Duo.teamOf: the server's other lane has it there, the page's hidden view in its armies), unless they are watched live
   const teamSold = (m, side) => (watching(m, 1 - side) ? [] : ((m.team && m.team.sold && m.team.sold[side]) || []).filter(q => q.soldRound === m.round && q.round < m.round && !G.hiddenFromFoe(m, q)));
   const impTier = (m, ui) => !!(m.units[ui] && !m.units[ui].building && G.tierOf(m.units, ui) <= DEN.impTier);
+  // (a squad the buyer can see is held, in a Jail or its School since an earlier round, has no body in the fight: no
+  // target; heldSeen, as the Jail's, so page and server agree and nothing hidden shows)
   function impTargets(m, side) {
-    const ok = (q) => !G.isRider(q) && impTier(m, q.unit);
-    return G.foeSeen(m, 1 - side).filter(ok).map(q => ({ who: 0, id: q.id, sq: q }))
-      .concat(G.teamSeen(m, 1 - side).concat(teamSold(m, 1 - side)).filter(ok).map(q => ({ who: 1, id: q.id >= LANE_OFF ? q.id - LANE_OFF : q.id, sq: q })));
+    const L = laneOf(m), ok = (lane) => (q) => !G.isRider(q) && impTier(m, q.unit) && !heldSeen(m, 1 - side, lane, { ...q, id: q.id >= LANE_OFF ? q.id - LANE_OFF : q.id });
+    return G.foeSeen(m, 1 - side).filter(ok(L)).map(q => ({ who: 0, id: q.id, sq: q }))
+      .concat(G.teamSeen(m, 1 - side).concat(teamSold(m, 1 - side)).filter(ok(1 - L)).map(q => ({ who: 1, id: q.id >= LANE_OFF ? q.id - LANE_OFF : q.id, sq: q })));
   }
   // the target's squad wherever it stands (also sold or riding): its unit type is kept with the buy, so a squad id
   // used again after their Undo all (a live target while watching) is no target
@@ -1372,18 +1399,35 @@
       },
       afterFight(lanes, side, rec, res, sums, round) {
         const m = lanes[0], fell = rec.fell === round, k = recs(m, side).indexOf(rec); // (m.round is the next round already)
-        const made = (rec.data.imp || []).filter(x => x.round === round).filter((x, j) => res.squads && res.squads[side + ':' + extraOf(k, j)]).length;
+        const now = (rec.data.imp || []).filter(x => x.round === round), sq = res.squads || {};
+        const made = now.filter((x, j) => sq[side + ':' + extraOf(k, j)]).length;
         if (made) news(sums, side, { kind: 'shadowDen', imp: made, text: `${side === 0 ? 'Team A' : 'Team B'}’s Shadow Den: ${made} enemy bod${made > 1 ? 'ies' : 'y'} turned into Shadowhands.` });
+        // a target that still stands but had no body in the fight (it sat it out in its School, or a Jail locked it up
+        // this round): nothing could be taken, the buyer gets the gold back (as the Jail's own rule). A target sold or
+        // taken back is no refund (PATCH-NOTES).
+        let back = 0;
+        now.forEach((x, j) => {
+          const q = lanes[x.tl] && lanes[x.tl].armies[1 - side].find(s => s.id === x.id);
+          if (sq[side + ':' + extraOf(k, j)] || !q || q.unit !== x.u || sq[(1 - side) + ':' + (x.tl === 0 ? x.id : x.id + LANE_OFF)]) return;
+          if (lanes[x.lane]) { lanes[x.lane].gold[side] += DEN.impersonate; back++; }
+        });
+        if (back) news(sums, side, { kind: 'shadowDen', back, text: `${side === 0 ? 'Team A' : 'Team B'}’s Shadow Den: ${back > 1 ? 'two Impersonate targets' : 'an Impersonate target'} sat the fight out (School or Jail): ${DEN.impersonate} gold back.` });
         const ins = rec.data.insider;
         if (ins && ins.round === round) {
           rec.data.watch = { round: round + 1, by: fell ? 1 - side : side, free: fell };
           delete rec.data.insider;
           if (fell) news(sums, side, { kind: 'shadowDen', flip: true, text: `${side === 0 ? 'Team A' : 'Team B'}’s Shadow Den fell while its Insider information was on: the other team gets it for free next round.` });
         }
-        if (!fell) return;
+        if (fell) news(sums, side, { kind: 'shadowDen', lost: rec.data.lost || 0, text: `${side === 0 ? 'Team A' : 'Team B'}’s Shadow Den was destroyed: ${rec.data.lost ? `${rec.data.lost} Shadowhands squad${rec.data.lost > 1 ? 's' : ''} lost, ` : ''}no Den skills next round.` });
+        delete rec.data.lost;
+      },
+      // destroyed: the team's Shadowhands squads go before any building's afterFight runs (Mpb.afterFight's clear
+      // pass), so the other team's Jail sees them gone whichever side's buildings run first (a cell on one: the gold back)
+      clear(lanes, side, rec, res, sums, round) {
+        if (rec.fell !== round) return;
         let lost = 0;
         for (const L of lanes) { const before = L.armies[side].length; L.armies[side] = L.armies[side].filter(q => !isHands(L, q.unit)); lost += before - L.armies[side].length; }
-        news(sums, side, { kind: 'shadowDen', lost, text: `${side === 0 ? 'Team A' : 'Team B'}’s Shadow Den was destroyed: ${lost ? `${lost} Shadowhands squad${lost > 1 ? 's' : ''} lost, ` : ''}no Den skills next round.` });
+        rec.data.lost = lost;
       },
       // old buys are done with: a lock only lasts the round after it was bought, a watch only its own round
       roundStart(lanes, side, rec) {
@@ -1399,6 +1443,7 @@
         if (d.imp) d.imp = d.imp.filter(x => x.round !== s.round);
         if (d.sab) d.sab = sabList(rec).filter(x => x.round !== s.round); // (the one in force since the round began shows)
         if (d.insider && d.insider.round === s.round) delete d.insider;
+        for (const f of ['imp', 'sab']) if (Array.isArray(d[f]) && !d[f].length) delete d[f]; // (no key when empty: a first buy leaves no trace)
       },
       // viewer: the side reading the sheet (the owners by default)
       info(m, side, rec, viewer = side) {
@@ -1506,26 +1551,69 @@
   // they may be seen (a refusal never shows where a hidden one stands; the Coal mine's exit, the Magic lake)
   const seenTaken = (m, side, col, row) => G.occupied(m, side, col, row) || G.bldgSeen(m, side, col, row) || G.enemyHolds(m, side, col, row) || !!recAt(m, col, row);
   const placeOf = (kindId, part) => { const K = kindOf(kindId); if (!K) return null; return part ? (K.place.parts || []).find(p => p.id === part) || null : K.place; };
-  // may team `side` put building kind (or its part) on this tile?
-  function spotOk(m, side, kindId, part, col, row) {
+  // may team `side` put building kind (or its part) on this tile? As the team sees the board (seenTaken: the
+  // opponents' squads put down this round don't count, so page and server agree and a refusal shows nothing hidden;
+  // one found there as the fight starts makes the building move to the nearest tile it may stand on: settle, unclash).
+  // strict: with everything known (the fight's start)
+  function spotOk(m, side, kindId, part, col, row, strict) {
     if (!on(m)) return false;
     grid(m);
     const K = kindOf(kindId), pl = placeOf(kindId, part);
     if (!K || !pl || !Number.isInteger(col) || !Number.isInteger(row) || !inBoard(col, row)) return false;
     if (!(WHERE[pl.where] || WHERE.interior)(side, col, row)) return false;
-    if (G.terrainBlocks(m, col, row) || taken(m, side, col, row)) return false;
+    if (G.terrainBlocks(m, col, row) || (strict ? taken : seenTaken)(m, side, col, row)) return false;
     if (pl.spacing !== false && !spaced(m, col, row)) return false;
     if (K.hooks.spotOk && !K.hooks.spotOk(m, side, part || null, col, row)) return false;
     return true;
   }
   // every allowed tile, best first: the back of the zone, then the middle (for no man's land: the own side, the middle)
-  function spots(m, side, kindId, part) {
+  function spots(m, side, kindId, part, strict) {
     const { COLS, ROWS } = grid(m), out = [];
-    for (let row = 0; row < ROWS; row++) for (let col = 0; col < COLS; col++) if (spotOk(m, side, kindId, part, col, row)) out.push({ col, row });
+    for (let row = 0; row < ROWS; row++) for (let col = 0; col < COLS; col++) if (spotOk(m, side, kindId, part, col, row, strict)) out.push({ col, row });
     const back = (r) => side === 0 ? ROWS - 1 - r : r, mid = (COLS - 1) / 2;
     return out.sort((a, b) => back(a.row) - back(b.row) || Math.abs(a.col - mid) - Math.abs(b.col - mid) || a.col - b.col);
   }
   const autoSpot = (m, side, kindId, part) => spots(m, side, kindId, part)[0] || null;
+  // the tile of list nearest (col, row): Chebyshev rings, then the straight line, then the list's own order
+  function nearestOf(list, col, row) {
+    let best = null, bd = 0, be = 0;
+    for (const t of list) {
+      const d = Math.max(Math.abs(t.col - col), Math.abs(t.row - row)), e = Math.hypot(t.col - col, t.row - row);
+      if (!best || d < bd || (d === bd && e < be - 1e-9)) { best = t; bd = d; be = e; }
+    }
+    return best ? { col: best.col, row: best.row } : null;
+  }
+  // a squad of the other team (either lane) stands on (col, row), or their Cog Builder's Factory (not one held: a
+  // jailed squad stands on the jail's tile)
+  const foeOn = (lanes, side, col, row) => lanes.some(L => (L.armies[1 - side] || []).some(q => !G.isRider(q) && !G.mpbHeld(q) && G.blockOf(L, q.unit, q.col, q.row).some(([c, r]) => c === col && r === row)) || !!G.buildingAt(L, 1 - side, col, row));
+  // "If things are placed on the same tile, they find another spot close to it" (Vilhelm, 6 Nov). As the fight starts
+  // (Mpb.settle, everything known): a building tile (or part) that stands on a squad of the other team the team
+  // couldn't see when it voted (placed later than it: the building's tile was seen, the squad's wasn't) moves to the
+  // nearest tile its kind may stand on (spotOk, strict; a kind's hooks.clashOk instead: the Coal mine's moved exit).
+  // Terrain has its own (the Magic lake's settle). Nothing found: it stays.
+  function unclash(lanes) {
+    const m = lanes[0];
+    grid(m);
+    for (const side of [0, 1]) for (const rec of recs(m, side)) {
+      const K = kindOf(rec.kind);
+      if (!K || rec.away || K.place.terrain || K.place.where === 'fixed') continue;
+      for (const t of tilesOf(rec)) {
+        if (!foeOn(lanes, side, t.col, t.row)) continue;
+        const part = t.part || null, ok = [];
+        const was = part ? rec.parts[part] : null;
+        if (part) delete rec.parts[part]; else rec.away = true; // (its own tile doesn't count while it looks)
+        try {
+          const { COLS, ROWS } = grid(m);
+          for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+            if (foeOn(lanes, side, c, r)) continue;
+            if (K.hooks.clashOk ? K.hooks.clashOk(m, side, rec, part, c, r) : spotOk(m, side, rec.kind, part, c, r, true)) ok.push({ col: c, row: r });
+          }
+        } finally { if (part) rec.parts[part] = was; else delete rec.away; }
+        const to = nearestOf(ok, t.col, t.row);
+        if (to) { if (part) rec.parts[part] = to; else { rec.col = to.col; rec.row = to.row; } }
+      }
+    }
+  }
 
   // =====================================================================
   // The placement vote (team state m.mpbVote; its 15 s clock is in D)
@@ -1607,7 +1695,7 @@
     if (!canBuy(m, side, key, id, ...args)) return false;
     const rec = recOf(m, side, key), sk = skillOf(rec.kind, id), L = laneOf(m), cost = skillCost(m, side, key, id);
     const e = rec.skills[id] || (rec.skills[id] = { round: m.round, n: 0, by: [0, 0], log: [] });
-    if (e.round !== m.round) { e.round = m.round; e.log = []; }
+    if (e.round !== m.round) { if (e.n > 0) e.prev = e.round; e.round = m.round; e.log = []; } // (prev: the round of the buy before this round's, for hide and a take-back)
     m.gold[side] -= cost;
     e.n++; e.by[L]++; e.log.push({ lane: L, cost });
     const K = kindOf(rec.kind);
@@ -1646,6 +1734,7 @@
     const K = kindOf(rec.kind);
     if (K.hooks.unbuy) K.hooks.unbuy(m, side, rec, sk, L, x);
     if (!e.n) delete rec.skills[id];
+    else if (!e.log.length && e.prev != null) { e.round = e.prev; delete e.prev; } // (as it stood before this round's clicks)
     return true;
   }
   // a kind's own action (tap a squad, move the exit...): hooks.canAct / hooks.act
@@ -1664,11 +1753,13 @@
     const drop = new Set();
     for (const rec of recs(s, h)) {
       for (const id of Object.keys(rec.skills)) {
-        const e = rec.skills[id];
+        const e = rec.skills[id], prev = e.prev;
+        delete e.prev; // (the team's own note: never in the opponents' view)
         if (e.round !== s.round || !e.log.length) continue;
         for (const x of e.log) { e.n--; e.by[x.lane]--; }
         e.log = [];
         if (e.n <= 0) delete rec.skills[id];
+        else if (prev != null) e.round = prev; // a skill bought again this round: as it stood when the round began
       }
       const K = kindOf(rec.kind);
       if (K && K.hooks.hide && K.hooks.hide(s, h, rec) === false) drop.add(rec); // (false: not seen at all)
@@ -1778,6 +1869,9 @@
       const q = res.squads[side + ':' + squadOf(k)];
       if (q && q.total > 0 && q.alive === 0) rec.fell = round;
     });
+    // squads a building's fall takes off the board (hooks.clear: the Shadow Den's Shadowhands) go first, both sides,
+    // so no kind's afterFight depends on which side's buildings run first
+    for (const side of [0, 1]) for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.clear) K.hooks.clear(lanes, side, rec, res, sums, round); }
     for (const side of [0, 1]) for (const rec of recs(m, side)) { const K = kindOf(rec.kind); if (K && K.hooks.afterFight) K.hooks.afterFight(lanes, side, rec, res, sums, round, hp || [0, 0]); }
     // artifacts: res.artifacts (Engine, group A) [{ won: -1 | 0 | 1 }]; without it nobody won
     const A = m.artifacts;
@@ -1800,6 +1894,7 @@
   function settle(lanes) {
     const m = lanes[0];
     if (!on(m)) return;
+    unclash(lanes); // a building on a squad its team couldn't see: the nearest tile it may stand on
     for (const side of [0, 1]) for (const rec of recs(m, side).slice()) { const K = kindOf(rec.kind); if (K && K.hooks.settle) K.hooks.settle(lanes, side, rec); }
   }
   // after Undo all (Duo.rebuildTeam): the team's part was replayed, a lane's squads put back; a kind whose record and
@@ -1846,6 +1941,7 @@
     for (let row = 0; row < ROWS / 2; row++) for (let col = 0; col < COLS; col++) {
       const p = mirror(col, row);
       if (!nmlOk(col, row) || !nmlOk(p.col, p.row) || G.terrainBlocks(m, col, row) || G.terrainBlocks(m, p.col, p.row)) continue;
+      if (at(m, col, row) || at(m, p.col, p.row)) continue; // (nor on a building's tile, nor one a Coal mine's exit keeps free: a fair pair)
       if (Math.hypot(p.col - col, p.row - row) < ARTIFACT.apart) continue;
       ok.push({ col, row });
     }
@@ -1939,7 +2035,7 @@
     SQ, XSQ, VOTE_MS, DRAFT_MS, SPACING, ARTIFACT, DRAFT_ROUNDS, VAULT_SPOT, PER, VAULT, GOLEM, KINDS, SYS,
     KOJJA, SCORCH, kojjaUnit, scorchUnit,
     def, kindOf, recs, recOf, has, skillOf, skillN, addRec, tilesOf, recAt, at, terrainAt, settle, init,
-    interior, spaced, spotOk, spots, autoSpot,
+    interior, spaced, spotOk, spots, autoSpot, nearestOf, unclash,
     voteQueue, voteHead, voteEntry, queue, placeHead, placeEntry, mpbVote, voteResult,
     skillCost, whyNot, canBuy, mpbBuy, canUndo, undoAllOk, mpbUndo, mpbAct, seenTaken,
     vaultOf, vaultRec, vaultMode, vaultMoved, vaultRoom, canVault, vaultPut, vaultTake, golemOf, golemUnit, golemSkin,

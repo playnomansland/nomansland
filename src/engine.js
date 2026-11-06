@@ -911,16 +911,7 @@ const Engine = (() => {
         for (const f of sides[1 - v.side]) if (f.alive && f !== v.rammed && hyp(f.x - v.x, f.y - v.y) <= v.u.blastR) hurt(v, f, dmg, v.x, v.y);
       }
       // a carrier is gone: whoever rode inside jumps out where it fell (a Tree kojja's one body too: b.nest)
-      if (v.u.carrier || v.nest) {
-        let k = 0;
-        for (const r of sides[v.side]) {
-          if (r.carrier !== v || !r.boarded) continue;
-          const [ox, oy] = SPAWN_SPOTS[k++ % SPAWN_SPOTS.length], fwd = v.side === 0 ? 1 : -1;
-          r.boarded = false; r.alive = true; r.carrier = null;
-          r.x = v.x + ox * g.spacing * 0.5; r.y = v.y + oy * fwd * g.spacing * 0.5;
-          invalidateTargetIndex();
-        }
-      }
+      if (v.u.carrier || v.nest) dropRiders(v);
       // Spawn on death: new bodies take its place (they join at the end of this tick).
       // A spawn of the unit itself copies the dead body's stats (level, skills, buffs). Spawns never carry deathSpawn.
       const ds = v.u.deathSpawn;
@@ -1431,6 +1422,18 @@ const Engine = (() => {
     // sitting in the kojja, the squad's other bodies ride in that body: boarded, carrier = it): the body leaves the
     // kojja (it saw no enemy for WATCH_IDLE s, or the kojja fell): it loses the kojja's extra range and sight, and the
     // rest of its squad steps out round it
+    // a carrier (or a Tree kojja's one body: b.nest) is gone: whoever rode inside jumps out where it stood (a death, or
+    // the Shadow Den's Impersonate taking it)
+    function dropRiders(v) {
+      let k = 0;
+      for (const r of sides[v.side]) {
+        if (r.carrier !== v || !r.boarded) continue;
+        const [ox, oy] = SPAWN_SPOTS[k++ % SPAWN_SPOTS.length], fwd = v.side === 0 ? 1 : -1;
+        r.boarded = false; r.alive = true; r.carrier = null;
+        r.x = v.x + ox * g.spacing * 0.5; r.y = v.y + oy * fwd * g.spacing * 0.5;
+        invalidateTargetIndex();
+      }
+    }
     function unnest(b) {
       const n = b.nest;
       b.nest = null;
@@ -3266,6 +3269,7 @@ const Engine = (() => {
         const v = sides[1 - x.side].find(b => b.alive && b.squad === x.squad && !b.boarded && !b.turning && !b.u.structure);
         if (!v) continue; // the squad is gone (or never came): nothing happens
         v.hp = 0; v.alive = false; v.diedTick = tick; v.sacrificed = true; v.impTaken = true;
+        if (v.u.carrier || v.nest) dropRiders(v); // a carrier's riders (a Tree kojja's squad) step out, as at a death
         const kid = newBody(x.unit, x.side, v.x, v.y, spawnNo[x.side]++, x.sq);
         kid.tier = 1; kid.impersonated = true;
         if (x.lane === 0 || x.lane === 1) kid.lane = x.lane;

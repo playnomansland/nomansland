@@ -156,6 +156,73 @@
   // Mpb.SQ - k and Mpb.XSQ - ...): lane 0's stand in the fight, lane 1's don't (lane 1 never builds MPB bodies)
   const teamBody = (sq) => sq === -2 || sq === -3 || sq === -4 || sq === G.TREASURY_SQ || (sq <= G.BWALL_SQ && sq > G.BWALL_SQ - 100) || M.isSquad(sq);
 
+  // ----- two squads on one tile (Vilhelm, 6 Nov: "if things are placed on the same tile, they find another spot close
+  // to it"). A squad may be put on a tile an enemy squad of this round stands on (it can't be seen: the Assassin's
+  // 'anywhere', Forward planting, Shadowhands), and a teammate's Undo all may bring a squad back onto a tile the other
+  // player took meanwhile. The newer of the two moves to the nearest tile it may stand on. -----
+  const covering = (m, q) => G.blockOf(m, q.unit, q.col, q.row);
+  const overlap = (ma, a, mb, b) => { const B = covering(mb, b); return covering(ma, a).some(([c, r]) => B.some(([c2, r2]) => c === c2 && r === r2)); };
+  // squad q of side sd in lanes[L] to the nearest tile it may be deployed on (its own placement rules, as a move) with
+  // nothing on it in either lane; riders in it go along (the teammate's follow: setTeams). Returns the tile, or null.
+  // seen: the opponents still see it where it stood until the fight (as Game.moveSquad's free move; while deploying)
+  function relocate(lanes, L, sd, q, seen) {
+    setTeams(lanes);
+    const m = lanes[L], arr = m.armies[sd], i = arr.indexOf(q), ui = q.unit;
+    G.useGrid(m);
+    const COLS = G.COLS, ROWS = G.ROWS;
+    const clear = (c, r) => G.blockOf(m, ui, c, r).every(([cc, rr]) => cc >= 0 && cc < COLS && rr >= 0 && rr < ROWS && !G.occupied(m, sd, cc, rr) && !G.occupied(m, 1 - sd, cc, rr) && !G.terrainBlocks(m, cc, rr));
+    let best = null;
+    arr.splice(i, 1); // (its own tiles don't count while it looks)
+    try {
+      for (const loose of [false, true]) { // (none by its rules: any free tile of its own zone)
+        let bd = 0, be = 0;
+        for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+          if (c === q.col && r === q.row) continue;
+          if (!(loose ? G.inZone(sd, r) && !G.reserved(sd, c, r) : G.canPlaceAt(m, sd, c, r, ui, true)) || !clear(c, r)) continue;
+          const d = Math.max(Math.abs(c - q.col), Math.abs(r - q.row)), e = Math.hypot(c - q.col, r - q.row);
+          if (!best || d < bd || (d === bd && e < be - 1e-9)) { best = { col: c, row: r }; bd = d; be = e; }
+        }
+        if (best) break;
+      }
+    } finally { arr.splice(i, 0, q); }
+    if (!best) return null;
+    const was = { col: q.col, row: q.row };
+    if (seen && q.round !== m.round && !(q.from && q.movedRound === m.round)) { q.from = { col: q.col, row: q.row, ...(G.isRider(q) ? { in: q.in } : {}) }; q.movedRound = m.round; }
+    q.col = best.col; q.row = best.row;
+    for (const x of arr) if (x !== q && x.in === q.id && x.col === was.col && x.row === was.row) { x.col = best.col; x.row = best.row; }
+    setTeams(lanes);
+    return best;
+  }
+  // before a fight (Duo.runFight): every two squads on one tile, either team, either lane: the newer moves (D.stamp: when
+  // each seat's squads last took their tiles this round; one from an earlier round or a bot's turn counts as oldest).
+  // The same age: the one outside its own zone moves, then a seeded coin.
+  function unstack(D) {
+    const lanes = ms(D);
+    setTeams(lanes);
+    for (let guard = 0; guard < 64; guard++) {
+      const all = [];
+      lanes.forEach((m, L) => { for (const sd of [0, 1]) for (const q of m.armies[sd] || []) if (!G.isRider(q) && !G.mpbHeld(q)) all.push({ L, sd, q, m }); });
+      let pair = null;
+      for (let a = 0; a < all.length && !pair; a++) for (let b = a + 1; b < all.length; b++) if (overlap(all[a].m, all[a].q, all[b].m, all[b].q)) { pair = [all[a], all[b]]; break; }
+      if (!pair) return;
+      const age = (x) => stampOf(D, seatOf(x.L, x.sd), x.q.id), out = (x) => !G.inZone(x.sd, x.q.row);
+      const [x, y] = pair;
+      const mover = age(x) !== age(y) ? (age(x) > age(y) ? x : y) : out(x) !== out(y) ? (out(x) ? x : y) : (mrand(D, 17 + guard) < 0.5 ? x : y);
+      if (!relocate(lanes, mover.L, mover.sd, mover.q)) return; // (no room at all: they stay)
+    }
+  }
+  // when each seat's squads took their tiles this round (D.stamp[seat][id] = { c, r, n }; n 0: from before the round's
+  // first action), noted after every action of the seat
+  const stampOf = (D, seat, id) => { const s = D.stamp && D.stamp[seat] && D.stamp[seat][id]; return s ? s.n : 0; };
+  function stamp(D, seat, base) {
+    const own = SEATS[seat], m = D.lanes[own.lane].m;
+    if (!D.stamp) D.stamp = [{}, {}, {}, {}];
+    if (!D.stampN) D.stampN = 0;
+    const map = base ? {} : D.stamp[seat] || {}, next = {};
+    for (const q of m.armies[own.side] || []) { const p = map[q.id]; next[q.id] = p && p.c === q.col && p.r === q.row ? p : { c: q.col, r: q.row, n: base ? 0 : ++D.stampN }; }
+    D.stamp[seat] = next;
+  }
+
   // The fight of two lanes (matches with units, as they stand when it begins): a steppable Engine battle on the one
   // board. Changes nothing. Bodies carry .lane.
   function battle(lanes, opts = {}) {
@@ -314,7 +381,10 @@
   }
 
   // ----- the 2v2 buildings: the artifact draft and the placement votes (src/mpb.js), their clocks (D.mclock) -----
-  const mpbPending = (D) => { const m = D.lanes[0] && D.lanes[0].m; return !!m && (M.draftOpen(m) || [0, 1].some(sd => !!M.voteHead(m, sd))); };
+  // (a placement a skill click queued, a Tree kojja's Grow, is hidden from the opponents: it never holds the clock, it
+  // has its own 15 s; Mpb.hide)
+  const mpbPending = (D) => { const m = D.lanes[0] && D.lanes[0].m; return !!m && (M.draftOpen(m) || [0, 1].some(sd => M.voteQueue(m, sd).some(e => !e.skill))); };
+  const mpbOpen = (D) => { const m = D.lanes[0] && D.lanes[0].m; return !!m && (M.draftOpen(m) || [0, 1].some(sd => !!M.voteHead(m, sd))); }; // (anything at all still to settle before the fight)
   const seatsOf = (sd) => [seatOf(0, sd), seatOf(1, sd)];
   // a system action on team sd's part in lane L (as: whose vote), then the same part in the other lane; logged
   function sysApply(D, sd, fn, a, L = 0) {
@@ -398,7 +468,7 @@
   // after anything that may have opened or changed a vote or the draft
   function mpbAfter(D, now) { mpbBots(D); mpbClock(D, now); setTeams(ms(D)); }
   // before the fight: nothing may stay open
-  function mpbSettle(D, now) { for (let k = 0; k < 40 && mpbPending(D); k++) { mpbTick(D, now, true); mpbBots(D); } mpbClock(D, now); }
+  function mpbSettle(D, now) { for (let k = 0; k < 40 && mpbOpen(D); k++) { mpbTick(D, now, true); mpbBots(D); } mpbClock(D, now); }
   // the start of a round: the buildings' roundStart, the artifacts (rounds 2 and 8), the draft (3 and 9)
   function mpbRound(D, now) {
     const lanes = ms(D), m = lanes[0];
@@ -515,6 +585,14 @@
     if (mine.towers && mine.towers[sd] && O.towers && O.towers[sd]) mine.towers[sd].type = O.towers[sd].type;
     for (const m of ms(D)) copyTeam(sc, m, sd);
     M.reconcile(ms(D)); // a building's record and the lanes' squads agree again (the School)
+    // a squad of this player's back on a tile the teammate took meanwhile (a Tree kojja's Nest too): it moves to the
+    // nearest tile it may stand on (the teammate's stays where they put it)
+    const lanes = ms(D);
+    setTeams(lanes);
+    for (const q of lanes[lane].armies[sd].slice()) {
+      if (G.isRider(q) || G.mpbHeld(q)) continue;
+      if (lanes[1 - lane].armies[sd].some(o => !G.isRider(o) && overlap(lanes[lane], q, lanes[1 - lane], o))) relocate(lanes, lane, sd, q, true);
+    }
   }
 
   // a bot's turn at the start of a round: package, tower pick and squads (it levels up when the fight begins)
@@ -543,6 +621,7 @@
     mpbAfter(D, now); // bots pick and vote at once
     setTeams(ms(D));
     D.tbase = [0, 1].map(sd => teamState(D.lanes[0].m, sd)); D.tlog = [[], []];
+    for (let k = 0; k < 4; k++) stamp(D, k, true); // (everything on the board now, the bots' squads too, counts as oldest)
     D.deadline = 0; D.held = deployMsOf(D);
     clock(D, now);
   }
@@ -560,6 +639,7 @@
     D.hp = [HP, HP];
     for (const R of D.lanes) R.m.hp = D.hp.slice();
     D.lanes.forEach((R, L) => M.init(R.m, L)); // the Vaults, no tower pick (the artifact draft instead), who is who
+    for (const R of D.lanes) for (const f of TEAM_FIELDS) if (!R.m[f]) R.m[f] = [BLANK[f], BLANK[f]].map(x => JSON.parse(JSON.stringify(x))); // (every team field from the start: a first team action adds none to the opponents' view)
     D.summary = null; D.fights = 0; D.forfeit = null; D.mclock = { vote: [null, null], draft: 0 };
     beginRound(D, now);
     return true;
@@ -614,6 +694,7 @@
       else if (fn === 'undoAll') { rebuildTeam(D, sd, own.lane); team = true; }
       mpbAfter(D, now); // a building's action may have opened a vote (bots vote at once)
       r.h = Ref.sideHash(R.m, sd); // this lane may have changed again (the team's part)
+      stamp(D, seat); // (which of its squads took a tile now: the newer of two on one tile moves, unstack)
     }
     clock(D, now); // a tower pick may let the clock start (Referee.act only looks at its own lane)
     return { ...r, team };
@@ -628,6 +709,7 @@
     for (let k = 0; k < 4; k++) if (D.bots[k]) { setTeam(ms(D), SEATS[k].lane); G.aiLevel(laneOf(D, k).m, SEATS[k].side); }
     for (const m of ms(D)) G.settleTowerPicks(m);
     mpbSettle(D, now); // a draft pick or a placement vote still open: settled now
+    unstack(D); // two squads on one tile: the newer moves to the nearest tile it may stand on
     for (const m of ms(D)) m.fhSeed = M.rng((D.seed + m.round * 4111 + 17) >>> 0)() * 4294967296 >>> 0; // Field hospital's Field dressing picks (src/mpb.js): out of the views until the fight
     const f = fight(ms(D), D.hp);
     setTeams(ms(D));
@@ -710,7 +792,7 @@
     V, MAP, OFF, HP, PINGS, EMOTES, EMOTE_TEXT, SEATS, SEAT_NAMES, seatOf, mateOf, remap, unmap, laneOfId, move, teamOf, setTeam, setTeams,
     MECHITES, unitSet, TEAM_FIELDS, TEAM_FNS, SYS_FNS, copyTeam, copyAll, teamBody, settle, battle, laneResult, fight, view,
     create, start, act, setReady, runFight, tick, due, next, rematch, forfeit, setAway, viewFor, clock, clocks, canAct, cutFor, remainingFor, heldFor, save, load, humans,
-    mpbPending, mpbTick, mpbSettle, rebuildTeam, undoAllAllowed, teamState,
+    mpbPending, mpbTick, mpbSettle, rebuildTeam, undoAllAllowed, teamState, unstack, relocate, stamp,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.Duo = api;

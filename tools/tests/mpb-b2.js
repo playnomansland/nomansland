@@ -187,7 +187,8 @@ check('Second wind: once a round, the chosen squad comes back whole in front of 
   assert.ok(x.act(1, 'mpbAct', h.key, 'wind', 1, gob.id).ok, 'A2 moves it to their goblins (no gold)');
   assert.strictEqual(x.m(1).gold[0], 1000);
   sameTeam(D, 0);
-  assert.deepStrictEqual(Mpb.recOf(x.m(0), 0, h.key).data.wind, { round: 1, lane: 1, id: gob.id });
+  assert.deepStrictEqual(Mpb.recOf(x.m(0), 0, h.key).data.wind, { round: 1, lane: 1, id: gob.id, u: gob.unit }, 'the squad and its unit type (review 2026-11-06)');
+  assert.ok(!x.act(1, 'mpbAct', h.key, 'wind', 1, 999).ok, 'a squad of the team\'s only');
   // hidden from the opponents, seen by the teammate
   assert.ok(!Mpb.recOf(Duo.viewFor(D, 2).m, 0, h.key).data.wind && !Mpb.recOf(Duo.viewFor(D, 3).m, 0, h.key).skills.wind, 'the opponents see no Second wind');
   assert.ok(Mpb.recOf(Duo.viewFor(D, 0).m, 0, h.key).data.wind, 'the teammate does');
@@ -288,6 +289,12 @@ check('The Oak\'s Heal: +5 Team HP a click (once a round each), before the fight
   const x = bare(22), { D } = x;
   const oak = addKind(D, 0, 'oak');
   for (const R of D.lanes) R.m.gold[0] = 1000;
+  assert.strictEqual(Mpb.whyNot(x.m(0), 0, oak.key, 'heal', []), 'rules', 'at full Team HP it would do nothing: refused (review 2026-11-06)');
+  D.hp = [196, 200]; for (const R of D.lanes) R.m.hp = D.hp.slice();
+  assert.ok(x.act(0, 'mpbBuy', oak.key, 'heal').ok, 'one click can still add something');
+  assert.ok(!x.act(1, 'mpbBuy', oak.key, 'heal').ok, 'a second would only reach 200 already');
+  assert.ok(x.act(0, 'mpbUndo', oak.key, 'heal').ok);
+  D.hp = [150, 200]; for (const R of D.lanes) R.m.hp = D.hp.slice();
   assert.ok(x.act(0, 'mpbBuy', oak.key, 'heal').ok && x.act(1, 'mpbBuy', oak.key, 'heal').ok, 'each player once');
   assert.ok(!x.act(0, 'mpbBuy', oak.key, 'heal').ok, 'not twice a round');
   assert.strictEqual(x.m(0).gold[0], 950); assert.strictEqual(x.m(1).gold[0], 950);
@@ -512,6 +519,7 @@ check('The Oak\'s Heal writes a results line: the HP bar and the results screen 
   const x = bare(22), { D } = x;
   const oak = addKind(D, 0, 'oak');
   for (const R of D.lanes) R.m.gold[0] = 1000;
+  D.hp = [150, 150]; for (const R of D.lanes) R.m.hp = D.hp.slice();
   assert.ok(x.act(0, 'mpbBuy', oak.key, 'heal').ok && x.act(1, 'mpbBuy', oak.key, 'heal').ok);
   put(D, 0, 0, 'Goblin Swarm', 10, 12); put(D, 0, 1, 'Brute', 10, 5); put(D, 1, 1, 'Ether Golem', 13, 5);
   D.hp = [150, 150]; for (const R of D.lanes) R.m.hp = D.hp.slice();
@@ -525,6 +533,7 @@ check('The Oak\'s Heal writes a results line: the HP bar and the results screen 
   // at the cap: nothing gained, no line
   const y = bare(22), o2 = addKind(y.D, 0, 'oak');
   for (const R of y.D.lanes) R.m.gold[0] = 1000;
+  for (const R of y.D.lanes) R.m.hp = [190, 200]; // (bought while hurt: at full health it is refused)
   assert.ok(y.act(0, 'mpbBuy', o2.key, 'heal').ok);
   const sums = [{}, {}], hp = [200, 200]; Mpb.teamHeal(lanesOf(y.D), hp, y.m(0).round, sums);
   assert.deepStrictEqual(hp, [200, 200]); assert.ok(!sums[0].mpbNews, 'no line when the team is at its starting health');

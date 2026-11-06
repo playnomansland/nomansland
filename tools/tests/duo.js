@@ -622,7 +622,7 @@ check('the teammate\'s horse: a bot teammate sells or moves it, nothing breaks',
       T += 1000;
       for (const R of D.lanes) for (const sd of [0, 1]) for (const q of R.m.armies[sd]) if (Game.isRider(q)) assert.ok(Game.carrierOf(R.m, sd, q), 'every rider has its carrier');
       assert.strictEqual(clashes(D.lanes.map(R => R.m)), 0);
-      const f = Duo.tick(D, T + 200000) || Duo.tick(D, T + 400000); // (a placement vote A1 left to its 15 s holds the clock until the first tick)
+      let f = null; for (let k = 1; k <= 4 && !f; k++) f = Duo.tick(D, T + 200000 * k); // (a draft pick, then a placement vote A1 left to its 15 s, each hold the clock until a tick)
       assert.ok(f);
       const bt = Duo.battle(f.pres.map(W)); while (bt.step()) {}
       assert.strictEqual(bt.result().winner, f.summaries[0].duo.winner, 'playback: same winner');
