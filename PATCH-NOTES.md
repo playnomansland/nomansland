@@ -20,6 +20,16 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 6 November 2026 – Developers: a triangle budget for 3D unit models
+
+Nothing changes in the game.
+
+- **How many triangles a unit model may have**, measured instead of guessed: `docs/RENDER-BUDGET.md`. Every model's triangle count, the biggest board in 40 AI matches (173 bodies in round 11), and how the 3D board draws units. Units are instanced already, so the limit is triangles, not draw calls.
+- **A stress test page for phones** (developers only, nothing links to it): `tools/tri-budget/stress.html` plays that biggest fight with test models of a set size and measures the frame rate at each size. The final per-model numbers come from running it on an iPhone.
+- Tools in `tools/tri-budget/`: `count.js` (triangles per model and squad), `worst.js` (the biggest board in a Balance Lab batch).
+
+---
+
 ## 5 November 2026 – New skin (coming later): Ember Robe Fire Mage
 
 - **Ember Robe Fire Mage:** a Fire Mage in a long robe with an ember hem, cuffs and chest stripe, a fire gem on a belt in your team colour, long dark red hair and a flame held in each hand. 3D board only (the 2D board keeps the Fire Mage's symbol). It's a cosmetic skin and the Fire Mage's normal look stays the same.

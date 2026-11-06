@@ -1,0 +1,6235 @@
+{
+ "config": {
+  "matches": 40,
+  "seed": 700000,
+  "mirror": false
+ },
+ "byRound": {
+  "1": {
+   "fights": 40,
+   "squads": 298,
+   "bodies": 1135,
+   "maxBodies": 54,
+   "maxTris": 8176
+  },
+  "2": {
+   "fights": 40,
+   "squads": 406,
+   "bodies": 1672,
+   "maxBodies": 68,
+   "maxTris": 9648
+  },
+  "3": {
+   "fights": 40,
+   "squads": 524,
+   "bodies": 2207,
+   "maxBodies": 88,
+   "maxTris": 14502
+  },
+  "4": {
+   "fights": 40,
+   "squads": 627,
+   "bodies": 2650,
+   "maxBodies": 110,
+   "maxTris": 17734
+  },
+  "5": {
+   "fights": 40,
+   "squads": 735,
+   "bodies": 3082,
+   "maxBodies": 140,
+   "maxTris": 21094
+  },
+  "6": {
+   "fights": 40,
+   "squads": 851,
+   "bodies": 3498,
+   "maxBodies": 155,
+   "maxTris": 22706
+  },
+  "7": {
+   "fights": 33,
+   "squads": 788,
+   "bodies": 3137,
+   "maxBodies": 137,
+   "maxTris": 20468
+  },
+  "8": {
+   "fights": 29,
+   "squads": 775,
+   "bodies": 3051,
+   "maxBodies": 144,
+   "maxTris": 21412
+  },
+  "9": {
+   "fights": 24,
+   "squads": 713,
+   "bodies": 2711,
+   "maxBodies": 156,
+   "maxTris": 22786
+  },
+  "10": {
+   "fights": 18,
+   "squads": 595,
+   "bodies": 2248,
+   "maxBodies": 169,
+   "maxTris": 25338
+  },
+  "11": {
+   "fights": 8,
+   "squads": 298,
+   "bodies": 1074,
+   "maxBodies": 173,
+   "maxTris": 26150
+  },
+  "12": {
+   "fights": 4,
+   "squads": 159,
+   "bodies": 583,
+   "maxBodies": 162,
+   "maxTris": 23442
+  },
+  "13": {
+   "fights": 1,
+   "squads": 44,
+   "bodies": 145,
+   "maxBodies": 145,
+   "maxTris": 20848
+  }
+ },
+ "worstBodies": {
+  "match": 700017,
+  "round": 11,
+  "map": "testgrid",
+  "squads": [
+   22,
+   20
+  ],
+  "maxBodies": 173,
+  "trisAtMax": 26150,
+  "maxTris": 26150,
+  "maxStructures": 4,
+  "structureTris": 7310,
+  "maxProjectiles": 58,
+  "maxShots": 39,
+  "at": 0.05,
+  "kinds": {
+   "wizard:fire": 7,
+   "wizard:earth": 7,
+   "wizard:leaf": 1,
+   "skeleton": 32,
+   "flier": 20,
+   "goblin": 60,
+   "sniper": 1,
+   "brute": 1,
+   "wizard:slime": 2,
+   "wizard:steel": 1,
+   "meteor": 5,
+   "spider": 6,
+   "slimeshot": 30
+  }
+ },
+ "worstTris": {
+  "match": 700017,
+  "round": 11,
+  "map": "testgrid",
+  "squads": [
+   22,
+   20
+  ],
+  "maxBodies": 173,
+  "trisAtMax": 26150,
+  "maxTris": 26150,
+  "maxStructures": 4,
+  "structureTris": 7310,
+  "maxProjectiles": 58,
+  "maxShots": 39,
+  "at": 0.05,
+  "kinds": {
+   "wizard:fire": 7,
+   "wizard:earth": 7,
+   "wizard:leaf": 1,
+   "skeleton": 32,
+   "flier": 20,
+   "goblin": 60,
+   "sniper": 1,
+   "brute": 1,
+   "wizard:slime": 2,
+   "wizard:steel": 1,
+   "meteor": 5,
+   "spider": 6,
+   "slimeshot": 30
+  }
+ },
+ "fights": [
+  {
+   "match": 700000,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 53,
+   "trisAtMax": 7466,
+   "maxTris": 7466,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 1,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700000,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 58,
+   "trisAtMax": 7958,
+   "maxTris": 7958,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 2,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700000,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    6
+   ],
+   "maxBodies": 69,
+   "trisAtMax": 9266,
+   "maxTris": 9266,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 3,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700000,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 71,
+   "trisAtMax": 9556,
+   "maxTris": 9556,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 4,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700000,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    8,
+    7
+   ],
+   "maxBodies": 75,
+   "trisAtMax": 9908,
+   "maxTris": 9908,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 4,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700000,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    9,
+    10
+   ],
+   "maxBodies": 79,
+   "trisAtMax": 10688,
+   "maxTris": 10688,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 12,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700000,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    10,
+    11
+   ],
+   "maxBodies": 84,
+   "trisAtMax": 11232,
+   "maxTris": 11232,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 12,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700000,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    12,
+    12
+   ],
+   "maxBodies": 99,
+   "trisAtMax": 12896,
+   "maxTris": 12896,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 19,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700000,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    13,
+    14
+   ],
+   "maxBodies": 102,
+   "trisAtMax": 13568,
+   "maxTris": 13568,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 31,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700000,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    14,
+    15
+   ],
+   "maxBodies": 104,
+   "trisAtMax": 14016,
+   "maxTris": 14016,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 29,
+   "maxShots": 25,
+   "at": 0.05
+  },
+  {
+   "match": 700001,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    3
+   ],
+   "maxBodies": 33,
+   "trisAtMax": 4246,
+   "maxTris": 4246,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 3,
+   "maxShots": 5,
+   "at": 0.05
+  },
+  {
+   "match": 700001,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 46,
+   "trisAtMax": 6508,
+   "maxTris": 6508,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 8,
+   "maxShots": 9,
+   "at": 0.05
+  },
+  {
+   "match": 700001,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 66,
+   "trisAtMax": 9716,
+   "maxTris": 9716,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 15,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700001,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    8
+   ],
+   "maxBodies": 68,
+   "trisAtMax": 9996,
+   "maxTris": 9996,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 18,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700001,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    8,
+    9
+   ],
+   "maxBodies": 69,
+   "trisAtMax": 10146,
+   "maxTris": 10146,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 21,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700001,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    10,
+    11
+   ],
+   "maxBodies": 76,
+   "trisAtMax": 11106,
+   "maxTris": 11106,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 18,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700001,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    12
+   ],
+   "maxBodies": 79,
+   "trisAtMax": 11620,
+   "maxTris": 11620,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 20,
+   "maxShots": 15,
+   "at": 0.05
+  },
+  {
+   "match": 700001,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    13
+   ],
+   "maxBodies": 81,
+   "trisAtMax": 12036,
+   "maxTris": 12036,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 24,
+   "maxShots": 16,
+   "at": 0.05
+  },
+  {
+   "match": 700001,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    15,
+    15
+   ],
+   "maxBodies": 103,
+   "trisAtMax": 14692,
+   "maxTris": 14692,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 38,
+   "maxShots": 31,
+   "at": 0.05
+  },
+  {
+   "match": 700001,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    17,
+    16
+   ],
+   "maxBodies": 115,
+   "trisAtMax": 16260,
+   "maxTris": 16260,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 47,
+   "maxShots": 28,
+   "at": 0.05
+  },
+  {
+   "match": 700002,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    3,
+    4
+   ],
+   "maxBodies": 9,
+   "trisAtMax": 1444,
+   "maxTris": 1444,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 3,
+   "maxShots": 2,
+   "at": 0.05
+  },
+  {
+   "match": 700002,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 12,
+   "trisAtMax": 1884,
+   "maxTris": 1884,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 3,
+   "maxShots": 2,
+   "at": 0.05
+  },
+  {
+   "match": 700002,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    6
+   ],
+   "maxBodies": 14,
+   "trisAtMax": 2226,
+   "maxTris": 2226,
+   "maxStructures": 5,
+   "structureTris": 7546,
+   "maxProjectiles": 4,
+   "maxShots": 2,
+   "at": 0.05
+  },
+  {
+   "match": 700002,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    7
+   ],
+   "maxBodies": 39,
+   "trisAtMax": 5640,
+   "maxTris": 5640,
+   "maxStructures": 7,
+   "structureTris": 7714,
+   "maxProjectiles": 6,
+   "maxShots": 5,
+   "at": 0.05
+  },
+  {
+   "match": 700002,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    10,
+    9
+   ],
+   "maxBodies": 79,
+   "trisAtMax": 10888,
+   "maxTris": 10888,
+   "maxStructures": 7,
+   "structureTris": 7714,
+   "maxProjectiles": 7,
+   "maxShots": 9,
+   "at": 0.05
+  },
+  {
+   "match": 700002,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    11,
+    12
+   ],
+   "maxBodies": 96,
+   "trisAtMax": 13492,
+   "maxTris": 13492,
+   "maxStructures": 8,
+   "structureTris": 7798,
+   "maxProjectiles": 9,
+   "maxShots": 15,
+   "at": 0.05
+  },
+  {
+   "match": 700002,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    13
+   ],
+   "maxBodies": 101,
+   "trisAtMax": 13984,
+   "maxTris": 13984,
+   "maxStructures": 7,
+   "structureTris": 7714,
+   "maxProjectiles": 11,
+   "maxShots": 15,
+   "at": 0.05
+  },
+  {
+   "match": 700002,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    15
+   ],
+   "maxBodies": 116,
+   "trisAtMax": 15606,
+   "maxTris": 15606,
+   "maxStructures": 8,
+   "structureTris": 7798,
+   "maxProjectiles": 16,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700002,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    15,
+    17
+   ],
+   "maxBodies": 127,
+   "trisAtMax": 17954,
+   "maxTris": 17954,
+   "maxStructures": 8,
+   "structureTris": 7798,
+   "maxProjectiles": 18,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700003,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    3,
+    4
+   ],
+   "maxBodies": 21,
+   "trisAtMax": 2718,
+   "maxTris": 2718,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 3,
+   "maxShots": 4,
+   "at": 0.05
+  },
+  {
+   "match": 700003,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 38,
+   "trisAtMax": 4852,
+   "maxTris": 4852,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 4,
+   "maxShots": 7,
+   "at": 0.05
+  },
+  {
+   "match": 700003,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    6
+   ],
+   "maxBodies": 49,
+   "trisAtMax": 6160,
+   "maxTris": 6160,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 6,
+   "maxShots": 8,
+   "at": 0.05
+  },
+  {
+   "match": 700003,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    7
+   ],
+   "maxBodies": 55,
+   "trisAtMax": 6792,
+   "maxTris": 6792,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 6,
+   "maxShots": 10,
+   "at": 0.05
+  },
+  {
+   "match": 700003,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    10,
+    9
+   ],
+   "maxBodies": 68,
+   "trisAtMax": 8384,
+   "maxTris": 8384,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 16,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700003,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    11,
+    11
+   ],
+   "maxBodies": 78,
+   "trisAtMax": 10476,
+   "maxTris": 10476,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 16,
+   "maxShots": 16,
+   "at": 0.05
+  },
+  {
+   "match": 700003,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    12
+   ],
+   "maxBodies": 80,
+   "trisAtMax": 10808,
+   "maxTris": 10808,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 19,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700003,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    14,
+    13
+   ],
+   "maxBodies": 83,
+   "trisAtMax": 11374,
+   "maxTris": 11374,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 20,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700003,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    16,
+    14
+   ],
+   "maxBodies": 89,
+   "trisAtMax": 12090,
+   "maxTris": 12090,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 22,
+   "maxShots": 16,
+   "at": 0.05
+  },
+  {
+   "match": 700003,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    18,
+    16
+   ],
+   "maxBodies": 111,
+   "trisAtMax": 15772,
+   "maxTris": 15772,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 21,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700003,
+   "round": 11,
+   "map": "testgrid",
+   "squads": [
+    19,
+    18
+   ],
+   "maxBodies": 114,
+   "trisAtMax": 16328,
+   "maxTris": 16328,
+   "maxStructures": 4,
+   "structureTris": 7094,
+   "maxProjectiles": 30,
+   "maxShots": 21,
+   "at": 0.05
+  },
+  {
+   "match": 700004,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 28,
+   "trisAtMax": 4512,
+   "maxTris": 4512,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 5,
+   "maxShots": 4,
+   "at": 0.05
+  },
+  {
+   "match": 700004,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 52,
+   "trisAtMax": 7776,
+   "maxTris": 7776,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 4,
+   "maxShots": 10,
+   "at": 0.05
+  },
+  {
+   "match": 700004,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    6
+   ],
+   "maxBodies": 64,
+   "trisAtMax": 9888,
+   "maxTris": 9888,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 12,
+   "maxShots": 16,
+   "at": 0.05
+  },
+  {
+   "match": 700004,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 72,
+   "trisAtMax": 10592,
+   "maxTris": 10592,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 14,
+   "maxShots": 16,
+   "at": 0.05
+  },
+  {
+   "match": 700004,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    8,
+    8
+   ],
+   "maxBodies": 74,
+   "trisAtMax": 10956,
+   "maxTris": 10956,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 16,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700004,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    9,
+    9
+   ],
+   "maxBodies": 82,
+   "trisAtMax": 12052,
+   "maxTris": 12052,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 22,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700004,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    11,
+    10
+   ],
+   "maxBodies": 85,
+   "trisAtMax": 12640,
+   "maxTris": 12640,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 25,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700004,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    11
+   ],
+   "maxBodies": 94,
+   "trisAtMax": 13568,
+   "maxTris": 13568,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 33,
+   "maxShots": 24,
+   "at": 0.05
+  },
+  {
+   "match": 700004,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    14,
+    13
+   ],
+   "maxBodies": 113,
+   "trisAtMax": 16672,
+   "maxTris": 16672,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 38,
+   "maxShots": 27,
+   "at": 0.05
+  },
+  {
+   "match": 700005,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    5
+   ],
+   "maxBodies": 34,
+   "trisAtMax": 5830,
+   "maxTris": 5830,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 9,
+   "maxShots": 7,
+   "at": 0.05
+  },
+  {
+   "match": 700005,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    6
+   ],
+   "maxBodies": 43,
+   "trisAtMax": 7730,
+   "maxTris": 7730,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 14,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700005,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    8
+   ],
+   "maxBodies": 46,
+   "trisAtMax": 8212,
+   "maxTris": 8212,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 17,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700005,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    7,
+    9
+   ],
+   "maxBodies": 55,
+   "trisAtMax": 10164,
+   "maxTris": 10164,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 20,
+   "maxShots": 15,
+   "at": 0.05
+  },
+  {
+   "match": 700005,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    8,
+    10
+   ],
+   "maxBodies": 57,
+   "trisAtMax": 10580,
+   "maxTris": 10580,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 19,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700005,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    10,
+    12
+   ],
+   "maxBodies": 79,
+   "trisAtMax": 13120,
+   "maxTris": 13120,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 30,
+   "maxShots": 16,
+   "at": 0.05
+  },
+  {
+   "match": 700005,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    11,
+    13
+   ],
+   "maxBodies": 95,
+   "trisAtMax": 15104,
+   "maxTris": 15104,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 37,
+   "maxShots": 21,
+   "at": 0.05
+  },
+  {
+   "match": 700005,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    15
+   ],
+   "maxBodies": 111,
+   "trisAtMax": 16938,
+   "maxTris": 16938,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 50,
+   "maxShots": 29,
+   "at": 0.05
+  },
+  {
+   "match": 700006,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    3,
+    3
+   ],
+   "maxBodies": 14,
+   "trisAtMax": 2778,
+   "maxTris": 2778,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 8,
+   "maxShots": 6,
+   "at": 0.05
+  },
+  {
+   "match": 700006,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    4,
+    5
+   ],
+   "maxBodies": 36,
+   "trisAtMax": 6010,
+   "maxTris": 6010,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 14,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700006,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 44,
+   "trisAtMax": 6932,
+   "maxTris": 6932,
+   "maxStructures": 4,
+   "structureTris": 7294,
+   "maxProjectiles": 20,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700006,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    9,
+    9
+   ],
+   "maxBodies": 55,
+   "trisAtMax": 9226,
+   "maxTris": 9226,
+   "maxStructures": 4,
+   "structureTris": 7294,
+   "maxProjectiles": 19,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700006,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    10
+   ],
+   "maxBodies": 56,
+   "trisAtMax": 9376,
+   "maxTris": 9376,
+   "maxStructures": 4,
+   "structureTris": 7294,
+   "maxProjectiles": 19,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700006,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    10,
+    11
+   ],
+   "maxBodies": 61,
+   "trisAtMax": 9952,
+   "maxTris": 9952,
+   "maxStructures": 4,
+   "structureTris": 7294,
+   "maxProjectiles": 21,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700006,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    12
+   ],
+   "maxBodies": 67,
+   "trisAtMax": 10604,
+   "maxTris": 10604,
+   "maxStructures": 4,
+   "structureTris": 7294,
+   "maxProjectiles": 23,
+   "maxShots": 21,
+   "at": 0.05
+  },
+  {
+   "match": 700006,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    14,
+    14
+   ],
+   "maxBodies": 89,
+   "trisAtMax": 14276,
+   "maxTris": 14276,
+   "maxStructures": 4,
+   "structureTris": 7294,
+   "maxProjectiles": 23,
+   "maxShots": 21,
+   "at": 0.05
+  },
+  {
+   "match": 700006,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    16,
+    15
+   ],
+   "maxBodies": 95,
+   "trisAtMax": 15076,
+   "maxTris": 15076,
+   "maxStructures": 4,
+   "structureTris": 7294,
+   "maxProjectiles": 27,
+   "maxShots": 23,
+   "at": 0.05
+  },
+  {
+   "match": 700006,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    18,
+    16
+   ],
+   "maxBodies": 116,
+   "trisAtMax": 18608,
+   "maxTris": 18608,
+   "maxStructures": 4,
+   "structureTris": 7294,
+   "maxProjectiles": 38,
+   "maxShots": 30,
+   "at": 0.05
+  },
+  {
+   "match": 700006,
+   "round": 11,
+   "map": "testgrid",
+   "squads": [
+    19,
+    18
+   ],
+   "maxBodies": 139,
+   "trisAtMax": 21828,
+   "maxTris": 21828,
+   "maxStructures": 4,
+   "structureTris": 7294,
+   "maxProjectiles": 39,
+   "maxShots": 29,
+   "at": 0.05
+  },
+  {
+   "match": 700006,
+   "round": 12,
+   "map": "testgrid",
+   "squads": [
+    21,
+    20
+   ],
+   "maxBodies": 143,
+   "trisAtMax": 22640,
+   "maxTris": 22640,
+   "maxStructures": 4,
+   "structureTris": 7294,
+   "maxProjectiles": 38,
+   "maxShots": 30,
+   "at": 0.05
+  },
+  {
+   "match": 700007,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 32,
+   "trisAtMax": 4300,
+   "maxTris": 4300,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 5,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700007,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    6
+   ],
+   "maxBodies": 64,
+   "trisAtMax": 9324,
+   "maxTris": 9324,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 9,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700007,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 86,
+   "trisAtMax": 12556,
+   "maxTris": 12556,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 18,
+   "maxShots": 23,
+   "at": 0.05
+  },
+  {
+   "match": 700007,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    8
+   ],
+   "maxBodies": 109,
+   "trisAtMax": 15252,
+   "maxTris": 15252,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 23,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700007,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    8,
+    9
+   ],
+   "maxBodies": 113,
+   "trisAtMax": 15604,
+   "maxTris": 15604,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 22,
+   "maxShots": 24,
+   "at": 0.05
+  },
+  {
+   "match": 700007,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    11,
+    10
+   ],
+   "maxBodies": 120,
+   "trisAtMax": 16370,
+   "maxTris": 16370,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 26,
+   "maxShots": 24,
+   "at": 0.05
+  },
+  {
+   "match": 700007,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    11
+   ],
+   "maxBodies": 125,
+   "trisAtMax": 16856,
+   "maxTris": 16856,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 27,
+   "maxShots": 22,
+   "at": 0.05
+  },
+  {
+   "match": 700007,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    13
+   ],
+   "maxBodies": 131,
+   "trisAtMax": 17492,
+   "maxTris": 17492,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 29,
+   "maxShots": 29,
+   "at": 0.05
+  },
+  {
+   "match": 700007,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    14,
+    14
+   ],
+   "maxBodies": 133,
+   "trisAtMax": 17854,
+   "maxTris": 17854,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 25,
+   "maxShots": 26,
+   "at": 0.05
+  },
+  {
+   "match": 700007,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    15,
+    17
+   ],
+   "maxBodies": 137,
+   "trisAtMax": 18634,
+   "maxTris": 18634,
+   "maxStructures": 4,
+   "structureTris": 7200,
+   "maxProjectiles": 36,
+   "maxShots": 29,
+   "at": 0.05
+  },
+  {
+   "match": 700008,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    3,
+    4
+   ],
+   "maxBodies": 40,
+   "trisAtMax": 5464,
+   "maxTris": 5464,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 12,
+   "maxShots": 10,
+   "at": 0.05
+  },
+  {
+   "match": 700008,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 45,
+   "trisAtMax": 6060,
+   "maxTris": 6060,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 13,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700008,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    8,
+    6
+   ],
+   "maxBodies": 50,
+   "trisAtMax": 6718,
+   "maxTris": 6718,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 16,
+   "maxShots": 15,
+   "at": 0.05
+  },
+  {
+   "match": 700008,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    9,
+    7
+   ],
+   "maxBodies": 53,
+   "trisAtMax": 7106,
+   "maxTris": 7106,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 16,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700008,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    10,
+    9
+   ],
+   "maxBodies": 57,
+   "trisAtMax": 7728,
+   "maxTris": 7728,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 13,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700008,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    11,
+    10
+   ],
+   "maxBodies": 60,
+   "trisAtMax": 8190,
+   "maxTris": 8190,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 20,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700008,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    11
+   ],
+   "maxBodies": 63,
+   "trisAtMax": 8620,
+   "maxTris": 8620,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 20,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700008,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    13
+   ],
+   "maxBodies": 67,
+   "trisAtMax": 9264,
+   "maxTris": 9264,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 20,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700008,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    15,
+    14
+   ],
+   "maxBodies": 89,
+   "trisAtMax": 12884,
+   "maxTris": 12884,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 22,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700008,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    17,
+    17
+   ],
+   "maxBodies": 104,
+   "trisAtMax": 14756,
+   "maxTris": 14756,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 26,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700008,
+   "round": 11,
+   "map": "testgrid",
+   "squads": [
+    19,
+    19
+   ],
+   "maxBodies": 123,
+   "trisAtMax": 17468,
+   "maxTris": 17468,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 34,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700009,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 12,
+   "trisAtMax": 1844,
+   "maxTris": 1844,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 6,
+   "maxShots": 4,
+   "at": 0.05
+  },
+  {
+   "match": 700009,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    6,
+    6
+   ],
+   "maxBodies": 31,
+   "trisAtMax": 5690,
+   "maxTris": 5690,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 13,
+   "maxShots": 10,
+   "at": 0.05
+  },
+  {
+   "match": 700009,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    8
+   ],
+   "maxBodies": 35,
+   "trisAtMax": 6156,
+   "maxTris": 6156,
+   "maxStructures": 4,
+   "structureTris": 7204,
+   "maxProjectiles": 16,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700009,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    9
+   ],
+   "maxBodies": 37,
+   "trisAtMax": 6510,
+   "maxTris": 6510,
+   "maxStructures": 4,
+   "structureTris": 7204,
+   "maxProjectiles": 16,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700009,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    10
+   ],
+   "maxBodies": 39,
+   "trisAtMax": 6864,
+   "maxTris": 6864,
+   "maxStructures": 4,
+   "structureTris": 7204,
+   "maxProjectiles": 15,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700009,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    10,
+    11
+   ],
+   "maxBodies": 50,
+   "trisAtMax": 8176,
+   "maxTris": 8176,
+   "maxStructures": 4,
+   "structureTris": 7204,
+   "maxProjectiles": 19,
+   "maxShots": 15,
+   "at": 0.05
+  },
+  {
+   "match": 700010,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 33,
+   "trisAtMax": 6518,
+   "maxTris": 6518,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 11,
+   "maxShots": 8,
+   "at": 0.05
+  },
+  {
+   "match": 700010,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 35,
+   "trisAtMax": 6808,
+   "maxTris": 6808,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 14,
+   "maxShots": 10,
+   "at": 0.05
+  },
+  {
+   "match": 700010,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 46,
+   "trisAtMax": 9050,
+   "maxTris": 9050,
+   "maxStructures": 4,
+   "structureTris": 7920,
+   "maxProjectiles": 17,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700010,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    8
+   ],
+   "maxBodies": 55,
+   "trisAtMax": 11002,
+   "maxTris": 11002,
+   "maxStructures": 7,
+   "structureTris": 8172,
+   "maxProjectiles": 12,
+   "maxShots": 9,
+   "at": 0.05
+  },
+  {
+   "match": 700010,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    10
+   ],
+   "maxBodies": 65,
+   "trisAtMax": 13104,
+   "maxTris": 13104,
+   "maxStructures": 9,
+   "structureTris": 8340,
+   "maxProjectiles": 19,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700010,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    11,
+    12
+   ],
+   "maxBodies": 83,
+   "trisAtMax": 15442,
+   "maxTris": 15442,
+   "maxStructures": 8,
+   "structureTris": 8256,
+   "maxProjectiles": 18,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700010,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    13,
+    13
+   ],
+   "maxBodies": 97,
+   "trisAtMax": 17438,
+   "maxTris": 17438,
+   "maxStructures": 7,
+   "structureTris": 8172,
+   "maxProjectiles": 19,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700011,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 28,
+   "trisAtMax": 3268,
+   "maxTris": 3268,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 2,
+   "maxShots": 7,
+   "at": 0.05
+  },
+  {
+   "match": 700011,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 32,
+   "trisAtMax": 3734,
+   "maxTris": 3734,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 6,
+   "maxShots": 7,
+   "at": 0.05
+  },
+  {
+   "match": 700011,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    7
+   ],
+   "maxBodies": 42,
+   "trisAtMax": 4718,
+   "maxTris": 4718,
+   "maxStructures": 4,
+   "structureTris": 7568,
+   "maxProjectiles": 4,
+   "maxShots": 8,
+   "at": 0.05
+  },
+  {
+   "match": 700011,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    8
+   ],
+   "maxBodies": 52,
+   "trisAtMax": 5702,
+   "maxTris": 5702,
+   "maxStructures": 4,
+   "structureTris": 7568,
+   "maxProjectiles": 18,
+   "maxShots": 16,
+   "at": 0.05
+  },
+  {
+   "match": 700011,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    9
+   ],
+   "maxBodies": 64,
+   "trisAtMax": 7050,
+   "maxTris": 7050,
+   "maxStructures": 4,
+   "structureTris": 7568,
+   "maxProjectiles": 29,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700011,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    10,
+    10
+   ],
+   "maxBodies": 78,
+   "trisAtMax": 8920,
+   "maxTris": 8920,
+   "maxStructures": 4,
+   "structureTris": 7568,
+   "maxProjectiles": 25,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700011,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    11
+   ],
+   "maxBodies": 93,
+   "trisAtMax": 10920,
+   "maxTris": 10920,
+   "maxStructures": 8,
+   "structureTris": 7904,
+   "maxProjectiles": 24,
+   "maxShots": 22,
+   "at": 0.05
+  },
+  {
+   "match": 700011,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    14,
+    12
+   ],
+   "maxBodies": 108,
+   "trisAtMax": 12920,
+   "maxTris": 12920,
+   "maxStructures": 7,
+   "structureTris": 7820,
+   "maxProjectiles": 27,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700011,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    15,
+    14
+   ],
+   "maxBodies": 121,
+   "trisAtMax": 14502,
+   "maxTris": 14502,
+   "maxStructures": 7,
+   "structureTris": 7820,
+   "maxProjectiles": 31,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700011,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    17,
+    16
+   ],
+   "maxBodies": 137,
+   "trisAtMax": 16374,
+   "maxTris": 16374,
+   "maxStructures": 7,
+   "structureTris": 7820,
+   "maxProjectiles": 40,
+   "maxShots": 26,
+   "at": 0.05
+  },
+  {
+   "match": 700012,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    3,
+    4
+   ],
+   "maxBodies": 18,
+   "trisAtMax": 3592,
+   "maxTris": 3592,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 8,
+   "maxShots": 8,
+   "at": 0.05
+  },
+  {
+   "match": 700012,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 31,
+   "trisAtMax": 5896,
+   "maxTris": 5896,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 11,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700012,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    6
+   ],
+   "maxBodies": 41,
+   "trisAtMax": 7956,
+   "maxTris": 7956,
+   "maxStructures": 4,
+   "structureTris": 7204,
+   "maxProjectiles": 19,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700012,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    10,
+    7
+   ],
+   "maxBodies": 54,
+   "trisAtMax": 9162,
+   "maxTris": 9162,
+   "maxStructures": 4,
+   "structureTris": 7204,
+   "maxProjectiles": 18,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700012,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    11,
+    9
+   ],
+   "maxBodies": 57,
+   "trisAtMax": 9582,
+   "maxTris": 9582,
+   "maxStructures": 4,
+   "structureTris": 7204,
+   "maxProjectiles": 20,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700012,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    12,
+    11
+   ],
+   "maxBodies": 67,
+   "trisAtMax": 11706,
+   "maxTris": 11706,
+   "maxStructures": 4,
+   "structureTris": 7204,
+   "maxProjectiles": 27,
+   "maxShots": 23,
+   "at": 0.05
+  },
+  {
+   "match": 700012,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    13,
+    13
+   ],
+   "maxBodies": 82,
+   "trisAtMax": 13370,
+   "maxTris": 13370,
+   "maxStructures": 4,
+   "structureTris": 7204,
+   "maxProjectiles": 31,
+   "maxShots": 28,
+   "at": 0.05
+  },
+  {
+   "match": 700012,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    15,
+    14
+   ],
+   "maxBodies": 85,
+   "trisAtMax": 13852,
+   "maxTris": 13852,
+   "maxStructures": 4,
+   "structureTris": 7204,
+   "maxProjectiles": 32,
+   "maxShots": 24,
+   "at": 0.05
+  },
+  {
+   "match": 700012,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    17,
+    15
+   ],
+   "maxBodies": 88,
+   "trisAtMax": 14356,
+   "maxTris": 14356,
+   "maxStructures": 4,
+   "structureTris": 7204,
+   "maxProjectiles": 33,
+   "maxShots": 22,
+   "at": 0.05
+  },
+  {
+   "match": 700013,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    3,
+    4
+   ],
+   "maxBodies": 30,
+   "trisAtMax": 4268,
+   "maxTris": 4268,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 2,
+   "maxShots": 8,
+   "at": 0.05
+  },
+  {
+   "match": 700013,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 50,
+   "trisAtMax": 8140,
+   "maxTris": 8140,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 9,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700013,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    6
+   ],
+   "maxBodies": 74,
+   "trisAtMax": 10780,
+   "maxTris": 10780,
+   "maxStructures": 5,
+   "structureTris": 7746,
+   "maxProjectiles": 15,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700013,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    9,
+    8
+   ],
+   "maxBodies": 87,
+   "trisAtMax": 12320,
+   "maxTris": 12320,
+   "maxStructures": 5,
+   "structureTris": 7746,
+   "maxProjectiles": 21,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700013,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    10,
+    9
+   ],
+   "maxBodies": 89,
+   "trisAtMax": 12652,
+   "maxTris": 12652,
+   "maxStructures": 7,
+   "structureTris": 7914,
+   "maxProjectiles": 24,
+   "maxShots": 21,
+   "at": 0.05
+  },
+  {
+   "match": 700013,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    11,
+    10
+   ],
+   "maxBodies": 91,
+   "trisAtMax": 12926,
+   "maxTris": 12926,
+   "maxStructures": 7,
+   "structureTris": 7914,
+   "maxProjectiles": 21,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700013,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    12
+   ],
+   "maxBodies": 103,
+   "trisAtMax": 14388,
+   "maxTris": 14388,
+   "maxStructures": 7,
+   "structureTris": 7914,
+   "maxProjectiles": 33,
+   "maxShots": 26,
+   "at": 0.05
+  },
+  {
+   "match": 700013,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    13
+   ],
+   "maxBodies": 105,
+   "trisAtMax": 14678,
+   "maxTris": 14678,
+   "maxStructures": 7,
+   "structureTris": 7914,
+   "maxProjectiles": 34,
+   "maxShots": 26,
+   "at": 0.05
+  },
+  {
+   "match": 700013,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    15,
+    14
+   ],
+   "maxBodies": 111,
+   "trisAtMax": 15318,
+   "maxTris": 15318,
+   "maxStructures": 8,
+   "structureTris": 7998,
+   "maxProjectiles": 35,
+   "maxShots": 25,
+   "at": 0.05
+  },
+  {
+   "match": 700013,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    17,
+    16
+   ],
+   "maxBodies": 124,
+   "trisAtMax": 16994,
+   "maxTris": 16994,
+   "maxStructures": 7,
+   "structureTris": 7914,
+   "maxProjectiles": 44,
+   "maxShots": 32,
+   "at": 0.05
+  },
+  {
+   "match": 700013,
+   "round": 11,
+   "map": "testgrid",
+   "squads": [
+    19,
+    18
+   ],
+   "maxBodies": 128,
+   "trisAtMax": 17784,
+   "maxTris": 17784,
+   "maxStructures": 7,
+   "structureTris": 7914,
+   "maxProjectiles": 52,
+   "maxShots": 33,
+   "at": 0.05
+  },
+  {
+   "match": 700013,
+   "round": 12,
+   "map": "testgrid",
+   "squads": [
+    20,
+    20
+   ],
+   "maxBodies": 134,
+   "trisAtMax": 18500,
+   "maxTris": 18500,
+   "maxStructures": 8,
+   "structureTris": 7998,
+   "maxProjectiles": 45,
+   "maxShots": 33,
+   "at": 0.05
+  },
+  {
+   "match": 700013,
+   "round": 13,
+   "map": "testgrid",
+   "squads": [
+    22,
+    22
+   ],
+   "maxBodies": 145,
+   "trisAtMax": 20848,
+   "maxTris": 20848,
+   "maxStructures": 7,
+   "structureTris": 7914,
+   "maxProjectiles": 47,
+   "maxShots": 32,
+   "at": 0.05
+  },
+  {
+   "match": 700014,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    3
+   ],
+   "maxBodies": 54,
+   "trisAtMax": 8176,
+   "maxTris": 8176,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 8,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700014,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    4
+   ],
+   "maxBodies": 68,
+   "trisAtMax": 9648,
+   "maxTris": 9648,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 15,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700014,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    5
+   ],
+   "maxBodies": 85,
+   "trisAtMax": 12166,
+   "maxTris": 12166,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 16,
+   "maxShots": 21,
+   "at": 0.05
+  },
+  {
+   "match": 700014,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    6
+   ],
+   "maxBodies": 91,
+   "trisAtMax": 12798,
+   "maxTris": 12798,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 17,
+   "maxShots": 23,
+   "at": 0.05
+  },
+  {
+   "match": 700014,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    7
+   ],
+   "maxBodies": 100,
+   "trisAtMax": 14426,
+   "maxTris": 14426,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 18,
+   "maxShots": 23,
+   "at": 0.05
+  },
+  {
+   "match": 700014,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    9,
+    9
+   ],
+   "maxBodies": 102,
+   "trisAtMax": 14758,
+   "maxTris": 14758,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 20,
+   "maxShots": 25,
+   "at": 0.05
+  },
+  {
+   "match": 700014,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    10
+   ],
+   "maxBodies": 124,
+   "trisAtMax": 17362,
+   "maxTris": 17362,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 31,
+   "maxShots": 26,
+   "at": 0.05
+  },
+  {
+   "match": 700014,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    12
+   ],
+   "maxBodies": 127,
+   "trisAtMax": 17886,
+   "maxTris": 17886,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 35,
+   "maxShots": 30,
+   "at": 0.05
+  },
+  {
+   "match": 700014,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    15,
+    14
+   ],
+   "maxBodies": 137,
+   "trisAtMax": 18880,
+   "maxTris": 18880,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 38,
+   "maxShots": 37,
+   "at": 0.05
+  },
+  {
+   "match": 700015,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    3,
+    3
+   ],
+   "maxBodies": 16,
+   "trisAtMax": 2660,
+   "maxTris": 2660,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 6,
+   "maxShots": 6,
+   "at": 0.05
+  },
+  {
+   "match": 700015,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    4,
+    5
+   ],
+   "maxBodies": 37,
+   "trisAtMax": 6178,
+   "maxTris": 6178,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 10,
+   "maxShots": 8,
+   "at": 0.05
+  },
+  {
+   "match": 700015,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    5,
+    8
+   ],
+   "maxBodies": 69,
+   "trisAtMax": 11706,
+   "maxTris": 11706,
+   "maxStructures": 4,
+   "structureTris": 7552,
+   "maxProjectiles": 20,
+   "maxShots": 16,
+   "at": 0.05
+  },
+  {
+   "match": 700015,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    6,
+    8
+   ],
+   "maxBodies": 70,
+   "trisAtMax": 11846,
+   "maxTris": 11846,
+   "maxStructures": 5,
+   "structureTris": 7636,
+   "maxProjectiles": 16,
+   "maxShots": 15,
+   "at": 0.05
+  },
+  {
+   "match": 700015,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    10
+   ],
+   "maxBodies": 75,
+   "trisAtMax": 12640,
+   "maxTris": 12640,
+   "maxStructures": 5,
+   "structureTris": 7636,
+   "maxProjectiles": 25,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700015,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    10,
+    11
+   ],
+   "maxBodies": 91,
+   "trisAtMax": 16160,
+   "maxTris": 16160,
+   "maxStructures": 5,
+   "structureTris": 7636,
+   "maxProjectiles": 28,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700015,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    11,
+    12
+   ],
+   "maxBodies": 99,
+   "trisAtMax": 16864,
+   "maxTris": 16864,
+   "maxStructures": 8,
+   "structureTris": 7888,
+   "maxProjectiles": 32,
+   "maxShots": 25,
+   "at": 0.05
+  },
+  {
+   "match": 700015,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    13
+   ],
+   "maxBodies": 120,
+   "trisAtMax": 19242,
+   "maxTris": 19242,
+   "maxStructures": 7,
+   "structureTris": 7804,
+   "maxProjectiles": 35,
+   "maxShots": 25,
+   "at": 0.05
+  },
+  {
+   "match": 700016,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 42,
+   "trisAtMax": 6578,
+   "maxTris": 6578,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 6,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700016,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    6
+   ],
+   "maxBodies": 55,
+   "trisAtMax": 8830,
+   "maxTris": 8830,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 10,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700016,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    7
+   ],
+   "maxBodies": 63,
+   "trisAtMax": 9978,
+   "maxTris": 9978,
+   "maxStructures": 7,
+   "structureTris": 7804,
+   "maxProjectiles": 11,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700016,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    7,
+    8
+   ],
+   "maxBodies": 68,
+   "trisAtMax": 10522,
+   "maxTris": 10522,
+   "maxStructures": 7,
+   "structureTris": 7804,
+   "maxProjectiles": 8,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700016,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    10
+   ],
+   "maxBodies": 91,
+   "trisAtMax": 13978,
+   "maxTris": 13978,
+   "maxStructures": 8,
+   "structureTris": 7888,
+   "maxProjectiles": 18,
+   "maxShots": 22,
+   "at": 0.05
+  },
+  {
+   "match": 700016,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    10,
+    11
+   ],
+   "maxBodies": 102,
+   "trisAtMax": 15238,
+   "maxTris": 15238,
+   "maxStructures": 7,
+   "structureTris": 7804,
+   "maxProjectiles": 25,
+   "maxShots": 21,
+   "at": 0.05
+  },
+  {
+   "match": 700016,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    11,
+    12
+   ],
+   "maxBodies": 115,
+   "trisAtMax": 17094,
+   "maxTris": 17094,
+   "maxStructures": 7,
+   "structureTris": 7804,
+   "maxProjectiles": 26,
+   "maxShots": 21,
+   "at": 0.05
+  },
+  {
+   "match": 700016,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    12,
+    13
+   ],
+   "maxBodies": 126,
+   "trisAtMax": 18354,
+   "maxTris": 18354,
+   "maxStructures": 8,
+   "structureTris": 7888,
+   "maxProjectiles": 37,
+   "maxShots": 31,
+   "at": 0.05
+  },
+  {
+   "match": 700016,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    13,
+    15
+   ],
+   "maxBodies": 140,
+   "trisAtMax": 20348,
+   "maxTris": 20348,
+   "maxStructures": 7,
+   "structureTris": 7804,
+   "maxProjectiles": 38,
+   "maxShots": 29,
+   "at": 0.05
+  },
+  {
+   "match": 700016,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    16,
+    16
+   ],
+   "maxBodies": 164,
+   "trisAtMax": 23708,
+   "maxTris": 23708,
+   "maxStructures": 7,
+   "structureTris": 7804,
+   "maxProjectiles": 37,
+   "maxShots": 29,
+   "at": 0.05
+  },
+  {
+   "match": 700017,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    3,
+    3
+   ],
+   "maxBodies": 22,
+   "trisAtMax": 4002,
+   "maxTris": 4002,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 3,
+   "maxShots": 4,
+   "at": 0.05
+  },
+  {
+   "match": 700017,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    3,
+    5
+   ],
+   "maxBodies": 35,
+   "trisAtMax": 5784,
+   "maxTris": 5784,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 2,
+   "maxShots": 4,
+   "at": 0.05
+  },
+  {
+   "match": 700017,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    6
+   ],
+   "maxBodies": 66,
+   "trisAtMax": 12030,
+   "maxTris": 12030,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 13,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700017,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 71,
+   "trisAtMax": 12522,
+   "maxTris": 12522,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 23,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700017,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    11,
+    8
+   ],
+   "maxBodies": 113,
+   "trisAtMax": 17610,
+   "maxTris": 17610,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 24,
+   "maxShots": 30,
+   "at": 0.05
+  },
+  {
+   "match": 700017,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    12,
+    10
+   ],
+   "maxBodies": 122,
+   "trisAtMax": 18856,
+   "maxTris": 18856,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 28,
+   "maxShots": 34,
+   "at": 0.05
+  },
+  {
+   "match": 700017,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    13,
+    12
+   ],
+   "maxBodies": 137,
+   "trisAtMax": 20468,
+   "maxTris": 20468,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 39,
+   "maxShots": 34,
+   "at": 0.05
+  },
+  {
+   "match": 700017,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    14,
+    14
+   ],
+   "maxBodies": 140,
+   "trisAtMax": 21024,
+   "maxTris": 21024,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 42,
+   "maxShots": 30,
+   "at": 0.05
+  },
+  {
+   "match": 700017,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    16,
+    16
+   ],
+   "maxBodies": 156,
+   "trisAtMax": 22786,
+   "maxTris": 22786,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 45,
+   "maxShots": 35,
+   "at": 0.05
+  },
+  {
+   "match": 700017,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    20,
+    18
+   ],
+   "maxBodies": 169,
+   "trisAtMax": 25338,
+   "maxTris": 25338,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 59,
+   "maxShots": 42,
+   "at": 0.05
+  },
+  {
+   "match": 700017,
+   "round": 11,
+   "map": "testgrid",
+   "squads": [
+    22,
+    20
+   ],
+   "maxBodies": 173,
+   "trisAtMax": 26150,
+   "maxTris": 26150,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 58,
+   "maxShots": 39,
+   "at": 0.05
+  },
+  {
+   "match": 700018,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    3,
+    4
+   ],
+   "maxBodies": 25,
+   "trisAtMax": 4488,
+   "maxTris": 4488,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 11,
+   "maxShots": 9,
+   "at": 0.05
+  },
+  {
+   "match": 700018,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    4,
+    6
+   ],
+   "maxBodies": 59,
+   "trisAtMax": 8872,
+   "maxTris": 8872,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 17,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700018,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    8
+   ],
+   "maxBodies": 88,
+   "trisAtMax": 12790,
+   "maxTris": 12790,
+   "maxStructures": 4,
+   "structureTris": 7856,
+   "maxProjectiles": 25,
+   "maxShots": 21,
+   "at": 0.05
+  },
+  {
+   "match": 700018,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    10
+   ],
+   "maxBodies": 105,
+   "trisAtMax": 15778,
+   "maxTris": 15778,
+   "maxStructures": 4,
+   "structureTris": 7856,
+   "maxProjectiles": 29,
+   "maxShots": 22,
+   "at": 0.05
+  },
+  {
+   "match": 700018,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    12
+   ],
+   "maxBodies": 108,
+   "trisAtMax": 16032,
+   "maxTris": 16032,
+   "maxStructures": 4,
+   "structureTris": 7856,
+   "maxProjectiles": 31,
+   "maxShots": 26,
+   "at": 0.05
+  },
+  {
+   "match": 700018,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    10,
+    14
+   ],
+   "maxBodies": 118,
+   "trisAtMax": 18072,
+   "maxTris": 18072,
+   "maxStructures": 4,
+   "structureTris": 7856,
+   "maxProjectiles": 29,
+   "maxShots": 25,
+   "at": 0.05
+  },
+  {
+   "match": 700018,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    15
+   ],
+   "maxBodies": 127,
+   "trisAtMax": 18938,
+   "maxTris": 18938,
+   "maxStructures": 4,
+   "structureTris": 7856,
+   "maxProjectiles": 34,
+   "maxShots": 26,
+   "at": 0.05
+  },
+  {
+   "match": 700018,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    15,
+    16
+   ],
+   "maxBodies": 141,
+   "trisAtMax": 21412,
+   "maxTris": 21412,
+   "maxStructures": 4,
+   "structureTris": 7856,
+   "maxProjectiles": 39,
+   "maxShots": 32,
+   "at": 0.05
+  },
+  {
+   "match": 700018,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    17,
+    18
+   ],
+   "maxBodies": 148,
+   "trisAtMax": 22352,
+   "maxTris": 22352,
+   "maxStructures": 4,
+   "structureTris": 7856,
+   "maxProjectiles": 50,
+   "maxShots": 34,
+   "at": 0.05
+  },
+  {
+   "match": 700019,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    3,
+    3
+   ],
+   "maxBodies": 22,
+   "trisAtMax": 3480,
+   "maxTris": 3480,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 11,
+   "maxShots": 8,
+   "at": 0.05
+  },
+  {
+   "match": 700019,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 39,
+   "trisAtMax": 6094,
+   "maxTris": 6094,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 13,
+   "maxShots": 10,
+   "at": 0.05
+  },
+  {
+   "match": 700019,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    6
+   ],
+   "maxBodies": 48,
+   "trisAtMax": 7994,
+   "maxTris": 7994,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 22,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700019,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    8
+   ],
+   "maxBodies": 59,
+   "trisAtMax": 9502,
+   "maxTris": 9502,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 30,
+   "maxShots": 21,
+   "at": 0.05
+  },
+  {
+   "match": 700019,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    9
+   ],
+   "maxBodies": 64,
+   "trisAtMax": 10004,
+   "maxTris": 10004,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 31,
+   "maxShots": 22,
+   "at": 0.05
+  },
+  {
+   "match": 700019,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    11,
+    10
+   ],
+   "maxBodies": 70,
+   "trisAtMax": 10740,
+   "maxTris": 10740,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 33,
+   "maxShots": 28,
+   "at": 0.05
+  },
+  {
+   "match": 700019,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    13,
+    11
+   ],
+   "maxBodies": 80,
+   "trisAtMax": 12864,
+   "maxTris": 12864,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 41,
+   "maxShots": 30,
+   "at": 0.05
+  },
+  {
+   "match": 700019,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    14,
+    13
+   ],
+   "maxBodies": 86,
+   "trisAtMax": 13590,
+   "maxTris": 13590,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 45,
+   "maxShots": 40,
+   "at": 0.05
+  },
+  {
+   "match": 700019,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    16,
+    15
+   ],
+   "maxBodies": 99,
+   "trisAtMax": 15214,
+   "maxTris": 15214,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 52,
+   "maxShots": 39,
+   "at": 0.05
+  },
+  {
+   "match": 700019,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    17,
+    16
+   ],
+   "maxBodies": 101,
+   "trisAtMax": 15504,
+   "maxTris": 15504,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 43,
+   "maxShots": 32,
+   "at": 0.05
+  },
+  {
+   "match": 700019,
+   "round": 11,
+   "map": "testgrid",
+   "squads": [
+    19,
+    17
+   ],
+   "maxBodies": 107,
+   "trisAtMax": 16038,
+   "maxTris": 16038,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 45,
+   "maxShots": 32,
+   "at": 0.05
+  },
+  {
+   "match": 700020,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 20,
+   "trisAtMax": 1916,
+   "maxTris": 1916,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 6,
+   "maxShots": 7,
+   "at": 0.05
+  },
+  {
+   "match": 700020,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    6,
+    5
+   ],
+   "maxBodies": 44,
+   "trisAtMax": 7196,
+   "maxTris": 7196,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 15,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700020,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 56,
+   "trisAtMax": 8606,
+   "maxTris": 8606,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 21,
+   "maxShots": 15,
+   "at": 0.05
+  },
+  {
+   "match": 700020,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    9,
+    9
+   ],
+   "maxBodies": 69,
+   "trisAtMax": 10146,
+   "maxTris": 10146,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 25,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700020,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    10,
+    12
+   ],
+   "maxBodies": 76,
+   "trisAtMax": 10980,
+   "maxTris": 10980,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 29,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700020,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    12,
+    13
+   ],
+   "maxBodies": 88,
+   "trisAtMax": 12390,
+   "maxTris": 12390,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 37,
+   "maxShots": 22,
+   "at": 0.05
+  },
+  {
+   "match": 700020,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    14,
+    14
+   ],
+   "maxBodies": 98,
+   "trisAtMax": 14440,
+   "maxTris": 14440,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 40,
+   "maxShots": 26,
+   "at": 0.05
+  },
+  {
+   "match": 700020,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    16,
+    15
+   ],
+   "maxBodies": 105,
+   "trisAtMax": 15658,
+   "maxTris": 15658,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 42,
+   "maxShots": 27,
+   "at": 0.05
+  },
+  {
+   "match": 700020,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    18,
+    17
+   ],
+   "maxBodies": 118,
+   "trisAtMax": 17168,
+   "maxTris": 17168,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 47,
+   "maxShots": 30,
+   "at": 0.05
+  },
+  {
+   "match": 700020,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    19,
+    19
+   ],
+   "maxBodies": 141,
+   "trisAtMax": 20070,
+   "maxTris": 20070,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 55,
+   "maxShots": 32,
+   "at": 0.05
+  },
+  {
+   "match": 700021,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 25,
+   "trisAtMax": 3192,
+   "maxTris": 3192,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 2,
+   "maxShots": 5,
+   "at": 0.05
+  },
+  {
+   "match": 700021,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 27,
+   "trisAtMax": 3482,
+   "maxTris": 3482,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 5,
+   "maxShots": 6,
+   "at": 0.05
+  },
+  {
+   "match": 700021,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    6
+   ],
+   "maxBodies": 34,
+   "trisAtMax": 4700,
+   "maxTris": 4700,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 6,
+   "maxShots": 5,
+   "at": 0.05
+  },
+  {
+   "match": 700021,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    10,
+    7
+   ],
+   "maxBodies": 38,
+   "trisAtMax": 5384,
+   "maxTris": 5384,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 6,
+   "maxShots": 5,
+   "at": 0.05
+  },
+  {
+   "match": 700021,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    13,
+    9
+   ],
+   "maxBodies": 65,
+   "trisAtMax": 9140,
+   "maxTris": 9140,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 9,
+   "maxShots": 10,
+   "at": 0.05
+  },
+  {
+   "match": 700021,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    14,
+    11
+   ],
+   "maxBodies": 83,
+   "trisAtMax": 10964,
+   "maxTris": 10964,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 14,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700022,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 14,
+   "trisAtMax": 1762,
+   "maxTris": 1762,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 2,
+   "maxShots": 3,
+   "at": 0.05
+  },
+  {
+   "match": 700022,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 32,
+   "trisAtMax": 3922,
+   "maxTris": 3922,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 2,
+   "maxShots": 7,
+   "at": 0.05
+  },
+  {
+   "match": 700022,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    6
+   ],
+   "maxBodies": 49,
+   "trisAtMax": 6858,
+   "maxTris": 6858,
+   "maxStructures": 4,
+   "structureTris": 7856,
+   "maxProjectiles": 7,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700022,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    6
+   ],
+   "maxBodies": 65,
+   "trisAtMax": 8766,
+   "maxTris": 8766,
+   "maxStructures": 4,
+   "structureTris": 7856,
+   "maxProjectiles": 12,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700022,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    7
+   ],
+   "maxBodies": 77,
+   "trisAtMax": 10124,
+   "maxTris": 10124,
+   "maxStructures": 4,
+   "structureTris": 7856,
+   "maxProjectiles": 19,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700022,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    11,
+    8
+   ],
+   "maxBodies": 87,
+   "trisAtMax": 11066,
+   "maxTris": 11066,
+   "maxStructures": 4,
+   "structureTris": 7856,
+   "maxProjectiles": 16,
+   "maxShots": 16,
+   "at": 0.05
+  },
+  {
+   "match": 700023,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    3,
+    4
+   ],
+   "maxBodies": 23,
+   "trisAtMax": 2440,
+   "maxTris": 2440,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 9,
+   "maxShots": 8,
+   "at": 0.05
+  },
+  {
+   "match": 700023,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 37,
+   "trisAtMax": 4026,
+   "maxTris": 4026,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 17,
+   "maxShots": 10,
+   "at": 0.05
+  },
+  {
+   "match": 700023,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    6
+   ],
+   "maxBodies": 58,
+   "trisAtMax": 7986,
+   "maxTris": 7986,
+   "maxStructures": 4,
+   "structureTris": 7110,
+   "maxProjectiles": 27,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700023,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    7
+   ],
+   "maxBodies": 64,
+   "trisAtMax": 8566,
+   "maxTris": 8574,
+   "maxStructures": 4,
+   "structureTris": 7110,
+   "maxProjectiles": 31,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700023,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    10,
+    8
+   ],
+   "maxBodies": 68,
+   "trisAtMax": 9096,
+   "maxTris": 9096,
+   "maxStructures": 4,
+   "structureTris": 7110,
+   "maxProjectiles": 27,
+   "maxShots": 24,
+   "at": 0.05
+  },
+  {
+   "match": 700023,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    12,
+    9
+   ],
+   "maxBodies": 81,
+   "trisAtMax": 11528,
+   "maxTris": 11528,
+   "maxStructures": 4,
+   "structureTris": 7110,
+   "maxProjectiles": 36,
+   "maxShots": 23,
+   "at": 3.05
+  },
+  {
+   "match": 700024,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 32,
+   "trisAtMax": 4850,
+   "maxTris": 4850,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 2,
+   "maxShots": 5,
+   "at": 0.05
+  },
+  {
+   "match": 700024,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 37,
+   "trisAtMax": 5394,
+   "maxTris": 5394,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 2,
+   "maxShots": 5,
+   "at": 0.05
+  },
+  {
+   "match": 700024,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    6
+   ],
+   "maxBodies": 54,
+   "trisAtMax": 7902,
+   "maxTris": 7902,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 4,
+   "maxShots": 9,
+   "at": 0.05
+  },
+  {
+   "match": 700024,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 71,
+   "trisAtMax": 9978,
+   "maxTris": 9978,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 11,
+   "maxShots": 16,
+   "at": 0.05
+  },
+  {
+   "match": 700024,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    8
+   ],
+   "maxBodies": 83,
+   "trisAtMax": 11386,
+   "maxTris": 11386,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 17,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700024,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    10,
+    9
+   ],
+   "maxBodies": 85,
+   "trisAtMax": 11674,
+   "maxTris": 11674,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 16,
+   "maxShots": 16,
+   "at": 0.05
+  },
+  {
+   "match": 700024,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    11
+   ],
+   "maxBodies": 96,
+   "trisAtMax": 13948,
+   "maxTris": 13948,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 19,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700024,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    14,
+    13
+   ],
+   "maxBodies": 103,
+   "trisAtMax": 14814,
+   "maxTris": 14814,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 23,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700024,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    16,
+    14
+   ],
+   "maxBodies": 109,
+   "trisAtMax": 15332,
+   "maxTris": 15332,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 24,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700024,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    19,
+    16
+   ],
+   "maxBodies": 114,
+   "trisAtMax": 16302,
+   "maxTris": 16302,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 28,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700024,
+   "round": 11,
+   "map": "testgrid",
+   "squads": [
+    20,
+    19
+   ],
+   "maxBodies": 150,
+   "trisAtMax": 21958,
+   "maxTris": 21958,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 30,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700024,
+   "round": 12,
+   "map": "testgrid",
+   "squads": [
+    22,
+    20
+   ],
+   "maxBodies": 162,
+   "trisAtMax": 23442,
+   "maxTris": 23442,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 36,
+   "maxShots": 21,
+   "at": 0.05
+  },
+  {
+   "match": 700025,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 48,
+   "trisAtMax": 7360,
+   "maxTris": 7360,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 13,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700025,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    6,
+    5
+   ],
+   "maxBodies": 58,
+   "trisAtMax": 9400,
+   "maxTris": 9400,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 16,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700025,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    8,
+    6
+   ],
+   "maxBodies": 70,
+   "trisAtMax": 10810,
+   "maxTris": 10810,
+   "maxStructures": 5,
+   "structureTris": 8004,
+   "maxProjectiles": 19,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700025,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    9,
+    8
+   ],
+   "maxBodies": 80,
+   "trisAtMax": 12854,
+   "maxTris": 12854,
+   "maxStructures": 4,
+   "structureTris": 7920,
+   "maxProjectiles": 23,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700025,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    11,
+    9
+   ],
+   "maxBodies": 89,
+   "trisAtMax": 13698,
+   "maxTris": 13698,
+   "maxStructures": 11,
+   "structureTris": 8508,
+   "maxProjectiles": 32,
+   "maxShots": 26,
+   "at": 0.05
+  },
+  {
+   "match": 700025,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    13,
+    11
+   ],
+   "maxBodies": 93,
+   "trisAtMax": 14324,
+   "maxTris": 14324,
+   "maxStructures": 12,
+   "structureTris": 8592,
+   "maxProjectiles": 31,
+   "maxShots": 27,
+   "at": 0.05
+  },
+  {
+   "match": 700026,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    3
+   ],
+   "maxBodies": 35,
+   "trisAtMax": 4562,
+   "maxTris": 4562,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 5,
+   "maxShots": 8,
+   "at": 0.05
+  },
+  {
+   "match": 700026,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 49,
+   "trisAtMax": 6474,
+   "maxTris": 6474,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 7,
+   "maxShots": 7,
+   "at": 0.05
+  },
+  {
+   "match": 700026,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 59,
+   "trisAtMax": 7562,
+   "maxTris": 7562,
+   "maxStructures": 5,
+   "structureTris": 7652,
+   "maxProjectiles": 7,
+   "maxShots": 10,
+   "at": 0.05
+  },
+  {
+   "match": 700026,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    9
+   ],
+   "maxBodies": 78,
+   "trisAtMax": 10666,
+   "maxTris": 10666,
+   "maxStructures": 4,
+   "structureTris": 7568,
+   "maxProjectiles": 20,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700026,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    8,
+    11
+   ],
+   "maxBodies": 96,
+   "trisAtMax": 13546,
+   "maxTris": 13546,
+   "maxStructures": 7,
+   "structureTris": 7820,
+   "maxProjectiles": 36,
+   "maxShots": 25,
+   "at": 0.05
+  },
+  {
+   "match": 700026,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    9,
+    14
+   ],
+   "maxBodies": 121,
+   "trisAtMax": 17430,
+   "maxTris": 17430,
+   "maxStructures": 8,
+   "structureTris": 7904,
+   "maxProjectiles": 46,
+   "maxShots": 41,
+   "at": 0.05
+  },
+  {
+   "match": 700026,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    11,
+    16
+   ],
+   "maxBodies": 128,
+   "trisAtMax": 18286,
+   "maxTris": 18286,
+   "maxStructures": 7,
+   "structureTris": 7820,
+   "maxProjectiles": 41,
+   "maxShots": 35,
+   "at": 0.05
+  },
+  {
+   "match": 700026,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    18
+   ],
+   "maxBodies": 144,
+   "trisAtMax": 20206,
+   "maxTris": 20206,
+   "maxStructures": 7,
+   "structureTris": 7820,
+   "maxProjectiles": 48,
+   "maxShots": 36,
+   "at": 0.05
+  },
+  {
+   "match": 700027,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    3
+   ],
+   "maxBodies": 19,
+   "trisAtMax": 2904,
+   "maxTris": 2904,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 7,
+   "maxShots": 8,
+   "at": 0.05
+  },
+  {
+   "match": 700027,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    4
+   ],
+   "maxBodies": 37,
+   "trisAtMax": 5784,
+   "maxTris": 5784,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 17,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700027,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    6
+   ],
+   "maxBodies": 60,
+   "trisAtMax": 9550,
+   "maxTris": 9550,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 24,
+   "maxShots": 15,
+   "at": 0.05
+  },
+  {
+   "match": 700027,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    7,
+    8
+   ],
+   "maxBodies": 73,
+   "trisAtMax": 11626,
+   "maxTris": 11626,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 29,
+   "maxShots": 21,
+   "at": 0.05
+  },
+  {
+   "match": 700027,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    8,
+    10
+   ],
+   "maxBodies": 85,
+   "trisAtMax": 13026,
+   "maxTris": 13026,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 39,
+   "maxShots": 25,
+   "at": 0.05
+  },
+  {
+   "match": 700027,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    10,
+    11
+   ],
+   "maxBodies": 88,
+   "trisAtMax": 13540,
+   "maxTris": 13540,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 39,
+   "maxShots": 25,
+   "at": 0.05
+  },
+  {
+   "match": 700027,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    11,
+    12
+   ],
+   "maxBodies": 90,
+   "trisAtMax": 13882,
+   "maxTris": 13882,
+   "maxStructures": 4,
+   "structureTris": 7536,
+   "maxProjectiles": 45,
+   "maxShots": 34,
+   "at": 0.05
+  },
+  {
+   "match": 700028,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 27,
+   "trisAtMax": 3730,
+   "maxTris": 3730,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 1,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700028,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    6,
+    5
+   ],
+   "maxBodies": 33,
+   "trisAtMax": 4400,
+   "maxTris": 4400,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 1,
+   "maxShots": 9,
+   "at": 0.05
+  },
+  {
+   "match": 700028,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    6
+   ],
+   "maxBodies": 42,
+   "trisAtMax": 6300,
+   "maxTris": 6300,
+   "maxStructures": 5,
+   "structureTris": 7546,
+   "maxProjectiles": 7,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700028,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    9,
+    7
+   ],
+   "maxBodies": 54,
+   "trisAtMax": 7720,
+   "maxTris": 7720,
+   "maxStructures": 4,
+   "structureTris": 7462,
+   "maxProjectiles": 14,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700028,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    10,
+    9
+   ],
+   "maxBodies": 63,
+   "trisAtMax": 8616,
+   "maxTris": 8616,
+   "maxStructures": 7,
+   "structureTris": 7714,
+   "maxProjectiles": 14,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700028,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    11,
+    11
+   ],
+   "maxBodies": 80,
+   "trisAtMax": 12310,
+   "maxTris": 12310,
+   "maxStructures": 8,
+   "structureTris": 7798,
+   "maxProjectiles": 19,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700028,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    13
+   ],
+   "maxBodies": 97,
+   "trisAtMax": 14518,
+   "maxTris": 14518,
+   "maxStructures": 7,
+   "structureTris": 7714,
+   "maxProjectiles": 25,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700029,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    5,
+    3
+   ],
+   "maxBodies": 39,
+   "trisAtMax": 6300,
+   "maxTris": 6300,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 4,
+   "maxShots": 7,
+   "at": 0.05
+  },
+  {
+   "match": 700029,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    6,
+    5
+   ],
+   "maxBodies": 42,
+   "trisAtMax": 6772,
+   "maxTris": 6772,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 5,
+   "maxShots": 6,
+   "at": 0.05
+  },
+  {
+   "match": 700029,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    6
+   ],
+   "maxBodies": 44,
+   "trisAtMax": 7104,
+   "maxTris": 7104,
+   "maxStructures": 4,
+   "structureTris": 7110,
+   "maxProjectiles": 7,
+   "maxShots": 6,
+   "at": 0.05
+  },
+  {
+   "match": 700029,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    7
+   ],
+   "maxBodies": 46,
+   "trisAtMax": 7436,
+   "maxTris": 7436,
+   "maxStructures": 4,
+   "structureTris": 7110,
+   "maxProjectiles": 11,
+   "maxShots": 10,
+   "at": 0.05
+  },
+  {
+   "match": 700029,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    10,
+    8
+   ],
+   "maxBodies": 58,
+   "trisAtMax": 8940,
+   "maxTris": 8940,
+   "maxStructures": 4,
+   "structureTris": 7110,
+   "maxProjectiles": 18,
+   "maxShots": 10,
+   "at": 0.05
+  },
+  {
+   "match": 700029,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    13,
+    9
+   ],
+   "maxBodies": 62,
+   "trisAtMax": 9656,
+   "maxTris": 9656,
+   "maxStructures": 4,
+   "structureTris": 7110,
+   "maxProjectiles": 17,
+   "maxShots": 10,
+   "at": 0.05
+  },
+  {
+   "match": 700029,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    14,
+    12
+   ],
+   "maxBodies": 80,
+   "trisAtMax": 12004,
+   "maxTris": 12004,
+   "maxStructures": 4,
+   "structureTris": 7110,
+   "maxProjectiles": 22,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700030,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 14,
+   "trisAtMax": 1886,
+   "maxTris": 1886,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 3,
+   "maxShots": 3,
+   "at": 0.05
+  },
+  {
+   "match": 700030,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 27,
+   "trisAtMax": 3710,
+   "maxTris": 3710,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 4,
+   "maxShots": 6,
+   "at": 0.05
+  },
+  {
+   "match": 700030,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    6
+   ],
+   "maxBodies": 43,
+   "trisAtMax": 5694,
+   "maxTris": 5694,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 3,
+   "maxShots": 7,
+   "at": 0.05
+  },
+  {
+   "match": 700030,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 76,
+   "trisAtMax": 11046,
+   "maxTris": 11046,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 10,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700030,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    8
+   ],
+   "maxBodies": 94,
+   "trisAtMax": 12598,
+   "maxTris": 12598,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 15,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700030,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    10,
+    9
+   ],
+   "maxBodies": 99,
+   "trisAtMax": 13100,
+   "maxTris": 13100,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 13,
+   "maxShots": 21,
+   "at": 0.05
+  },
+  {
+   "match": 700030,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    10
+   ],
+   "maxBodies": 109,
+   "trisAtMax": 15140,
+   "maxTris": 15140,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 20,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700030,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    12
+   ],
+   "maxBodies": 130,
+   "trisAtMax": 17604,
+   "maxTris": 17604,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 28,
+   "maxShots": 22,
+   "at": 0.05
+  },
+  {
+   "match": 700030,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    15,
+    13
+   ],
+   "maxBodies": 133,
+   "trisAtMax": 18192,
+   "maxTris": 18192,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 35,
+   "maxShots": 25,
+   "at": 0.05
+  },
+  {
+   "match": 700030,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    16,
+    14
+   ],
+   "maxBodies": 138,
+   "trisAtMax": 18768,
+   "maxTris": 18768,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 38,
+   "maxShots": 24,
+   "at": 0.05
+  },
+  {
+   "match": 700030,
+   "round": 11,
+   "map": "testgrid",
+   "squads": [
+    17,
+    15
+   ],
+   "maxBodies": 140,
+   "trisAtMax": 19132,
+   "maxTris": 19132,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 43,
+   "maxShots": 27,
+   "at": 0.05
+  },
+  {
+   "match": 700030,
+   "round": 12,
+   "map": "testgrid",
+   "squads": [
+    19,
+    17
+   ],
+   "maxBodies": 144,
+   "trisAtMax": 19860,
+   "maxTris": 19860,
+   "maxStructures": 4,
+   "structureTris": 7630,
+   "maxProjectiles": 47,
+   "maxShots": 24,
+   "at": 0.05
+  },
+  {
+   "match": 700031,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 29,
+   "trisAtMax": 4558,
+   "maxTris": 4558,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 6,
+   "maxShots": 4,
+   "at": 0.05
+  },
+  {
+   "match": 700031,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 36,
+   "trisAtMax": 5236,
+   "maxTris": 5236,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 5,
+   "maxShots": 5,
+   "at": 0.05
+  },
+  {
+   "match": 700031,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    6
+   ],
+   "maxBodies": 50,
+   "trisAtMax": 7628,
+   "maxTris": 7628,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 7,
+   "maxShots": 9,
+   "at": 0.05
+  },
+  {
+   "match": 700031,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    7
+   ],
+   "maxBodies": 62,
+   "trisAtMax": 8976,
+   "maxTris": 8976,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 24,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700031,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    10,
+    8
+   ],
+   "maxBodies": 84,
+   "trisAtMax": 12590,
+   "maxTris": 12590,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 32,
+   "maxShots": 26,
+   "at": 0.05
+  },
+  {
+   "match": 700031,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    10,
+    9
+   ],
+   "maxBodies": 86,
+   "trisAtMax": 12812,
+   "maxTris": 12812,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 18,
+   "maxShots": 15,
+   "at": 0.05
+  },
+  {
+   "match": 700031,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    13,
+    11
+   ],
+   "maxBodies": 92,
+   "trisAtMax": 13778,
+   "maxTris": 13778,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 20,
+   "maxShots": 16,
+   "at": 0.05
+  },
+  {
+   "match": 700031,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    14,
+    12
+   ],
+   "maxBodies": 109,
+   "trisAtMax": 15850,
+   "maxTris": 15850,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 23,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700031,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    15,
+    13
+   ],
+   "maxBodies": 112,
+   "trisAtMax": 16302,
+   "maxTris": 16302,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 31,
+   "maxShots": 22,
+   "at": 0.05
+  },
+  {
+   "match": 700031,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    17,
+    15
+   ],
+   "maxBodies": 129,
+   "trisAtMax": 18278,
+   "maxTris": 18278,
+   "maxStructures": 4,
+   "structureTris": 7184,
+   "maxProjectiles": 29,
+   "maxShots": 22,
+   "at": 0.05
+  },
+  {
+   "match": 700032,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 23,
+   "trisAtMax": 3150,
+   "maxTris": 3150,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 5,
+   "maxShots": 8,
+   "at": 0.05
+  },
+  {
+   "match": 700032,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 43,
+   "trisAtMax": 6542,
+   "maxTris": 6542,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 10,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700032,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    5
+   ],
+   "maxBodies": 51,
+   "trisAtMax": 8302,
+   "maxTris": 8302,
+   "maxStructures": 8,
+   "structureTris": 8224,
+   "maxProjectiles": 12,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700032,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    6
+   ],
+   "maxBodies": 77,
+   "trisAtMax": 12270,
+   "maxTris": 12270,
+   "maxStructures": 7,
+   "structureTris": 8140,
+   "maxProjectiles": 21,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700032,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    7
+   ],
+   "maxBodies": 82,
+   "trisAtMax": 12608,
+   "maxTris": 12608,
+   "maxStructures": 7,
+   "structureTris": 8140,
+   "maxProjectiles": 22,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700032,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    10,
+    9
+   ],
+   "maxBodies": 94,
+   "trisAtMax": 14030,
+   "maxTris": 14030,
+   "maxStructures": 7,
+   "structureTris": 8140,
+   "maxProjectiles": 29,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700032,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    10
+   ],
+   "maxBodies": 100,
+   "trisAtMax": 14660,
+   "maxTris": 14660,
+   "maxStructures": 7,
+   "structureTris": 8140,
+   "maxProjectiles": 32,
+   "maxShots": 22,
+   "at": 0.05
+  },
+  {
+   "match": 700032,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    14,
+    11
+   ],
+   "maxBodies": 114,
+   "trisAtMax": 16348,
+   "maxTris": 16348,
+   "maxStructures": 7,
+   "structureTris": 8140,
+   "maxProjectiles": 40,
+   "maxShots": 28,
+   "at": 0.05
+  },
+  {
+   "match": 700032,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    16,
+    12
+   ],
+   "maxBodies": 117,
+   "trisAtMax": 16902,
+   "maxTris": 16902,
+   "maxStructures": 7,
+   "structureTris": 8140,
+   "maxProjectiles": 46,
+   "maxShots": 29,
+   "at": 0.05
+  },
+  {
+   "match": 700032,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    19,
+    13
+   ],
+   "maxBodies": 121,
+   "trisAtMax": 17566,
+   "maxTris": 17566,
+   "maxStructures": 7,
+   "structureTris": 8140,
+   "maxProjectiles": 51,
+   "maxShots": 32,
+   "at": 0.05
+  },
+  {
+   "match": 700033,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 33,
+   "trisAtMax": 4512,
+   "maxTris": 4512,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 4,
+   "maxShots": 9,
+   "at": 0.05
+  },
+  {
+   "match": 700033,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 45,
+   "trisAtMax": 6624,
+   "maxTris": 6624,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 10,
+   "maxShots": 9,
+   "at": 0.05
+  },
+  {
+   "match": 700033,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    6
+   ],
+   "maxBodies": 55,
+   "trisAtMax": 8664,
+   "maxTris": 8664,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 14,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700033,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    8
+   ],
+   "maxBodies": 58,
+   "trisAtMax": 9084,
+   "maxTris": 9084,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 17,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700033,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    9
+   ],
+   "maxBodies": 69,
+   "trisAtMax": 10396,
+   "maxTris": 10396,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 19,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700033,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    11,
+    10
+   ],
+   "maxBodies": 81,
+   "trisAtMax": 11858,
+   "maxTris": 11858,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 24,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700033,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    11
+   ],
+   "maxBodies": 83,
+   "trisAtMax": 12274,
+   "maxTris": 12274,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 23,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700033,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    12
+   ],
+   "maxBodies": 85,
+   "trisAtMax": 12574,
+   "maxTris": 12574,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 31,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700033,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    14,
+    13
+   ],
+   "maxBodies": 98,
+   "trisAtMax": 14398,
+   "maxTris": 14398,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 31,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700033,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    16,
+    15
+   ],
+   "maxBodies": 116,
+   "trisAtMax": 16830,
+   "maxTris": 16830,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 31,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700034,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 32,
+   "trisAtMax": 3786,
+   "maxTris": 3786,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 2,
+   "maxShots": 7,
+   "at": 0.05
+  },
+  {
+   "match": 700034,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 34,
+   "trisAtMax": 4066,
+   "maxTris": 4066,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 8,
+   "maxShots": 10,
+   "at": 0.05
+  },
+  {
+   "match": 700034,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    8
+   ],
+   "maxBodies": 39,
+   "trisAtMax": 4828,
+   "maxTris": 4828,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 10,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700034,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    9,
+    9
+   ],
+   "maxBodies": 49,
+   "trisAtMax": 6972,
+   "maxTris": 6972,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 12,
+   "maxShots": 10,
+   "at": 0.05
+  },
+  {
+   "match": 700034,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    10,
+    10
+   ],
+   "maxBodies": 58,
+   "trisAtMax": 8924,
+   "maxTris": 8924,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 15,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700034,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    11,
+    11
+   ],
+   "maxBodies": 63,
+   "trisAtMax": 9416,
+   "maxTris": 9416,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 14,
+   "maxShots": 9,
+   "at": 0.05
+  },
+  {
+   "match": 700034,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    12
+   ],
+   "maxBodies": 81,
+   "trisAtMax": 12296,
+   "maxTris": 12296,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 23,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700034,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    14,
+    14
+   ],
+   "maxBodies": 85,
+   "trisAtMax": 12992,
+   "maxTris": 12992,
+   "maxStructures": 4,
+   "structureTris": 7004,
+   "maxProjectiles": 30,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700035,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    3,
+    4
+   ],
+   "maxBodies": 32,
+   "trisAtMax": 5254,
+   "maxTris": 5254,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 10,
+   "maxShots": 12,
+   "at": 0.05
+  },
+  {
+   "match": 700035,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 60,
+   "trisAtMax": 8870,
+   "maxTris": 8870,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 10,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700035,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    8,
+    6
+   ],
+   "maxBodies": 88,
+   "trisAtMax": 14502,
+   "maxTris": 14502,
+   "maxStructures": 7,
+   "structureTris": 7914,
+   "maxProjectiles": 18,
+   "maxShots": 25,
+   "at": 0.05
+  },
+  {
+   "match": 700035,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    9,
+    8
+   ],
+   "maxBodies": 110,
+   "trisAtMax": 17734,
+   "maxTris": 17734,
+   "maxStructures": 7,
+   "structureTris": 7914,
+   "maxProjectiles": 29,
+   "maxShots": 28,
+   "at": 0.05
+  },
+  {
+   "match": 700035,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    11,
+    9
+   ],
+   "maxBodies": 140,
+   "trisAtMax": 21094,
+   "maxTris": 21094,
+   "maxStructures": 8,
+   "structureTris": 7998,
+   "maxProjectiles": 44,
+   "maxShots": 37,
+   "at": 0.05
+  },
+  {
+   "match": 700035,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    13,
+    10
+   ],
+   "maxBodies": 155,
+   "trisAtMax": 22706,
+   "maxTris": 22706,
+   "maxStructures": 7,
+   "structureTris": 7914,
+   "maxProjectiles": 53,
+   "maxShots": 38,
+   "at": 0.05
+  },
+  {
+   "match": 700036,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    3,
+    4
+   ],
+   "maxBodies": 36,
+   "trisAtMax": 6078,
+   "maxTris": 6078,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 15,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700036,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    6
+   ],
+   "maxBodies": 43,
+   "trisAtMax": 6850,
+   "maxTris": 6850,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 16,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700036,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 46,
+   "trisAtMax": 7290,
+   "maxTris": 7290,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 19,
+   "maxShots": 16,
+   "at": 0.05
+  },
+  {
+   "match": 700036,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    7
+   ],
+   "maxBodies": 52,
+   "trisAtMax": 7914,
+   "maxTris": 7914,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 22,
+   "maxShots": 19,
+   "at": 3.05
+  },
+  {
+   "match": 700036,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    8
+   ],
+   "maxBodies": 52,
+   "trisAtMax": 7922,
+   "maxTris": 7922,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 22,
+   "maxShots": 18,
+   "at": 0.05
+  },
+  {
+   "match": 700036,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    11,
+    10
+   ],
+   "maxBodies": 56,
+   "trisAtMax": 8648,
+   "maxTris": 8648,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 21,
+   "maxShots": 14,
+   "at": 0.05
+  },
+  {
+   "match": 700036,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    12
+   ],
+   "maxBodies": 70,
+   "trisAtMax": 10580,
+   "maxTris": 10580,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 30,
+   "maxShots": 23,
+   "at": 0.05
+  },
+  {
+   "match": 700036,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    14
+   ],
+   "maxBodies": 76,
+   "trisAtMax": 11212,
+   "maxTris": 11212,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 29,
+   "maxShots": 22,
+   "at": 0.05
+  },
+  {
+   "match": 700036,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    14,
+    16
+   ],
+   "maxBodies": 79,
+   "trisAtMax": 11716,
+   "maxTris": 11716,
+   "maxStructures": 4,
+   "structureTris": 7310,
+   "maxProjectiles": 32,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700037,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    3,
+    3
+   ],
+   "maxBodies": 12,
+   "trisAtMax": 1892,
+   "maxTris": 1892,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 8,
+   "maxShots": 5,
+   "at": 0.05
+  },
+  {
+   "match": 700037,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    5
+   ],
+   "maxBodies": 28,
+   "trisAtMax": 4042,
+   "maxTris": 4042,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 9,
+   "maxShots": 6,
+   "at": 0.05
+  },
+  {
+   "match": 700037,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    6,
+    6
+   ],
+   "maxBodies": 42,
+   "trisAtMax": 5850,
+   "maxTris": 5850,
+   "maxStructures": 7,
+   "structureTris": 7820,
+   "maxProjectiles": 11,
+   "maxShots": 8,
+   "at": 0.05
+  },
+  {
+   "match": 700037,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 67,
+   "trisAtMax": 9058,
+   "maxTris": 9058,
+   "maxStructures": 8,
+   "structureTris": 7904,
+   "maxProjectiles": 11,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700037,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    8
+   ],
+   "maxBodies": 77,
+   "trisAtMax": 11150,
+   "maxTris": 11150,
+   "maxStructures": 7,
+   "structureTris": 7820,
+   "maxProjectiles": 18,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700037,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    11,
+    11
+   ],
+   "maxBodies": 127,
+   "trisAtMax": 17902,
+   "maxTris": 17902,
+   "maxStructures": 7,
+   "structureTris": 7820,
+   "maxProjectiles": 39,
+   "maxShots": 29,
+   "at": 0.05
+  },
+  {
+   "match": 700038,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 39,
+   "trisAtMax": 6742,
+   "maxTris": 6742,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 11,
+   "maxShots": 9,
+   "at": 0.05
+  },
+  {
+   "match": 700038,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    6
+   ],
+   "maxBodies": 48,
+   "trisAtMax": 7586,
+   "maxTris": 7586,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 13,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700038,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 51,
+   "trisAtMax": 8006,
+   "maxTris": 8006,
+   "maxStructures": 4,
+   "structureTris": 7430,
+   "maxProjectiles": 13,
+   "maxShots": 13,
+   "at": 0.05
+  },
+  {
+   "match": 700038,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    9
+   ],
+   "maxBodies": 63,
+   "trisAtMax": 9510,
+   "maxTris": 9510,
+   "maxStructures": 4,
+   "structureTris": 7430,
+   "maxProjectiles": 19,
+   "maxShots": 17,
+   "at": 0.05
+  },
+  {
+   "match": 700038,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    9,
+    10
+   ],
+   "maxBodies": 78,
+   "trisAtMax": 11506,
+   "maxTris": 11506,
+   "maxStructures": 4,
+   "structureTris": 7430,
+   "maxProjectiles": 24,
+   "maxShots": 19,
+   "at": 0.05
+  },
+  {
+   "match": 700038,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    10,
+    11
+   ],
+   "maxBodies": 87,
+   "trisAtMax": 13458,
+   "maxTris": 13458,
+   "maxStructures": 4,
+   "structureTris": 7430,
+   "maxProjectiles": 29,
+   "maxShots": 22,
+   "at": 0.05
+  },
+  {
+   "match": 700038,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    11,
+    12
+   ],
+   "maxBodies": 89,
+   "trisAtMax": 13822,
+   "maxTris": 13822,
+   "maxStructures": 4,
+   "structureTris": 7430,
+   "maxProjectiles": 32,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700038,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    13
+   ],
+   "maxBodies": 101,
+   "trisAtMax": 15284,
+   "maxTris": 15284,
+   "maxStructures": 4,
+   "structureTris": 7430,
+   "maxProjectiles": 45,
+   "maxShots": 28,
+   "at": 0.05
+  },
+  {
+   "match": 700039,
+   "round": 1,
+   "map": "testgrid",
+   "squads": [
+    4,
+    4
+   ],
+   "maxBodies": 37,
+   "trisAtMax": 8030,
+   "maxTris": 8030,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 13,
+   "maxShots": 9,
+   "at": 0.05
+  },
+  {
+   "match": 700039,
+   "round": 2,
+   "map": "testgrid",
+   "squads": [
+    5,
+    6
+   ],
+   "maxBodies": 46,
+   "trisAtMax": 8874,
+   "maxTris": 8874,
+   "maxStructures": 4,
+   "structureTris": 7016,
+   "maxProjectiles": 17,
+   "maxShots": 11,
+   "at": 0.05
+  },
+  {
+   "match": 700039,
+   "round": 3,
+   "map": "testgrid",
+   "squads": [
+    7,
+    7
+   ],
+   "maxBodies": 71,
+   "trisAtMax": 12000,
+   "maxTris": 12000,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 32,
+   "maxShots": 22,
+   "at": 0.05
+  },
+  {
+   "match": 700039,
+   "round": 4,
+   "map": "testgrid",
+   "squads": [
+    8,
+    7
+   ],
+   "maxBodies": 72,
+   "trisAtMax": 11964,
+   "maxTris": 11964,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 28,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700039,
+   "round": 5,
+   "map": "testgrid",
+   "squads": [
+    10,
+    8
+   ],
+   "maxBodies": 75,
+   "trisAtMax": 12382,
+   "maxTris": 12382,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 30,
+   "maxShots": 20,
+   "at": 0.05
+  },
+  {
+   "match": 700039,
+   "round": 6,
+   "map": "testgrid",
+   "squads": [
+    11,
+    9
+   ],
+   "maxBodies": 77,
+   "trisAtMax": 12714,
+   "maxTris": 12714,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 29,
+   "maxShots": 23,
+   "at": 0.05
+  },
+  {
+   "match": 700039,
+   "round": 7,
+   "map": "testgrid",
+   "squads": [
+    12,
+    10
+   ],
+   "maxBodies": 88,
+   "trisAtMax": 13984,
+   "maxTris": 13984,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 36,
+   "maxShots": 23,
+   "at": 0.05
+  },
+  {
+   "match": 700039,
+   "round": 8,
+   "map": "testgrid",
+   "squads": [
+    13,
+    11
+   ],
+   "maxBodies": 90,
+   "trisAtMax": 14346,
+   "maxTris": 14346,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 35,
+   "maxShots": 26,
+   "at": 0.05
+  },
+  {
+   "match": 700039,
+   "round": 9,
+   "map": "testgrid",
+   "squads": [
+    15,
+    13
+   ],
+   "maxBodies": 94,
+   "trisAtMax": 15052,
+   "maxTris": 15052,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 35,
+   "maxShots": 24,
+   "at": 0.05
+  },
+  {
+   "match": 700039,
+   "round": 10,
+   "map": "testgrid",
+   "squads": [
+    18,
+    14
+   ],
+   "maxBodies": 107,
+   "trisAtMax": 16844,
+   "maxTris": 16844,
+   "maxStructures": 4,
+   "structureTris": 7520,
+   "maxProjectiles": 46,
+   "maxShots": 29,
+   "at": 0.05
+  }
+ ]
+}
