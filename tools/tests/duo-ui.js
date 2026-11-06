@@ -4,7 +4,7 @@
 // phone with the same result.
 // Also: a phone without a developer account doesn't get the button, a reload keeps the seat, teammates see each
 // other's squads at once (m.team) and can't place on each other's tiles, no leaders, and pings (? ! ⚔) and quick lines
-// reach the team and only the team.
+// reach the team and only the team. A status the page handles late doesn't wind its deploy clock back.
 // Needs: python3 -m http.server 8766 (repo root), cd server && npx wrangler dev --port 8798 --var DUO_ANYONE:1
 // (PB_SHOTS=dir saves screenshots)
 const { chromium } = require('playwright-core');
@@ -52,6 +52,16 @@ const DEV = { id: 'p0123456789abcdef', session: 'a'.repeat(64), tag: 'Vilhelm', 
   const f1 = await mk('friend1', null, { width: 1440, height: 900 }), f2 = await mk('friend2'); // friend 1 (the host's teammate) on a PC
   await f1.goto(link + '&test');
   await host.waitForFunction(() => /2 of 4 here/.test(document.getElementById('lobby-status').textContent), null, { timeout: process.env.PB_BOARD === "3d" ? 60000 : 15000 });
+  // (friend 2's page: the last clock message it got, and its socket, for the late-status check below)
+  await f2.context().addInitScript(() => {
+    const W = window.WebSocket;
+    window.WebSocket = function (...a) {
+      const w = new W(...a); window.__ws = w;
+      w.addEventListener('message', (e) => { try { const d = JSON.parse(e.data); if ((d.t === 'status' || d.t === 'sync') && d.phase === 'deploy' && d.remaining > 0) window.__clockMsg = { d, at: Date.now() }; } catch (er) {} });
+      return w;
+    };
+    window.WebSocket.prototype = W.prototype; Object.assign(window.WebSocket, { OPEN: 1, CLOSED: 3, CONNECTING: 0, CLOSING: 2 });
+  });
   await f2.goto(link + '&test');
   await host.waitForFunction(() => /3 of 4 here/.test(document.getElementById('lobby-status').textContent), null, { timeout: process.env.PB_BOARD === "3d" ? 60000 : 15000 });
   ok(true, 'two friends joined (seats A2, B1)');
@@ -103,6 +113,16 @@ const DEV = { id: 'p0123456789abcdef', session: 'a'.repeat(64), tag: 'Vilhelm', 
   await f1.click('#duo-say'); await f1.evaluate(() => document.querySelector('[data-emote="help"]').click());
   await host.waitForFunction(() => /Help me!/.test(document.getElementById('net-text').textContent), null, { timeout: 8000 });
   ok(true, 'Say: Help me! reaches the teammate');
+  // a status the page handles late (a busy 3D phone: its 'remaining' is then older than it looks) doesn't push the
+  // 2v2 deploy clock later: the earliest end the page learnt stands (srvClock)
+  {
+    const secs = () => f2.evaluate(() => { const t = document.getElementById('timer').textContent.split(':'); return (+t[0]) * 60 + (+t[1]); });
+    const before = await secs();
+    await f2.evaluate(() => { const x = window.__clockMsg, left = x.d.remaining - (Date.now() - x.at); window.__ws.onmessage({ data: JSON.stringify({ ...x.d, t: 'status', remaining: left + 6000 }) }); });
+    await sleep(300);
+    const after = await secs();
+    ok(before > 0 && after <= before, `a late status doesn't wind the clock back: ${before} s, then ${after} s`);
+  }
   // Ready
   for (const p of [host, f1, f2]) await p.click('#ready');
   for (const p of [host, f1, f2]) await waitPhase(p, 'Battle', 30000);

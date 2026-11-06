@@ -836,8 +836,11 @@
   function botTurnSeen(D, seat) {
     const own = SEATS[seat], R = laneOf(D, seat), m = R.m, sd = own.side;
     setTeam(ms(D), own.lane);
-    if (G.needsPack(m, sd)) G.choosePack(m, sd, Math.floor(Math.random() * m.packages[sd].length));
-    if (G.needsTowerPick(m, sd)) { const ch = G.towerChoices(m, sd); G.setTowerType(m, sd, ch[Math.floor(Math.random() * ch.length)].id); }
+    // (the package and tower picks: a stream of their own from D.secret, so a bot-played match can be played again and
+    // the stream r below, for its buildings' skills, stays as it was)
+    const pick = M.rng((sec(D) + m.round * 3571 + seat * 131 + 99991) >>> 0);
+    if (G.needsPack(m, sd)) G.choosePack(m, sd, Math.floor(pick() * m.packages[sd].length));
+    if (G.needsTowerPick(m, sd)) { const ch = G.towerChoices(m, sd); G.setTowerType(m, sd, ch[Math.floor(pick() * ch.length)].id); }
     const r = M.rng((sec(D) + m.round * 3571 + seat * 131) >>> 0);
     M.bots(m, sd, r); // the team's buildings' skills now and then (src/mpb.js hooks.bot, before the squads)
     G.aiDeploy(m, sd);

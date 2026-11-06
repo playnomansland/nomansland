@@ -159,11 +159,23 @@ export class DuoRoom extends DurableObject {
       // the other lane (m.team) goes on its own ('team'), so a teammate's change doesn't resend this phone's own lane
       const team = msg.m ? msg.m.team : undefined, tk = team === undefined ? '' : Ref.fnv(JSON.stringify(team));
       const key = Ref.fnv(JSON.stringify({ ...msg, remaining: 0, ack: 0, held: 0, m: msg.m ? { ...msg.m, team: null } : msg.m, duo: msg.duo ? { ...msg.duo, clock: null } : msg.duo }));
-      if (s === opts.skip) { this.sent.set(s, key); this.teamSent.set(s, tk); continue; }
-      if (opts.force || this.sent.get(s) !== key) { this.sent.set(s, key); this.teamSent.set(s, tk); this.send(s, msg); continue; }
-      if (tk && this.teamSent.get(s) !== tk) { this.teamSent.set(s, tk); this.send(s, { t: 'team', team }); }
+      if (s === opts.skip) { this.mark(s, key, tk); continue; }
+      if (opts.force || this.sentKey(s) !== key) { this.mark(s, key, tk); this.send(s, msg); continue; }
+      if (tk && this.teamKey(s) !== tk) { this.mark(s, key, tk); this.send(s, { t: 'team', team }); }
     }
   }
+  // what each phone last got from push(): in memory and in the socket's attachment, which outlives hibernation (a room
+  // woken by an alarm or a message starts with empty Maps). Without it, the alarm of a hidden vote's 15 s (or any act
+  // after a wake-up) would send every phone a sync, and the other team would learn when it happened.
+  sentKey(s) { return this.sent.has(s) ? this.sent.get(s) : this.att(s).sk; }
+  teamKey(s) { return this.teamSent.has(s) ? this.teamSent.get(s) : this.att(s).tk; }
+  mark(s, key, tk) {
+    this.sent.set(s, key); this.teamSent.set(s, tk);
+    const a = this.att(s);
+    if (a.sk !== key || a.tk !== tk) this.setAtt(s, { sk: key, tk });
+  }
+  // the next push() sends this phone a sync whatever it holds
+  forget(s) { this.sent.delete(s); if (this.att(s).sk != null) this.setAtt(s, { sk: null }); }
   broadcastFight(f) {
     const D = this.D;
     for (const s of this.sockets()) {
@@ -171,7 +183,7 @@ export class DuoRoom extends DurableObject {
       if (a.role !== 'p') continue;
       const L = Duo.SEATS[a.seat].lane;
       this.send(s, { t: 'fight', pre: f.pres[L], post: f.posts[L], summary: f.summaries[L], fights: D.fights, duo: { ...this.duoInfo(a.seat, this.here()), pres: f.pres } });
-      this.sent.delete(s);
+      this.forget(s);
     }
     this.push();
   }
@@ -188,6 +200,9 @@ export class DuoRoom extends DurableObject {
     const inLobby = !D || !D.lanes[0] || D.phase === 'lobby';
     switch (d.t) {
       case 'sync': return this.send(ws, this.syncMsg(ws));
+      case 'evict': // tests only (DUO_TEST_EVICT): the in-memory state a room woken from hibernation starts with
+        if (this.env.DUO_TEST_EVICT === '1') { this.sent.clear(); this.teamSent.clear(); }
+        return;
       case 'seat': { // the host swaps two seats (a player and an empty seat, or two players)
         const x = d.a | 0, y = d.b | 0;
         if (!host || !inLobby || x === y || x < 0 || x > 3 || y < 0 || y > 3) return;
@@ -244,7 +259,7 @@ export class DuoRoom extends DurableObject {
         const was = this.clocks(now);
         const res = Duo.act(D, seat, d, now);
         this.send(ws, { t: 'ack', seq: Number.isInteger(d.seq) ? d.seq : 0, ok: res.ok, h: res.h || null, why: res.why || null });
-        if (!res.ok) { this.sent.delete(ws); this.send(ws, this.syncMsg(ws)); if (res.why !== 'time') await this.save(); return; }
+        if (!res.ok) { this.forget(ws); this.send(ws, this.syncMsg(ws)); if (res.why !== 'time') await this.save(); return; }
         await this.save();
         this.push({ skip: ws }); // the others' views (the teammate's m.team, a shared tower buy, the vote)
         if (d.fn === 'undoAll') this.send(ws, this.syncMsg(ws)); // 2v2 Undo all: the team's part as the server rebuilt it (the page keeps its own until then)
@@ -351,7 +366,7 @@ export class DuoRoom extends DurableObject {
     if (this.meta.pub) this.meta.waitAt = now;
     for (const s of this.atSeat(seat)) if (s !== ws) { this.setAtt(s, { role: 'x' }); try { s.close(1000, 'replaced'); } catch {} }
     this.setAtt(ws, { role: 'p', seat });
-    this.sent.delete(ws);
+    this.forget(ws);
     this.send(ws, { t: 'welcome', ...this.welcome(seat) });
     if (this.D && this.D.lanes[0]) Duo.setAway(this.D, seat, false, now);
     await this.save();

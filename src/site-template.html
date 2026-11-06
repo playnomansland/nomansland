@@ -8150,7 +8150,17 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   }
   function srvClock(d) {
     if (phase !== 'deploy') return;
-    if (d.remaining > 0) { if (!timeUp) deadline = now() + d.remaining - 300; heldMs = 0; }
+    if (d.remaining > 0) {
+      if (!timeUp) {
+        const t = now() + d.remaining - 300;
+        // 2v2: a status the page handles late (a busy 3D phone; one comes whenever a vote or the draft opens or closes)
+        // can't push the running clock later: the earliest end this connection learnt stands. The server's clock never
+        // runs longer while it runs (a held clock comes back through 0, and a new round or a reconnect starts afresh).
+        deadline = mode === 'net' && net.duo && net.duoClock && deadline > 0 ? Math.min(deadline, t) : t;
+        net.duoClock = true;
+      }
+      heldMs = 0;
+    }
     else deadline = 0;
   }
   function srvLobby() {
@@ -8669,7 +8679,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // messages only a 2v2 room sends (true: handled here); the rest go on to srvRecv as in 1v1
   function duoRecv(d) {
     if (d.t === 'welcome' && d.duo) {
-      net.welcomed = true; net.create = false;
+      net.welcomed = true; net.create = false; net.duoClock = false; // (srvClock: this connection's clock starts afresh)
       me = d.side; net.key = d.key || net.key; net.seq = Math.max(net.seq, d.seq | 0); net.duoHost = !!d.host;
       net.duoInfo = { ...(net.duoInfo || {}), seat: d.seat, lane: d.lane };
       srvSave(); netStatus(); hud();

@@ -7,7 +7,8 @@
 //  3. a building voted onto a hidden Assassin "should act normally": it takes the nearest tile it is allowed on, the
 //     Assassin stays
 //  4. the Coal mine's exit and its ring never make anything move; a squad whose tile at the exit (or the exit's own
-//     tile) is taken by a squad, building, water or wall of either team doesn't go down the mine
+//     tile) is taken by a squad (or any other unit standing there: the other lane's Factory, Jail guards), building,
+//     water or wall of either team doesn't go down the mine
 //  7. Insider information "Should show everything": the watched team's buildings, water, dug exit, walls and vote
 //     tiles live, and the watchers' deploy checks agree on the page and the server
 //  8. the four artifacts of a match are all different, never the Vault (nor the Outpost); the draft's cards are its
@@ -319,6 +320,46 @@ check('4: a squad whose tile at the exit, or the exit\'s own tile, is taken (squ
     const bt = battleOf(D); assert.ok(travels(bt, 0, go.id) && stays(bt, 0, other.id), 'a wall of either team on its tile at the exit: it stays'); }
 });
 
+check('4: any other unit standing on the tile at the exit blocks it too (the other lane\'s Factory, Jail guards)', () => {
+  // a Cog Builder's Factory of team B on the landing tile, in either lane (the other lane's: its body, Engine mineOn)
+  for (const facLane of [0, 1]) {
+    const x = match(561 + facLane, [true, true, true, true]), { D } = x;
+    playTo(x, 4);
+    for (const m of lanesOf(D)) { m.armies = [[], []]; m.packages = null; m.buildings = [[], []]; }
+    teams(D);
+    addMine(D, 0, 11, 15, 11, 7);
+    x.m(facLane).buildings[1].push({ id: 'factory', col: 10, row: 6, round: 1, progress: 999, built: true, xp: 0, level: 0 });
+    teams(D);
+    const m = x.m(0), q = squad(m, 0, 'Brute', 10, 14), q2 = squad(m, 0, 'Brute', 12, 16); // q comes up on (10,6), q2 on (12,8)
+    const bt = battleOf(D);
+    assert.ok(stays(bt, 0, q.id) && travels(bt, 0, q2.id), 'a Factory in lane ' + facLane + ' on its tile at the exit: it stays, the other goes');
+  }
+  { // a Factory on the exit's own tile, in the other lane: the mine is blocked
+    const x = match(563, [true, true, true, true]), { D } = x;
+    playTo(x, 4);
+    for (const m of lanesOf(D)) { m.armies = [[], []]; m.packages = null; m.buildings = [[], []]; }
+    teams(D);
+    addMine(D, 0, 11, 15, 11, 7);
+    x.m(1).buildings[1].push({ id: 'factory', col: 11, row: 7, round: 1, progress: 999, built: true, xp: 0, level: 0 });
+    teams(D);
+    const q = squad(x.m(0), 0, 'Brute', 10, 14);
+    assert.ok(stays(battleOf(D), 0, q.id), 'the other lane\'s Factory on the exit\'s own tile: nobody goes');
+  }
+  { // Jail guards at their post on the landing tile (B's Jail on (3,3), its west post in tile (2,3); A's exit on (1,3))
+    const x = match(551, [true, true, true, true]), { D } = x;
+    playTo(x, 4);
+    for (const m of lanesOf(D)) { m.armies = [[], []]; m.packages = null; }
+    teams(D);
+    addMine(D, 0, 11, 15, 1, 3);
+    for (const R of D.lanes) { const j = Mpb.addRec(R.m, 1, 'jail', 3, 3); j.skills.guards = { round: 1, n: 1, by: [1, 0], log: [] }; }
+    teams(D);
+    const m = x.m(0), q = squad(m, 0, 'Brute', 12, 15), q2 = squad(m, 0, 'Brute', 11, 14); // q comes up on (2,3), q2 on (1,2)
+    const bt = battleOf(D);
+    assert.ok(bt.bodies.some(b => b.side === 1 && b.guard), 'the guards fight');
+    assert.ok(stays(bt, 0, q.id) && travels(bt, 0, q2.id), 'a Jail guard on its tile at the exit: it stays, the other goes');
+  }
+});
+
 // ===================================== 7: Insider information =====================================
 check('7: Insider information shows the watched team\'s board live (buildings, water, dug exit, walls, vote tiles); the watchers\' checks agree page vs server', () => {
   const x = board(261, 4), { D } = x; // (round 4: no draft)
@@ -433,6 +474,21 @@ check('8: real matches (bots, other secrets): rounds 2 and 8 all different, each
     done++;
   }
   assert.ok(done >= 3, 'matches that reached round 9: ' + done);
+});
+
+check('8: a bot-played match plays the same every time (the bots\' package and tower picks come from D.secret)', () => {
+  const play = () => {
+    const x = match(7, [true, true, true, true], 1), { D } = x, hp = [];
+    while (x.m(0).round < 6 && D.phase !== 'end') {
+      for (let k = 0; k < 4; k++) Duo.setReady(D, k, true, T);
+      hp.push(x.m(0).round + ':' + D.hp.join('/') + ':' + D.lanes.map(R => R.m.towers.map(t => t && t.type).join(',')).join(';'));
+      if (D.phase === 'end') break;
+      for (let k = 0; k < 4; k++) Duo.next(D, k, D.summary[0].round, T);
+    }
+    return hp.join(' ');
+  };
+  const a = play(), b = play();
+  assert.strictEqual(b, a, 'two plays of one match');
 });
 
 // ===================================== 10: the Shadow Den and the mine =====================================

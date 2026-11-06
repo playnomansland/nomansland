@@ -91,7 +91,8 @@ Branch: everything lands on `claude/exciting-meitner-889u3z` (merged there by th
   (the other thing does); a thing with no room anywhere stays, and the other one moves instead if it can; neither can:
   both stay. The Coal mine's exit never moves (place.parts' `stays`): one placed or dug onto a hidden thing of the
   other team's stays there, blocked. "Taken" for a mine's landing tile: a squad's body of either team (both lanes;
-  own team's too), a building tile, water, or a Bastion wall (that fights) on that tile; a taken exit tile stops every
+  own team's too), any other non-structure body that starts there (the other lane's Factory, Jail guards, a golem,
+  an Ent: Engine mineOn counts every fighting body), a building tile, water, or a Bastion wall (that fights) on that tile; a taken exit tile stops every
   squad of the mine. Insider information "everything": the board as the fight will show it; not the gold, skill buys,
   levels, the Vault, or a kind's own picks (Second wind, a jailing, Impersonate, Sabotage, what the School teaches).
   The Den's no-wait at a mine: the same units and the same condition as its no flank delay (the team has a Den).
@@ -276,6 +277,11 @@ lanes** of a team, the way the tower part is (`Duo.TEAM_FIELDS`, `copyTeam`).
   `settle`) finds nothing left; they stay as the fallback for a fight without D (node tests' `Duo.settle`).
 - The server (server/src/duo.js): a sync goes to a phone only when its view changed, and a 'status' only when its
   clock did (`clockNews`, after an act and after an alarm's tick; the alarm no longer forces a sync to all four).
+  What each phone last got (`sentKey` / `teamKey`, `mark`, `forget`) is kept in the socket's attachment as well as in
+  memory, so a room woken from hibernation (a vote's or the draft's own 15 s alarm, an act) still sends the other
+  team nothing for a hidden change (server/test/duo.test.js: `DUO_TEST_EVICT`, the 'evict' message). The page
+  (`srvClock`, 2v2 only) keeps the earliest deploy end this connection learnt, so a status handled late can't wind
+  its clock back. The bots' package and tower picks (`Duo.botTurn`) come from `D.secret` like every other stream.
 - Placement: `Mpb.spotOk(m, side, kind, part, col, row, strict)` (as the team sees the board unless strict), `Mpb.spots(...)` (all allowed tiles, back of the zone and
   middle first), `Mpb.autoSpot(...)` (the first). `Game.mpbAt(m, col, row)` (in `Game.occupied`): every MPB tile and
   part is taken for both teams' squads (unless `place.open`). A kind that lets squads in (garrison, School) uses

@@ -10,6 +10,7 @@
 //  - the Vault (src/mpb.js): a put is acked in step with the phone; the teammate sees it, the opponent not yet
 //  - all ready: one fight for all four, both lanes before it (duo.pres), which plays back the same in node
 //  - a reload gets the same seat back with its key
+//  - a room woken from hibernation sends the other team nothing for a hidden action (DUO_TEST_EVICT: the 'evict' message)
 // Run: cd server && node test/duo.test.js
 const assert = require('assert');
 const { startServer, open, sleep, waitFor } = require('./harness.js');
@@ -25,7 +26,7 @@ const newCode = () => 'D' + Math.random().toString(36).slice(2, 6).toUpperCase()
 
 setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 * 1000).unref();
 (async () => {
-  const srv = await startServer(8791, ['--var', 'DUO_ANYONE:1']);
+  const srv = await startServer(8791, ['--var', 'DUO_ANYONE:1', '--var', 'DUO_TEST_EVICT:1']);
   try {
     const url = (code) => `${srv.ws}/duo/${code}`;
     async function phone(code, hello = {}) {
@@ -137,6 +138,20 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 *
     await sleep(500);
     assert.ok(!phones[3].inbox.some((x) => x.t === 'mark' || x.t === 'emote'), 'the other team hears nothing');
     assert.strictEqual(phones[1].inbox.filter((x) => x.t === 'mark').length, 1, 'an unknown ping kind is dropped');
+    // a room woken from hibernation (its in-memory 'what each phone last got' starts empty: the test-only 'evict'
+    // clears it as a fresh DuoRoom would): an action hidden from the other team (seat 1 puts gold into the Vault)
+    // sends the other team nothing, so they never learn that it (or a hidden vote's 15 s running out) just happened
+    {
+      await sleep(500);
+      phones[1].json({ t: 'evict' }); await sleep(300);
+      const b0 = phones[3].inbox.length, h0 = host.inbox.length;
+      phones[1].json({ t: 'act', seq: 70, fn: 'vaultPut', a: [10] });
+      const va = await waitFor(() => phones[1].inbox.find((x) => x.t === 'ack' && x.seq === 70), 8000);
+      assert.ok(va.ok, 'vaultPut after the room woke up');
+      await sleep(800);
+      assert.deepStrictEqual(phones[3].inbox.slice(b0).map((x) => x.t).filter((t) => t !== 'pong'), [], 'the other team gets no message after a wake-up');
+      assert.ok(host.inbox.slice(h0).some((x) => x.t === 'sync' && x.m && x.m.vault[0].gold === 60), 'the teammate sees the Vault move');
+    }
     // all ready: one fight
     for (const k of [0, 1, 3]) phones[k].json({ t: 'ready', v: true });
     const fights = {};

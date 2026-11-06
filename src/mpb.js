@@ -385,7 +385,8 @@
   // deployed on the 8 tiles round the entrance go down the mine as the fight starts and come up on the matching tile
   // round the exit (the same offset) COAL.travel s later, then stand COAL.rise s more (vulnerable, as a squad new on a
   // flank tile). No squad of either team may be deployed on the 8 tiles round the exit (hooks.blocks; enemy tiles too).
-  // A squad whose tile at the exit is taken as the fight starts (a squad of either team: Engine mineTo; a building,
+  // A squad whose tile at the exit is taken as the fight starts (a squad of either team, or a building's units standing
+  // there: the other lane's Factory, Jail guards, a golem: Engine mineTo; a building,
   // water or a Bastion wall: mineOut), or whose exit tile itself is taken, doesn't go in (Vilhelm, 6 Nov: "the mine
   // exit tiles can be blocked and any units that would end up on the blocked tile simply do not go through the mine to
   // begin with"). So the exit and its ring never make anything move at the fight's start (place.parts' stays). Rogues,
@@ -444,7 +445,7 @@
   const canMoveExit = (m, side, rec) => skillN(rec, 'shaft') > 0 && !rec.data.moved && !!exitOf(rec);
   def({ id: 'coalMine', name: 'Coal mine', short: 'cm', kind: 'technical', hp: COAL.hp, armor: COAL.armor, color: '#4A4440',
     text: `Squads deployed on the 8 tiles round the entrance go down the mine as the fight starts and come up round the exit in no man’s land ${COAL.travel} s later (on the matching tile), then stand ${COAL.rise} s before they fight (not Rogues, Assassins or Shadowhands with a Shadow Den).`,
-    downside: 'No squad of either team may be deployed on the 8 tiles round its exit. If the exit, or the tile a squad would come up on, is taken (a squad, building, water or wall of either team), that squad doesn’t go down the mine: it fights from its own tile.',
+    downside: 'No squad of either team may be deployed on the 8 tiles round its exit. If the exit, or the tile a squad would come up on, is taken (a squad or any other unit, a building, water or a wall, of either team), that squad doesn’t go down the mine: it fights from its own tile.',
     // (stays: the exit never moves at the fight's start and never makes anything move: it is just blocked, Duo.settleBoard)
     place: { where: 'interior', spacing: true, parts: [{ id: 'exit', name: 'exit', where: 'nml', spacing: false, stays: true }] },
     skills: [
