@@ -112,6 +112,8 @@ const zone = (sd, k) => Game.zoneRows(sd)[k];
   const sum = Game.resolve(m, bt.result());
   assert.ok(!b.built && b.progress === 0.5, 'back to 50%');
   assert.deepStrictEqual(sum.buildings[0], [{ id: 'factory', lost: true }]);
+  assert.ok(b.fell === m.round - 1 && Game.buildingFell(b), 'it remembers the round it fell (2026-11-07: the boards draw a rebuild unlike a new site)');
+  assert.ok(!Game.buildingFell({ built: false, progress: 0.3 }) && !Game.buildingFell({ ...b, built: true }), 'a new site, or one built again: not fallen');
 }
 // ---------- the Machinegunner winds up from 0.3 to 3 attacks a second ----------
 {

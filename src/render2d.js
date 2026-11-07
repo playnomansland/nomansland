@@ -922,29 +922,47 @@ const Render2D = (cv, view, opts = {}) => {
     if (o.hpr != null) { ctx.strokeStyle = team; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, R * 1.32, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, o.hpr)); ctx.stroke(); }
     if (o.level > 0) { ctx.fillStyle = css('--gold'); const pr = Math.max(2, s * 0.07); for (let k = 0; k < o.level; k++) { ctx.beginPath(); ctx.arc(x - R + pr + k * pr * 2.6, y - R - pr, pr, 0, Math.PI * 2); ctx.fill(); } }
   }
+  // o.ruined (2026-11-07): destroyed and out of action this round (the 2v2 Factory resting, a Cog Builder's being
+  // rebuilt): greyed, the cog stopped, no smoke, the shared badge (restBadge); a rebuild keeps its gold arc
   function drawFactory(x, y, s, side, color, o) {
-    const w = s * 0.74, h = s * 0.42, x0 = x - w / 2, y0 = y - h * 0.25, team = teamCol(side);
+    const w = s * 0.74, h = s * 0.42, x0 = x - w / 2, y0 = y - h * 0.25, team = teamCol(side), ruined = !!o.ruined;
     ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y0 + h + s * 0.02, w * 0.55, s * 0.07, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = o.built ? 1 : 0.5;
+    ctx.globalAlpha = o.built || ruined ? 1 : 0.5;
     ctx.fillStyle = '#3A3330'; ctx.fillRect(x0 + w * 0.7, y0 - h * 0.85, w * 0.13, h * 0.85); // chimney
-    ctx.fillStyle = color; ctx.strokeStyle = team; ctx.lineWidth = Math.max(1, s * 0.035);
+    ctx.fillStyle = ruined ? REST_GREY : color; ctx.strokeStyle = team; ctx.lineWidth = Math.max(1, s * 0.035);
     ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#5B4A3A'; // sawtooth roof
+    ctx.fillStyle = ruined ? '#3E3934' : '#5B4A3A'; // sawtooth roof
     for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(x0 + k * w / 3, y0); ctx.lineTo(x0 + (k + 1) * w / 3, y0 - h * 0.38); ctx.lineTo(x0 + (k + 1) * w / 3, y0); ctx.closePath(); ctx.fill(); ctx.stroke(); }
-    const cr = h * 0.27, cx = x0 + w * 0.3, cy = y0 + h * 0.5, turn = (o.time || 0) * 1.5; // the cog turns while it works
-    ctx.fillStyle = '#D6B26A';
+    const cr = h * 0.27, cx = x0 + w * 0.3, cy = y0 + h * 0.5, turn = ruined ? 0 : (o.time || 0) * 1.5; // the cog turns while it works
+    ctx.fillStyle = ruined ? '#7A7268' : '#D6B26A';
     ctx.beginPath(); for (let k = 0; k < 16; k++) { const a = turn + k * Math.PI / 8, r = k % 2 ? cr : cr * 1.3; ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } ctx.closePath(); ctx.fill();
-    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(cx, cy, cr * 0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = ruined ? REST_GREY : color; ctx.beginPath(); ctx.arc(cx, cy, cr * 0.4, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#231E1B'; ctx.fillRect(x0 + w * 0.58, y0 + h * 0.35, w * 0.22, h * 0.65); // door
     ctx.globalAlpha = 1;
-    if (!o.built) { // scaffold poles and how far along it is
+    if (!o.built) { // scaffold poles (a new site, not a ruin) and how far along it is
       ctx.strokeStyle = '#C8A46A'; ctx.lineWidth = 1; ctx.setLineDash([2, 2]);
-      ctx.strokeRect(x0 - s * 0.05, y0 - h * 0.45, w + s * 0.1, h * 1.45); ctx.setLineDash([]);
+      if (!ruined) ctx.strokeRect(x0 - s * 0.05, y0 - h * 0.45, w + s * 0.1, h * 1.45);
+      ctx.setLineDash([]);
       ctx.strokeStyle = css('--gold'); ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.arc(x, y, s * 0.46, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, Math.min(1, o.progress || 0))); ctx.stroke();
-    } else if (o.time != null) puffs(x0 + w * 0.765, y0 - h * 0.85, s * 0.07, o.time, x * 0.37);
+    } else if (o.time != null && !ruined) puffs(x0 + w * 0.765, y0 - h * 0.85, s * 0.07, o.time, x * 0.37);
     if (o.hpr != null) { ctx.strokeStyle = team; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, s * 0.52, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, o.hpr)); ctx.stroke(); }
     if (o.level > 0) { ctx.fillStyle = css('--gold'); const pr = Math.max(2, s * 0.07); for (let k = 0; k < o.level; k++) { ctx.beginPath(); ctx.arc(x - s / 2 + pr + 3 + k * pr * 2.6, y - s / 2 + pr + 3, pr, 0, Math.PI * 2); ctx.fill(); } }
+    if (ruined && !o.noBadge) restBadge(x, y, s);
+  }
+  // ---------- out of action this round (2026-11-07): one look for every building that does nothing this round ----------
+  // (Mpb.resting: the 2v2 Factory being rebuilt, a shut Coal mine; Game.buildingFell: a Cog Builder's Factory being
+  // rebuilt), while deploying: greyed, lights out and nothing turning or smoking (as the Jail's dark lantern), and this
+  // small badge in the tile's bottom-left corner: a dark disc ringed in the foe colour, a stopped grey cog struck
+  // through. render3d.js draws the same: the 'ruin' look and its 'rest' icon.
+  const REST_GREY = '#5E5852';
+  function restBadge(x, y, t) {
+    const r = Math.max(5, t * 0.15), bx = x - t / 2 + r + 2, by = y + t / 2 - r - 2;
+    ctx.fillStyle = '#2B2F33'; ctx.strokeStyle = css('--foe'); ctx.lineWidth = Math.max(1.5, r * 0.22);
+    ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#A8A29A'; ctx.beginPath(); for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8, rr = k % 2 ? r * 0.42 : r * 0.58; ctx.lineTo(bx + Math.cos(a) * rr, by + Math.sin(a) * rr); } ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#2B2F33'; ctx.beginPath(); ctx.arc(bx, by, r * 0.18, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = css('--foe'); ctx.lineWidth = Math.max(1.5, r * 0.2); ctx.beginPath(); ctx.moveTo(bx - r * 0.6, by + r * 0.6); ctx.lineTo(bx + r * 0.6, by - r * 0.6); ctx.stroke();
   }
   // ---------- 2v2 buildings (src/mpb.js): one drawing per kind, a plain one for the rest ----------
   // MPB_DRAW[kind](x, y, t, side, o): a building at screen (x, y), t = tile px; o: { hpr (health left in a fight, or
@@ -1019,10 +1037,11 @@ const Render2D = (cv, view, opts = {}) => {
     // ===== coalMine (2D) =====
     // the entrance: a rocky mound with a timber-framed adit (a black arch under a lintel in the team colour), rails
     // running out of it and a little cart heaped with coal; a lantern hangs by the door
+    // (shut, o.resting: greyed, the adit boarded up, the lantern out, the shared badge)
     coalMine(x, y, t, side, o) {
-      const s = t * 0.8, c = teamCol(side);
+      const s = t * 0.8, c = o.resting ? REST_GREY : teamCol(side);
       ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x, y + s * 0.36, s * 0.52, s * 0.11, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
-      ctx.fillStyle = '#6B625A'; ctx.strokeStyle = '#3A342F'; ctx.lineWidth = Math.max(1, s * 0.03); // the mound
+      ctx.fillStyle = o.resting ? '#4E4843' : '#6B625A'; ctx.strokeStyle = '#3A342F'; ctx.lineWidth = Math.max(1, s * 0.03); // the mound
       ctx.beginPath(); ctx.moveTo(x - s * 0.5, y + s * 0.34); ctx.quadraticCurveTo(x - s * 0.46, y - s * 0.4, x, y - s * 0.44); ctx.quadraticCurveTo(x + s * 0.46, y - s * 0.4, x + s * 0.5, y + s * 0.34); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#857A6E'; for (const [fx, fy, fr] of [[-0.3, -0.12, 0.07], [0.28, -0.2, 0.06], [0.34, 0.1, 0.05], [-0.36, 0.14, 0.05]]) { ctx.beginPath(); ctx.arc(x + s * fx, y + s * fy, s * fr, 0, Math.PI * 2); ctx.fill(); } // stones
       ctx.fillStyle = '#121212'; ctx.beginPath(); ctx.moveTo(x - s * 0.2, y + s * 0.3); ctx.lineTo(x - s * 0.2, y - s * 0.08); ctx.quadraticCurveTo(x, y - s * 0.26, x + s * 0.2, y - s * 0.08); ctx.lineTo(x + s * 0.2, y + s * 0.3); ctx.closePath(); ctx.fill(); // the dark adit
@@ -1033,6 +1052,13 @@ const Render2D = (cv, view, opts = {}) => {
       ctx.fillStyle = '#55595E'; ctx.fillRect(x + s * 0.02, y + s * 0.24, s * 0.26, s * 0.13); // the cart
       ctx.fillStyle = '#1E1C1B'; for (const [fx, fy] of [[0.08, 0.23], [0.15, 0.21], [0.22, 0.23], [0.12, 0.18]]) { ctx.beginPath(); ctx.arc(x + s * fx, y + s * fy, s * 0.045, 0, Math.PI * 2); ctx.fill(); } // its coal
       ctx.fillStyle = '#2B2F33'; for (const fx of [0.07, 0.23]) { ctx.beginPath(); ctx.arc(x + s * fx, y + s * 0.38, s * 0.03, 0, Math.PI * 2); ctx.fill(); }
+      if (o.resting) { // shut: planks nailed across the adit, the lantern out
+        ctx.fillStyle = '#7A6A58'; ctx.strokeStyle = '#3A2E22'; ctx.lineWidth = 1;
+        for (const [fy, a] of [[-0.02, 0.18], [0.14, -0.15]]) { ctx.save(); ctx.translate(x, y + s * fy); ctx.rotate(a); ctx.fillRect(-s * 0.24, -s * 0.035, s * 0.48, s * 0.07); ctx.strokeRect(-s * 0.24, -s * 0.035, s * 0.48, s * 0.07); ctx.restore(); }
+        ctx.fillStyle = '#6E6A64'; ctx.beginPath(); ctx.arc(x - s * 0.32, y - s * 0.02, s * 0.035, 0, Math.PI * 2); ctx.fill();
+        restBadge(x, y, t);
+        return;
+      }
       const glow = 0.75 + 0.25 * Math.sin((o.time || 0) * 3 + x); // the lantern
       ctx.fillStyle = '#FFD27A'; ctx.globalAlpha = 0.35 * glow; ctx.beginPath(); ctx.arc(x - s * 0.32, y - s * 0.02, s * 0.1, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(x - s * 0.32, y - s * 0.02, s * 0.035, 0, Math.PI * 2); ctx.fill();
@@ -1090,8 +1116,8 @@ const Render2D = (cv, view, opts = {}) => {
     // the Cog Builder's Factory as drawn for a Cog Builder (always built, its cog turning), under the team's tall
     // swallow-tailed banner on a pole at its side with a white cog on it: the team's, not one player's
     factory(x, y, t, side, o) {
-      const s = t * 0.92, c = teamCol(side);
-      drawFactory(x + s * 0.06, y, s, side, '#B07A3C', { built: true, time: o.time, level: 0 });
+      const s = t * 0.92, c = o.resting ? REST_GREY : teamCol(side); // (resting: being rebuilt this round, drawFactory's ruined look)
+      drawFactory(x + s * 0.06, y, s, side, '#B07A3C', { built: true, time: o.time, level: 0, ruined: !!o.resting, noBadge: true });
       const px = x - s * 0.38, top = y - s * 0.56, bh = s * 0.36, bw = s * 0.34;
       ctx.strokeStyle = '#2B2F33'; ctx.lineWidth = Math.max(1.5, s * 0.035);
       ctx.beginPath(); ctx.moveTo(px, y + s * 0.22); ctx.lineTo(px, top - s * 0.05); ctx.stroke(); // the pole
@@ -1101,6 +1127,7 @@ const Render2D = (cv, view, opts = {}) => {
       const cx = px + bw * 0.38, cy = top + bh * 0.5, cr = bh * 0.2; // a small white cog on it
       ctx.fillStyle = '#F4EFE3'; ctx.beginPath(); for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6, r = k % 2 ? cr : cr * 1.35; ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } ctx.closePath(); ctx.fill();
       ctx.fillStyle = c; ctx.beginPath(); ctx.arc(cx, cy, cr * 0.45, 0, Math.PI * 2); ctx.fill();
+      if (o.resting) restBadge(x, y, t);
     },
     // ===== magicLake (2D) =====
     // a pond filling its tile: soft blue water with a pale shimmer, slow ripples, a lily pad and reeds at its edge, a
@@ -1339,7 +1366,8 @@ const Render2D = (cv, view, opts = {}) => {
     ctx.fillStyle = 'rgba(255,226,160,0.16)';
     for (const side of [me, foe()]) for (const rec of Mpb.recs(m, side)) for (const tl of Mpb.litTiles(m, side, rec)) ctx.fillRect(scol(tl.col) * t + 1, srow(tl.row) * t + 1, t - 2, t - 2);
     for (const side of [me, foe()]) for (const rec of Mpb.recs(m, side)) for (const tl of Mpb.tilesOf(rec)) {
-      drawMpb(rec.kind, (scol(tl.col) + 0.5) * t, (srow(tl.row) + 0.5) * t, t, side, { part: tl.part || null, fresh: phase === 'deploy' && rec.round === m.round && rec.round > 1, time: performance.now() / 1000, rec });
+      drawMpb(rec.kind, (scol(tl.col) + 0.5) * t, (srow(tl.row) + 0.5) * t, t, side, { part: tl.part || null, fresh: phase === 'deploy' && rec.round === m.round && rec.round > 1, time: performance.now() / 1000, rec,
+        resting: phase === 'deploy' && !tl.part && Mpb.resting(m, side, rec) }); // (out of action this round: the shared look, deploying only)
     }
   }
   // in a fight: the tiles of buildings that are no fight body (a mine's exit, a lake's water: parts, and kinds with no
@@ -1362,13 +1390,20 @@ const Render2D = (cv, view, opts = {}) => {
     }
     ctx.globalAlpha = 1;
   }
-  // the buildings on the board while deploying (an opponent's new one only from the fight on)
+  // the buildings on the board while deploying (an opponent's new one only from the fight on). 2v2: the other lane's
+  // too (m.team.buildings: your teammate's, and the other opponent's from the round after it was placed; 2026-11-07).
+  // One destroyed and being rebuilt has the out-of-action look while deploying (drawFactory's ruined).
   function drawBuildings() {
     const t = tilePx();
+    for (const side of [me, foe()]) for (const b of Game.teamBuildings(m, side)) {
+      if (!Game.teamBuildingShown(m, me, deploying(), side, b)) continue;
+      const info = Game.buildingInfo(b.id) || {};
+      drawBuilding(b.id, (scol(b.col) + 0.5) * t, (srow(b.row) + 0.5) * t, t, side, info.color || '#B07A3C', { built: b.built, progress: b.progress, level: b.level, ruined: deploying() && Game.buildingFell(b) });
+    }
     for (const side of [me, foe()]) for (const b of Game.buildingsOf(m, side)) {
       if (!Game.buildingShown(m, me, deploying(), side, b)) continue;
       const info = Game.buildingInfo(b.id) || {};
-      drawBuilding(b.id, (scol(b.col) + 0.5) * t, (srow(b.row) + 0.5) * t, t, side, info.color || '#B07A3C', { built: b.built, progress: b.progress, level: b.level });
+      drawBuilding(b.id, (scol(b.col) + 0.5) * t, (srow(b.row) + 0.5) * t, t, side, info.color || '#B07A3C', { built: b.built, progress: b.progress, level: b.level, ruined: deploying() && Game.buildingFell(b) });
       if (side === me && deploying() && Game.buildingReady(b)) { // ready to level up: the gold plus badge, as on a squad
         const br = Math.max(5, t * 0.17), bx = (scol(b.col) + 1) * t - br - 2, by = srow(b.row) * t + br + 2;
         ctx.fillStyle = css('--gold'); ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();

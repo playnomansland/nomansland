@@ -177,6 +177,9 @@ const Render3D = (THREE, el, view, opts = {}) => {
   // see-through looks, the whole body in the team colour: stealthed (yours, the enemy's), waiting to flank, fliers
   const seeThrough = (opacity) => new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.5, transparent: true, opacity, depthWrite: false });
   const LOOKS = { ghost: seeThrough(0.45), ghostFoe: seeThrough(0.22), glass: seeThrough(0.55) };
+  // 'ruin' (2026-11-07): a building out of action this round (render2d.js restBadge), its own model and materials,
+  // greyed and darkened (RUIN_GREY; no rattle, no smoke) with the 'rest' icon over it: no new model, no extra triangles
+  const RUIN_GREY = new THREE.Color('#6A655F');
   const flatMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, depthWrite: false });
   const ringGeo = new THREE.RingGeometry(1.0, 1.25, 20).rotateX(-Math.PI / 2).translate(0, 0.04, 0);
   const shotGeo = new THREE.SphereGeometry(0.28, 6, 4);
@@ -305,6 +308,11 @@ const Render3D = (THREE, el, view, opts = {}) => {
   const ICONS = {
     dot: (g) => { g.fillStyle = '#fff'; g.beginPath(); g.arc(32, 32, 26, 0, Math.PI * 2); g.fill(); },
     star: (g) => { g.fillStyle = '#fff'; g.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? 12 : 28; g.lineTo(32 + r * Math.cos(a), 34 + r * Math.sin(a)); } g.closePath(); g.fill(); },
+    rest: (g) => { // out of action this round (render2d.js restBadge): a dark disc ringed in the foe colour, a grey cog struck through
+      g.fillStyle = '#2B2F33'; g.strokeStyle = css('--foe') || '#E0705A'; g.lineWidth = 6; g.beginPath(); g.arc(32, 32, 27, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = '#A8A29A'; g.beginPath(); for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8, r = k % 2 ? 11 : 16; g.lineTo(32 + Math.cos(a) * r, 32 + Math.sin(a) * r); } g.closePath(); g.fill();
+      g.fillStyle = '#2B2F33'; g.beginPath(); g.arc(32, 32, 5, 0, Math.PI * 2); g.fill();
+      g.lineWidth = 6; g.beginPath(); g.moveTo(16, 48); g.lineTo(48, 16); g.stroke(); },
     plus: (g) => { // ready to level up: a gold badge with a plus
       g.fillStyle = css('--gold'); g.beginPath(); g.arc(32, 32, 28, 0, Math.PI * 2); g.fill();
       g.strokeStyle = css('--bg'); g.lineWidth = 8; g.beginPath(); g.moveTo(16, 32); g.lineTo(48, 32); g.moveTo(32, 16); g.lineTo(32, 48); g.stroke(); },
@@ -717,19 +725,25 @@ const Render3D = (THREE, el, view, opts = {}) => {
       bodies.push({ u: towerUnit(m, side, Game.towerTypeShown(m, me, deploying, side)), side, x: w.x, y: w.y, look: 'solid', crest, edge: Art.teamCol(side, me) });
     }
     addSpires(v, m, deploying, f);
-    // buildings (the Mechites' Factory): a see-through scaffold with a gold arc until it is built (an opponent's new one only from the fight on)
-    for (const side of [me, foe]) for (const bl of Game.buildingsOf(m, side)) {
-      if (!Game.buildingShown(m, me, deploying, side, bl)) continue;
-      const info = Game.buildingInfo(bl.id) || {}, w = Game.tileToWorld(bl.col, bl.row), [wx, wz] = world(f, w.x, w.y);
-      bodies.push({ u: { name: info.name, building: bl.id, color: info.color || '#B07A3C', hp: info.hp || 1000 }, side, x: w.x, y: w.y, look: bl.built ? 'solid' : 'glass' });
+    // buildings (the Mechites' Factory): a see-through scaffold with a gold arc until it is built (an opponent's new one only from the fight on);
+    // one destroyed and being rebuilt: the 'ruin' look and its icon while deploying, with the gold arc. 2v2: the other
+    // lane's too (m.team.buildings, as Game.teamBuildingShown allows; 2026-11-07), without the level-up plus
+    const bldg = (bl, side, other) => {
+      if (!(other ? Game.teamBuildingShown : Game.buildingShown)(m, me, deploying, side, bl)) return;
+      const info = Game.buildingInfo(bl.id) || {}, w = Game.tileToWorld(bl.col, bl.row), [wx, wz] = world(f, w.x, w.y), ruin = deploying && Game.buildingFell(bl);
+      bodies.push({ u: { name: info.name, building: bl.id, color: info.color || '#B07A3C', hp: info.hp || 1000 }, side, x: w.x, y: w.y, look: bl.built ? 'solid' : ruin ? 'ruin' : 'glass' });
       if (!bl.built) arc(wx, wz, 3.2, gold, 0.95, bl.progress || 0, 0.07);
+      if (ruin) icon('rest', wx - camRight.x * 2.4, 4.2, wz - camRight.z * 2.4, 1.8);
       if (bl.level > 0) iconRow([...Array(bl.level)].map(() => 'dot'), wx, 5.6, wz, 0.5, gold);
-      if (side === me && deploying && Game.buildingReady(bl)) icon('plus', wx + camRight.x * 2.4, 4.2, wz + camRight.z * 2.4, 1.0);
-    }
+      if (!other && side === me && deploying && Game.buildingReady(bl)) icon('plus', wx + camRight.x * 2.4, 4.2, wz + camRight.z * 2.4, 1.0);
+    };
+    for (const side of [me, foe]) for (const bl of Game.teamBuildings(m, side)) bldg(bl, side, true);
+    for (const side of [me, foe]) for (const bl of Game.buildingsOf(m, side)) bldg(bl, side, false);
     // 2v2 buildings (src/mpb.js): both teams', each part on its own tile (models3d 'mpb:<kind>')
     if (typeof Mpb !== 'undefined' && Mpb.on(m)) for (const side of [me, foe]) for (const rec of Mpb.recs(m, side)) for (const tl of Mpb.tilesOf(rec)) {
-      const w = Game.tileToWorld(tl.col, tl.row), u = Mpb.unitOf(m, side, rec);
-      bodies.push({ u: tl.part ? { ...u, mpbPart: tl.part } : u, side, x: w.x, y: w.y, look: 'solid', edge: Art.teamCol(side, me) });
+      const w = Game.tileToWorld(tl.col, tl.row), u = Mpb.unitOf(m, side, rec), ruin = deploying && !tl.part && Mpb.resting(m, side, rec); // (out of action this round: the 'ruin' look, as the 2D board)
+      bodies.push({ u: tl.part ? { ...u, mpbPart: tl.part } : u, side, x: w.x, y: w.y, look: ruin ? 'ruin' : 'solid', edge: Art.teamCol(side, me) });
+      if (ruin) { const [wx, wz] = world(f, w.x, w.y); icon('rest', wx - camRight.x * 2.4, 4.2, wz - camRight.z * 2.4, 1.8); }
       if (deploying && rec.round === m.round && rec.round > 1) { const st = tileCenter(v, tl.col, tl.row); tileSq(st.c, st.r, teamColor(side, me), 0.8, 0.05, 14); }
       if (!tl.part) for (const lt of Mpb.litTiles(m, side, rec)) { const st = tileCenter(v, lt.col, lt.row); tileSq(st.c, st.r, color('#FFE2A0'), 0.16, 1, 0, 0.02); } // tiles it lights up (the Jail's Skywatch)
     }
@@ -834,7 +848,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
     for (const [key, list] of Object.entries(byKey)) {
       const [kind, look] = key.split('#'), parts = models.parts(kind), top = models.height(kind);
       const gs = [['tint', tintMat], ['team', teamMat], ['fixed', fixedMat]].filter(([p]) => parts[p])
-        .map(([p, mat]) => [p, group(key + ':' + p, parts[p], look === 'solid' ? mat : LOOKS[look], list.length)]);
+        .map(([p, mat]) => [p, group(key + ':' + p, parts[p], look === 'solid' || look === 'ruin' ? mat : LOOKS[look], list.length)]);
       const rollAt = models.ROLL_AT[kind];
       list.forEach((s, i) => {
         // towers and buildings are drawn at their own size and face their own side (a walking building faces where it goes)
@@ -857,7 +871,8 @@ const Render3D = (THREE, el, view, opts = {}) => {
         const team = s.flag || teamColor(s.side, me);
         for (const [p, g] of gs) {
           g.setMatrixAt(i, tmpM);
-          if (look !== 'solid') g.setColorAt(i, team);
+          if (look === 'ruin') g.setColorAt(i, (p === 'tint' ? tmpC.set(s.u.color || '#cccccc') : p === 'team' ? tmpC.copy(team) : tmpC.set('#9A9590')).lerp(RUIN_GREY, 0.6).multiplyScalar(0.85));
+          else if (look !== 'solid') g.setColorAt(i, team);
           else g.setColorAt(i, p === 'tint' ? tmpC.set(s.u.color || '#cccccc') : p === 'team' ? team : white);
         }
         // a stealthed body is only its see-through model, as the dashed ghost on the 2D board: no markers, and no

@@ -5,7 +5,8 @@
 //  - a real Duo fight: a squad round the entrance is down the mine for 2 s (can't be seen, hit or pushed), comes up on
 //    the matching tile round the exit, stands 1.5 s, then fights; a squad elsewhere doesn't; an enemy squad on its
 //    exit tile keeps it out; a destroyed entrance doesn't stop squads already on their way
-//  - Dig a new exit (150, once a match): one move, flank tiles of the enemy's half too, taken back with the skill
+//  - Dig a new exit (150, +50 for each earlier dig of the mine; once a round, since 2026-11-07): one move a buy, flank
+//    tiles of the enemy's half too, taken back with the skill
 //  - Fresh air (200): +25% speed and +4 armor for 5 s after coming up
 //  - mirror: both teams' mines, point-mirrored: the same travel, mirrored
 //  Magic lake
@@ -185,7 +186,7 @@ check('coal mine fight: an enemy squad on the exit tile keeps that squad out; a 
   assert.ok(!bt.bodies.some(z => z.u.mpb === 'coalMine' && z.u.mpbPart), 'the exit is no fight body');
 });
 
-check('coal mine: Dig a new exit (150): one move, flank tiles too, taken back with the skill; hashes as the server', () => {
+check('coal mine: Dig a new exit (150, then 200...): one move a round, flank tiles too, taken back with the skill; hashes as the server', () => {
   const x = match(305), { D } = x;
   const key = addMine(D, 0, 11, 15, 11, 9);
   for (const R of D.lanes) R.m.gold[0] = 1000;
@@ -197,7 +198,7 @@ check('coal mine: Dig a new exit (150): one move, flank tiles too, taken back wi
   const r = x.act(0, 'mpbBuy', key, 'shaft');
   assert.ok(r.ok && Ref.sideHash(pm, 0) === r.h, 'bought: page and server agree');
   assert.strictEqual(x.m(0).gold[0], 1000 - COAL.moveCost);
-  assert.ok(!x.act(1, 'mpbBuy', key, 'shaft').ok, 'once a match');
+  assert.ok(!x.act(1, 'mpbBuy', key, 'shaft').ok, 'once a round');
   assert.ok(!x.act(1, 'mpbAct', key, 'exit', 10, 13).ok, 'not into the zone');
   assert.ok(!x.act(1, 'mpbAct', key, 'exit', 0, 12).ok, 'not on the own half\'s flank tiles (they are the enemy\'s)');
   assert.ok(CM.exitMoveOk(x.m(0), 0, Mpb.recOf(x.m(0), 0, key), 0, 3), 'a flank tile of the enemy\'s zone is allowed');
@@ -209,7 +210,7 @@ check('coal mine: Dig a new exit (150): one move, flank tiles too, taken back wi
   sameTeam(D, 0);
   assert.deepStrictEqual(Mpb.recOf(x.m(0), 0, key).parts.exit, { col: 1, row: 7 });
   assert.ok(Game.occupied(x.m(0), 1, 2, 6) && !Game.occupied(x.m(0), 1, 12, 9), 'the blocked tiles moved with it');
-  assert.ok(!x.act(0, 'mpbAct', key, 'exit', 12, 8).ok, 'only once');
+  assert.ok(!x.act(0, 'mpbAct', key, 'exit', 12, 8).ok && !x.act(0, 'mpbBuy', key, 'shaft').ok, 'only once a round');
   assert.deepStrictEqual(Duo.viewFor(D, 2).m.mpb[0].find(q => q.key === key).parts.exit, { col: 11, row: 9 }, 'the opponents still see the old exit until the fight (hidden as every placement this round)');
   assert.ok(!Duo.viewFor(D, 2).m.mpb[0].find(q => q.key === key).skills.shaft, 'but not this round\'s skill');
   assert.ok(x.act(0, 'mpbUndo', key, 'shaft').ok, 'A1 takes the skill back');
@@ -218,7 +219,17 @@ check('coal mine: Dig a new exit (150): one move, flank tiles too, taken back wi
   // a move in a later round stays
   assert.ok(x.act(1, 'mpbBuy', key, 'shaft').ok && x.act(1, 'mpbAct', key, 'exit', 13, 8).ok);
   playTo(x, 2);
-  if (D.phase !== 'end') { assert.deepStrictEqual(Mpb.recOf(x.m(0), 0, key).parts.exit, { col: 13, row: 8 }); assert.ok(!x.act(1, 'mpbAct', key, 'exit', 12, 8).ok && !x.act(0, 'mpbUndo', key, 'shaft').ok, 'done for the match'); }
+  if (D.phase !== 'end') {
+    assert.deepStrictEqual(Mpb.recOf(x.m(0), 0, key).parts.exit, { col: 13, row: 8 });
+    assert.ok(!x.act(1, 'mpbAct', key, 'exit', 12, 8).ok && !x.act(0, 'mpbUndo', key, 'shaft').ok, 'no move without a new dig; last round’s can’t be taken back');
+    // (2026-11-07) dug again in a later round: 50 gold more each time
+    for (const R of D.lanes) R.m.gold[0] = 1000;
+    assert.strictEqual(Mpb.skillCost(x.m(1), 0, key, 'shaft'), COAL.moveCost + COAL.moveRise, 'the 2nd dig: 200');
+    assert.ok(x.act(1, 'mpbBuy', key, 'shaft').ok && x.act(1, 'mpbAct', key, 'exit', 12, 8).ok, 'dug again');
+    assert.strictEqual(x.m(1).gold[0], 1000 - COAL.moveCost - COAL.moveRise);
+    assert.ok(!x.act(1, 'mpbBuy', key, 'shaft').ok && !x.act(0, 'mpbBuy', key, 'shaft').ok, 'once a round for the team');
+    sameTeam(D, 0);
+  }
 });
 
 check('coal mine: Fresh air (200): +25% speed and +4 armor for 5 s after coming up', () => {

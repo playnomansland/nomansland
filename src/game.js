@@ -1663,6 +1663,11 @@ const Game = (() => {
   const buildingAt = (m, side, col, row) => buildingsOf(m, side).find(b => b.col === col && b.row === row) || null;
   // what a screen may show of a player's building: an opponent's new one only from the fight on
   const buildingShown = (v, viewer, deploying, side, b) => side === viewer || !deploying || b.round < v.round;
+  // 2v2: the other lane's buildings (m.team.buildings, the teammate's and the other opponent's) as bldgSeen counts
+  // them: the team's always, the other team's from the round after it was placed, or live when watched (2026-11-07)
+  const teamBuildingShown = (v, viewer, deploying, side, b) => buildingShown(v, viewer, deploying, side, b) || watchedLive(v, side);
+  // a building from a skill destroyed in a fight and not rebuilt yet (not a new site): the boards' out-of-action look
+  const buildingFell = (b) => !!b && !b.built && b.fell > 0;
   const buildingSpotOk = (m, side, col, row) => col >= 0 && col < COLS && inZone(side, row) && !reserved(side, col, row) && !occupied(m, side, col, row) && !terrainBlocks(m, col, row);
   const canBuyBuilding = (m, side, ui, k) => isBuildingSkill(m, ui, k) && !!buildingInfo(buildingIdOf(m, ui, k)) && !buildingOf(m, side, buildingIdOf(m, ui, k)) && canBuySkill(m, side, ui, k);
   // buy unit ui's building skill k and put the building on (col, row)
@@ -1815,7 +1820,7 @@ const Game = (() => {
       const q = res.squads && res.squads[side + ':' + r.squad];
       if (b.built) {
         if (q && !r.sq) b.xp += q.xp;
-        if (!x.alive) { b.built = false; b.progress = Math.max(0, Math.min(1, (info.rebuild == null ? 50 : info.rebuild) / 100)); news[side].push({ id: r.id, lost: true }); }
+        if (!x.alive) { b.built = false; b.progress = Math.max(0, Math.min(1, (info.rebuild == null ? 50 : info.rebuild) / 100)); if (!r.sq) b.fell = m.round; news[side].push({ id: r.id, lost: true }); } // (fell: the round it was destroyed in, so a rebuild looks unlike a new site; 2026-11-07)
       } else if (x.work != null) {
         b.progress = Math.max(0, Math.min(1, x.work / info.buildSecs));
         if (x.work >= info.buildSecs - 1e-9 || (info.survive && x.alive && x.worked)) { b.built = true; b.progress = 1; news[side].push({ id: r.id, built: true }); }
@@ -3462,7 +3467,7 @@ const Game = (() => {
     unlockCost, tierOf, startLevel, shopCost, mapFreeOf, mapFreeLeft, isUnlocked, unlockVisible, unlock, undoUnlock,
     isHunter, preyOf, canHunt, huntMark, undoHunt, preyShown, preyOn, aiHunt, skillDef, skillCost, SKILL_STEP, skillsBought, isInnate, hasSkill, skillVisible, skillNeeds, skillNeedsAny, skillNeedsMissing, skillHeldUp, isFlat, isMaster, isAwaken, awakenSlot, awakenCost, wokeUnit, awakenBlock, canAwaken, awaken, undoAwaken, seenAwake, isEvolve, evolveSlot, evolveReady, isEvolved, shownAwake, glutOf, glutMax, glutFull, skillOr, skillOrTaken, unitFor, withCharacter,
     footprint, blockOf, spotFree, buildingRecords, recordOf, recordWorld, buildingEffects,
-    setBuildings, BUILDINGS: () => BUILDINGS, buildingInfo, BUILDING_SQUAD, isBuildingSkill, buildingIdOf, buildingsOf, buildingOf, buildingAt, buildingShown, buildingSpotOk,
+    setBuildings, BUILDINGS: () => BUILDINGS, buildingInfo, BUILDING_SQUAD, isBuildingSkill, buildingIdOf, buildingsOf, buildingOf, buildingAt, buildingShown, teamBuildingShown, buildingFell, buildingSpotOk,
     canBuyBuilding, buyBuilding, buildingSkills, buildingSkillInfo, bskillOf, bskillCost, canBuyBuildingSkill, buyBuildingSkill, undoBuildingSkill,
     buildingXpNeeded, buildingLevelCost, buildingReady, levelBuilding, undoLevelBuilding, constructBuff, buildingBodies, canBuySkill, buySkill, undoSkill, sellValue, sell,
     isRider, mpbHeld, schoolLock, TEAM_ID, mateRide, mateAt, syncRiders, freeOut, horseUse, horseOk, horseLeft, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
