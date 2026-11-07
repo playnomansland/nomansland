@@ -29,7 +29,8 @@ const dock = require('./dock');
       const fa = Mpb.addRec(m, me, 'factory', 4, z[2]), cm = Mpb.addRec(m, me, 'coalMine', 8, z[2]); cm.parts.exit = { col: 8, row: Game.ROWS / 2 };
       fa.fell = cm.fell = 1;
       Mpb.resting = (mm, sd, rec) => !!rec && rec.kind !== 'vault'; // (as the round after they fell)
-      m.buildings = [[], []]; m.buildings[me] = [{ id: 'factory', col: 12, row: z[3], round: 1, progress: 0.5, built: false, xp: 0, level: 0, fell: 1 }];
+      m.buildings = [[], []]; m.buildings[me] = [{ id: 'factory', col: 12, row: z[3], round: 1, progress: 0.5, built: false, xp: 0, level: 0, fell: 1 },
+        { id: 'altar', col: 20, row: z[3], round: 1, progress: 0.5, built: false, xp: 0, level: 0, fell: 1 }]; // (an Altar of Build being rebuilt: a plain scaffold, as on the 2D board)
       m.team = { half: 0, armies: [[], []], buildings: [[], []], tech: [null, null], sold: [[], []], horse: [{}, {}] };
       m.team.buildings[me] = [{ id: 'factory', col: 16, row: z[3], round: 1, built: false, progress: 0.5, level: 0, fell: 1 }];
       window.__pbRedraw();
@@ -40,6 +41,8 @@ const dock = require('./dock');
     if (board === '3d') {
       const d = await p.evaluate(() => window.__pb().board3d.drawn().filter(x => x.building || /factory|coal/i.test(x.name || '')).map(x => [x.name, x.look]));
       check(d.filter(([, l]) => l === 'ruin').length >= 4, `3D: the four out of action drawn with the 'ruin' look (${JSON.stringify(d)})`);
+      const alt = await p.evaluate(() => window.__pb().board3d.drawn().filter(x => x.building === 'altar').map(x => x.look));
+      check(alt.length === 1 && alt[0] === 'glass', `3D: an Altar of Build being rebuilt is a plain scaffold, not 'ruin' (as 2D) (${JSON.stringify(alt)})`);
     }
     if (process.env.PB_SHOTS) { await dock.down(p); await p.screenshot({ path: `${process.env.PB_SHOTS}/fixes-A-${board}.png` }); }
     // A6: the team Factory's sheet, Read more open across a redraw (as after a buy)

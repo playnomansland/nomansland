@@ -726,11 +726,12 @@ const Render3D = (THREE, el, view, opts = {}) => {
     }
     addSpires(v, m, deploying, f);
     // buildings (the Mechites' Factory): a see-through scaffold with a gold arc until it is built (an opponent's new one only from the fight on);
-    // one destroyed and being rebuilt: the 'ruin' look and its icon while deploying, with the gold arc. 2v2: the other
+    // a Factory destroyed and being rebuilt: the 'ruin' look and its icon while deploying, with the gold arc (the Factory only,
+  // as the 2D board's drawFactory; an Altar of Build being rebuilt is a plain scaffold on both). 2v2: the other
     // lane's too (m.team.buildings, as Game.teamBuildingShown allows; 2026-11-07), without the level-up plus
     const bldg = (bl, side, other) => {
       if (!(other ? Game.teamBuildingShown : Game.buildingShown)(m, me, deploying, side, bl)) return;
-      const info = Game.buildingInfo(bl.id) || {}, w = Game.tileToWorld(bl.col, bl.row), [wx, wz] = world(f, w.x, w.y), ruin = deploying && Game.buildingFell(bl);
+      const info = Game.buildingInfo(bl.id) || {}, w = Game.tileToWorld(bl.col, bl.row), [wx, wz] = world(f, w.x, w.y), ruin = deploying && bl.id === 'factory' && Game.buildingFell(bl);
       bodies.push({ u: { name: info.name, building: bl.id, color: info.color || '#B07A3C', hp: info.hp || 1000 }, side, x: w.x, y: w.y, look: bl.built ? 'solid' : ruin ? 'ruin' : 'glass' });
       if (!bl.built) arc(wx, wz, 3.2, gold, 0.95, bl.progress || 0, 0.07);
       if (ruin) icon('rest', wx - camRight.x * 2.4, 4.2, wz - camRight.z * 2.4, 1.8);

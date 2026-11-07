@@ -397,7 +397,8 @@
   // comes up, but it still stands in the fight as a target, its exit still blocks its ring, and both skills can still
   // be bought. Destroyed again that round: shut again the round after.
   // Dig a new exit (2026-11-07): once a round per mine, each dig 50 gold more than the last (moveRise: per earlier dig
-  // of this mine this match, Mpb.skillCost's costRise); rec.data.digs = moves made, so a dig bought is one move.
+  // of this mine this match, Mpb.skillCost's costRise); rec.data.digs = moves made, so a dig bought is one move. A dig
+  // is used the round it is bought: one bought and not used is lost as the next round begins (rec.data.lapsed, roundStart).
   const COAL = { hp: 700, armor: 4, travel: 2, rise: 1.5, moveCost: 150, moveRise: 50, airCost: 200, air: { speed: 25, armor: 4, secs: 5 } };
   const cmResting = (m, rec) => !!rec && rec.fell > 0 && rec.fell === m.round - 1;
   const exitOf = (rec) => (rec && rec.parts && rec.parts.exit) || null;
@@ -448,8 +449,10 @@
     for (let row = 0; row < ROWS; row++) for (let col = 0; col < COLS; col++) if (exitMoveOk(m, side, rec, col, row)) out.push({ col, row });
     return out;
   }
-  // a dig bought and not used yet (one move for each buy: data.digs counts the moves), and none made this round
-  const canMoveExit = (m, side, rec) => skillN(rec, 'shaft') > (rec.data.digs || 0) && rec.data.moved !== m.round && !!exitOf(rec);
+  // a dig bought and not used yet (one move for each buy: data.digs counts the moves, data.lapsed the ones lost), and
+  // none made this round
+  const digsLeft = (rec) => skillN(rec, 'shaft') - (rec.data.digs || 0) - (rec.data.lapsed || 0);
+  const canMoveExit = (m, side, rec) => digsLeft(rec) > 0 && rec.data.moved !== m.round && !!exitOf(rec);
   def({ id: 'coalMine', name: 'Coal mine', short: 'cm', kind: 'technical', hp: COAL.hp, armor: COAL.armor, color: '#4A4440',
     text: `Squads deployed on the 8 tiles round the entrance go down the mine as the fight starts and come up round the exit in no man’s land ${COAL.travel} s later (on the matching tile), then stand ${COAL.rise} s before they fight (not Rogues, Assassins or Shadowhands with a Shadow Den).`,
     downside: 'No squad of either team may be deployed on the 8 tiles round its exit. If the exit, or the tile a squad would come up on, is taken (a squad or any other unit, a building, water or a wall, of either team), that squad doesn’t go down the mine: it fights from its own tile. Destroyed in a fight: the mine is shut the next round (nobody goes down it).',
@@ -481,7 +484,7 @@
       },
       // Dig a new exit: not while a dig bought is still unused, nor once the exit moved this round (so a dig taken back
       // is always the one this round's move used)
-      canBuy: (m, side, rec, sk) => !!exitOf(rec) && (sk.id !== 'shaft' || (skillN(rec, 'shaft') <= (rec.data.digs || 0) && rec.data.moved !== m.round)),
+      canBuy: (m, side, rec, sk) => !!exitOf(rec) && (sk.id !== 'shaft' || (digsLeft(rec) <= 0 && rec.data.moved !== m.round)),
       // Dig a new exit taken back the round it was bought: the exit goes back too (refused once its old tile is taken)
       canUndo: (m, side, rec, id) => id !== 'shaft' || !(rec.data.moved === m.round && rec.data.from) || exitBackOk(m, side, rec, rec.data.from),
       // Undo all would put the exit back where it stood (restoreOk: was = the record as it would be again)
@@ -503,8 +506,12 @@
         if (!dug) return rec;
         return { ...rec, parts: { ...rec.parts, exit: { col: d.from.col, row: d.from.row } }, data: d.was && d.was.round === round ? clone(d.was.data) : {} };
       },
-      // an earlier round's round-start copy goes (so the record as a round begins never holds one)
-      roundStart(lanes, side, rec) { if (rec.data.was && rec.data.was.round !== lanes[0].round) delete rec.data.was; },
+      // an earlier round's round-start copy goes (so the record as a round begins never holds one), and a dig bought
+      // last round and not used is lost (a dig is used the round it is bought)
+      roundStart(lanes, side, rec) {
+        if (rec.data.was && rec.data.was.round !== lanes[0].round) delete rec.data.was;
+        if (digsLeft(rec) > 0) rec.data.lapsed = (rec.data.lapsed || 0) + digsLeft(rec);
+      },
       // bots: now and then one of the squads they put down this round goes round the entrance (down the mine), Fresh
       // air when they have gold to spare, and sometimes a new exit nearer the enemy
       botAfter(m, side, rec, r) {

@@ -168,13 +168,19 @@ check('A5: Dig a new exit: once a round per mine, 150 / 200 / 250, take-back ref
   assert.ok(x.act(0, 'mpbBuy', key, 'shaft').ok && x.act(0, 'mpbAct', key, 'exit', 14, 8).ok, 'dug again this round');
   playTo(x, 3); assert.notStrictEqual(D.phase, 'end', 'the match goes on');
   assert.strictEqual(price(), COAL.moveCost + 2 * COAL.moveRise, 'the 3rd dig: 250');
-  // a dig bought and not used: no second buy until it is used (so a take-back always undoes this round's own move)
+  // a dig is used the round it is bought: one bought and not used is lost as the next round begins
   gold(1000);
   assert.ok(x.act(0, 'mpbBuy', key, 'shaft').ok, 'bought, not used');
+  assert.ok(CM.canMoveExit(x.m(0), 0, Mpb.recOf(x.m(0), 0, key)), 'it could move the exit this round');
+  const exit3 = copy(Mpb.recOf(x.m(0), 0, key).parts.exit);
   playTo(x, 4); assert.notStrictEqual(D.phase, 'end', 'the match goes on');
   gold(1000);
-  assert.ok(CM.canMoveExit(x.m(0), 0, Mpb.recOf(x.m(0), 0, key)) && !x.act(0, 'mpbBuy', key, 'shaft').ok, 'the unused dig still moves it; no second one on top');
-  assert.ok(x.act(0, 'mpbAct', key, 'exit', 13, 8).ok && !x.act(0, 'mpbBuy', key, 'shaft').ok, 'used; no buy after a move this round');
+  const rec4 = Mpb.recOf(x.m(0), 0, key);
+  assert.deepStrictEqual(rec4.parts.exit, exit3, 'the exit stayed put');
+  assert.ok(!CM.canMoveExit(x.m(0), 0, rec4) && !x.act(0, 'mpbAct', key, 'exit', 13, 8).ok, 'last round’s unused dig is lost');
+  assert.strictEqual(price(), COAL.moveCost + 3 * COAL.moveRise, 'it still counts as a dig: 300');
+  assert.ok(x.act(0, 'mpbBuy', key, 'shaft').ok && x.act(0, 'mpbAct', key, 'exit', 13, 8).ok, 'a new dig moves it');
+  assert.ok(!x.act(0, 'mpbBuy', key, 'shaft').ok, 'no buy after a move this round');
   sameTeam(D, 0);
 });
 
