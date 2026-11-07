@@ -10,7 +10,7 @@ Floors.FLOORS = {
   // Ashlands (2026-11-07): burnt ground, scorched no man's land, grey ash flecks and a few glowing embers
   ash: { base: '#4B4744', patch: ['#55504C', '#423E3B', '#5B5550', '#3D3937'], mid: ['#36312E', '#3F3935', '#2F2B29'], strokes: ['#625B55', '#2C2826'], ripples: false, leaves: ['#7D766F', '#8A827A', '#6B645E', '#7D766F', '#8A827A', '#C0652C', '#D98A3A'] },
   // Moonlit Snow: fresh snow under a night sky with wind ripples; no man's land is pale blue ice with cracks and shine
-  moonlit: { base: '#A3B0C4', patch: ['#B0BCCE', '#99A7BC', '#BCC7D7', '#93A1B6'], mid: ['#B4D0E8', '#A3C2DE', '#C2DBEE'], strokes: ['#C6D0DE', '#7F8CA3'], ripples: true, ice: '#9FC3E2' },
+  moonlit: { base: '#8F9BB0', patch: ['#99A5B9', '#8692A8', '#A3AFC2', '#808CA2'], mid: ['#8FB8E0', '#80ADD9', '#9DC2E6'], strokes: ['#AEB9CB', '#6F7B93'], ripples: true, ice: '#76A8DA' },
   // Savanna: dry golden grass, dusty earth across no man's land
   savanna: { base: '#9E8B4F', patch: ['#AA965A', '#917F46', '#B39F61', '#887840'], mid: ['#977852', '#8B6E49', '#A3855C'], strokes: ['#C4B06C', '#6F6337'], ripples: false },
   sand: { base: '#B39A6C', patch: ['#BDA478', '#A88F62', '#C2AA7E', '#A38A5F'], mid: ['#9E8457', '#A78D60', '#94794E'], strokes: ['#C9B288', '#8F7650'], ripples: true },
@@ -42,7 +42,7 @@ Floors.floor = (() => {
       if (L.ice) { // a sheet of ice over no man's land, soft at its edges
         const g = c.createLinearGradient(0, y0 - t * 0.3, 0, y1 + t * 0.3), e = t * 0.6 / (y1 - y0 + t * 0.6);
         g.addColorStop(0, L.ice + '00'); g.addColorStop(e, L.ice); g.addColorStop(1 - e, L.ice); g.addColorStop(1, L.ice + '00');
-        c.globalAlpha = 0.8; c.fillStyle = g; c.fillRect(0, y0 - t * 0.3, W, y1 - y0 + t * 0.6); c.globalAlpha = 1;
+        c.globalAlpha = 0.88; c.fillStyle = g; c.fillRect(0, y0 - t * 0.3, W, y1 - y0 + t * 0.6); c.globalAlpha = 1;
       }
       for (let k = 0; k < 55; k++) blob(rr() * W, y0 + rr() * (y1 - y0), t * (0.6 + rr() * 1.5), t * (0.4 + rr() * 0.8), L.mid[k % 3], 0.5);
       if (L.ice) {

@@ -41,7 +41,8 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     light: { hemi: ['#D2C1B2', '#2A2220', 1.35], sun: ['#FFCDA6', 1.8] }, fall: 'embers', farLight: 0.9 };
   // Moonlit Snow: Frozen Peak at night, blue moonlight, falling snow and a cabin with warm windows at the far end
   BIOMES.moonlit = { ...BIOMES.ice, sky: '#141C2A', land: '#5A6880', low: 'moonlit', tint: [0.6, 0.68, 0.85], trees: ['Pine_1', 'Pine_2', 'Pine_3', 'Pine_5', 'Pine_1', 'DeadTree_3'], grow: 0.85,
-    light: { hemi: ['#9DB2E0', '#1A2030', 1.2], sun: ['#C4D2F5', 1.55], pos: [30, 58, 18] }, drift: '#9AA9C2', farLight: 0.62, cabin: true, shade: [0.86, 0.5, 18], deepSnow: 1.1 };
+    light: { hemi: ['#9DB2E0', '#1A2030', 1.05], sun: ['#C4D2F5', 1.35], pos: [30, 58, 18] }, drift: '#9AA9C2', farLight: 0.62, cabin: true,
+    shade: [0.88, 0.5, 22], night: [0.5, 0.68, 1.0, 0.55], deepSnow: 1.1 };
   // Savanna: golden hour on dry grass, lone flat-topped trees like acacias, a low warm sun with long shadows
   BIOMES.savanna = { sky: '#DDB27C', land: '#8F7C43', tint: [1.06, 0.98, 0.82], low: 'savanna', trees: ['CommonTree_3', 'CommonTree_5', 'DeadTree_1', 'CommonTree_3'], grow: 0.42, dress: 0.8,
     squash: [[/^CommonTree/, 0.5]], tints: [[/^CommonTree/, [1.0, 0.92, 0.6]], [/^Grass/, [1.35, 1.1, 0.55]], [/^Bush/, [1.1, 0.95, 0.55]], [/^DeadTree/, [1.1, 0.95, 0.78]]],
@@ -52,8 +53,19 @@ const Scenery3D = (THREE, scene, opts = {}) => {
 
   // ---------- shade: a look can darken everything round the board, more the further out (Moonlit Snow), while the board
   // itself keeps its light. shade = [how dark at most (0 to 1), from how far outside the board (m), fully by (m)]. ----------
-  const shadeU = { uShade: { value: new THREE.Vector3(0, 1, 2) }, uHalf: { value: new THREE.Vector2(40, 50) } };
-  const SHADE_GLSL = 'uniform vec3 uShade; uniform vec2 uHalf;\nfloat pbShade(vec2 xz) { return 1.0 - uShade.x * smoothstep(uShade.y, uShade.z, length(max(abs(xz) - uHalf, 0.0))); }\n';
+  // night (biome .night = [r, g, b, brightness]): how the unlit snow is seen in the dark. Low light shifts what the eye
+  // sees toward blue-green (the Purkinje shift): colours wash out, reds go dark first, and shadows sink into blue
+  // rather than black. So far from the light a colour becomes its night brightness (weighted toward green and blue)
+  // times a blue tint, with a faint blue floor. The cabin's warm light (uWarm: x, z, radius) is kept out of it.
+  const shadeU = { uShade: { value: new THREE.Vector3(0, 1, 2) }, uHalf: { value: new THREE.Vector2(40, 50) }, uNight: { value: new THREE.Vector4(0, 0, 0, 0) }, uWarm: { value: new THREE.Vector3(0, 0, 0) } };
+  const SHADE_GLSL = `uniform vec3 uShade; uniform vec2 uHalf; uniform vec4 uNight; uniform vec3 uWarm;
+float pbK(vec2 xz) { float k = uShade.x * smoothstep(uShade.y, uShade.z, length(max(abs(xz) - uHalf, 0.0)));
+  if (uWarm.z > 0.0) k *= smoothstep(uWarm.z * 0.55, uWarm.z, length(xz - uWarm.xy)); return k; }
+float pbShade(vec2 xz) { return 1.0 - pbK(xz); }
+vec3 pbNight(vec3 c, vec2 xz) { float k = pbK(xz); if (k <= 0.0) return c;
+  vec3 dark = uNight.w > 0.0 ? dot(c, vec3(0.08, 0.55, 0.37)) * uNight.rgb * uNight.w + uNight.rgb * 0.018 : vec3(0.0);
+  return mix(c, dark, k); }
+`;
   // a lit material (scenery, drifts): darkened after lighting, by where each fragment stands
   function shadeLit(sh) {
     Object.assign(sh.uniforms, shadeU);
@@ -63,7 +75,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
       #else
         vShadeXZ = (modelMatrix * vec4(transformed, 1.0)).xz;
       #endif`);
-    sh.fragmentShader = SHADE_GLSL + 'varying vec2 vShadeXZ;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', 'outgoingLight *= pbShade(vShadeXZ);\n#include <opaque_fragment>');
+    sh.fragmentShader = SHADE_GLSL + 'varying vec2 vShadeXZ;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', 'outgoingLight = pbNight(outgoingLight, vShadeXZ);\n#include <opaque_fragment>');
   }
 
   // ---------- loading ----------
@@ -219,7 +231,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
         void main() {
           vec4 c = mix(texture2D(uAtlas, vUv0), texture2D(uAtlas, vUv1), vMix);
           if (c.a < 0.4) discard;
-          gl_FragColor = vec4(c.rgb / c.a * vTint * pbShade(vShadeXZ), 1.0);
+          gl_FragColor = vec4(pbNight(c.rgb / c.a * vTint, vShadeXZ), 1.0);
           #include <colorspace_fragment>
           #include <fog_fragment>
         }`,
@@ -327,7 +339,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
         #ifdef USE_FOG
           a *= 1.0 - smoothstep(fogNear, fogFar, vFogDepth);
         #endif
-        gl_FragColor = vec4(0.0, 0.0, 0.0, a); }` });
+        gl_FragColor = vec4(uNight.rgb * 0.05, a); }` });
   const veil = new THREE.Mesh(new THREE.PlaneGeometry(600, 600).rotateX(-Math.PI / 2), veilMat);
   veil.position.y = -0.035; veil.raycast = () => {}; veil.visible = false; veil.renderOrder = -1; scene.add(veil);
   // falling snow: points drifting down through a box round the board, moved in the shader (tick(dt) moves the clock)
@@ -537,7 +549,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     }    // 7. the deep snow itself: a big rolling sheet over the land, whiter on the crests and bluer in the hollows
     if (bi.deepSnow) {
       const g = new THREE.PlaneGeometry(BW + 260, BD + 260, 150, 170).rotateX(-Math.PI / 2), pos = g.attributes.position, col = new Float32Array(pos.count * 3);
-      const hi = new THREE.Color('#EEF3FA'), lo = new THREE.Color('#9FB2CC'), c = new THREE.Color();
+      const hi = new THREE.Color('#D8E1EE'), lo = new THREE.Color('#93A7C4'), c = new THREE.Color();
       for (let k = 0; k < pos.count; k++) {
         const x = pos.getX(k), z = pos.getZ(k), h = groundH(x, z);
         pos.setY(k, outside(x, z) > 0 ? h : -0.2);
@@ -551,6 +563,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
 
     // far trees and bushes: impostors
     shadeU.uHalf.value.set(hw, hd); shadeU.uShade.value.set(...(bi.shade || [0, 1, 2])); veil.visible = !!bi.shade;
+    shadeU.uNight.value.set(...(bi.night || [0, 0, 0, 0])); shadeU.uWarm.value.set(cab ? cab.x : 0, cab ? cab.z : 0, cab ? cab.r * 1.5 : 0);
     snowU.value = bi.snow || 0; showFall(bi.fall || (bi.snow ? 'snow' : null)); showCabin(cab);
     bake([...new Set([...placed.keys()].filter((k) => k.endsWith('~')).map((k) => k.slice(0, -1)).filter(impostorable))].sort());
     const far = [];
