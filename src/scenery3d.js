@@ -41,7 +41,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     light: { hemi: ['#D2C1B2', '#2A2220', 1.35], sun: ['#FFCDA6', 1.8] }, fall: 'embers', farLight: 0.9 };
   // Moonlit Snow: Frozen Peak at night, blue moonlight, falling snow and a cabin with warm windows at the far end
   BIOMES.moonlit = { ...BIOMES.ice, sky: '#141C2A', land: '#2F3A4C', tint: [0.6, 0.68, 0.85], trees: ['Pine_1', 'Pine_2', 'Pine_3', 'Pine_5', 'Pine_1', 'DeadTree_3'], grow: 0.85,
-    light: { hemi: ['#9DB2E0', '#1A2030', 1.2], sun: ['#C4D2F5', 1.55], pos: [30, 58, 18] }, drift: '#9AA9C2', farLight: 0.62, cabin: true };
+    light: { hemi: ['#9DB2E0', '#1A2030', 1.2], sun: ['#C4D2F5', 1.55], pos: [30, 58, 18] }, drift: '#9AA9C2', farLight: 0.62, cabin: true, shade: [0.86, 0.5, 18] };
   // Savanna: golden hour on dry grass, lone flat-topped trees like acacias, a low warm sun with long shadows
   BIOMES.savanna = { sky: '#DDB27C', land: '#8F7C43', tint: [1.06, 0.98, 0.82], low: 'savanna', trees: ['CommonTree_3', 'CommonTree_5', 'DeadTree_1', 'CommonTree_3'], grow: 0.42, dress: 0.8,
     squash: [[/^CommonTree/, 0.5]], tints: [[/^CommonTree/, [1.0, 0.92, 0.6]], [/^Grass/, [1.35, 1.1, 0.55]], [/^Bush/, [1.1, 0.95, 0.55]], [/^DeadTree/, [1.1, 0.95, 0.78]]],
@@ -49,6 +49,22 @@ const Scenery3D = (THREE, scene, opts = {}) => {
   // a look (Scenery3D.LOOKS, below) -> its biome
   const biomeOf = (look) => BIOMES[(Scenery3D.LOOKS[look] || Scenery3D.LOOKS.meadow).biome] || BIOMES.meadow;
   const biome = (v) => biomeOf(Scenery3D.lookOf(v && (v.battlePre || v.m)));
+
+  // ---------- shade: a look can darken everything round the board, more the further out (Moonlit Snow), while the board
+  // itself keeps its light. shade = [how dark at most (0 to 1), from how far outside the board (m), fully by (m)]. ----------
+  const shadeU = { uShade: { value: new THREE.Vector3(0, 1, 2) }, uHalf: { value: new THREE.Vector2(40, 50) } };
+  const SHADE_GLSL = 'uniform vec3 uShade; uniform vec2 uHalf;\nfloat pbShade(vec2 xz) { return 1.0 - uShade.x * smoothstep(uShade.y, uShade.z, length(max(abs(xz) - uHalf, 0.0))); }\n';
+  // a lit material (scenery, drifts): darkened after lighting, by where each fragment stands
+  function shadeLit(sh) {
+    Object.assign(sh.uniforms, shadeU);
+    sh.vertexShader = 'varying vec2 vShadeXZ;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+        vShadeXZ = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xz;
+      #else
+        vShadeXZ = (modelMatrix * vec4(transformed, 1.0)).xz;
+      #endif`);
+    sh.fragmentShader = SHADE_GLSL + 'varying vec2 vShadeXZ;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', 'outgoingLight *= pbShade(vShadeXZ);\n#include <opaque_fragment>');
+  }
 
   // ---------- loading ----------
   const FOLIAGE = /Leaves|Leaf|Grass|Flowers/;
@@ -82,6 +98,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
             vUpN = normalize(mat3(modelMatrix) * objectNormal).y;
           #endif`);
         sh.fragmentShader = 'uniform float uSnow;\nvarying float vUpN;\n' + sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.25);\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.9, 0.95), uSnow * smoothstep(0.3, 0.75, vUpN));');
+        shadeLit(sh);
         if (leafy) sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', 'float faceDirection = 1.0; vec3 normal = normalize( vNormal ); vec3 nonPerturbedNormal = normal;');
       };
       mat.customProgramCacheKey = () => leafy ? 'pb-leaf' : 'pb-scenery';
@@ -152,12 +169,12 @@ const Scenery3D = (THREE, scene, opts = {}) => {
   function setupImpostors() {
     impGeo = new THREE.InstancedBufferGeometry().copy(new THREE.PlaneGeometry(1, 1));
     impMat = new THREE.ShaderMaterial({
-      uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uAtlas: { value: null }, uGrid: { value: new THREE.Vector2(IGRID, 1) } }]),
+      uniforms: { ...THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uAtlas: { value: null }, uGrid: { value: new THREE.Vector2(IGRID, 1) } }]), ...shadeU },
       fog: true,
       vertexShader: `
         attribute vec3 iPos; attribute float iSize; attribute float iModel; attribute vec3 iTint; attribute float iFlip; attribute float iSy;
         uniform vec2 uGrid;
-        varying vec2 vUv0; varying vec2 vUv1; varying float vMix; varying vec3 vTint;
+        varying vec2 vUv0; varying vec2 vUv1; varying float vMix; varying vec3 vTint; varying vec2 vShadeXZ;
         #include <fog_pars_vertex>
         vec2 cellUv(float c, vec2 uv) { return (vec2(mod(c, uGrid.x), floor(c / uGrid.x)) + uv) / uGrid; }
         void main() {
@@ -170,19 +187,20 @@ const Scenery3D = (THREE, scene, opts = {}) => {
           vec3 wp = iPos + (right * position.x + up * position.y * iSy) * iSize;
           vec2 uv = vec2(position.x * iFlip + 0.5, position.y + 0.5);
           float c0 = iModel * 3.0 + i0;
-          vUv0 = cellUv(c0, uv); vUv1 = cellUv(c0 + 1.0, uv); vTint = iTint;
+          vUv0 = cellUv(c0, uv); vUv1 = cellUv(c0 + 1.0, uv); vTint = iTint; vShadeXZ = iPos.xz;
           vec4 mvPosition = viewMatrix * vec4(wp, 1.0);
           gl_Position = projectionMatrix * mvPosition;
           #include <fog_vertex>
         }`,
       fragmentShader: `
         uniform sampler2D uAtlas;
-        varying vec2 vUv0; varying vec2 vUv1; varying float vMix; varying vec3 vTint;
+        varying vec2 vUv0; varying vec2 vUv1; varying float vMix; varying vec3 vTint; varying vec2 vShadeXZ;
+        ${SHADE_GLSL}
         #include <fog_pars_fragment>
         void main() {
           vec4 c = mix(texture2D(uAtlas, vUv0), texture2D(uAtlas, vUv1), vMix);
           if (c.a < 0.4) discard;
-          gl_FragColor = vec4(c.rgb / c.a * vTint, 1.0);
+          gl_FragColor = vec4(c.rgb / c.a * vTint * pbShade(vShadeXZ), 1.0);
           #include <colorspace_fragment>
           #include <fog_fragment>
         }`,
@@ -258,6 +276,23 @@ const Scenery3D = (THREE, scene, opts = {}) => {
   const pondGeo = new THREE.CircleGeometry(1, 48).rotateX(-Math.PI / 2);
   // snow drifts: soft low mounds
   const driftGeo = new THREE.IcosahedronGeometry(1, 1), driftMat = new THREE.MeshLambertMaterial({ color: '#B4C1CA' });
+  driftMat.onBeforeCompile = shadeLit; driftMat.customProgramCacheKey = () => 'pb-drift';
+  // the land's own shade: a dark veil over the ground round the board (the page's land plane is one flat colour)
+  const veilMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, fog: true, uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), ...shadeU },
+    vertexShader: `varying vec2 vShadeXZ;
+      #include <fog_pars_vertex>
+      void main() { vec4 w = modelMatrix * vec4(position, 1.0); vShadeXZ = w.xz; vec4 mvPosition = viewMatrix * w; gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
+      }`,
+    fragmentShader: `${SHADE_GLSL} varying vec2 vShadeXZ;
+      #include <fog_pars_fragment>
+      void main() { float a = 1.0 - pbShade(vShadeXZ);
+        #ifdef USE_FOG
+          a *= 1.0 - smoothstep(fogNear, fogFar, vFogDepth);
+        #endif
+        gl_FragColor = vec4(0.0, 0.0, 0.0, a); }` });
+  const veil = new THREE.Mesh(new THREE.PlaneGeometry(600, 600).rotateX(-Math.PI / 2), veilMat);
+  veil.position.y = -0.035; veil.raycast = () => {}; veil.visible = false; veil.renderOrder = -1; scene.add(veil);
   // falling snow: points drifting down through a box round the board, moved in the shader (tick(dt) moves the clock)
   const FLAKES = 1600, snowTime = { value: 0 };
   const flakeGeo = new THREE.BufferGeometry(); {
@@ -273,11 +308,12 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     embers: { col: [1.0, 0.58, 0.26], dir: -1, spd: 0.75, keep: 0.5, size: 1.2, flick: 0.8, sway: 1.8 },
   };
   const fallU = { uCol: { value: new THREE.Vector3() }, uDir: { value: 1 }, uSpd: { value: 1 }, uKeep: { value: 1 }, uSize: { value: 1 }, uFlick: { value: 0 }, uSway: { value: 1 } };
-  const flakeMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uTime: snowTime, uPx: { value: 1 }, ...fallU },
+  const flakeMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uTime: snowTime, uPx: { value: 1 }, ...fallU, ...shadeU },
     vertexShader: `attribute float aSeed; uniform float uTime; uniform float uPx; uniform float uDir; uniform float uSpd; uniform float uKeep; uniform float uSize; uniform float uFlick; uniform float uSway; varying float vA;
+      ${SHADE_GLSL}
       void main() { vec3 p = position; p.y = mod(p.y - uDir * uTime * uSpd * (1.6 + aSeed * 1.6), 45.0); p.x += sin(uTime * 0.7 + aSeed * 40.0) * 1.3 * uSway; p.z += cos(uTime * 0.5 + aSeed * 30.0) * 0.8 * uSway;
         vec4 mv = viewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = aSeed > uKeep ? 0.0 : uPx * uSize * (0.35 + aSeed * 0.35) * 300.0 / max(1.0, -mv.z);
-        vA = (0.55 + aSeed * 0.35) * (1.0 - uFlick * (0.5 + 0.5 * sin(uTime * (3.0 + aSeed * 4.0) + aSeed * 60.0))) * (uDir < 0.0 ? smoothstep(45.0, 20.0, p.y) : 1.0); }`,
+        vA = (0.55 + aSeed * 0.35) * (1.0 - uFlick * (0.5 + 0.5 * sin(uTime * (3.0 + aSeed * 4.0) + aSeed * 60.0))) * (uDir < 0.0 ? smoothstep(45.0, 20.0, p.y) : 1.0) * (0.35 + 0.65 * pbShade(p.xz)); }`,
     fragmentShader: `uniform vec3 uCol; varying float vA; void main() { float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = vec4(uCol, vA * smoothstep(0.5, 0.2, d)); }` });
   const flakes = new THREE.Points(flakeGeo, flakeMat); flakes.visible = false; flakes.raycast = () => {}; scene.add(flakes);
   function showFall(kind) {
@@ -453,6 +489,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
       scene.add(dr); meshes.push(dr);
     }
     // far trees and bushes: impostors
+    shadeU.uHalf.value.set(hw, hd); shadeU.uShade.value.set(...(bi.shade || [0, 1, 2])); veil.visible = !!bi.shade;
     snowU.value = bi.snow || 0; showFall(bi.fall || (bi.snow ? 'snow' : null)); showCabin(cab);
     bake([...new Set([...placed.keys()].filter((k) => k.endsWith('~')).map((k) => k.slice(0, -1)).filter(impostorable))].sort());
     const far = [];
@@ -482,7 +519,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     }
   }
   function shadows(on) { if (on !== castShadows) { castShadows = on; key = ''; } }
-  function dispose() { clear(); scene.remove(flakes, cabin, cabinLight); cabin.userData.dispose(); cabinLight.dispose(); flakeGeo.dispose(); flakeMat.dispose(); driftGeo.dispose(); driftMat.dispose(); pondGeo.dispose(); for (const m of pondMats) m.dispose(); if (atlas) atlas.dispose(); if (impMat) { impMat.dispose(); impGeo.dispose(); blobMat.map.dispose(); blobMat.dispose(); blobGeo.dispose(); } for (const m of mats) { if (m.map) m.map.dispose(); m.dispose(); } if (lib) for (const md of Object.values(lib)) for (const p of md.parts) p.geo.dispose(); }
+  function dispose() { clear(); scene.remove(flakes, cabin, cabinLight, veil); veil.geometry.dispose(); veilMat.dispose(); cabin.userData.dispose(); cabinLight.dispose(); flakeGeo.dispose(); flakeMat.dispose(); driftGeo.dispose(); driftMat.dispose(); pondGeo.dispose(); for (const m of pondMats) m.dispose(); if (atlas) atlas.dispose(); if (impMat) { impMat.dispose(); impGeo.dispose(); blobMat.map.dispose(); blobMat.dispose(); blobGeo.dispose(); } for (const m of mats) { if (m.map) m.map.dispose(); m.dispose(); } if (lib) for (const md of Object.values(lib)) for (const p of md.parts) p.geo.dispose(); }
   return { _lib: () => lib, _meshes: () => meshes, update, biome, shadows, dispose, ready, tick, snowing: () => flakes.visible, count: () => meshes.reduce((s, m) => s + m.count, 0) };
 };
 
