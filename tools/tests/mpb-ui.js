@@ -154,9 +154,9 @@ const shot = async (p, name) => { if (process.env.PB_SHOTS) await p.screenshot({
   await mate.evaluate(() => document.getElementById('ml-put').click());
   await sleep(300);
   ok(await mate.evaluate(() => document.querySelectorAll('#marks .mpb-lake').length > 5), 'the lake\'s tiles glow');
-  { // a tap near the north edge of (13,10): the wall's own edge
+  { // a tap near the north edge of (13,11): the wall's own edge
     const bb = await mate.locator('#board').boundingBox(), C = await mate.evaluate(() => Game.COLS), R = await mate.evaluate(() => Game.ROWS);
-    await mate.mouse.click(bb.x + 13.5 * bb.width / C, bb.y + 10.08 * bb.height / R);
+    await mate.mouse.click(bb.x + 13.5 * bb.width / C, bb.y + 11.08 * bb.height / R);
   }
   await sleep(300);
   ok(await mate.evaluate(() => { const { m, me } = window.__pb(); return !!Game.bwallOn(m, me, 13, 11, 'n'); }), 'the refused tap left the wall standing');

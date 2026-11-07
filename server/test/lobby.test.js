@@ -15,6 +15,7 @@
 const assert = require('assert');
 const { open, sleep, waitFor } = require('./harness.js');
 const { idToken, startAccounts } = require('./accounts-env.js');
+const Duo = require('../../src/duo.js');
 
 const ORIGIN = 'http://localhost:8766';
 const newCode = () => 'L' + Math.random().toString(36).slice(2, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'Q');
@@ -47,7 +48,7 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 6 * 60 *
   };
   async function phone(code, hello, path = 'room') {
     const ws = await open(`${srv.ws}/${path}/${code}`);
-    ws.json({ t: 'hello', ...hello });
+    ws.json({ t: 'hello', ...(path === 'duo' ? { v: Duo.V } : {}), ...hello }); // (a 2v2 hello carries the page's Duo.V, 2026-11-07)
     ws.first = await waitFor(() => ws.inbox.find((x) => ['welcome', 'denied', 'full', 'nomatch', 'taken'].includes(x.t)), 8000);
     return ws;
   }

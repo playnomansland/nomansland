@@ -2117,17 +2117,26 @@
   const cardText = (c) => !c ? '' : c.type === 'tower' ? ((G.TOWER_TYPES.find(t => t.id === c.id) || {}).text || '') : ((kindOf(c.id) || {}).text || '');
   // two point-mirrored tiles in no man's land (not flank tiles, not water), at least ARTIFACT.apart tiles apart, and
   // two different cards. r: a seeded 0..1 source. Returns { round, list }. On a board with a middle row (the 2v2
-  // board, 2026-11-07) both stand on it: the same distance from both teams' zones.
+  // board, 2026-11-07) both stand on it: the same distance from both teams' zones, and not in the flank columns (the
+  // middle row has no flank tiles, so a column with flank tiles beside it is kept free, as before). If the middle row
+  // has no free pair left (Coal mine exits, lake tiles), the top half's rows of no man's land, as before. Null: none.
   function rollArtifacts(m, r) {
     const { COLS, ROWS } = grid(m), mirror = (c, w) => ({ col: COLS - 1 - c, row: ROWS - 1 - w });
-    const ok = [], rows = ROWS % 2 ? [(ROWS - 1) / 2] : Array.from({ length: ROWS / 2 }, (_, i) => i);
-    for (const row of rows) for (let col = 0; col < COLS; col++) {
-      const p = mirror(col, row);
-      if (!nmlOk(col, row) || !nmlOk(p.col, p.row) || G.terrainBlocks(m, col, row) || G.terrainBlocks(m, p.col, p.row)) continue;
-      if (at(m, col, row) || at(m, p.col, p.row)) continue; // (nor on a building's tile, nor one a Coal mine's exit keeps free: a fair pair)
-      if (Math.hypot(p.col - col, p.row - row) < ARTIFACT.apart) continue;
-      ok.push({ col, row });
-    }
+    // (not water, nor a building's tile, nor one a Coal mine's exit keeps free)
+    const free = (col, row) => nmlOk(col, row) && !G.terrainBlocks(m, col, row) && !at(m, col, row) && !(G.midRow(row) && (flank(col, row - 1) || flank(col, row + 1)));
+    const pairs = (rows) => {
+      const ok = [];
+      for (const row of rows) for (let col = 0; col < COLS; col++) {
+        const p = mirror(col, row);
+        if (!free(col, row) || !free(p.col, p.row)) continue; // (a fair pair)
+        if (Math.hypot(p.col - col, p.row - row) < ARTIFACT.apart) continue;
+        ok.push({ col, row });
+      }
+      return ok;
+    };
+    let ok = ROWS % 2 ? pairs([(ROWS - 1) / 2]) : [];
+    if (!ok.length) ok = pairs(Array.from({ length: Math.floor(ROWS / 2) }, (_, i) => i));
+    if (!ok.length) return null; // (never in play: no free pair anywhere, so no artifacts this round)
     const a = ok[Math.floor(r() * ok.length)], b = mirror(a.col, a.row);
     const pool = cardPool(m), cards = [];
     while (cards.length < 2 && pool.length) cards.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);
