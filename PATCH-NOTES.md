@@ -25,7 +25,7 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 Looks change only how the board and the land around it look, never the rules. Pick them in the look picker on any map that has looks (Standard, Old standard, 2v2), or get them from Random.
 
 - **Ashlands:** a burnt forest. Scorched grey ground with ash flecks and a few glowing embers, charred pines and bare dead trees, rocks, and embers drifting up through smoky air under a dim, warm light.
-- **Moonlit Snow:** a snowy night. Blue moonlight, snow-capped pines and drifts, falling snow, and a log cabin past the enemy's end of the board: warm lit windows, light spilling onto the snow, firewood by the wall and smoke from the chimney. Plays the snow music. Everything round the board fades into the dark the further out it stands, while the battlefield itself stays lit, so the cabin's windows glow out of the night.
+- **Moonlit Snow:** a snowy night. Blue moonlight, a fresh pale snow floor, snow-covered land, snow piles where other looks have boulders (a few rocks still poke through), snow-capped pines and drifts, falling snow, and a log cabin past the enemy's end of the board: warm lit windows, light spilling onto the snow, firewood by the wall and smoke from the chimney. Plays the snow music. Everything round the board fades into the dark the further out it stands, while the battlefield itself stays lit, so the cabin's windows glow out of the night.
 - **Savanna:** golden hour on dry grass. Tall golden grass, lone flat-topped trees and bare trees, sun-baked rocks, and a low warm sun with long shadows.
 
 ---

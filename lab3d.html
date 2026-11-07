@@ -9389,8 +9389,8 @@ Floors.FLOORS = {
   autumn: { base: '#62633E', patch: ['#6E6C3E', '#585B37', '#78693A', '#545634'], mid: ['#776146', '#6B583E', '#816A4B'], strokes: ['#8C7F4A', '#474A2C'], ripples: false, leaves: ['#B8532F', '#C9782F', '#D3A43A', '#9A3B2A'] },
   // Ashlands (2026-11-07): burnt ground, scorched no man's land, grey ash flecks and a few glowing embers
   ash: { base: '#4B4744', patch: ['#55504C', '#423E3B', '#5B5550', '#3D3937'], mid: ['#36312E', '#3F3935', '#2F2B29'], strokes: ['#625B55', '#2C2826'], ripples: false, leaves: ['#7D766F', '#8A827A', '#6B645E', '#7D766F', '#8A827A', '#C0652C', '#D98A3A'] },
-  // Moonlit Snow: snow under a night sky, blue-grey, wind ripples, trampled darker across no man's land
-  moonlit: { base: '#7C8BA3', patch: ['#8694AB', '#73829A', '#8E9CB2', '#6D7B93'], mid: ['#66728A', '#6E7A92', '#5F6B83'], strokes: ['#9AA8BD', '#5E6A82'], ripples: true },
+  // Moonlit Snow: fresh snow under a night sky, pale blue, wind ripples, trampled a little darker across no man's land
+  moonlit: { base: '#A3B0C4', patch: ['#B0BCCE', '#99A7BC', '#BCC7D7', '#93A1B6'], mid: ['#8D9AB0', '#96A3B8', '#8693A9'], strokes: ['#C6D0DE', '#7F8CA3'], ripples: true },
   // Savanna: dry golden grass, dusty earth across no man's land
   savanna: { base: '#9E8B4F', patch: ['#AA965A', '#917F46', '#B39F61', '#887840'], mid: ['#977852', '#8B6E49', '#A3855C'], strokes: ['#C4B06C', '#6F6337'], ripples: false },
   sand: { base: '#B39A6C', patch: ['#BDA478', '#A88F62', '#C2AA7E', '#A38A5F'], mid: ['#9E8457', '#A78D60', '#94794E'], strokes: ['#C9B288', '#8F7650'], ripples: true },
@@ -10826,7 +10826,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     tints: [[/^Pine/, [0.3, 0.27, 0.25]], [/^Grass/, [1.05, 0.9, 0.7]], [/^DeadTree/, [0.7, 0.64, 0.6]]],
     light: { hemi: ['#D2C1B2', '#2A2220', 1.35], sun: ['#FFCDA6', 1.8] }, fall: 'embers', farLight: 0.9 };
   // Moonlit Snow: Frozen Peak at night, blue moonlight, falling snow and a cabin with warm windows at the far end
-  BIOMES.moonlit = { ...BIOMES.ice, sky: '#141C2A', land: '#2F3A4C', tint: [0.6, 0.68, 0.85], trees: ['Pine_1', 'Pine_2', 'Pine_3', 'Pine_5', 'Pine_1', 'DeadTree_3'], grow: 0.85,
+  BIOMES.moonlit = { ...BIOMES.ice, sky: '#141C2A', land: '#5A6880', low: 'moonlit', tint: [0.6, 0.68, 0.85], trees: ['Pine_1', 'Pine_2', 'Pine_3', 'Pine_5', 'Pine_1', 'DeadTree_3'], grow: 0.85,
     light: { hemi: ['#9DB2E0', '#1A2030', 1.2], sun: ['#C4D2F5', 1.55], pos: [30, 58, 18] }, drift: '#9AA9C2', farLight: 0.62, cabin: true, shade: [0.86, 0.5, 18] };
   // Savanna: golden hour on dry grass, lone flat-topped trees like acacias, a low warm sun with long shadows
   BIOMES.savanna = { sky: '#DDB27C', land: '#8F7C43', tint: [1.06, 0.98, 0.82], low: 'savanna', trees: ['CommonTree_3', 'CommonTree_5', 'DeadTree_1', 'CommonTree_3'], grow: 0.42, dress: 0.8,
@@ -10912,7 +10912,26 @@ const Scenery3D = (THREE, scene, opts = {}) => {
       }) };
     }
   }
-  const ready = load().then(() => { if (opts.renderer) setupImpostors(); key = ''; opts.onReady && opts.onReady(); }).catch((e) => console.warn('No Mans Land: no 3D scenery', e));
+  // snow piles (Moonlit Snow): soft lumpy mounds made here, used like any scenery model (SnowPile_1 to _3)
+  function addSnowPiles() {
+    const mat = new THREE.MeshLambertMaterial({ color: '#E4EAF3', flatShading: true });
+    mat.onBeforeCompile = shadeLit; mat.customProgramCacheKey = () => 'pb-snowpile'; mats.push(mat);
+    [[1.25, 0.85, 0.5, 0], [0.9, 1.1, 0.62, 1.7], [1.5, 0.75, 0.4, 3.1]].forEach(([sx, sz, sy, ph], i) => {
+      const geo = new THREE.IcosahedronGeometry(1, 2), pos = geo.attributes.position, v = new THREE.Vector3();
+      let lo = Infinity;
+      for (let k = 0; k < pos.count; k++) {
+        v.fromBufferAttribute(pos, k);
+        // a bumpy outline, the same for a corner shared by several faces (so the surface stays closed), then flattened
+        const f = 1 + 0.16 * Math.sin(3 * v.x + ph) * Math.sin(2.7 * v.z + 0.4 + ph) + 0.08 * Math.sin(5 * v.y + ph * 2);
+        v.multiplyScalar(f); v.y = Math.max(v.y, -0.15);
+        v.set(v.x * sx, v.y * sy, v.z * sz); pos.setXYZ(k, v.x, v.y, v.z); lo = Math.min(lo, v.y);
+      }
+      geo.translate(0, -lo - 0.05, 0); geo.computeVertexNormals(); geo.computeBoundingSphere();
+      geo.computeBoundingBox();
+      lib['SnowPile_' + (i + 1)] = { h: geo.boundingBox.max.y, r: Math.max(sx, sz), parts: [{ geo, mat }] };
+    });
+  }
+  const ready = load().then(() => { addSnowPiles(); if (opts.renderer) setupImpostors(); key = ''; opts.onReady && opts.onReady(); }).catch((e) => console.warn('No Mans Land: no 3D scenery', e));
 
   // ---------- impostors: pictures of the far trees and bushes, baked into one atlas ----------
   const ELEV = [8, 40, 90], ICELL = 256, IGRID = 8; // views per model, cell size in pixels, cells per atlas row
@@ -11051,6 +11070,13 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     rocks: ROCKS,
   };
   // Savanna's lists: tall golden grass everywhere, a few bushes and rocks
+  // Moonlit Snow's lists: snow piles in place of most of the rocks
+  const SNOWY = {
+    low: [['SnowPile_1', 2], ['SnowPile_2', 2], ['SnowPile_3', 2], ['Rock_Medium_1', 0.4], ['Rock_Medium_2', 0.4]],
+    tuft: [['SnowPile_1', 1.5], ['SnowPile_2', 1.5], ['SnowPile_3', 1.5], ['Pebble_Round_1', 0.4], ['Pebble_Square_2', 0.3]],
+    dress: DRESS,
+    rocks: [['SnowPile_1', 1], ['SnowPile_2', 1], ['SnowPile_3', 1], ['Rock_Medium_1', 0.25], ['Rock_Medium_3', 0.25]],
+  };
   const SAVANNA = {
     low: [['Grass_Common_Tall', 5], ['Grass_Wispy_Short', 2], ['Bush_Common', 1], ['DesertRock_1', 0.4], ['DesertRock_2', 0.4]],
     tuft: [['Grass_Common_Tall', 4], ['Grass_Wispy_Short', 3], ['Grass_Common_Short', 2], ['Pebble_Round_1', 0.5]],
@@ -11208,7 +11234,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
       const d = outside(x, z), k = name + (d > 16 || (d > 6 && /^Bush/.test(name)) ? '~' : ''), sh = 0.85 + rr() * 0.3, t = tintFor(name);
       (placed.get(k) || placed.set(k, []).get(k)).push([x, y, z, rr() * Math.PI * 2, s, [bi.tint[0] * t[0] * sh, bi.tint[1] * t[1] * sh, bi.tint[2] * t[2] * sh], squashOf(name)]);
     };
-    const L = { desert: DESERT, autumn: AUTUMN, ash: ASH, savanna: SAVANNA, rocks: { low: ROCKS, tuft: PEBBLES, rocks: ROCKS, dress: DRESS } }[bi.low] || { low: LOW, tuft: TUFT, rocks: ROCKS, dress: DRESS };
+    const L = { desert: DESERT, autumn: AUTUMN, ash: ASH, savanna: SAVANNA, moonlit: SNOWY, rocks: { low: ROCKS, tuft: PEBBLES, rocks: ROCKS, dress: DRESS } }[bi.low] || { low: LOW, tuft: TUFT, rocks: ROCKS, dress: DRESS };
     const low = () => pickOf(L.low), tuft = () => pickOf(L.tuft);
     const outside = (x, z) => Math.max(Math.abs(x) - hw, Math.abs(z) - hd, 0) > 0 ? Math.hypot(Math.max(0, Math.abs(x) - hw), Math.max(0, Math.abs(z) - hd)) : 0;
     // 1. the edge: a frame of bushes, rocks and tall grass hugging the board, so its edge doesn't end in a hard line

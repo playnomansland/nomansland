@@ -9,8 +9,8 @@ Floors.FLOORS = {
   autumn: { base: '#62633E', patch: ['#6E6C3E', '#585B37', '#78693A', '#545634'], mid: ['#776146', '#6B583E', '#816A4B'], strokes: ['#8C7F4A', '#474A2C'], ripples: false, leaves: ['#B8532F', '#C9782F', '#D3A43A', '#9A3B2A'] },
   // Ashlands (2026-11-07): burnt ground, scorched no man's land, grey ash flecks and a few glowing embers
   ash: { base: '#4B4744', patch: ['#55504C', '#423E3B', '#5B5550', '#3D3937'], mid: ['#36312E', '#3F3935', '#2F2B29'], strokes: ['#625B55', '#2C2826'], ripples: false, leaves: ['#7D766F', '#8A827A', '#6B645E', '#7D766F', '#8A827A', '#C0652C', '#D98A3A'] },
-  // Moonlit Snow: snow under a night sky, blue-grey, wind ripples, trampled darker across no man's land
-  moonlit: { base: '#7C8BA3', patch: ['#8694AB', '#73829A', '#8E9CB2', '#6D7B93'], mid: ['#66728A', '#6E7A92', '#5F6B83'], strokes: ['#9AA8BD', '#5E6A82'], ripples: true },
+  // Moonlit Snow: fresh snow under a night sky, pale blue, wind ripples, trampled a little darker across no man's land
+  moonlit: { base: '#A3B0C4', patch: ['#B0BCCE', '#99A7BC', '#BCC7D7', '#93A1B6'], mid: ['#8D9AB0', '#96A3B8', '#8693A9'], strokes: ['#C6D0DE', '#7F8CA3'], ripples: true },
   // Savanna: dry golden grass, dusty earth across no man's land
   savanna: { base: '#9E8B4F', patch: ['#AA965A', '#917F46', '#B39F61', '#887840'], mid: ['#977852', '#8B6E49', '#A3855C'], strokes: ['#C4B06C', '#6F6337'], ripples: false },
   sand: { base: '#B39A6C', patch: ['#BDA478', '#A88F62', '#C2AA7E', '#A38A5F'], mid: ['#9E8457', '#A78D60', '#94794E'], strokes: ['#C9B288', '#8F7650'], ripples: true },
