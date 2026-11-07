@@ -1107,7 +1107,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     icy: { deploy: ['icyOne'], battle: ['knarkkungn'] },    // Icy Peak
     autumn: { deploy: ['berlin'] },                         // Autumn
   };
-  const LOOK_MUSIC = { frost: 'cavern', autumn: 'autumn', cavern: 'cavern', snow: 'icy' }; // frost = Darkwoods
+  const LOOK_MUSIC = { frost: 'cavern', autumn: 'autumn', cavern: 'cavern', snow: 'icy', moonlit: 'icy' }; // frost = Darkwoods
   // the menu playlist: every song that isn't deployment or battle music (a new song shows up in it by itself)
   const phaseSongs = new Set([...UNASSIGNED, ...PLAYLISTS.deploy, ...PLAYLISTS.battle, ...Object.values(MUSIC_COMBOS).flatMap(o => Object.values(o).flat())]);
   PLAYLISTS.menu = Object.keys(SONGS).filter(id => !phaseSongs.has(id));

@@ -4474,7 +4474,7 @@ const Game = (() => {
   const findMap = (id) => MAPS.find(x => x.id === id) || TEAM_MAPS.find(x => x.id === id) || VIEW_MAPS.find(x => x.id === id);
   // Looks (skins) for the 3D board: a map with skins (the Standard and the Test Grid) can be played in any of them; the
   // others have their own look. Only how the board looks: the rules stay the map's. The match keeps the host's pick (m.skin).
-  const SKINS = [{ id: 'meadow', name: 'Meadow' }, { id: 'autumn', name: 'Autumn' }, { id: 'snow', name: 'Snow' }, { id: 'frost', name: 'Darkwoods' }, { id: 'desert', name: 'Desert' }];
+  const SKINS = [{ id: 'meadow', name: 'Meadow' }, { id: 'autumn', name: 'Autumn' }, { id: 'snow', name: 'Snow' }, { id: 'frost', name: 'Darkwoods' }, { id: 'desert', name: 'Desert' }, { id: 'ash', name: 'Ashlands' }, { id: 'moonlit', name: 'Moonlit Snow' }, { id: 'savanna', name: 'Savanna' }];
   // each map's own look (the rest: meadow), and the look a match is drawn in: the host's pick on a map with skins, else
   // the map's own. The deployment and battle music follow the look too (LOOK_MUSIC in the page).
   const MAP_LOOK = { standard: 'meadow', testgrid: 'frost', ice: 'snow', forest: 'forest', cavern: 'cavern' };
@@ -9387,6 +9387,12 @@ var Floors = {};
 Floors.FLOORS = {
   meadow: { base: '#5F714C', patch: ['#6A7D53', '#556944', '#718156', '#506343'], mid: ['#776C51', '#6B6248', '#7F7359'], strokes: ['#76895C', '#485B3C'], ripples: false },
   autumn: { base: '#62633E', patch: ['#6E6C3E', '#585B37', '#78693A', '#545634'], mid: ['#776146', '#6B583E', '#816A4B'], strokes: ['#8C7F4A', '#474A2C'], ripples: false, leaves: ['#B8532F', '#C9782F', '#D3A43A', '#9A3B2A'] },
+  // Ashlands (2026-11-07): burnt ground, scorched no man's land, grey ash flecks and a few glowing embers
+  ash: { base: '#4B4744', patch: ['#55504C', '#423E3B', '#5B5550', '#3D3937'], mid: ['#36312E', '#3F3935', '#2F2B29'], strokes: ['#625B55', '#2C2826'], ripples: false, leaves: ['#7D766F', '#8A827A', '#6B645E', '#7D766F', '#8A827A', '#C0652C', '#D98A3A'] },
+  // Moonlit Snow: snow under a night sky, blue-grey, wind ripples, trampled darker across no man's land
+  moonlit: { base: '#7C8BA3', patch: ['#8694AB', '#73829A', '#8E9CB2', '#6D7B93'], mid: ['#66728A', '#6E7A92', '#5F6B83'], strokes: ['#9AA8BD', '#5E6A82'], ripples: true },
+  // Savanna: dry golden grass, dusty earth across no man's land
+  savanna: { base: '#9E8B4F', patch: ['#AA965A', '#917F46', '#B39F61', '#887840'], mid: ['#977852', '#8B6E49', '#A3855C'], strokes: ['#C4B06C', '#6F6337'], ripples: false },
   sand: { base: '#B39A6C', patch: ['#BDA478', '#A88F62', '#C2AA7E', '#A38A5F'], mid: ['#9E8457', '#A78D60', '#94794E'], strokes: ['#C9B288', '#8F7650'], ripples: true },
 };
 // Looks: what each draws (its biome round the board, and its floor: one painted here, or a map's painted ground in the
@@ -9394,6 +9400,7 @@ Floors.FLOORS = {
 Floors.LOOKS = {
   meadow: { biome: 'meadow', floor: 'meadow' }, autumn: { biome: 'autumn', floor: 'autumn' }, desert: { biome: 'desert', floor: 'sand' },
   snow: { biome: 'ice', bg: 'ice' }, frost: { biome: 'frost', bg: 'darkwoods' }, forest: { biome: 'forest', bg: 'forest' }, cavern: { biome: 'cavern', bg: 'cavern' },
+  ash: { biome: 'ash', floor: 'ash' }, moonlit: { biome: 'moonlit', floor: 'moonlit' }, savanna: { biome: 'savanna', floor: 'savanna' },
 };
 Floors.lookOf = (src) => { const k = Game.lookOf(src); return Floors.LOOKS[k] ? k : 'meadow'; };
 Floors.floor = (() => {
@@ -10810,6 +10817,21 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     tints: [[/^Grass/, [1.2, 1.02, 0.6]], [/^Fern|^Plant_1/, [1.25, 0.95, 0.5]], [/^Clover/, [1.15, 1, 0.6]]] };
   BIOMES.frost = { ...BIOMES.ice }; // Darkwoods: Frozen Peak's look without the snow (the Test Grid's own look)
   BIOMES.ice.snow = 0.75; // snow on everything that faces up, drifts round the board and falling snow
+  // Looks added 2026-11-07. light: the scene's lights for this look (render3d; default the day sun) as hemi [sky,
+  // ground, intensity], sun [colour, intensity], pos (the sun's position); fall: what drifts through the air (FALL
+  // below); farLight: the far impostors' brightness, so they match the real models under a darker light; squash: models
+  // drawn lower than tall ([pattern, height factor]); cabin: the cozy cabin off the board's far end.
+  // Ashlands: a burnt forest. Charred pines and dead trees, bare rocks, embers rising through smoky air.
+  BIOMES.ash = { sky: '#4E4642', land: '#2E2A27', tint: [0.62, 0.58, 0.55], low: 'ash', trees: ['DeadTree_1', 'DeadTree_3', 'DeadTree_1', 'Pine_2', 'Pine_3'], grow: 0.85, dress: 0.5,
+    tints: [[/^Pine/, [0.3, 0.27, 0.25]], [/^Grass/, [1.05, 0.9, 0.7]], [/^DeadTree/, [0.7, 0.64, 0.6]]],
+    light: { hemi: ['#D2C1B2', '#2A2220', 1.35], sun: ['#FFCDA6', 1.8] }, fall: 'embers', farLight: 0.9 };
+  // Moonlit Snow: Frozen Peak at night, blue moonlight, falling snow and a cabin with warm windows at the far end
+  BIOMES.moonlit = { ...BIOMES.ice, sky: '#141C2A', land: '#2F3A4C', tint: [0.6, 0.68, 0.85], trees: ['Pine_1', 'Pine_2', 'Pine_3', 'Pine_5', 'Pine_1', 'DeadTree_3'], grow: 0.85,
+    light: { hemi: ['#9DB2E0', '#1A2030', 1.2], sun: ['#C4D2F5', 1.55], pos: [30, 58, 18] }, drift: '#9AA9C2', farLight: 0.62, cabin: true };
+  // Savanna: golden hour on dry grass, lone flat-topped trees like acacias, a low warm sun with long shadows
+  BIOMES.savanna = { sky: '#DDB27C', land: '#8F7C43', tint: [1.06, 0.98, 0.82], low: 'savanna', trees: ['CommonTree_3', 'CommonTree_5', 'DeadTree_1', 'CommonTree_3'], grow: 0.42, dress: 0.8,
+    squash: [[/^CommonTree/, 0.5]], tints: [[/^CommonTree/, [1.0, 0.92, 0.6]], [/^Grass/, [1.35, 1.1, 0.55]], [/^Bush/, [1.1, 0.95, 0.55]], [/^DeadTree/, [1.1, 0.95, 0.78]]],
+    light: { hemi: ['#FFE0B8', '#3A2E1E', 1.35], sun: ['#FFCF94', 2.5], pos: [-52, 40, 22] } };
   // a look (Scenery3D.LOOKS, below) -> its biome
   const biomeOf = (look) => BIOMES[(Scenery3D.LOOKS[look] || Scenery3D.LOOKS.meadow).biome] || BIOMES.meadow;
   const biome = (v) => biomeOf(Scenery3D.lookOf(v && (v.battlePre || v.m)));
@@ -10919,7 +10941,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
       uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uAtlas: { value: null }, uGrid: { value: new THREE.Vector2(IGRID, 1) } }]),
       fog: true,
       vertexShader: `
-        attribute vec3 iPos; attribute float iSize; attribute float iModel; attribute vec3 iTint; attribute float iFlip;
+        attribute vec3 iPos; attribute float iSize; attribute float iModel; attribute vec3 iTint; attribute float iFlip; attribute float iSy;
         uniform vec2 uGrid;
         varying vec2 vUv0; varying vec2 vUv1; varying float vMix; varying vec3 vTint;
         #include <fog_pars_vertex>
@@ -10931,7 +10953,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
           vMix = elev < 40.0 ? clamp((elev - 8.0) / 32.0, 0.0, 1.0) : clamp((elev - 40.0) / 50.0, 0.0, 1.0);
           vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
           vec3 up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
-          vec3 wp = iPos + (right * position.x + up * position.y) * iSize;
+          vec3 wp = iPos + (right * position.x + up * position.y * iSy) * iSize;
           vec2 uv = vec2(position.x * iFlip + 0.5, position.y + 0.5);
           float c0 = iModel * 3.0 + i0;
           vUv0 = cellUv(c0, uv); vUv1 = cellUv(c0 + 1.0, uv); vTint = iTint;
@@ -10959,22 +10981,22 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     blobMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), color: '#1A2414', transparent: true, opacity: 0.45, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
     blobGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
   }
-  // the impostors and their shadows for one layout: list of [name, x, y, z, s, colour [r, g, b], flip]
+  // the impostors and their shadows for one layout: list of [name, x, y, z, s, colour [r, g, b], flip, height factor]
   function impostors(list) {
     const n = list.length; if (!n || !impMat) return;
     const geo = impGeo.clone(); geo.instanceCount = n;
-    const P = new Float32Array(n * 3), Z = new Float32Array(n), M = new Float32Array(n), C = new Float32Array(n * 3), F = new Float32Array(n);
+    const P = new Float32Array(n * 3), Z = new Float32Array(n), M = new Float32Array(n), C = new Float32Array(n * 3), F = new Float32Array(n), SY = new Float32Array(n);
     const blobs = new THREE.InstancedMesh(blobGeo, blobMat, n);
-    list.forEach(([name, x, y, z, s, col, flip], i) => {
+    list.forEach(([name, x, y, z, s, col, flip, sy = 1], i) => {
       const md = lib[name], im = impIndex[name];
-      P.set([x, y + md.h * s / 2, z], i * 3); Z[i] = im.S * s; M[i] = im.i; F[i] = flip;
+      P.set([x, y + md.h * s * sy / 2, z], i * 3); Z[i] = im.S * s; M[i] = im.i; F[i] = flip; SY[i] = sy;
       C.set(col, i * 3);
       const b = Math.max(1.5, md.r * s * 1.6);
       blobs.setMatrixAt(i, tmpM.compose(tmpP.set(x + b * 0.15, y + 0.02, z + b * 0.1), tmpQ.identity(), tmpS.set(b, 1, b)));
     });
     geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(P, 3)); geo.setAttribute('iSize', new THREE.InstancedBufferAttribute(Z, 1));
     geo.setAttribute('iModel', new THREE.InstancedBufferAttribute(M, 1)); geo.setAttribute('iTint', new THREE.InstancedBufferAttribute(C, 3));
-    geo.setAttribute('iFlip', new THREE.InstancedBufferAttribute(F, 1));
+    geo.setAttribute('iFlip', new THREE.InstancedBufferAttribute(F, 1)); geo.setAttribute('iSy', new THREE.InstancedBufferAttribute(SY, 1));
     const mesh = new THREE.Mesh(geo, impMat); mesh.frustumCulled = false; mesh.raycast = () => {}; mesh.name = 'impostors'; mesh.count = n;
     blobs.instanceMatrix.needsUpdate = true; blobs.computeBoundingSphere(); blobs.raycast = () => {}; blobs.name = 'blobs';
     scene.add(mesh, blobs); meshes.push(mesh, blobs);
@@ -11003,6 +11025,20 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     dress: [['Pebble_Round_1', 2], ['Pebble_Round_2', 2], ['Pebble_Square_2', 2], ['Grass_Wispy_Short', 1.5]],
     rocks: [['DesertRock_1', 1], ['DesertRock_2', 1], ['DesertRock_3', 1]],
   };
+  // Ashlands' lists: rocks and pebbles, a little dry grass
+  const ASH = {
+    low: [['Rock_Medium_1', 1], ['Rock_Medium_2', 1], ['Rock_Medium_3', 1], ['Grass_Wispy_Short', 1.5], ['Pebble_Square_2', 1]],
+    tuft: [['Pebble_Round_1', 2], ['Pebble_Round_2', 2], ['Pebble_Square_2', 1.5], ['Grass_Wispy_Short', 1]],
+    dress: [['Pebble_Round_1', 2], ['Pebble_Round_2', 2], ['Pebble_Square_2', 1.5], ['Grass_Wispy_Short', 0.6]],
+    rocks: ROCKS,
+  };
+  // Savanna's lists: tall golden grass everywhere, a few bushes and rocks
+  const SAVANNA = {
+    low: [['Grass_Common_Tall', 5], ['Grass_Wispy_Short', 2], ['Bush_Common', 1], ['DesertRock_1', 0.4], ['DesertRock_2', 0.4]],
+    tuft: [['Grass_Common_Tall', 4], ['Grass_Wispy_Short', 3], ['Grass_Common_Short', 2], ['Pebble_Round_1', 0.5]],
+    dress: [['Grass_Wispy_Short', 3], ['Grass_Common_Short', 3], ['Pebble_Round_1', 1], ['Pebble_Round_2', 1]],
+    rocks: [['DesertRock_1', 1], ['DesertRock_2', 1], ['DesertRock_3', 1]],
+  };
   // the oasis's water (off the board): water, a shallow rim and wet sand round it
   const pondMats = [new THREE.MeshLambertMaterial({ color: '#8C7650' }), new THREE.MeshLambertMaterial({ color: '#86AE9E' }), new THREE.MeshStandardMaterial({ color: '#4E8C8E', roughness: 0.2, metalness: 0 })];
   const pondGeo = new THREE.CircleGeometry(1, 48).rotateX(-Math.PI / 2);
@@ -11016,15 +11052,100 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     flakeGeo.setAttribute('position', new THREE.BufferAttribute(P, 3)); flakeGeo.setAttribute('aSeed', new THREE.BufferAttribute(S, 1));
     flakeGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 20, -15), 130);
   }
-  const flakeMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uTime: snowTime, uPx: { value: 1 } },
-    vertexShader: `attribute float aSeed; uniform float uTime; uniform float uPx; varying float vA;
-      void main() { vec3 p = position; p.y = mod(p.y - uTime * (1.6 + aSeed * 1.6), 45.0); p.x += sin(uTime * 0.7 + aSeed * 40.0) * 1.3; p.z += cos(uTime * 0.5 + aSeed * 30.0) * 0.8;
-        vec4 mv = viewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = uPx * (0.35 + aSeed * 0.35) * 300.0 / max(1.0, -mv.z); vA = 0.55 + aSeed * 0.35; }`,
-    fragmentShader: `varying float vA; void main() { float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = vec4(0.93, 0.96, 1.0, vA * smoothstep(0.5, 0.2, d)); }` });
+  // the same points carry falling snow or rising embers (Ashlands): dir 1 falls, -1 rises; keep: the share of the
+  // points shown; flick: how much each one flickers; sway: how far it drifts sideways
+  const FALL = {
+    snow: { col: [0.93, 0.96, 1.0], dir: 1, spd: 1, keep: 1, size: 1, flick: 0, sway: 1 },
+    embers: { col: [1.0, 0.58, 0.26], dir: -1, spd: 0.75, keep: 0.5, size: 1.2, flick: 0.8, sway: 1.8 },
+  };
+  const fallU = { uCol: { value: new THREE.Vector3() }, uDir: { value: 1 }, uSpd: { value: 1 }, uKeep: { value: 1 }, uSize: { value: 1 }, uFlick: { value: 0 }, uSway: { value: 1 } };
+  const flakeMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uTime: snowTime, uPx: { value: 1 }, ...fallU },
+    vertexShader: `attribute float aSeed; uniform float uTime; uniform float uPx; uniform float uDir; uniform float uSpd; uniform float uKeep; uniform float uSize; uniform float uFlick; uniform float uSway; varying float vA;
+      void main() { vec3 p = position; p.y = mod(p.y - uDir * uTime * uSpd * (1.6 + aSeed * 1.6), 45.0); p.x += sin(uTime * 0.7 + aSeed * 40.0) * 1.3 * uSway; p.z += cos(uTime * 0.5 + aSeed * 30.0) * 0.8 * uSway;
+        vec4 mv = viewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = aSeed > uKeep ? 0.0 : uPx * uSize * (0.35 + aSeed * 0.35) * 300.0 / max(1.0, -mv.z);
+        vA = (0.55 + aSeed * 0.35) * (1.0 - uFlick * (0.5 + 0.5 * sin(uTime * (3.0 + aSeed * 4.0) + aSeed * 60.0))) * (uDir < 0.0 ? smoothstep(45.0, 20.0, p.y) : 1.0); }`,
+    fragmentShader: `uniform vec3 uCol; varying float vA; void main() { float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = vec4(uCol, vA * smoothstep(0.5, 0.2, d)); }` });
   const flakes = new THREE.Points(flakeGeo, flakeMat); flakes.visible = false; flakes.raycast = () => {}; scene.add(flakes);
-  function showSnow(on) { flakes.visible = on; }
-  // the clock for the falling snow (the page calls it every frame it draws); px: the renderer's pixels per CSS pixel
-  function tick(dt, px = 1) { if (flakes.visible) { snowTime.value += dt; flakeMat.uniforms.uPx.value = px; } }
+  function showFall(kind) {
+    const f = FALL[kind]; flakes.visible = !!f; if (!f) return;
+    fallU.uCol.value.set(...f.col); fallU.uDir.value = f.dir; fallU.uSpd.value = f.spd; fallU.uKeep.value = f.keep; fallU.uSize.value = f.size; fallU.uFlick.value = f.flick; fallU.uSway.value = f.sway;
+    flakeMat.blending = kind === 'embers' ? THREE.AdditiveBlending : THREE.NormalBlending; flakeMat.needsUpdate = true;
+  }
+
+  // ---------- the cabin (Moonlit Snow): log walls, a snowy roof, a stone chimney with smoke, warm lit windows whose
+  // light spills on the snow. Built once from simple shapes, moved and shown per layout (never disposed with it). ----------
+  const cabin = new THREE.Group(); cabin.visible = false; scene.add(cabin);
+  const cabinLight = new THREE.PointLight('#FFAE5C', 0, 34, 2); // intensity 0 when hidden, so no look switch recompiles shaders
+  scene.add(cabinLight);
+  const smoke = [];
+  {
+    const cv = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; return tx; };
+    // logs: horizontal bands with dark gaps and a lighter top edge
+    const logTex = cv(64, 64, (g, w, h) => { for (let i = 0; i < 4; i++) { const y = i * 16; g.fillStyle = i % 2 ? '#6B4A33' : '#73513A'; g.fillRect(0, y, w, 16); g.fillStyle = '#8A6447'; g.fillRect(0, y + 2, w, 3); g.fillStyle = '#3A281D'; g.fillRect(0, y + 14, w, 2); } });
+    logTex.wrapS = logTex.wrapT = THREE.RepeatWrapping; logTex.repeat.set(2, 1.6);
+    const glowTex = cv(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.4, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
+    const puffTex = cv(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
+    const M = {
+      log: new THREE.MeshLambertMaterial({ map: logTex, color: '#B9A595', side: THREE.DoubleSide }),
+      roof: new THREE.MeshLambertMaterial({ color: '#3B2C24' }),
+      snow: new THREE.MeshLambertMaterial({ color: '#DDE5F0' }),
+      stone: new THREE.MeshLambertMaterial({ color: '#6A6E75' }),
+      dark: new THREE.MeshLambertMaterial({ color: '#2E2018' }),
+      win: new THREE.MeshBasicMaterial({ color: '#FFC56E' }), // unlit: it glows whatever the moon does
+      spill: new THREE.MeshBasicMaterial({ map: glowTex, color: '#FF9F4A', transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }),
+    };
+    const add = (geo, mat, x, y, z, ry = 0, rz = 0, parent = cabin) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(0, ry, rz); m.raycast = () => {}; parent.add(m); return m; };
+    const W = 7, D = 5.4, H = 3, R = 2.3, a = Math.atan2(R, W / 2), Ls = Math.hypot(W / 2, R) + 0.7;
+    add(new THREE.BoxGeometry(W, H, D), M.log, 0, H / 2, 0);
+    const tri = new THREE.Shape([new THREE.Vector2(-W / 2, 0), new THREE.Vector2(W / 2, 0), new THREE.Vector2(0, R)]);
+    for (const z of [D / 2 + 0.005, -D / 2 - 0.005]) add(new THREE.ShapeGeometry(tri), M.log, 0, H, z);
+    for (const sd of [1, -1]) { // the two roof slopes, each wood under a thick layer of snow
+      const p = new THREE.Group(); p.position.set(sd * W / 4, H + R / 2 + 0.05, 0); p.rotation.z = -sd * a; cabin.add(p);
+      add(new THREE.BoxGeometry(Ls, 0.28, D + 1.1), M.roof, 0, 0.14, 0, 0, 0, p);
+      add(new THREE.BoxGeometry(Ls + 0.1, 0.3, D + 1.2), M.snow, 0, 0.42, 0, 0, 0, p);
+    }
+    add(new THREE.BoxGeometry(0.95, R + 1.2, 0.95), M.stone, -W * 0.27, H + (R + 1.2) / 2, -0.6);
+    add(new THREE.BoxGeometry(1.15, 0.22, 1.15), M.snow, -W * 0.27, H + R + 1.3, -0.6);
+    add(new THREE.BoxGeometry(1.15, 2.1, 0.12), M.dark, 0, 1.05, D / 2 + 0.06); // the door
+    add(new THREE.BoxGeometry(2.4, 0.18, 1.3), M.snow, 0, 0.09, D / 2 + 0.75);   // snow on the doorstep
+    // a lit window: the glowing pane, a dark cross and a sill
+    const win = (x, y, z, ry, w = 1.2, h = 0.95) => {
+      const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; cabin.add(g);
+      add(new THREE.PlaneGeometry(w, h), M.win, 0, 0, 0.02, 0, 0, g);
+      add(new THREE.BoxGeometry(w + 0.2, 0.09, 0.08), M.dark, 0, 0, 0.05, 0, 0, g);
+      add(new THREE.BoxGeometry(0.09, h + 0.2, 0.08), M.dark, 0, 0, 0.05, 0, 0, g);
+      for (const yy of [h / 2 + 0.06, -h / 2 - 0.06]) add(new THREE.BoxGeometry(w + 0.3, 0.12, 0.16), yy > 0 ? M.dark : M.snow, 0, yy, 0.06, 0, 0, g);
+    };
+    win(-2.2, 1.65, D / 2 + 0.01, 0); win(2.2, 1.65, D / 2 + 0.01, 0); win(0, H + 0.85, D / 2 + 0.02, 0, 0.7, 0.6);
+    win(W / 2 + 0.01, 1.65, 0.6, Math.PI / 2); win(-W / 2 - 0.01, 1.65, 0.9, -Math.PI / 2);
+    // the warm light on the snow: soft glows under the windows and in front of the door
+    const spill = (x, z, sx, sz) => { const m = add(new THREE.PlaneGeometry(1, 1), M.spill, x, 0.06, z); m.rotation.x = -Math.PI / 2; m.scale.set(sx, sz, 1); m.renderOrder = 2; };
+    spill(0, D / 2 + 3.2, 11, 6.5); spill(W / 2 + 2.6, 0.6, 5, 4.5); spill(-W / 2 - 2.6, 0.9, 5, 4.5);
+    // firewood stacked by the wall
+    const logG = new THREE.CylinderGeometry(0.17, 0.17, 1.6, 7).rotateZ(Math.PI / 2);
+    [[0, 0.17], [0.36, 0.17], [0.72, 0.17], [0.18, 0.47], [0.54, 0.47], [0.36, 0.77]].forEach(([zz, y]) => add(logG, M.roof, W / 2 + 0.45, y, -1.6 + zz, Math.PI / 2));
+    // chimney smoke: a few soft puffs rising and fading (moved in tick)
+    for (let i = 0; i < 6; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, color: '#8C95A3', transparent: true, depthWrite: false, opacity: 0 })); s.raycast = () => {}; cabin.add(s); smoke.push(s); }
+    smoke.top = new THREE.Vector3(-W * 0.27, H + R + 1.5, -0.6);
+    cabin.userData.dispose = () => { cabin.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map && o.material.map !== logTex) o.material.map.dispose(); o.material.dispose(); } }); logTex.dispose(); for (const m of Object.values(M)) m.dispose(); };
+  }
+  // where the cabin stands in this layout (null: not shown); nothing else is placed within its clearing
+  let cabinAt = null;
+  function showCabin(at) {
+    cabinAt = at; cabin.visible = !!at; cabinLight.intensity = at ? 110 : 0;
+    if (!at) return;
+    cabin.position.set(at.x, 0, at.z); cabin.rotation.y = at.ang; cabin.scale.setScalar(at.s);
+    cabinLight.position.set(at.x + Math.sin(at.ang) * 4.5 * at.s, 2.4 * at.s, at.z + Math.cos(at.ang) * 4.5 * at.s);
+  }
+  // the clock for the falling snow, embers and chimney smoke (the page calls it every frame it draws); px: the renderer's pixels per CSS pixel
+  let smokeT = 0;
+  function tick(dt, px = 1) {
+    if (flakes.visible) { snowTime.value += dt; flakeMat.uniforms.uPx.value = px; }
+    if (cabin.visible) {
+      smokeT += dt;
+      smoke.forEach((s, i) => { const ph = (smokeT * 0.12 + i / smoke.length) % 1; s.position.set(smoke.top.x + ph * 1.8, smoke.top.y + ph * 7, smoke.top.z - ph * 0.6); s.scale.setScalar(0.9 + ph * 3); s.material.opacity = 0.42 * Math.sin(ph * Math.PI) * (1 - ph * 0.4); });
+    }
+  }
   function update(v, groundY, BW, BD, T) {
     if (!lib || !v || !v.m) return;
     const src = v.battlePre || v.m, mp = Game.mapOf(src), id = (mp && mp.id) || 'standard', look = Scenery3D.lookOf(src);
@@ -11041,14 +11162,17 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     const placed = new Map();
     // ponds (the desert's oasis): nothing else grows in the water
     const ponds = bi.ponds ? [{ x: hw * 0.2, z: -hd - 25, rx: 24, rz: 12 }, { x: -hw - 17, z: -hd * 0.25, rx: 9, rz: 16 }] : [];
-    const inPond = (x, z, k = 1.12) => ponds.some((p) => ((x - p.x) / p.rx) ** 2 + ((z - p.z) / p.rz) ** 2 < k * k);
+    // the cabin (Moonlit Snow): off the far end, a little right of the middle, turned toward the board; its clearing stays open
+    const cab = bi.cabin ? { x: hw * 0.32, z: -hd - 15, ang: -0.22, r: 11, s: 1.4 } : null;
+    const inPond = (x, z, k = 1.12) => ponds.some((p) => ((x - p.x) / p.rx) ** 2 + ((z - p.z) / p.rz) ** 2 < k * k) || (cab && Math.hypot(x - cab.x, z - cab.z) < cab.r);
     const tintFor = (name) => { const t = (bi.tints || []).find(([re]) => re.test(name)); return t ? t[1] : [1, 1, 1]; };
+    const squashOf = (name) => { const t = (bi.squash || []).find(([re]) => re.test(name)); return t ? t[1] : 1; };
     const put = (name, x, z, s, y = 0, wet = false) => {
       if (!lib[name] || (!wet && inPond(x, z))) return;
       const d = outside(x, z), k = name + (d > 16 || (d > 6 && /^Bush/.test(name)) ? '~' : ''), sh = 0.85 + rr() * 0.3, t = tintFor(name);
-      (placed.get(k) || placed.set(k, []).get(k)).push([x, y, z, rr() * Math.PI * 2, s, [bi.tint[0] * t[0] * sh, bi.tint[1] * t[1] * sh, bi.tint[2] * t[2] * sh]]);
+      (placed.get(k) || placed.set(k, []).get(k)).push([x, y, z, rr() * Math.PI * 2, s, [bi.tint[0] * t[0] * sh, bi.tint[1] * t[1] * sh, bi.tint[2] * t[2] * sh], squashOf(name)]);
     };
-    const L = bi.low === 'desert' ? DESERT : bi.low === 'autumn' ? AUTUMN : bi.low === 'rocks' ? { low: ROCKS, tuft: PEBBLES, rocks: ROCKS, dress: DRESS } : { low: LOW, tuft: TUFT, rocks: ROCKS, dress: DRESS };
+    const L = { desert: DESERT, autumn: AUTUMN, ash: ASH, savanna: SAVANNA, rocks: { low: ROCKS, tuft: PEBBLES, rocks: ROCKS, dress: DRESS } }[bi.low] || { low: LOW, tuft: TUFT, rocks: ROCKS, dress: DRESS };
     const low = () => pickOf(L.low), tuft = () => pickOf(L.tuft);
     const outside = (x, z) => Math.max(Math.abs(x) - hw, Math.abs(z) - hd, 0) > 0 ? Math.hypot(Math.max(0, Math.abs(x) - hw), Math.max(0, Math.abs(z) - hd)) : 0;
     // 1. the edge: a frame of bushes, rocks and tall grass hugging the board, so its edge doesn't end in a hard line
@@ -11107,20 +11231,22 @@ const Scenery3D = (THREE, scene, opts = {}) => {
       for (let k = 0; k < 600 && n < 120; k++) {
         const x = (rr() * 2 - 1) * (hw + 45), z = -hd - 60 + rr() * (BD + 95), d = outside(x, z);
         if (d < 0.6 || d > 40 || rr() > 1.2 - d / 40) continue;
+        if (cab && Math.hypot(x - cab.x, z - cab.z) < cab.r - 2) continue;
         const w = 2 + rr() * 4.5;
         dr.setMatrixAt(n++, tmpM.compose(tmpP.set(x, -0.1, z), tmpQ.setFromAxisAngle(upY, rr() * 6.3), tmpS.set(w * 1.4, 0.35 + rr() * 0.6, w * (0.35 + rr() * 0.35))));
       }
-      dr.count = n; dr.instanceMatrix.needsUpdate = true; dr.computeBoundingSphere(); dr.raycast = () => {}; dr.receiveShadow = true; dr.name = 'drifts';
+      dr.count = n; dr.instanceMatrix.needsUpdate = true; driftMat.color.set(bi.drift || '#B4C1CA'); dr.computeBoundingSphere(); dr.raycast = () => {}; dr.receiveShadow = true; dr.name = 'drifts';
       scene.add(dr); meshes.push(dr);
     }
     // far trees and bushes: impostors
-    snowU.value = bi.snow || 0; showSnow(!!bi.snow);
+    snowU.value = bi.snow || 0; showFall(bi.fall || (bi.snow ? 'snow' : null)); showCabin(cab);
     bake([...new Set([...placed.keys()].filter((k) => k.endsWith('~')).map((k) => k.slice(0, -1)).filter(impostorable))].sort());
     const far = [];
     for (const [k, list] of [...placed]) {
       const name = k.replace('~', '');
       if (!k.endsWith('~') || !impIndex || !impIndex[name]) continue;
-      for (const [x, y, z, ang, s, col] of list) far.push([name, x, y, z, s, col, ang < Math.PI ? 1 : -1]);
+      const fl = bi.farLight || 1;
+      for (const [x, y, z, ang, s, col, sy] of list) far.push([name, x, y, z, s, col.map((c) => c * fl), ang < Math.PI ? 1 : -1, sy]);
       placed.delete(k);
     }
     impostors(far);
@@ -11129,8 +11255,8 @@ const Scenery3D = (THREE, scene, opts = {}) => {
       const md = lib[k.replace('~', '')], tall = md.h > 3 && !k.endsWith('~');
       for (const part of md.parts) {
         const im = new THREE.InstancedMesh(part.geo, part.mat, list.length);
-        list.forEach(([x, y, z, ang, s, col], i) => {
-          tmpP.set(x, y, z); tmpQ.setFromAxisAngle(upY, ang); tmpS.set(s, s * (0.95 + (ang % 1) * 0.15), s);
+        list.forEach(([x, y, z, ang, s, col, sy], i) => {
+          tmpP.set(x, y, z); tmpQ.setFromAxisAngle(upY, ang); tmpS.set(s, s * (0.95 + (ang % 1) * 0.15) * sy, s);
           im.setMatrixAt(i, tmpM.compose(tmpP, tmpQ, tmpS));
           im.setColorAt(i, tmpC.setRGB(col[0], col[1], col[2]));
         });
@@ -11142,7 +11268,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     }
   }
   function shadows(on) { if (on !== castShadows) { castShadows = on; key = ''; } }
-  function dispose() { clear(); scene.remove(flakes); flakeGeo.dispose(); flakeMat.dispose(); driftGeo.dispose(); driftMat.dispose(); pondGeo.dispose(); for (const m of pondMats) m.dispose(); if (atlas) atlas.dispose(); if (impMat) { impMat.dispose(); impGeo.dispose(); blobMat.map.dispose(); blobMat.dispose(); blobGeo.dispose(); } for (const m of mats) { if (m.map) m.map.dispose(); m.dispose(); } if (lib) for (const md of Object.values(lib)) for (const p of md.parts) p.geo.dispose(); }
+  function dispose() { clear(); scene.remove(flakes, cabin, cabinLight); cabin.userData.dispose(); cabinLight.dispose(); flakeGeo.dispose(); flakeMat.dispose(); driftGeo.dispose(); driftMat.dispose(); pondGeo.dispose(); for (const m of pondMats) m.dispose(); if (atlas) atlas.dispose(); if (impMat) { impMat.dispose(); impGeo.dispose(); blobMat.map.dispose(); blobMat.dispose(); blobGeo.dispose(); } for (const m of mats) { if (m.map) m.map.dispose(); m.dispose(); } if (lib) for (const md of Object.values(lib)) for (const p of md.parts) p.geo.dispose(); }
   return { _lib: () => lib, _meshes: () => meshes, update, biome, shadows, dispose, ready, tick, snowing: () => flakes.visible, count: () => meshes.reduce((s, m) => s + m.count, 0) };
 };
 
@@ -11205,9 +11331,11 @@ const Render3D = (THREE, el, view, opts = {}) => {
   scene.background = new THREE.Color(bg);
   scene.fog = new THREE.Fog(bg, 90, 220);
   const camera = new THREE.PerspectiveCamera(35, 1, 1, 600);
-  scene.add(new THREE.HemisphereLight('#cfe3ff', '#20262a', 1.6));
-  const sun = new THREE.DirectionalLight('#fff3dc', 2.2);
-  sun.position.set(-30, 60, 25);
+  // the day's lights; a look can bring its own (Scenery3D biome .light: Moonlit Snow's moon, Savanna's low sun)
+  const DAY = { hemi: ['#cfe3ff', '#20262a', 1.6], sun: ['#fff3dc', 2.2], pos: [-30, 60, 25] };
+  const hemi = new THREE.HemisphereLight(...DAY.hemi); scene.add(hemi);
+  const sun = new THREE.DirectionalLight(...DAY.sun);
+  sun.position.set(...DAY.pos);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -55, right: 55, top: 65, bottom: -65, near: 1, far: 160 });
@@ -11243,6 +11371,9 @@ const Render3D = (THREE, el, view, opts = {}) => {
     if (bi.sky === biomeKey) return;
     biomeKey = bi.sky;
     scene.background.set(bi.sky); scene.fog.color.set(bi.sky); around.material.color.set(bi.land);
+    const li = { ...DAY, ...(bi.light || {}) };
+    hemi.color.set(li.hemi[0]); hemi.groundColor.set(li.hemi[1]); hemi.intensity = li.hemi[2];
+    sun.color.set(li.sun[0]); sun.intensity = li.sun[1]; sun.position.set(...li.pos);
   }
   // ---------- ground height (a map's terrain: Game.groundHeight): the floor rises and falls with it, and everything
   // standing or drawn on it (models, rings, markers, shots) goes up and down with it. Heights are sampled HK times a

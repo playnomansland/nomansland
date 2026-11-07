@@ -49,9 +49,11 @@ const Render3D = (THREE, el, view, opts = {}) => {
   scene.background = new THREE.Color(bg);
   scene.fog = new THREE.Fog(bg, 90, 220);
   const camera = new THREE.PerspectiveCamera(35, 1, 1, 600);
-  scene.add(new THREE.HemisphereLight('#cfe3ff', '#20262a', 1.6));
-  const sun = new THREE.DirectionalLight('#fff3dc', 2.2);
-  sun.position.set(-30, 60, 25);
+  // the day's lights; a look can bring its own (Scenery3D biome .light: Moonlit Snow's moon, Savanna's low sun)
+  const DAY = { hemi: ['#cfe3ff', '#20262a', 1.6], sun: ['#fff3dc', 2.2], pos: [-30, 60, 25] };
+  const hemi = new THREE.HemisphereLight(...DAY.hemi); scene.add(hemi);
+  const sun = new THREE.DirectionalLight(...DAY.sun);
+  sun.position.set(...DAY.pos);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -55, right: 55, top: 65, bottom: -65, near: 1, far: 160 });
@@ -87,6 +89,9 @@ const Render3D = (THREE, el, view, opts = {}) => {
     if (bi.sky === biomeKey) return;
     biomeKey = bi.sky;
     scene.background.set(bi.sky); scene.fog.color.set(bi.sky); around.material.color.set(bi.land);
+    const li = { ...DAY, ...(bi.light || {}) };
+    hemi.color.set(li.hemi[0]); hemi.groundColor.set(li.hemi[1]); hemi.intensity = li.hemi[2];
+    sun.color.set(li.sun[0]); sun.intensity = li.sun[1]; sun.position.set(...li.pos);
   }
   // ---------- ground height (a map's terrain: Game.groundHeight): the floor rises and falls with it, and everything
   // standing or drawn on it (models, rings, markers, shots) goes up and down with it. Heights are sampled HK times a

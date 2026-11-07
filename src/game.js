@@ -618,7 +618,7 @@ const Game = (() => {
   const findMap = (id) => MAPS.find(x => x.id === id) || TEAM_MAPS.find(x => x.id === id) || VIEW_MAPS.find(x => x.id === id);
   // Looks (skins) for the 3D board: a map with skins (the Standard and the Test Grid) can be played in any of them; the
   // others have their own look. Only how the board looks: the rules stay the map's. The match keeps the host's pick (m.skin).
-  const SKINS = [{ id: 'meadow', name: 'Meadow' }, { id: 'autumn', name: 'Autumn' }, { id: 'snow', name: 'Snow' }, { id: 'frost', name: 'Darkwoods' }, { id: 'desert', name: 'Desert' }];
+  const SKINS = [{ id: 'meadow', name: 'Meadow' }, { id: 'autumn', name: 'Autumn' }, { id: 'snow', name: 'Snow' }, { id: 'frost', name: 'Darkwoods' }, { id: 'desert', name: 'Desert' }, { id: 'ash', name: 'Ashlands' }, { id: 'moonlit', name: 'Moonlit Snow' }, { id: 'savanna', name: 'Savanna' }];
   // each map's own look (the rest: meadow), and the look a match is drawn in: the host's pick on a map with skins, else
   // the map's own. The deployment and battle music follow the look too (LOOK_MUSIC in the page).
   const MAP_LOOK = { standard: 'meadow', testgrid: 'frost', ice: 'snow', forest: 'forest', cavern: 'cavern' };
