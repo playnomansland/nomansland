@@ -20,6 +20,54 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 7 November 2026 – Playtest fixes
+
+### For every mode and map
+
+**Units**
+- **Meteor Caller:** its meteors no longer hit enemies inside its minimum range (16 m). A spider biting the caller no longer brings the meteor down on itself and the swarm. A meteor still splashes everything around where it lands.
+- **Truespear:** spears thrown at the enemy it is locked on to fly past everything in between (skeletons, chaff) and follow that enemy, so they no longer miss a target walking sideways. With Dual Spear, the main spear stays on the locked enemy and the second spear takes someone else.
+- **Brute, Bullhead:** charge damage 85 (was 100) and knockback 5 m (was 6). The Keep's Brute guards share it. The skill text now says it charges on the first attack, then every 5th. Its extra armor while charging starts the moment after it sets off, so two Brutes charging each other at the same time now trade evenly.
+- **Rollers:** roll 9 m past their target before turning back (was 6).
+- **Necromancer, Healing touch:** heals only allies within 25 m, and never towers or walls. With nobody wounded in reach, nothing is healed.
+- **Necromancer, Raise dead:** raised skeletons now level up with the Necromancer (x2 health and damage at level 1, x3 at level 2) and get the Skeleton Archer skills you own.
+- **Cog Builder:** a Cog Builder busy with a Factory or Altar site (walking to it or building it) no longer keeps its side in the fight: once your other units are dead, the round is lost. If its site is knocked down, the builder fights on as usual. Its 1.5 s turret build is unchanged.
+- **Factory:** it only counts as built by surviving a fight when its side didn't lose that fight. After a lost fight it keeps the work done so far. The Factory sheet and the Claude opponent's rules now say so.
+
+**Direction arrows and moves**
+- **Direction arrows:** a squad walking its arrow now stops only for an enemy blocking the way ahead. Enemies beside or behind it get hit in passing. Slows and knockback no longer make it drop the arrow: walking back after being knocked back counts as getting closer. It gives up only after about 3 s without getting closer (stuck on a wall or in a crowd).
+- Drag the head of a direction arrow to change where it points, no sheet needed; drop it on its squad to clear it.
+- **March order (Bastion):** the free move now goes at most 2 tiles from where the squad stood at the start of the round. A longer move is the paid move (or Otto's horseshoe move). While you drag, tiles only the paid move reaches are dimmer.
+- **Level all** now spreads levels: every squad that is ready gets its next level before any squad is levelled twice (lowest level first, then most XP).
+- Hovering or tapping an enemy squad shows its range ring on every tile of a big unit, on the 3D board's tilted view over the model itself, and in 2v2 for your teammate's and the other opponent's squads.
+
+**Match flow**
+- **Replay a round:** when your opponent taps Next game or Rematch, or says GG, you now see it at once, next to Back to results. If the next game starts while you're replaying, you're taken straight to it.
+- Replay a round is no longer offered once you've tapped Next game or Rematch.
+- **GG:** when your opponent says GG you now get a banner and a sound wherever you are: on the result card, on Look at board, or in Replay a round. If you're signed in and have already gone back to the menu, it still reaches you there.
+- Say GG now shows "Sending…" until the server has it, and it goes again by itself if the connection dropped.
+- **Leader draft:** round 1 now tells you what winning it is worth: the winner picks a leader first in round 2. The round 1 result card says who picks first, also when time ran out (more health left) or on a draw (coin flip).
+- Replays of fights from before this patch may play out a little differently.
+
+### 2v2
+
+**The board**
+- No man's land is one row deeper (the board is 24 x 19). Its new middle row is the same distance from both teams' zones and belongs to nobody: no flank tiles and no Bastion walls there, and neither team has priority there when hidden things land on the same tile. Units that can stand in no man's land (Forward planting, Assassins, Shadowhands, Coal mine exits, Magic lake tiles) may use it.
+- Both artifacts (rounds 2 and 8) now stand on that middle row, mirrored, at least 10 tiles apart and out of the two flank columns on each edge, so each is the same distance from both teams' front lines. If Coal mine exits or lake tiles fill the middle row, they stand one row nearer a team as before.
+- Team A's tower and Vault moved one row back with the bigger board (tower row 17, Vault row 16).
+- A phone running an older version of the game can't join a 2v2 room any more (the board changed shape). It shows "The game was updated. Please reload the page."
+
+**Buildings**
+- Your teammate's Cog Builder Factory now shows on your board while you deploy, built or being rebuilt. Tapping it opens a read-only sheet. The other opponent's shows from the round after they place it.
+- A building that is out of action this round now looks it while you deploy: greyed out, nothing turning or smoking, with a small crossed-cog badge. This covers the 2v2 Factory being rebuilt, a Coal mine that is shut, and a Cog Builder's Factory being rebuilt after it was destroyed (it no longer looks like a brand-new site). Same on the 2D and 3D boards.
+- **Coal mine** (new rule from Vilhelm): a mine destroyed in a fight is shut the next round, so nobody goes down it. It still stands in the fight, its exit still blocks the tiles round it, and you can still buy its skills.
+- **Coal mine, Dig a new exit:** you can now buy it again, once a round per mine. It costs 150 the first time and 50 more for each earlier dig. Use it the round you buy it: one you don't use is lost when the next round begins. Taking it back refunds it. After you buy it, the tiles you can dig to light up straight away.
+- With a unit still selected in the shop, tapping a building now opens its sheet (and lets go of the unit) instead of doing nothing. Move the exit also lets go of a selected unit.
+- Both Factory sheets have a Read more. It explains that a unit you buy fights in that round's fight only and doesn't come back, and when it walks out (2 s or 4 s, sooner with Master engineering or the Blessing on a Cog Builder's Factory). You get no refund if the Factory falls first, and a unit that survives keeps your side in the fight but deals no Team HP damage.
+- **School: new Respec.** Once a round, for free, swap an either-or skill of the unit type in your School for the other one, once that squad has sat a fight out inside. It counts in that round's fight, the enemy doesn't see it until the fight, and it stays even if the School is destroyed. Undo respec (same round) gives the use back.
+
+---
+
 ## 7 November 2026 – Three new looks: Ashlands, Moonlit Snow and Savanna
 
 Looks change only how the board and the land around it look, never the rules. Pick them in the look picker on any map that has looks (Standard, Old standard, 2v2), or get them from Random.
