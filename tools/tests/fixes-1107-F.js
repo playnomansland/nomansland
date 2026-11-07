@@ -89,9 +89,15 @@ check('F1: Level all gives every ready squad its next level before any squad get
   assert.deepStrictEqual(plan(cost), [C.id], 'gold for one: the level-0 squad with the most XP');
   assert.deepStrictEqual(plan(2 * cost), [C.id, B.id], 'gold for two: both level-0 squads, not the level-1 one');
   assert.deepStrictEqual(plan(3 * cost), [C.id, B.id, A.id], 'gold for three: then the level-1 squad');
-  // a squad levelled 0 -> 1 in the plan with XP for another joins the level-1 tier (the most XP first there)
+  // a squad with XP for two levels gets its second only after every ready squad (A too) got one (2026-11-07)
   C.xp = Game.xpNeeded(u, 1) + 100;
-  assert.deepStrictEqual(plan(10 * cost), [C.id, B.id, C.id, A.id], 'all levels: level 0s first, then level 1s by XP');
+  assert.deepStrictEqual(plan(10 * cost), [C.id, B.id, A.id, C.id], 'all levels: one pass for every ready squad first');
+  assert.deepStrictEqual(plan(3 * cost), [C.id, B.id, A.id], 'gold for three: A before the second level of C');
+  // the reviewer's case: B (level 0) has more XP than A (level 1, ready); A still gets a level before B's second
+  C.xp = Game.xpNeeded(u, 0); B.xp = Game.xpNeeded(u, 1) + 10; A.xp = Game.xpNeeded(u, 1);
+  assert.deepStrictEqual(plan(2 * cost), [B.id, C.id], 'gold for two: both level 0s');
+  assert.deepStrictEqual(plan(3 * cost), [B.id, C.id, A.id], 'gold for three: A, not B again');
+  C.xp = Game.xpNeeded(u, 1) + 100;
   // all on one level: as before, the most XP first, then the oldest
   for (const q of [A, B, C]) { q.level = 0; q.xp = Game.xpNeeded(u, 0); }
   A.xp += 1;

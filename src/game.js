@@ -2790,20 +2790,20 @@ const Game = (() => {
   }
 
   // Level all: every squad of unit ui that is ready to level up, until the gold runs out. It spreads the levels
-  // (2026-11-07): one level at a time, to the ready squad on the lowest level (then the most XP, then the oldest), so
-  // every ready squad gets its next level before any squad gets a second one. levelAllPlan: the squad ids in that
+  // (2026-11-07): in passes, one level at a time; in each pass every ready squad gets one level (the lowest level
+  // first, then the most XP, then the oldest) before any squad gets another one. levelAllPlan: the squad ids in that
   // order (an id twice for two levels), without changing anything; levelAll does them, one levelUp each (so a guest's
   // side reaches the host like single level-ups), and returns how many.
   function levelAllPlan(m, side, ui) {
     const u = m.units[ui], out = [];
     if (!u) return out;
-    const cost = levelCost(u), sim = m.armies[side].filter(s => s.unit === ui).map(s => ({ s, level: s.level }));
+    const cost = levelCost(u), sim = m.armies[side].filter(s => s.unit === ui).map(s => ({ s, level: s.level, n: 0 }));
     let gold = m.gold[side];
     while (gold >= cost) {
       const x = sim.filter(y => isReady(m, { ...y.s, level: y.level }))
-        .sort((a, b) => a.level - b.level || b.s.xp - a.s.xp || a.s.id - b.s.id)[0];
+        .sort((a, b) => a.n - b.n || a.level - b.level || b.s.xp - a.s.xp || a.s.id - b.s.id)[0];
       if (!x) break;
-      gold -= cost; x.level++; out.push(x.s.id);
+      gold -= cost; x.level++; x.n++; out.push(x.s.id);
     }
     return out;
   }

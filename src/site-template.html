@@ -7109,7 +7109,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         const cost = Game.levelCost(base);
         const boughtNow = sq.boughtLevels && sq.boughtLevels[m.round] > 0;
         const btns = [];
-        // Level all: two or more level-ups of this unit's squads the gold covers (Game.levelAllPlan: lowest level first, most XP breaks ties).
+        // Level all: two or more level-ups of this unit's squads the gold covers (Game.levelAllPlan: in passes, one level per ready squad each pass, lowest level first, most XP breaks ties).
         // A small "+ ALL" glued to the Level up button, in its colour
         const all = editable() ? Game.levelAllPlan(m, me, i) : [];
         const allBtn = all.length >= 2 ? `<button class="btn primary lvl-all" data-act="lvl-all" title="Level all ${all.length} · ${all.length * cost} gold">+ ALL</button>` : '';
