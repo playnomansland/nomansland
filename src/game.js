@@ -1644,7 +1644,8 @@ const Game = (() => {
   // Both stay all match. Until built, a building stands in every fight as a site (with its full health): the nearest
   // builder without a job walks over and builds it (buildSecs seconds of work; Master engineering is faster); a site
   // nobody builds builds itself at selfBuild times that speed (0 = not at all). The work carries over between fights.
-  // A site is built once the work is done, or (survive) if it is still standing at the end of a fight it was worked on.
+  // A site is built once the work is done, or (survive) if it is still standing at the end of a fight it was worked on
+  // and its side didn't lose (2026-11-07: a lost fight keeps the progress only, see Engine's builders at a site).
   // A built building destroyed in a fight starts the next round at `rebuild` % and has to be built again.
   // Once built, each round its owner may buy one of its skills (like a mage general: m.bskill[side][key] = { round,
   // skill }, swapped for a refund, hidden from the opponent until the fight). A skill makes units (`unit`, or `make`:
@@ -1818,7 +1819,7 @@ const Game = (() => {
         if (!x.alive) { b.built = false; b.progress = Math.max(0, Math.min(1, (info.rebuild == null ? 50 : info.rebuild) / 100)); news[side].push({ id: r.id, lost: true }); }
       } else if (x.work != null) {
         b.progress = Math.max(0, Math.min(1, x.work / info.buildSecs));
-        if (x.work >= info.buildSecs - 1e-9 || (info.survive && x.alive && x.worked)) { b.built = true; b.progress = 1; news[side].push({ id: r.id, built: true }); }
+        if (x.work >= info.buildSecs - 1e-9 || (info.survive && x.alive && x.worked && res.winner !== 1 - side)) { b.built = true; b.progress = 1; news[side].push({ id: r.id, built: true }); }
         else if (x.worked) news[side].push({ id: r.id, progress: b.progress });
       }
     });

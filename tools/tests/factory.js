@@ -23,6 +23,7 @@ const zone = (sd, k) => Game.zoneRows(sd)[k];
   Game.place(m, 0, cb, 5, zone(0, 1));
   assert.ok(Game.buyBuilding(m, 0, cb, 0, 6, zone(0, 4)), 'factory placed');
   Game.place(m, 1, guards, 6, zone(1, 0)); // something to fight
+  Game.place(m, 0, guards, 3, zone(0, 0)); Game.place(m, 0, guards, 5, zone(0, 0)); // an escort that wins it (a fight the builder's side loses doesn't build it, 2026-11-07)
   const bt = Game.startBattle(m);
   const site = bt.bodies.find(b => b.u.building === 'factory'), builder = bt.bodies.find(b => b.u.name === 'Cog Builder');
   assert.ok(site && site.site && site.u.hp === fac.hp && site.u.noCount, 'a site with its full health');
@@ -35,6 +36,43 @@ const zone = (sd, k) => Game.zoneRows(sd)[k];
   const b = Game.buildingOf(m, 0, 'factory');
   assert.ok(site.alive && b.built && b.progress === 1, 'built once the site survived the fight');
   assert.deepStrictEqual(sum.buildings[0], [{ id: 'factory', built: true }]);
+}
+// ---------- a builder at its site doesn't keep its side in the fight (2026-11-07) ----------
+{
+  // the escort falls with the builder still at work: the fight ends there, lost; the site keeps its progress only
+  const m = match();
+  Game.place(m, 0, cb, 5, zone(0, 1));
+  Game.buyBuilding(m, 0, cb, 0, 6, zone(0, 4));
+  Game.place(m, 1, guards, 6, zone(1, 0));
+  const bt = Game.startBattle(m);
+  const builder = bt.bodies.find(b => b.u.name === 'Cog Builder'), site = bt.bodies.find(b => b.u.building === 'factory');
+  const others = bt.bodies.filter(b => b.side === 0 && b !== builder && !b.u.structure && !b.u.noCount && !b.u.aloft);
+  assert.ok(others.length, 'the free squads escort it');
+  let lastFell = null;
+  while (bt.step()) if (lastFell == null && others.every(b => !b.alive)) lastFell = bt.time();
+  if (lastFell == null) lastFell = bt.time();
+  const r = bt.result();
+  assert.ok(builder.alive && builder.siteJob === site && site.alive, 'the builder is still at work');
+  assert.ok(bt.time() - lastFell <= Game.SETTINGS.dt + 1e-9, `the fight ends as its escort falls (${lastFell} vs ${bt.time()})`);
+  assert.strictEqual(r.winner, 1); assert.strictEqual(r.survivors[0], 0);
+  const sum = Game.resolve(m, r), b = Game.buildingOf(m, 0, 'factory');
+  assert.ok(!b.built && b.progress > 0 && b.progress < 1, 'a lost fight keeps the progress, no free Factory: ' + b.progress);
+  assert.deepStrictEqual(sum.buildings[0], [{ id: 'factory', progress: b.progress }]);
+  // its site knocked down (kill): the builder is free again and counts, so the fight goes on with it alone
+  const m2 = match();
+  Game.place(m2, 0, cb, 6, zone(0, 3));
+  Game.buyBuilding(m2, 0, cb, 0, 6, zone(0, 0)); // in front, in the path of their Rollers
+  Game.place(m2, 1, UI('Rollers'), 6, zone(1, 0)); Game.place(m2, 1, guards, 6, zone(1, 1));
+  const bt2 = Game.startBattle(m2);
+  const bl2 = bt2.bodies.find(b => b.u.name === 'Cog Builder'), s2 = bt2.bodies.find(b => b.u.building === 'factory');
+  s2.hp = 1; // one hit from falling
+  for (let k = 0; k < 4000 && s2.alive && bt2.step(); k++);
+  assert.ok(!s2.alive && bl2.alive, 'the site falls first');
+  assert.strictEqual(bl2.siteJob, null, 'a fallen site frees its builder');
+  for (const b of bt2.bodies) if (b.side === 0 && b !== bl2 && !b.u.structure && !b.u.noCount && !b.u.aloft) { b.hp = 0; b.alive = false; } // the escort gone
+  assert.ok(bt2.step(), 'the free builder keeps its side in the fight');
+  while (bt2.step());
+  assert.ok(!bl2.alive || bt2.result().winner !== 1, 'it ends when the builder falls');
 }
 // ---------- a site destroyed keeps its progress; a quick site is done mid-fight and the builder moves on ----------
 {
