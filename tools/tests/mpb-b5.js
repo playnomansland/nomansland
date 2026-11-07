@@ -333,7 +333,7 @@ check('Sabotage: the other team can\'t deploy that unit type next round (both la
 });
 
 check('Insider information: next round they see the opponents\' deployment live; the watched team has 15 s less and is told', () => {
-  const { x, D, key } = denRound2(33, 3); // (round 4 has no draft holding the clock)
+  const { x, D, key } = denRound2(34, 3); // (round 4 has no draft holding the clock; seed 34 since 2026-11-07: with the new combat rules seed 33's Den falls in round 3's fight)
   assert.ok(try1(x, 1, 'mpbBuy', key, 'insider').ok, 'A2 buys Insider information');
   assert.strictEqual(x.m(1).gold[0], 2000 - Mpb.DEN.insider);
   for (const seat of [2, 3]) assert.ok(!Mpb.recOf(Duo.viewFor(D, seat).m, 0, key).data.insider, 'hidden from seat ' + seat);
@@ -488,7 +488,7 @@ check('Impersonate a live squad while watching: a squad id used again after thei
 });
 
 check('Insider information: the watchers see the squads live, but not the watched team\'s gold, buys, Vault or levels', () => {
-  const { x, D, key } = denRound2(33, 3);
+  const { x, D, key } = denRound2(34, 3);
   const fkey = addKind(D, 1, 'factory');
   assert.ok(x.act(1, 'mpbBuy', key, 'insider').ok);
   playTo(x, 4);
@@ -514,7 +514,7 @@ check('Insider information: the watchers see the squads live, but not the watche
 });
 
 check('Insider information\'s cut after a pause: the watched team keeps at least 5 s, and its clock reads time up, not paused', () => {
-  const { x, D, key } = denRound2(33, 3);
+  const { x, D, key } = denRound2(34, 3);
   assert.ok(x.act(1, 'mpbBuy', key, 'insider').ok);
   playTo(x, 4);
   for (const L of [0, 1]) for (const sd of [0, 1]) gold(x, L, sd, 2000);
