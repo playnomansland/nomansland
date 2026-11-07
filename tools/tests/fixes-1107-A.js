@@ -61,18 +61,18 @@ const fellIn = (D, sd, key, round) => { for (const R of D.lanes) Mpb.recOf(R.m, 
 check('A3: a Coal mine destroyed in the last fight is shut this round (nobody goes down it), a target still; then it works again', () => {
   const x = match(1107, [true, true, true, true]), { D } = x;
   clear(D);
-  const key = addMine(D, 0, 11, 15, 11, 9);
+  const key = addMine(D, 0, 11, 16, 11, 10);
   const m = x.m(0);
   for (const R of D.lanes) R.m.round = 3;
   fellIn(D, 0, key, 2); // destroyed in round 2's fight
-  const q = squad(m, 0, 'Brute', 12, 14); squad(m, 1, 'Brute', 11, 3);
+  const q = squad(m, 0, 'Brute', 12, 15); squad(m, 1, 'Brute', 11, 3);
   const rec = Mpb.recOf(m, 0, key);
   assert.ok(CM.cmResting(m, rec) && Mpb.resting(m, 0, rec), 'shut this round (the boards\' out-of-action look too)');
   let bt = battleOf(D);
   assert.ok(Game.tileToWorld && bt.bodies.filter(b => b.side === 0 && b.squad === q.id).every(b => !b.mineTo && !(b.mineT > 0)), 'the squad round the entrance fights from its own tile');
   const ent = bt.bodies.find(b => b.u.mpb === 'coalMine' && b.side === 0);
   assert.ok(ent && ent.u.hp === COAL.hp, 'the entrance still stands in the fight as a target');
-  assert.ok(Game.occupied(m, 1, 12, 8) && Game.occupied(m, 0, 10, 10), 'its exit still blocks its ring');
+  assert.ok(Game.occupied(m, 1, 12, 9) && Game.occupied(m, 0, 10, 11), 'its exit still blocks its ring');
   for (const R of D.lanes) R.m.gold[0] = 1000;
   assert.ok(!Mpb.whyNot(m, 0, key, 'air') && !Mpb.whyNot(m, 0, key, 'shaft'), 'Fresh air and Dig a new exit can still be bought');
   const info = CM.hooks.info(m, 0, rec).join(' · ');
@@ -91,7 +91,7 @@ check('A3: a Coal mine destroyed in the last fight is shut this round (nobody go
 check('A3: afterFight: the entrance destroyed in round 1’s fight → shut in round 2 (bots leave it), open in round 3', () => {
   const x = match(1108, [true, true, true, true]), { D } = x;
   clear(D);
-  const key = addMine(D, 0, 11, 15, 11, 9);
+  const key = addMine(D, 0, 11, 16, 11, 10);
   // round 1's fight with the entrance knocked down by hand (as Duo.fight does it: afterFight reads res.squads)
   const lanes = lanesOf(D), res = { squads: {} };
   res.squads['0:' + Mpb.squadOf(Mpb.recs(lanes[0], 0).findIndex(r => r.key === key))] = { total: 1, alive: 0 };
@@ -100,7 +100,7 @@ check('A3: afterFight: the entrance destroyed in round 1’s fight → shut in r
   for (const R of D.lanes) { R.m.round = 2; Mpb.recOf(R.m, 0, key).fell = 1; }
   // a bot turn of team A: no squad moved round the entrance while it is shut (botAfter)
   const m = x.m(0), rec = Mpb.recOf(m, 0, key);
-  m.armies[0].push({ id: 900, unit: m.units.findIndex(u => u.name === 'Brute'), col: 5, row: 13, level: 0, xp: 0, round: 2 });
+  m.armies[0].push({ id: 900, unit: m.units.findIndex(u => u.name === 'Brute'), col: 5, row: 14, level: 0, xp: 0, round: 2 });
   for (let s = 0; s < 40; s++) { const r = Mpb.rng(s); CM.hooks.botAfter(m, 0, rec, r); }
   assert.ok(!Mpb.kindOf('coalMine').mineOut(m, rec, m.armies[0][0].col, m.armies[0][0].row), 'the bot left its squad off the entrance');
   for (const R of D.lanes) R.m.round = 3;
@@ -110,7 +110,7 @@ check('A3: afterFight: the entrance destroyed in round 1’s fight → shut in r
 // ===================================== A2: Mpb.resting =====================================
 check('A2: Mpb.resting: the 2v2 Factory the round after it fell (and only then); kinds without the hook never', () => {
   const m = { round: 4, mpb: [[], []] };
-  const fa = { key: 'fa1', kind: 'factory', col: 5, row: 14, parts: {}, round: 1, fell: 3, skills: {}, data: {} };
+  const fa = { key: 'fa1', kind: 'factory', col: 5, row: 15, parts: {}, round: 1, fell: 3, skills: {}, data: {} };
   assert.ok(Mpb.resting(m, 0, fa) && Mpb.facResting(m, fa), 'rebuilt this round');
   assert.ok(/being rebuilt this round/.test(Mpb.kindOf('factory').hooks.fellText(m, 0, fa)), 'the sheet line says so');
   m.round = 5; assert.ok(!Mpb.resting(m, 0, fa), 'the round after: working');
@@ -122,10 +122,10 @@ check('A2: Mpb.resting: the 2v2 Factory the round after it fell (and only then);
 check('A1: m.team.buildings carries progress, level and fell; the teammate\'s always shown, the other team\'s from the round after', () => {
   const x = match(1109), { D } = x;
   const lanes = lanesOf(D);
-  lanes[1].buildings = [[{ id: 'factory', col: 18, row: 14, round: 1, progress: 0.5, built: false, xp: 0, level: 1, fell: 1 }], [{ id: 'factory', col: 18, row: 2, round: lanes[1].round, progress: 0, built: false, xp: 0, level: 0 }]];
+  lanes[1].buildings = [[{ id: 'factory', col: 18, row: 15, round: 1, progress: 0.5, built: false, xp: 0, level: 1, fell: 1 }], [{ id: 'factory', col: 18, row: 2, round: lanes[1].round, progress: 0, built: false, xp: 0, level: 0 }]];
   Duo.setTeams(lanes);
   const tb = Game.teamBuildings(lanes[0], 0)[0];
-  assert.deepStrictEqual(tb, { id: 'factory', col: 18, row: 14, round: 1, built: false, progress: 0.5, level: 1, fell: 1 }, 'the teammate\'s Factory as lane 0 gets it');
+  assert.deepStrictEqual(tb, { id: 'factory', col: 18, row: 15, round: 1, built: false, progress: 0.5, level: 1, fell: 1 }, 'the teammate\'s Factory as lane 0 gets it');
   assert.ok(Game.buildingFell(tb), 'destroyed, being rebuilt: the boards\' out-of-action look');
   assert.ok(Game.teamBuildingShown(lanes[0], 0, true, 0, tb), 'your teammate\'s: always');
   const foe = Game.teamBuildings(lanes[0], 1)[0];
@@ -140,7 +140,7 @@ check('A1: m.team.buildings carries progress, level and fell; the teammate\'s al
 // ===================================== A5: Dig a new exit again =====================================
 check('A5: Dig a new exit: once a round per mine, 150 / 200 / 250, take-back refunds and lowers the price, one move a buy', () => {
   const x = match(1110), { D } = x;
-  const key = addMine(D, 0, 11, 15, 11, 9);
+  const key = addMine(D, 0, 11, 16, 11, 10);
   const gold = (g) => { for (const R of D.lanes) R.m.gold[0] = g; };
   gold(1000); Duo.setTeams(lanesOf(D));
   const price = () => Mpb.skillCost(x.m(0), 0, key, 'shaft');
@@ -186,7 +186,7 @@ check('A5: Dig a new exit: once a round per mine, 150 / 200 / 250, take-back ref
 
 check('A5: the bots may dig again (each dig dearer)', () => {
   const x = match(1111), { D } = x;
-  const key = addMine(D, 0, 11, 15, 11, 9);
+  const key = addMine(D, 0, 11, 16, 11, 10);
   const m = x.m(0), rec = Mpb.recOf(m, 0, key);
   rec.skills.shaft = { round: 0, n: 1, by: [1, 0], log: [] }; rec.data = { digs: 1, moved: 0 };
   m.gold[0] = 5000;
