@@ -26,7 +26,7 @@ const run = (bt, secs) => { for (let k = 0; k < secs / g.dt - 1e-9 && bt.step();
   assert.ok(r.u.unfolded && r.u.roll === 0 && hitRolling > 0, 'it rolled through an enemy, then folded out');
   assert.ok(r.y > 30, 'past its target when it folds out');
   const dealt = r.dealt;
-  run(bt, 8);
+  run(bt, 10); // 9 m past since 2026-11-07 (6 before): a little longer to turn and walk back
   assert.ok(r.dealt > dealt, 'then it walks back and hits in melee');
   near(Math.min(...d.map(x => Math.hypot(x.x - r.x, x.y - r.y))), r.u.range, 1.5, 'standing next to its target');
   // without the skill it keeps rolling
@@ -41,11 +41,12 @@ const run = (bt, secs) => { for (let k = 0; k < secs / g.dt - 1e-9 && bt.step();
   const bt = E.createBattle([r], squad(DUMMY, 1, 0, 30, 2), g);
   run(bt, 1); near(r.rollV, 4, 0.2, 'roller at 1 s');
   run(bt, 1.2); near(r.rollV, 7, 1e-9, 'roller at full speed');
-  // it rolls through the dummy, carries on a tile past it and stops
+  // it rolls through the dummy, carries on ROLL_PAST (9 m, a tile and a half) past it and stops
   let passed = null;
   for (let k = 0; k < 400 && bt.step(); k++) if (r.y > 30 && r.rollV <= E.ROLL_START + 1e-9) { passed = r.y; break; }
   assert.ok(passed != null, 'roller stopped past its target');
-  near(passed - 30, E.ROLL_PAST, 1, 'stops about a tile past its target');
+  assert.strictEqual(E.ROLL_PAST, 9);
+  near(passed - 30, E.ROLL_PAST, 1, 'stops about a tile and a half past its target');
   assert.ok(bt.bodies[1].hp < 1e6, 'the dummy was run over');
 }
 {

@@ -158,7 +158,7 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
   steps(bt2, 5.2);
   assert.ok(b.hunt === false, 'no lone target for 5 s: it gives up');
 }
-// Bullhead: the first attack charges through, 100 to each in the line and a tile of knockback; armor while charging
+// Bullhead: the first attack charges through, bull.hit (85 since 2026-11-07) to each in the line and knockback; armor while charging
 {
   const br = body(withSkills('Brute', ['bullhead']), 0, 0, -1.8);
   const vs = [0, 3].map((y, k) => body(dummy(1000, { idle: false }), 1, 0, y, 50 + k));
@@ -166,7 +166,7 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
   let charged = false, armorWhile = 0;
   for (let k = 0; k < 40; k++) { bt.step(); if (br.charging) { charged = true; armorWhile = E.TOWER_DOWN && br.u.bull.armor; } }
   assert.ok(charged && armorWhile === 4, 'a charge on its first attack');
-  assert.ok(vs[1].hp <= 1000 - 100 + 1e-6, `the one behind takes the charge (${1000 - vs[1].hp})`);
+  assert.ok(vs[1].hp <= 1000 - br.u.bull.hit + 1e-6, `the one behind takes the charge (${1000 - vs[1].hp})`);
 }
 // Rampager: up to 4 stacks
 {

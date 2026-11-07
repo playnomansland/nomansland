@@ -1401,11 +1401,23 @@ const Game = (() => {
     // Mubarak: a slime unit also gets the skills bought for the other slime units
     if (charOf(m, side) === 'mubarak' && base && SLIME_UNITS.includes(base.name)) defs.push(...slimeSkillDefs(m, side, ui));
     let u = defs.length ? E.applySkills(base, defs, m.units) : base;
+    u = withSpawnSkills(m, side, ui, u);
     if (sq && u.glut && glutOf(sq) > 0) u = E.glutUnit(u, glutOf(sq)); // the Obelisk's Glut, kept between rounds
     u = withFactionTrait(u, base && base.faction);
     u = withPowers(m, side, u, base);
     if (base && SLIME_UNITS.includes(base.name)) u = { ...u, slime: true }; // poison heals slime units
     return withCharacter(m, side, u);
+  }
+  // Raise dead (2026-11-07): the Necromancer's skeletons get the Skeleton Archer skills its side owns (bought for a
+  // squad of them, or built in). Made with applySkills, not unitFor, so the character (withCharacter, through withKids)
+  // still reaches them only once, from the Necromancer's own unitFor. The engine levels them like the Necromancer.
+  function withSpawnSkills(m, side, ui, u) {
+    const sp = u && u.spawn, si = sp && sp.unit ? m.units.findIndex(x => x.name === sp.unit.name) : -1;
+    if (si < 0 || si === ui) return u;
+    const defs = E.SLOTS.filter(k => hasSkill(m, side, si, k)).map(k => skillDef(m, si, k)).filter(Boolean);
+    if (!defs.length) return u;
+    const { skills, skillDefs, skillsOn, skillsInnate, skillMods, spawn, ...plain } = E.applySkills(m.units[si], defs, m.units);
+    return { ...u, spawn: { ...sp, unit: E.withTraits({ ...plain, level: 0 }) } };
   }
   // the player's character on one of their units (spawned ones too): Noah cuts health and damage, Cage adds health
   function withCharacter(m, side, u) {
@@ -2063,9 +2075,9 @@ const Game = (() => {
       if (dis) { const mask = { name: dis.name, shape: dis.shape, color: dis.color, bodies: dis.bodies, range: dis.range }; for (const x of b) x.mask = mask; }
       if (isDev(m) && sq.guide && sq.guide.length && !isRider(sq)) for (const x of b) x.guide = sq.guide.map(p => tileToWorld(p.col, p.row)); // devtest: the squad's arrow
       else if (sq.aim && canAim(m, side, sq)) { // a melee squad's direction arrow (AIM): every body walks it, keeping its place in the formation
-        const dx = sq.aim.dc * TILE, dy = -sq.aim.dr * TILE, secs = Math.max(AIM.minSecs, AIM.slack * Math.sqrt(dx * dx + dy * dy) / Math.max(0.1, u.speed));
+        const dx = sq.aim.dc * TILE, dy = -sq.aim.dr * TILE;
         const cl = (v, lo, hi) => Math.max(lo + 1, Math.min(hi - 1, v));
-        for (const x of b) { x.guide = [{ x: cl(x.x + dx, BOUNDS.x0 + XOFF, BOUNDS.x1 + XOFF), y: cl(x.y + dy, BOUNDS.y0, BOUNDS.y1) }]; x.guideT = secs; }
+        for (const x of b) { x.guide = [{ x: cl(x.x + dx, BOUNDS.x0 + XOFF, BOUNDS.x1 + XOFF), y: cl(x.y + dy, BOUNDS.y0, BOUNDS.y1) }]; x.guideT = AIM.stall; }
       }
       if (markOn(m, side)) for (const x of b) x.sniperMark = MARK.hit; // Mark Bounty: all its units hunt the mark (since 2026-11-03; Snipers only before)
       if (markOn(m, 1 - side) && markOf(m, 1 - side).squad === sq.id) for (const x of b) x.marked = true;
@@ -3159,12 +3171,13 @@ const Game = (() => {
   // A melee squad (base range up to AIM.melee m) may get an arrow from its tile, at most AIM.maxTiles tiles long, in
   // any gamemode, for free. In the fight its bodies walk the arrow first, each keeping its place in the formation: sight
   // and awareness are off until they reach its end, so they walk past enemies they would have turned to, and only stand
-  // to fight one already in their reach (it walks on once that one is gone). From the end on they fight as usual. A walk
-  // that can't get there (a wall, a crowd) gives up after AIM.slack times the time it should take (at least AIM.minSecs
-  // s, time spent fighting not counted).
+  // to fight one already in their reach that blocks the way ahead (it walks on once that one is gone; one beside or
+  // behind is hit in passing). From the end on they fight as usual. A walk that can't get there (a wall, a crowd) gives
+  // up after AIM.stall s without getting closer (time spent fighting not counted; slows and knockback don't use it up)
+  // (2026-11-07: before, any enemy in reach stopped it and it gave up after a fixed time).
   // sq.aim = { dc, dr }: the end in tiles from the squad's tile (so it moves with the squad). Kept from round to round
   // until cleared; the opponent doesn't see it before the fight (Referee.hide, seenBy).
-  const AIM = { maxTiles: 5, melee: 5, slack: 2.5, minSecs: 4 };
+  const AIM = { maxTiles: 5, melee: 5, stall: 3 };
   const canAim = (m, side, sq) => {
     if (!sq || isRider(sq) || !m.armies[side].includes(sq)) return false;
     const u = m.units[sq.unit];

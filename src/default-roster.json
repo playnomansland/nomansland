@@ -79,7 +79,9 @@
       "type": "healer",
       "name": "Healing touch",
       "cost": 200,
-      "params": {}
+      "params": {
+        "range": 25
+      }
     },
     {
       "id": "range",
@@ -516,8 +518,8 @@
       "cost": 150,
       "params": {
         "every": 5,
-        "hit": 100,
-        "push": 6,
+        "hit": 85,
+        "push": 5,
         "armor": 4,
         "run": 6
       },
@@ -2181,6 +2183,7 @@
       "trample": 0,
       "deathBlast": 0,
       "pctHit": 8,
+      "seek": 1,
       "defense": "none",
       "defVal": 0,
       "level": 0,
