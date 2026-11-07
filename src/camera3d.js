@@ -8,7 +8,7 @@
 // when it lifts (null when a second finger or a cancel ends it); a short press still counts as a tap after the drop.
 // onTap and onPress also get the screen point (clientX, clientY), and groundAt(clientX, clientY, h) finds where it
 // meets a level h metres above the ground (to pick what stands there).
-// A mouse moving over the strategic view with no button down goes to opts.onHover(point), null when it leaves.
+// A mouse moving over the strategic view with no button down goes to opts.onHover(point, clientX, clientY), null when it leaves.
 // While opts.placing() is true (the player is deploying), the angled view takes taps, drags and hover the same way;
 // a drag that the page doesn't take still looks around, and setLevel(k) (or a pinch, the wheel, Esc) changes view.
 // Level 1 is the tilted view: most of the board from your side at TILT degrees, gentler than the angled view; it works
@@ -210,7 +210,7 @@ const Camera3D = (THREE, camera, el, opts) => {
     woke();
     if (rotDrag) { yaw -= (e.clientX - rotDrag.x) * 0.008; rotDrag.x = e.clientX; return; }
     const p0 = pts.get(e.pointerId);
-    if (!p0) { if (e.pointerType === 'mouse' && !e.buttons && handsOn() && opts.onHover) opts.onHover(groundAt(e.clientX, e.clientY)); return; }
+    if (!p0) { if (e.pointerType === 'mouse' && !e.buttons && handsOn() && opts.onHover) opts.onHover(groundAt(e.clientX, e.clientY), e.clientX, e.clientY); return; }
     const dx = e.clientX - p0.x, dy = e.clientY - p0.y;
     p0.x = e.clientX; p0.y = e.clientY;
     if (tap && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > TAP_MOVE) tap = null;

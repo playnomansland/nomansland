@@ -669,8 +669,14 @@ const Render3D = (THREE, el, view, opts = {}) => {
     // (the squad tapped last shows its range as a dotted ring drawn by the page over the board, as on the 2D board: boardMarks)
     // where things may go
     if ((selected !== null || (drag && drag.moved) || moving != null) && deploying) {
+      // an older squad being moved (as on the 2D board, Render2D moveKinds): no tile where its move would be refused,
+      // dimmer where only the paid move gets there though a free one is left (March order's reach) (2026-11-07)
+      const mid = drag && drag.moved && drag.id != null ? drag.id : moving, msq = mid != null && m.armies[me].find(q => q.id === mid);
+      const mk = msq && msq.round !== m.round && !Game.freeMover(m, me, msq) && !Game.freeOut(m, me, msq) ? (c, r) => Game.moveKind(m, me, msq, c, r) : null;
+      const left = !!mk && (msq.luckMove === m.round || Game.freeMovesLeft(m, me) > 0);
       for (let row = 0; row < Game.ROWS; row++) for (let c = 0; c < Game.COLS; c++) {
-        if (Game.canPlaceAt(m, me, c, row, placingUnit, selected === null) && Game.spotFree(m, me, c, row, placingUnit)) { const s = tileCenter(v, c, row); tileSq(s.c, s.r, you, 0.3, 0.05); }
+        const k = mk ? mk(c, row) : 'free';
+        if (k && Game.canPlaceAt(m, me, c, row, placingUnit, selected === null) && Game.spotFree(m, me, c, row, placingUnit)) { const s = tileCenter(v, c, row); tileSq(s.c, s.r, you, k === 'paid' && left ? 0.12 : 0.3, 0.05); }
       }
       if (placingUnit != null) for (const sq of m.armies[me].concat(Game.teamArmy(m, me))) if (Game.boardable(m, me, sq.col, sq.row, placingUnit) && !(drag && drag.id === sq.id)) { const s = tileCenter(v, sq.col, sq.row); tileSq(s.c, s.r, gold, 0.85, 0.07, 0, 0.03); }
     }
@@ -1009,7 +1015,7 @@ const Render3D = (THREE, el, view, opts = {}) => {
     onPress: (p, cx, cy) => { const t = pick(groundHit(cx, cy) || p, cx, cy); return !!(opts.onPress && opts.onPress(t)) || !!(t && squadTiles.has(t.col + ',' + t.row)); },
     onDrag: (p) => { if (opts.onDrag) opts.onDrag(tileOfGround(p, lastMe)); },
     onDrop: (p) => { if (opts.onDrop) opts.onDrop(tileOfGround(p, lastMe), !!p); },
-    onHover: (p) => { if (opts.onHover) opts.onHover(tileOfGround(p, lastMe)); },
+    onHover: (p, cx, cy) => { if (opts.onHover) opts.onHover(p ? pick(groundHit(cx, cy) || p, cx, cy) : null); }, // through a standing model, as a tap (2026-11-07)
     placing: () => !!(opts.placing && opts.placing()),
     onLevel: (lv) => { if (opts.onLevel) opts.onLevel(lv); },
     onInput: () => { if (opts.onInput) opts.onInput(); },
