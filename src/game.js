@@ -61,7 +61,7 @@ const Game = (() => {
       skill2: { name: 'Defensive walls', cost: 0, noFree: true, text: 'Place 3 walls on your side that block enemies. Bastion +4 armor.' }, // free since 2026-11-06, still once a match (noFree: Blixten's discount isn't spent on it)
       fortify: { name: 'Fortify', cost: 50, text: 'Once a round: one extra wall on your side for this round’s fight only.' }, // see FORTIFY
       vault: { name: 'Vault', text: 'Your treasury has +6 armor, and a raid on it steals half as much.' },
-      freeMove: { name: 'March order', text: '1 free move every round.' } }, // see freeMoves
+      freeMove: { name: 'March order', text: '1 free move of up to 2 tiles every round.' } }, // see freeMoves, MARCH
     { id: 'mage', name: 'Mage tower', text: 'A beam that ramps up on one target. Melts giants.', unit: { ...TOWER, name: 'Mage Tower', kind: 'mage', hp: 600, hit: 14, aps: 1.5, range: 12, spinUp: 50, spinHit: 50, color: '#A493DE' },
       generals: true, muster: { name: 'Muster', text: '1 extra deployment every round, for free.' } }, // no once-per-match skill: a mage general can be called every round instead (MAGE_GENERALS)
     { id: 'bank', name: 'Bank tower', text: 'Sturdy, medium range. Credit line: your loans are 200 (pay back 300).', unit: { ...TOWER, name: 'Bank Tower', kind: 'bank', hp: 700, hit: 45, aps: 0.6, range: 18, color: '#D9B95B' },
@@ -1909,15 +1909,22 @@ const Game = (() => {
     if (old && outOf != null && !horseOk(m, side, outOf, 'out', sq.id)) return false; // this carrier has let one out already
     if (old && into && !horseOk(m, side, into.id, 'in', sq.id)) return false;          // or taken one in
     const free = freeMover(m, side, sq) || freeOut(m, side, sq);
-    if (sq.round !== m.round && !free && movedId(m, side) !== sq.id && sq.luckMove !== m.round && freeMovesLeft(m, side) > 0) { // a free move (used before the paid one)
-      sq.from = { col: sq.col, row: sq.row, ...(isRider(sq) ? { in: sq.in } : {}) };
-      sq.movedRound = m.round; sq.luckMove = m.round;
-    } else if (sq.round !== m.round && !free && sq.luckMove !== m.round && movedId(m, side) == null) {
+    // an older squad's move: a free one (used before the paid one) if it may be one to this tile, else the paid one; a
+    // squad already moved this round is weighed again on every drop (March order reaches MARCH.tiles: back within
+    // reach, a paid move is refunded and becomes the free one) (2026-11-07)
+    const paid = movedId(m, side) === sq.id, luck = sq.luckMove === m.round;
+    const kind = sq.round === m.round || free ? null : freeMoveOk(m, side, sq, col, row) ? 'free'
+      : paid || (movedId(m, side) == null && m.gold[side] >= CONFIG.moveCost) ? 'paid' : 'no';
+    if (kind === 'no') return false;
+    if (kind && !(sq.from && sq.movedRound === m.round)) { sq.from = { col: sq.col, row: sq.row, ...(isRider(sq) ? { in: sq.in } : {}) }; sq.movedRound = m.round; }
+    if (kind === 'free' && !luck) {
+      if (paid) { m.gold[side] += CONFIG.moveCost; m.moved[side] = null; }
+      sq.luckMove = m.round;
+    } else if (kind === 'paid' && !paid) {
       if (!m.moved) m.moved = [null, null];
       m.gold[side] -= CONFIG.moveCost;
       m.moved[side] = sq.id;
-      sq.from = { col: sq.col, row: sq.row, ...(isRider(sq) ? { in: sq.in } : {}) };
-      sq.movedRound = m.round;
+      delete sq.luckMove;
     }
     if (sq.round !== m.round && free && !(sq.from && sq.movedRound === m.round)) { // free, but the opponent still sees it where it was until the fight
       sq.from = { col: sq.col, row: sq.row, ...(isRider(sq) ? { in: sq.in } : {}) };
@@ -2063,7 +2070,7 @@ const Game = (() => {
       if (dis) { const mask = { name: dis.name, shape: dis.shape, color: dis.color, bodies: dis.bodies, range: dis.range }; for (const x of b) x.mask = mask; }
       if (isDev(m) && sq.guide && sq.guide.length && !isRider(sq)) for (const x of b) x.guide = sq.guide.map(p => tileToWorld(p.col, p.row)); // devtest: the squad's arrow
       else if (sq.aim && canAim(m, side, sq)) { // a melee squad's direction arrow (AIM): every body walks it, keeping its place in the formation
-        const dx = sq.aim.dc * TILE, dy = -sq.aim.dr * TILE, secs = Math.max(AIM.minSecs, AIM.slack * Math.sqrt(dx * dx + dy * dy) / Math.max(0.1, u.speed));
+        const a = aimUse(m, sq, sq.aim, side), dx = a.dc * TILE, dy = -a.dr * TILE, secs = Math.max(AIM.minSecs, AIM.slack * Math.sqrt(dx * dx + dy * dy) / Math.max(0.1, u.speed));
         const cl = (v, lo, hi) => Math.max(lo + 1, Math.min(hi - 1, v));
         for (const x of b) { x.guide = [{ x: cl(x.x + dx, BOUNDS.x0 + XOFF, BOUNDS.x1 + XOFF), y: cl(x.y + dy, BOUNDS.y0, BOUNDS.y1) }]; x.guideT = secs; }
       }
@@ -2654,7 +2661,22 @@ const Game = (() => {
   const slotWins = (m, side, sym) => slotSpins(m, side).filter(x => x.win === sym).length;
   // Free moves every round: Bastion's March order and Otto's horseshoe move (each 1). A free move is used before the
   // paid one, on its own: dragging an older squad just moves it. q.luckMove = the round it used one.
-  const freeMoves = (m, side) => (towerPicked(m, side) && towerType(m, side).freeMove ? 1 : 0) + (shoePerk(m, side, 'move') ? 1 : 0);
+  // March order's move reaches at most MARCH.tiles tiles (as a square) from the squad's tile at the round's start; the
+  // horseshoe's goes anywhere. Which free move a squad used is never stored: freeMoveOk works it out from how far each
+  // one went (so nothing new can show the opponent a move). A longer move is the horseshoe's or the paid one. (2026-11-07)
+  const MARCH = { tiles: 2 };
+  const marchMoves = (m, side) => towerPicked(m, side) && towerType(m, side).freeMove ? 1 : 0;
+  const shoeMoves = (m, side) => shoePerk(m, side, 'move') ? 1 : 0;
+  const freeMoves = (m, side) => marchMoves(m, side) + shoeMoves(m, side);
+  // within March order's reach: (col, row) from sq's tile at the round's start
+  const marchNear = (m, sq, col, row) => { const o = sq.from && sq.movedRound === m.round ? sq.from : sq; return Math.max(Math.abs(col - o.col), Math.abs(row - o.row)) <= MARCH.tiles; };
+  // may sq's move to (col, row) be a free one, next to the free moves the side's other squads made this round? The
+  // ones that went further than MARCH.tiles need the horseshoe.
+  function freeMoveOk(m, side, sq, col, row) {
+    const others = m.armies[side].filter(q => q !== sq && q.luckMove === m.round);
+    const far = others.filter(q => !marchNear(m, q, q.col, q.row)).length + (marchNear(m, sq, col, row) ? 0 : 1);
+    return others.length + 1 <= freeMoves(m, side) && far <= shoeMoves(m, side);
+  }
   const freeMovesLeft = (m, side) => freeMoves(m, side) - m.armies[side].filter(q => q.luckMove === m.round).length;
   const slotMovesLeft = freeMovesLeft; // older name
   // Otto's horseshoe (2026-11-03): three of a kind gives, at random, +1 deployment or +1 free move every round for the
@@ -3164,7 +3186,11 @@ const Game = (() => {
   // s, time spent fighting not counted).
   // sq.aim = { dc, dr }: the end in tiles from the squad's tile (so it moves with the squad). Kept from round to round
   // until cleared; the opponent doesn't see it before the fight (Referee.hide, seenBy).
-  const AIM = { maxTiles: 5, melee: 5, slack: 2.5, minSecs: 4 };
+  // A squad standing on a flank tile of its side (isFlank) when the fight starts reaches at most AIM.flank tiles (2v2:
+  // AIM.duoFlank), counted as a square (diagonals too). Its stored arrow is kept as set and only cut along its line where
+  // it is used (aimUse: aimTo, aimEnd, the fight), so the page, the P2P host, the server and the fight agree, and a squad
+  // moved off the flank gets its long arrow back. A squad coming out of a Coal mine exit follows its own tile. (2026-11-07)
+  const AIM = { maxTiles: 5, melee: 5, slack: 2.5, minSecs: 4, flank: 1, duoFlank: 2 };
   const canAim = (m, side, sq) => {
     if (!sq || isRider(sq) || !m.armies[side].includes(sq)) return false;
     const u = m.units[sq.unit];
@@ -3194,10 +3220,22 @@ const Game = (() => {
     delete sq.aim;
     return true;
   }
-  // the tile an arrow drawn from sq to (col, row) would end on (cut down as setAim does), or null
-  const aimTo = (m, sq, col, row) => { const a = sq && aimFit(sq, col - sq.col, row - sq.row); return a ? { col: sq.col + a.dc, row: sq.row + a.dr } : null; };
+  // the most tiles (as a square) the arrow of sq may reach where it stands: AIM.flank on a flank tile of its side
+  // (2v2: AIM.duoFlank), else 0 (no cap, AIM.maxTiles as a circle). side: found from m.armies when not given
+  const aimCap = (m, sq, side) => {
+    if (!sq) return 0;
+    if (side == null) side = m.armies.findIndex(a => a.includes(sq));
+    return side >= 0 && isFlank(side, sq.col, sq.row) ? (m.duoTowers ? AIM.duoFlank : AIM.flank) : 0;
+  };
+  // the arrow a = { dc, dr } as sq really walks it from where it stands: cut along its line to aimCap
+  function aimUse(m, sq, a, side) {
+    const n = a && aimCap(m, sq, side), k = n ? Math.max(Math.abs(a.dc), Math.abs(a.dr)) : 0;
+    return k > n ? { dc: Math.round(a.dc * n / k) || 0, dr: Math.round(a.dr * n / k) || 0 } : a; // (|| 0: never -0)
+  }
+  // the tile an arrow drawn from sq to (col, row) would end on (cut down as setAim does, and to aimCap), or null
+  const aimTo = (m, sq, col, row) => { const a = sq && aimUse(m, sq, aimFit(sq, col - sq.col, row - sq.row)); return a ? { col: sq.col + a.dc, row: sq.row + a.dr } : null; };
   // the tile its arrow ends on (for the page), or null
-  const aimEnd = (m, sq) => sq && sq.aim ? { col: Math.max(0, Math.min(COLS - 1, sq.col + sq.aim.dc)), row: Math.max(0, Math.min(ROWS - 1, sq.row + sq.aim.dr)) } : null; // (on the board: a squad moved since keeps its arrow)
+  const aimEnd = (m, sq) => { const a = sq && sq.aim && aimUse(m, sq, sq.aim); return a ? { col: Math.max(0, Math.min(COLS - 1, sq.col + a.dc)), row: Math.max(0, Math.min(ROWS - 1, sq.row + a.dr)) } : null; }; // (on the board: a squad moved since keeps its arrow)
 
   // ---- disguise ----
   // a unit with "disguise": "Unit name" looks like that unit to its opponent: on the board, in its sheet, and in the
@@ -3470,12 +3508,12 @@ const Game = (() => {
     FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, anywhere, mpbAt, bldgSeen, nearBldg, isOff, enemyHolds, inNoMans, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
     STANDARD_PACK, ICE, ALTAR, GOLEM, isIce, hailRound, altarRound, stormShift, stormRows, hailTiles, altarCost, altarRefund, altarCount, pushRoom, altarBought, addAltar, buyAltar, undoAltar, snowgres, snowgreUnit,
     MAPS, SKINS, MAP_LOOK, lookOf, EDITOR_MAPS, TERRAIN, objectiveOf, objectiveTiles, SHAPE_PATH, terrainTile, terrainBlocks, terrainOf, groundHeight, ELF_TOWER, SHROOM, SHROOM_SPLIT, shroomAt, shroomTileAt, shroomRemoval, SHROOM_REMOVE, shroomCost, removeShroom, undoRemoveShroom, mapOf, elfSpot, rollMap, BRIBE_COST, bribeList, bribeGold, bribeCount, bribeNow, bribeCost, bribeRefund, ELF_POWER, elfPowered, elfUnit, ELF_OWN, elfOwnCost, elfOwnOf, elfOwnAt, elfOwnUnlocked, elfOwnOffered, canBuyElfOwn, elfOwnSpotOk, buyElfOwn, undoElfOwn, bribeLeader, canBribe, bribe, undoBribe,
-    CHARACTERS, CHAR, charOf, SLOT, slotSpins, slotDry, slotWins, slotMovesLeft, freeMoves, freeMovesLeft, shoePerks, shoePerk, canSpin, slotOutcome, slotReels, spin, takeSpins, aiSlots, charInfo, enzoSkill, enzoActive, charmOf, isGentleman, canGiveCharm, giveCharm, undoCharm, ensureCharm, felixGold, isTier1, rollBuffTiles, onBuffTile, zoeBuff, yotImps, yotLevel, TOWER_SPOT, towerSpot,
+    CHARACTERS, CHAR, charOf, SLOT, MARCH, marchMoves, shoeMoves, marchNear, freeMoveOk, slotSpins, slotDry, slotWins, slotMovesLeft, freeMoves, freeMovesLeft, shoePerks, shoePerk, canSpin, slotOutcome, slotReels, spin, takeSpins, aiSlots, charInfo, enzoSkill, enzoActive, charmOf, isGentleman, canGiveCharm, giveCharm, undoCharm, ensureCharm, felixGold, isTier1, rollBuffTiles, onBuffTile, zoeBuff, yotImps, yotLevel, TOWER_SPOT, towerSpot,
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,
     mpbLocked, buildingMakes,
-    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, teamBuildings, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, AIM, canAim, setAim, clearAim, aimEnd, aimTo, resolve, aiDeploy, occupied, setMpb, mpbApi,
+    zoneRows, inZone, tileToWorld, withXOff, VIEW_MAPS, TEAM_MAPS, findMap, teamArmy, teamSeen, teamBuildings, squadRange, squadReach, towerReach, fightTowerUnit, createMatch, place, unplace, bodiesFor, startBattle, battleSetup, seenBy, intentPreview, INTENT, AWARENESS, AIM, canAim, setAim, clearAim, aimEnd, aimTo, aimCap, aimUse, resolve, aiDeploy, occupied, setMpb, mpbApi,
     GRID, useGrid,
     DEV, CAT_NAMES, LESSER_SQ, WALL_SQ, setDevData, devBuilding, devPower, devSpell, isDev, towerUp, pickCat, devOffer, pickNow, needsDevPick, devPick, undoDevPick, devShown,
     lessersOf, placedLessers, unplacedLesser, lesserAt, lesserSpotOk, placeLesser, lesserUnit, auraFor, modUnit, powersOf, devGold, devDeploys,
