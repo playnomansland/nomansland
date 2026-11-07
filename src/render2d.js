@@ -572,8 +572,18 @@ const Render2D = (cv, view, opts = {}) => {
     }
     ctx.globalAlpha = 1;
   }
+  // an older squad being moved (dragged, or picked with Move): (col, row) -> null where its move would be refused, 'dim'
+  // where only the paid move gets there though a free one is left (March order's reach, Game.MARCH), else true; null
+  // (no squad being moved, or one that moves for free): every tile as before (2026-11-07)
+  function moveKinds() {
+    const id = drag && drag.moved && drag.id != null ? drag.id : moving, sq = id != null && m.armies[me].find(q => q.id === id);
+    if (!sq || sq.round === m.round || Game.freeMover(m, me, sq) || Game.freeOut(m, me, sq)) return null;
+    const left = sq.luckMove === m.round || Game.freeMovesLeft(m, me) > 0;
+    return (c, r) => { const k = Game.moveKind(m, me, sq, c, r); return k === 'free' ? true : k === 'paid' ? (left ? 'dim' : true) : null; };
+  }
   // melee squads' direction arrows (Game.AIM), yours only: each squad's, and while one is being set (aim: { id, end })
-  // how far it may go (a dashed ring of AIM.maxTiles tiles) and the arrow to the tile under the finger, cut down as it will be
+  // how far it may go (a dashed ring of AIM.maxTiles tiles; on a flank a dashed square, Game.aimCap) and the arrow to the
+  // tile under the finger, cut down as it will be
   function aimFloor(v) {
     const draft = aim && v.armies[me].find(q => q.id === aim.id);
     for (const sq of v.armies[me]) if (sq.aim && sq !== draft && Game.canAim(v, me, sq)) drawArrow(v, sq, [Game.aimEnd(v, sq)], 0.75);
@@ -584,7 +594,9 @@ const Render2D = (cv, view, opts = {}) => {
     if (!draft) return;
     const t = tilePx(), cx = (scol(draft.col) + 0.5) * t, cy = (srow(draft.row) + 0.5) * t;
     ctx.strokeStyle = css('--you'); ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
-    ctx.beginPath(); ctx.arc(cx, cy, Game.AIM.maxTiles * t, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const n = Game.aimCap(v, draft, me); // a flank squad (2026-11-07): the square of tiles it may reach
+    ctx.beginPath(); if (n) ctx.rect(cx - (n + 0.5) * t, cy - (n + 0.5) * t, (2 * n + 1) * t, (2 * n + 1) * t); else ctx.arc(cx, cy, Game.AIM.maxTiles * t, 0, Math.PI * 2);
+    ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
     const end = aim.end ? Game.aimTo(v, draft, aim.end.col, aim.end.row) : Game.aimEnd(v, draft);
     if (end) drawArrow(v, draft, [end], 1);
   }
@@ -1409,9 +1421,10 @@ const Render2D = (cv, view, opts = {}) => {
     }
     if ((selected !== null || (drag && drag.moved) || moving != null) && phase === 'deploy') {
       ctx.strokeStyle = css('--you'); ctx.globalAlpha = 0.25; ctx.lineWidth = 1;
-      const pu = placingUnit;
+      const pu = placingUnit, mk = moveKinds();
       for (let row = 0; row < Game.ROWS; row++) for (let c = 0; c < Game.COLS; c++) {
-        if (Game.canPlaceAt(m, me, c, row, pu, selected === null) && Game.spotFree(m, me, c, row, pu)) ctx.strokeRect(scol(c) * t + 3, srow(row) * t + 3, t - 6, t - 6);
+        const k = mk ? mk(c, row) : true;
+        if (k !== null && Game.canPlaceAt(m, me, c, row, pu, selected === null) && Game.spotFree(m, me, c, row, pu)) { ctx.globalAlpha = k === 'dim' ? 0.1 : 0.25; ctx.strokeRect(scol(c) * t + 3, srow(row) * t + 3, t - 6, t - 6); }
       }
       // your carriers with room for this unit
       ctx.strokeStyle = css('--gold'); ctx.globalAlpha = 0.8; ctx.lineWidth = 1.5;

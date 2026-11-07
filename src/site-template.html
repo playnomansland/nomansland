@@ -1055,8 +1055,13 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
   // ('pick': choose the squad; else its id, with the points so far in guideDraft; guideDrag while dragging one out)
   let bPlacing = null, castMode = null, guideMode = null, guideDraft = [], guideDrag = null;
   // a melee squad's direction arrow (Game.AIM): aimMode is the id of the squad getting one (the next tap sets its end);
-  // aimDrag { id, end } while one is dragged out of it
+  // aimDrag { id, end } while one is dragged out of it (head: its head was grabbed, see aimHead)
   let aimMode = null, aimDrag = null;
+  // the free moves left are March order's only (it reaches Game.MARCH.tiles; the horseshoe's goes anywhere)
+  const marchOnly = () => !!m && Game.marchMoves(m, me) > 0 && !Game.shoeMoves(m, me);
+  // the hint's "(up to N tiles)": none for a squad whose arrow is cut shorter where it stands (a flank, Game.aimCap: the
+  // dashed outline shows it)
+  const aimUpTo = () => { const q = m && m.armies[me].find(x => x.id === aimMode); return q && Game.aimCap(m, q, me) ? '' : ` (up to ${Game.AIM.maxTiles} tiles)`; };
   let moving = null;        // id of the older squad picked to move
   // the unit being placed or moved right now (some units may use extra tiles, e.g. Forward planting)
   function placingUnit() {
@@ -1880,7 +1885,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     editable: editable(), placingUnit: placingUnit(), placingElf: placingElf(), placingTower: placingTower(), placingWall: placingWall(),
     dev: m && m.dev ? { bPlacing, castMode, guideMode, guideId: guideDrag ? guideDrag.id : guideMode !== 'pick' ? guideMode : null, guide: guideDrag ? guideDrag.pts : guideMode != null && guideMode !== 'pick' ? guideDraft : null } : null,
     battleCam: cam && cam.k > 0 ? { zoom: 1 + (CAM.zoom - 1) * cam.k, x: cam.x, y: cam.y, k: cam.k } : null,
-    aim: phase === 'deploy' && aimMode != null ? { id: aimMode, end: aimDrag ? aimDrag.end : hoverTile } : null,
+    aim: phase === 'deploy' && (aimMode != null || aimDrag) ? { id: aimDrag ? aimDrag.id : aimMode, end: aimDrag ? aimDrag.end : hoverTile } : null, // (aimDrag without aimMode: a head dragged)
     placingBuilding: placingBuilding(), win: null, duo: duoBoard() }); // duo (2v2): this phone's lane and each player's ring colour
   const board = Render2D(cv, boardView);
   let board3d = null; // the 3D board when it's on (see "the 3D board" below)
@@ -2695,7 +2700,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
       if (m.round === Game.FLANK.round && selected === null && !fresh) hint = `Flanks are open: deploy on the blue edges of their half. ${MORE('flank-more')}`;
       if (m.round === 1 && selected === null && m.armies[me].some(s => s.free)) hint = 'Your package squads are placed. Drag to move them.';
       if (charmMode && Game.canGiveCharm(m, me)) hint = 'Tap one of your squads to give it a stack of Charisma.';
-      if (moveMode) hint = moving == null ? `Tap an older squad to move it (${Game.freeMovesLeft(m, me) > 0 ? 'free' : `${Game.CONFIG.moveCost} gold`}).` : `Tap a free tile to move ${esc(units[m.armies[me].find(s => s.id === moving).unit].name)} there.`;
+      if (moveMode) hint = moving == null ? `Tap an older squad to move it (${Game.freeMovesLeft(m, me) > 0 ? `free${marchOnly() ? `, up to ${Game.MARCH.tiles} tiles` : ''}` : `${Game.CONFIG.moveCost} gold`}).` : `Tap a free tile to move ${esc(units[m.armies[me].find(s => s.id === moving).unit].name)} there.`;
       if (selected !== null && !moveMode && m.armies[me].some(q => Game.boardable(m, me, q.col, q.row, selected))) hint += ` Or tap your ${esc(units[m.armies[me].find(q => Game.boardable(m, me, q.col, q.row, selected)).unit].name)} (gold outline) to hide this squad inside it.`;
       if (selected !== null && Game.isCarrier(m, selected)) hint += ` It carries one squad of any other unit, hidden from your opponent: place one on its tile.`;
       const freeL = Game.freeLeft(m, me);
@@ -2714,7 +2719,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
       if (castMode) hint = `Tap a tile to cast ${esc((Game.devSpell(castMode) || {}).name || 'the spell')}${(Game.devSpell(castMode) || {}).kind === 'zone' ? ' (its top left corner on your screen)' : ''}. Tap anywhere it can't go to cancel.`;
       if (guideMode === 'pick') hint = 'Tap one of your squads, or drag from it to draw its path.';
       else if (guideMode != null) hint = `Tap tiles for its path (${guideDraft.length} of ${Game.DEV.guidePoints}), or drag from the squad. ✕ when done.`;
-      if (aimMode != null) hint = `Direction: tap where it walks first (up to ${Game.AIM.maxTiles} tiles), or drag from the squad. Until it gets there it ignores enemies, except ones in reach.`;
+      if (aimMode != null) hint = `Direction: tap where it walks first${aimUpTo()}, or drag from the squad. Until it gets there it ignores enemies, except ones in reach.`;
       if (placingBuilding()) hint = `Tap a tile in your zone for your ${esc(buildingName(placingBuilding().id))}.`;
       if (placingTower()) hint = 'Tap a gold tile to place your tower.';
     }
@@ -2726,7 +2731,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     helpTip = inline ? '' : hint;
     // phone: the task the next board tap is for, shown over the board while the drawer is down (dock())
     dockTask = !can ? null : placingTower() ? { text: hint, x: false }
-      : aimMode != null ? { text: `Direction: tap where it walks first (up to ${Game.AIM.maxTiles} tiles), or drag from the squad.`, x: true, through: true } // short, and a tap on it reaches the tile under it (a far tap on a phone lands there)
+      : aimMode != null ? { text: `Direction: tap where it walks first${aimUpTo()}, or drag from the squad.`, x: true, through: true } // short, and a tap on it reaches the tile under it (a far tap on a phone lands there)
       : moveMode || (charmMode && Game.canGiveCharm(m, me)) || placingElf() || placingWall() || placingBuilding() || devTask ? { text: hint, x: !(bPlacing != null && Game.unplacedLesser(m, me)) } : null;
     const news = can && selected === null && !fresh && !inline && (Game.hailRound(m) || Game.altarRound(m) || m.round === Game.FLANK.round || (tskillOffer() && m.round === Game.TOWER_PICK_ROUND));
     if (can && !choosingPack() && !choosingTower() && !devPicking()) takeUndoSnap();
@@ -4912,7 +4917,7 @@ Worst choices against it: ${answers.slice(-3).reverse().map(([i, v]) => `${units
     return `You are playing No Mans Land, a small auto-battler, against a human player. You are the RED side. Decide your moves for round ${m.round}. The human places their new squads at the same time and can't see yours until the fight. You only see their squads from earlier rounds. Play to win: build counters to what they have, protect your damage dealers, and think about what they are likely to add next.
 
 RULES
-- Board: columns 0-${Game.COLS - 1}, rows 0-${Game.ROWS - 1}, tiles ${Game.TILE} m wide. Your zone is rows 0-${Game.ZONE - 1}; row ${Game.ZONE - 1} is your front line, nearest the enemy, and row 0 is the back. Rows ${Game.ZONE}-${Game.ROWS - Game.ZONE - 1} are no man's land. From round ${Game.FLANK.round} each player may also deploy on flank tiles: columns ${Game.FLANK.cols.join(' and ')}, on the OPPONENT's half of the board: their whole zone plus their half of no man's land (yours: rows ${Math.min(...Game.flankRows(1))}-${Math.max(...Game.flankRows(1))}; theirs: rows ${Math.min(...Game.flankRows(0))}-${Math.max(...Game.flankRows(0))})${Game.flankOpen(m) ? ', OPEN NOW' : ''}. You can't use a tile the opponent already holds with a squad or their tower. Their flank columns on YOUR half (columns ${Game.FLANK.cols.join(' and ')}, rows ${Math.min(...Game.flankRows(0))}-${Math.max(...Game.flankRows(0))}) are reserved for them for the whole match: you can never place a squad or your tower there. Squads there start inside the enemy's lines, good for hitting their tower or backline from the side, so guard your own edges against theirs. A squad placed on a flank can't move or attack for the first ${Game.FLANK.delay} s of the first fight after it was placed; from the next round on it starts normally. The enemy zone is rows ${Game.ROWS - Game.ZONE}-${Game.ROWS - 1}; row ${Game.ROWS - Game.ZONE} is their front. One squad per tile. Squads keep their tile, except: once per round you may move ONE of your squads from an earlier round to another free tile you could place on, for ${Game.CONFIG.moveCost} gold ("move"). The opponent sees it on its old tile until the fight.${Game.freeMoves(m, 1) ? ` You also get ${Game.freeMoves(m, 1)} FREE move(s) every round (Bastion's March order or Otto's horseshoe): the first move(s) you make each round cost nothing.` : ''}
+- Board: columns 0-${Game.COLS - 1}, rows 0-${Game.ROWS - 1}, tiles ${Game.TILE} m wide. Your zone is rows 0-${Game.ZONE - 1}; row ${Game.ZONE - 1} is your front line, nearest the enemy, and row 0 is the back. Rows ${Game.ZONE}-${Game.ROWS - Game.ZONE - 1} are no man's land. From round ${Game.FLANK.round} each player may also deploy on flank tiles: columns ${Game.FLANK.cols.join(' and ')}, on the OPPONENT's half of the board: their whole zone plus their half of no man's land (yours: rows ${Math.min(...Game.flankRows(1))}-${Math.max(...Game.flankRows(1))}; theirs: rows ${Math.min(...Game.flankRows(0))}-${Math.max(...Game.flankRows(0))})${Game.flankOpen(m) ? ', OPEN NOW' : ''}. You can't use a tile the opponent already holds with a squad or their tower. Their flank columns on YOUR half (columns ${Game.FLANK.cols.join(' and ')}, rows ${Math.min(...Game.flankRows(0))}-${Math.max(...Game.flankRows(0))}) are reserved for them for the whole match: you can never place a squad or your tower there. Squads there start inside the enemy's lines, good for hitting their tower or backline from the side, so guard your own edges against theirs. A squad placed on a flank can't move or attack for the first ${Game.FLANK.delay} s of the first fight after it was placed; from the next round on it starts normally. The enemy zone is rows ${Game.ROWS - Game.ZONE}-${Game.ROWS - 1}; row ${Game.ROWS - Game.ZONE} is their front. One squad per tile. Squads keep their tile, except: once per round you may move ONE of your squads from an earlier round to another free tile you could place on, for ${Game.CONFIG.moveCost} gold ("move"). The opponent sees it on its old tile until the fight.${Game.marchMoves(m, 1) ? ` Bastion's March order gives you 1 FREE move every round, to a tile at most ${Game.MARCH.tiles} tiles from where that squad stood at the round's start (diagonals count as 1); a longer move is ${Game.shoeMoves(m, 1) ? "the horseshoe's free move or " : ''}the paid one.` : ''}${Game.shoeMoves(m, 1) ? ` Otto's horseshoe gives you 1 FREE move every round, any distance.` : ''}${Game.freeMoves(m, 1) ? ' Free moves are used before the paid one.' : ''}
 - The fight is automatic. Every body marches straight ahead in its own column (a squad on a flank tile marches sideways, toward the middle of the board, instead) until an enemy comes within its range + ${Game.SETTINGS.sight} m in any direction (at least ${Game.SETTINGS.minSight} m), then turns toward the nearest enemy and attacks once in range, staying on that enemy until it dies or leaves its range. Within ${Game.SETTINGS.drift} m beyond that it already starts curving toward the nearest enemy. Once no enemy is ahead of it, it turns toward the nearest one. So columns are lanes: a squad fights what stands in or near its lane, a squad in an empty lane far from the enemy walks past and hits the enemy from the side or behind, and long-range units in the back only get attacked once the front is gone. Short-range units in front shield long-range units behind. Spreading out limits splash damage.
 - The round's loser loses health: for each surviving enemy squad, by its tier (${Object.entries(Game.TIER_DMG).map(([t, d]) => `tier ${t}: ${d}`).join(', ')}), scaled by the share of its bodies alive. If time runs out, both sides take damage. A round costs the loser at most ${Game.MAX_ROUND_DMG} health. Health starts at ${Game.START_HP} and the match ends at 0.
 - Gold: both players get ${Game.incomeFor(2)} going into round 2, and ${Game.CONFIG.incomeStep} more every round after that (next round: +${Game.incomeFor(m.round + 1)}). From round ${Game.LOSER_BONUS_ROUND}, the round's loser gets +${Game.LOSER_BONUS} extra. A player whose tower falls in a fight also loses ${Game.TOWER_FALL_HP} health, but the round's damage and the tower's together are at most ${Game.MAX_ROUND_DMG}. At most ${Game.CARRY_CAP} unspent gold carries over; the rest is lost. Breaking a streak of ${Game.SHUTDOWN.from}+ wins in a row pays ${Game.SHUTDOWN.gold}, +${Game.SHUTDOWN.step} for each win past ${Game.SHUTDOWN.from} (current streaks: you ${(m.streak || [0, 0])[1]}, them ${(m.streak || [0, 0])[0]}).
@@ -5682,12 +5687,22 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const myB = Game.isDev(m) && Game.lesserAt(m, me, t.col, t.row);
     if (myB && myB.round === m.round) { guideDrag = null; drag = { bkey: myB.key, from: t, over: t, moved: false }; return true; } // drag a new building
     const sq = Game.squadAt(m, me, t.col, t.row);
-    if (!sq) return false;
+    if (!sq) return aimHead(t); // no squad of yours here (a squad on the tile wins: moving keeps priority): an arrow's head?
     sfx('pressBoard');
     const denied = (sq.round < m.round && !(moveMode || Game.movedId(m, me) === sq.id || Game.freeMover(m, me, sq) || Game.freeOut(m, me, sq) || sq.luckMove === m.round || Game.freeMovesLeft(m, me) > 0 || (Game.movedId(m, me) == null && m.gold[me] >= Game.CONFIG.moveCost)))
       || !Game.canMove(m, me, sq);
     if (denied) { if (!editable()) return false; drag = { id: sq.id, from: t, over: t, moved: false, denied: true }; return true; } // a drag of it only says no (a tap still opens it)
     drag = { id: sq.id, from: t, over: t, moved: false };
+    return true;
+  }
+  // the head of one of your direction arrows on tile t, dragged to a new end without the sheet (2026-11-07; dropped on its
+  // own squad it is cleared). Several ending there: the squad tapped last, else the newest. A press that doesn't drag
+  // is the tap it would have been (placing a unit there, a sheet...). A squad's first arrow still comes from its sheet.
+  function aimHead(t) {
+    const at = m.armies[me].filter(q => q.aim && Game.canAim(m, me, q) && (e => !!e && e.col === t.col && e.row === t.row)(Game.aimEnd(m, q)));
+    if (!at.length) return false;
+    const q = at.find(x => rangeOf && rangeOf.side === me && !rangeOf.team && rangeOf.id === x.id) || at[at.length - 1];
+    aimDrag = { id: q.id, end: { col: t.col, row: t.row }, moved: false, head: true };
     return true;
   }
   function boardDrag(t) {
@@ -5705,10 +5720,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         dragEndAt = performance.now();
         const sq = m.armies[me].find(q => q.id === ad.id), end = sq && Game.aimTo(m, sq, ad.end.col, ad.end.row);
         aimMode = null;
+        if (sq && !end && ad.head && editable() && Game.clearAim(m, me, sq.id)) { changed(); return; } // a head dropped on its squad: no arrow
         if (end && editable() && Game.setAim(m, me, sq.id, end.col - sq.col, end.row - sq.row)) { changed(); return; }
         panelDeploy();
       }
-      render(); return; // a press without a drag: the tap that follows (on the squad) cancels
+      render(); return; // a press without a drag: the tap that follows (on the squad) cancels (on a head: is a plain tap)
     }
     if (guideDrag) {
       if (ended) boardDrag(t);
@@ -6056,12 +6072,18 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // a squad while deploying (Game.squadReach: its skills, Eagle eye, the map's cut and Test Grid's +2 m, flame
   // cones), where this screen shows it: yours where it stands or is being dragged to, theirs as you can know it
   // (where you last saw it, the skills you have seen)
-  function squadRing(side, sq) {
+  // team (2v2): a squad of the other lane (m.team): your teammate's in full, the other opponent's as you can know it,
+  // with that lane's skills (duoSheetMatch); the tower (Eagle eye) is the team's, the same in both lanes. In the
+  // colour of its player. (2026-11-07)
+  function squadRing(side, sq, team) {
     if (!sq || Game.isRider(sq)) return null;
-    const mine = side === me, p = !mine ? Game.seenAt(m, sq) : drag && drag.moved && drag.id === sq.id ? drag.over : sq;
-    const n = Game.footprint(m, sq.unit), w = Game.tileToWorld(p.col + (n - 1) / 2, p.row + (n - 1) / 2), r = Game.squadReach(m, side, sq, !mine);
-    return r > 0 ? { x: w.x, y: w.y, r, side } : null;
+    const mine = side === me, mm = team ? duoSheetMatch(side) : m, p = !mine ? Game.seenAt(m, sq) : !team && drag && drag.moved && drag.id === sq.id ? drag.over : sq;
+    const n = Game.footprint(m, sq.unit), w = Game.tileToWorld(p.col + (n - 1) / 2, p.row + (n - 1) / 2), r = Game.squadReach(mm, side, sq, !mine);
+    const col = team && duoOn() ? duoRing(Duo.seatOf(1 - duoMyLane(), side)).col : null;
+    return r > 0 ? { x: w.x, y: w.y, r, side, ...(col ? { col } : {}) } : null;
   }
+  // a squad of side's in list on tile (col, row), any tile of its block, where this screen shows it (seenAt)
+  const ringAt = (list, col, row, seen) => list.find(s => { const p = seen ? Game.seenAt(m, s) : s; return !Game.isRider(s) && Game.blockOf(m, s.unit, p.col, p.row).some(([c, r]) => c === col && r === row); });
   function towerRing(side) {
     const t = m.towers && m.towers[side];
     if (!t) return null;
@@ -6087,15 +6109,21 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     for (const side of [me, foe()]) if (towerVisible(side) && Game.towerAt(m, side, t.col, t.row)) return towerRing(side);
     const own = Game.squadAt(m, me, t.col, t.row);
     if (own) return squadRing(me, Game.isRider(own) ? Game.carrierOf(m, me, own) || own : own);
-    const en = Game.foeSeen(m, foe()).find(s => { const p = Game.seenAt(m, s); return !Game.isRider(s) && p.col === t.col && p.row === t.row; });
-    return en ? squadRing(foe(), en) : null;
+    const en = ringAt(Game.foeSeen(m, foe()), t.col, t.row, true); // a big one on any tile of its block (2026-11-07)
+    if (en) return squadRing(foe(), en);
+    if (!duoOn()) return null;
+    const mate = Game.mateAt(m, me, t.col, t.row); // 2v2: the other lane's, your teammate's and the other opponent's (2026-11-07)
+    if (mate) return squadRing(me, mate, true);
+    const en2 = ringAt(Game.teamSeen(m, foe()), t.col, t.row, true);
+    return en2 ? squadRing(foe(), en2, true) : null;
   }
   // the ring of what was tapped: the squad last tapped while deploying (rangeOf), the body tapped in a fight (inspect)
   function tapRange() {
     if (!m) return null;
     if (phase === 'battle' && bt) return inspect && !(inspect.hidden && inspect.side !== me) ? bodyRing(inspect) : null;
     if (phase !== 'deploy' || !rangeOf) return null;
-    return squadRing(rangeOf.side, (rangeOf.side === me ? m.armies[me] : Game.foeSeen(m, rangeOf.side)).find(s => s.id === rangeOf.id));
+    const list = rangeOf.team ? (rangeOf.side === me ? Game.teamArmy(m, me) : Game.teamSeen(m, rangeOf.side)) : rangeOf.side === me ? m.armies[me] : Game.foeSeen(m, rangeOf.side); // (team: 2v2, the other lane's)
+    return squadRing(rangeOf.side, list.find(s => s.id === rangeOf.id), !!rangeOf.team);
   }
   // ---------- intent: where a squad means to go (its movement target, not whom it attacks) ----------
   // While deploying: Game.intentPreview, for the squad last tapped (rangeOf, yours), the one you drag to another tile, or
@@ -6208,13 +6236,14 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (!it) { watchSq = null; return ''; }
       from = it.from;
     } else if (phase === 'deploy') {
-      if (aimMode != null) return ''; // setting a direction arrow: the floor shows it
+      if (aimMode != null || aimDrag) return ''; // setting a direction arrow: the floor shows it
       const ask = intentAsk();
       if (!ask) return '';
       const asq = ask.q.id != null && m.armies[me].find(s => s.id === ask.q.id);
       if (asq && asq.aim && Game.canAim(m, me, asq)) { // a direction arrow: the floor shows it; a squad dragged elsewhere takes it along
         if (ask.q.col == null || (ask.col === asq.col && ask.row === asq.row)) return '';
-        const n = Game.footprint(m, ask.unit), a0 = Game.tileToWorld(ask.col + (n - 1) / 2, ask.row + (n - 1) / 2), b0 = Game.tileToWorld(ask.col + asq.aim.dc + (n - 1) / 2, ask.row + asq.aim.dr + (n - 1) / 2);
+        const n = Game.footprint(m, ask.unit), a = Game.aimUse(m, { ...asq, col: ask.col, row: ask.row }, asq.aim, me); // (onto a flank: cut as it will be)
+        const a0 = Game.tileToWorld(ask.col + (n - 1) / 2, ask.row + (n - 1) / 2), b0 = Game.tileToWorld(ask.col + a.dc + (n - 1) / 2, ask.row + a.dr + (n - 1) / 2);
         return arrowSvg(at(a0.x, a0.y), at(b0.x, b0.y), teamCol(me), { short: 0 });
       }
       const r = intentFor(ask.q, false);
@@ -6284,7 +6313,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         html += `<polygon class="tut-tile" points="${pt(c.x - d, c.y - d)} ${pt(c.x + d, c.y - d)} ${pt(c.x + d, c.y + d)} ${pt(c.x - d, c.y + d)}"/>`;
       }
       // a range ring: the same dotted circle for the mouse and a tap, on either board (projected point by point, so it lies on the 3D ground)
-      const rangeSvg = (c, cls) => `<polygon class="${cls}" style="stroke:${teamCol(c.side)}" points="${Array.from({ length: 72 }, (_, k) => { const a = k / 72 * Math.PI * 2; return pt(c.x + Math.cos(a) * c.r, c.y + Math.sin(a) * c.r); }).join(' ')}"/>`;
+      const rangeSvg = (c, cls) => `<polygon class="${cls}" style="stroke:${c.col || teamCol(c.side)}" points="${Array.from({ length: 72 }, (_, k) => { const a = k / 72 * Math.PI * 2; return pt(c.x + Math.cos(a) * c.r, c.y + Math.sin(a) * c.r); }).join(' ')}"/>`;
       if (h) html += rangeSvg(h, 'range');
       if (tr) html += rangeSvg(tr, 'range tapped');
       const el = $('coach-ring');
@@ -7123,7 +7152,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         if (sq.round === m.round && editable() && Game.isRider(sq)) btns.push(`<button class="btn" data-act="move-sq">Take out</button>`);
         const freeMv = sq.round < m.round && (sq.luckMove === m.round || Game.freeMovesLeft(m, me) > 0); // a free move: just drag it there
         if (sq.round < m.round && editable() && Game.movedId(m, me) === sq.id) btns.push(`<button class="btn" data-act="move-undo">Undo move · +${Game.CONFIG.moveCost}</button>`);
-        else if (freeMv && editable() && !Game.isRider(sq)) btns.push(`<button class="btn" data-act="move-sq">Move · free</button>`);
+        else if (freeMv && editable() && !Game.isRider(sq)) btns.push(`<button class="btn" data-act="move-sq">Move · free${marchOnly() ? ` (up to ${Game.MARCH.tiles} tiles)` : ''}</button>`);
         else if (sq.round < m.round && editable() && Game.isRider(sq)) btns.push(Game.horseOk(m, me, sq.in, 'out', sq.id) ? `<button class="btn" data-act="move-sq">Take out · free</button>` : `<button class="btn" disabled>Its carrier let one out this round</button>`);
         else if (sq.round < m.round && editable() && Game.movedId(m, me) == null) btns.push(`<button class="btn" data-act="move-sq" ${m.gold[me] >= Game.CONFIG.moveCost || Game.freeOut(m, me, sq) ? '' : 'disabled'}>Move${Game.freeOut(m, me, sq) ? ' · free' : ` · ${Game.CONFIG.moveCost} gold`}</button>`);
         if (sq.round < m.round && editable()) btns.push(`<button class="btn" data-act="sell">Sell · ${Game.sellValue(m, sq)} gold</button>`);
@@ -7729,9 +7758,12 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     // the guest's move this round: one squad at most
     if (!m.moved) m.moved = [null, null];
     m.moved[1] = null;
-    let luck = Game.freeMoves(m, 1); // free moves this round (Bastion's March order, Otto's horseshoe)
+    // free moves this round: Bastion's March order (only as far as Game.MARCH.tiles from where the squad stood) and
+    // Otto's horseshoe (anywhere) (2026-11-07). The host trusts the guest's gold, so this only keeps the counts right.
+    let march = Game.marchMoves(m, 1), shoe = Game.shoeMoves(m, 1);
     for (const q of m.armies[1]) if (q.movedRound === m.round && !Game.freeMover(m, 1, q) && !(q.from && q.from.in != null)) {
-      if (q.luckMove === m.round && luck > 0) { luck--; continue; }
+      if (q.luckMove === m.round && march > 0 && Game.marchNear(m, q, q.col, q.row)) { march--; continue; }
+      if (q.luckMove === m.round && shoe > 0) { shoe--; continue; }
       delete q.luckMove;
       if (m.moved[1] == null) m.moved[1] = q.id; else { delete q.from; delete q.movedRound; }
     }
@@ -8830,8 +8862,9 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     const at = (q) => Game.blockOf(m, q.unit, q.col, q.row).some(([c, r]) => c === t.col && r === t.row);
     const deploy = phase === 'deploy';
     const mate = Game.teamArmy(m, me).find(q => !Game.isRider(q) && at(q));
-    if (mate) { openSheet(mate.unit, mate, me, { ro: true }); duoRideSheet(mate); return true; }
+    if (mate) { if (deploy) rangeOf = { side: me, id: mate.id, team: true }; openSheet(mate.unit, mate, me, { ro: true }); duoRideSheet(mate); return true; } // (its range ring too, tapRange)
     const foe2 = (deploy ? Game.teamSeen(m, foe()) : Game.teamArmy(m, foe())).find(q => at(deploy ? { ...q, ...Game.seenAt(m, q) } : q));
+    if (foe2 && deploy) rangeOf = { side: foe(), id: foe2.id, team: true };
     if (foe2) { const look = Game.shownUnit(m, me, foe(), foe2.unit); openSheet(look, { ...foe2, unit: look }, foe(), { other: true }); return true; }
     if (deploy) return false;
     const own = m.armies[me].find(q => !Game.isRider(q) && at(q));

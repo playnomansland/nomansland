@@ -1913,8 +1913,7 @@ const Game = (() => {
     // squad already moved this round is weighed again on every drop (March order reaches MARCH.tiles: back within
     // reach, a paid move is refunded and becomes the free one) (2026-11-07)
     const paid = movedId(m, side) === sq.id, luck = sq.luckMove === m.round;
-    const kind = sq.round === m.round || free ? null : freeMoveOk(m, side, sq, col, row) ? 'free'
-      : paid || (movedId(m, side) == null && m.gold[side] >= CONFIG.moveCost) ? 'paid' : 'no';
+    const kind = sq.round === m.round || free ? null : moveKind(m, side, sq, col, row) || 'no';
     if (kind === 'no') return false;
     if (kind && !(sq.from && sq.movedRound === m.round)) { sq.from = { col: sq.col, row: sq.row, ...(isRider(sq) ? { in: sq.in } : {}) }; sq.movedRound = m.round; }
     if (kind === 'free' && !luck) {
@@ -2677,6 +2676,14 @@ const Game = (() => {
     const far = others.filter(q => !marchNear(m, q, q.col, q.row)).length + (marchNear(m, sq, col, row) ? 0 : 1);
     return others.length + 1 <= freeMoves(m, side) && far <= shoeMoves(m, side);
   }
+  // what a move of sq to (col, row) would be: 'free' (this round's squad, Spirit walk, stepping out of a carrier, or a
+  // free move that reaches there), 'paid' (the round's paid move: unused and affordable, or this squad's already), or
+  // null (refused). The page's move highlights and moveSquad use it alike. (2026-11-07)
+  function moveKind(m, side, sq, col, row) {
+    if (!sq) return null;
+    if (sq.round === m.round || freeMover(m, side, sq) || freeOut(m, side, sq) || freeMoveOk(m, side, sq, col, row)) return 'free';
+    return movedId(m, side) === sq.id || (movedId(m, side) == null && m.gold[side] >= CONFIG.moveCost) ? 'paid' : null;
+  }
   const freeMovesLeft = (m, side) => freeMoves(m, side) - m.armies[side].filter(q => q.luckMove === m.round).length;
   const slotMovesLeft = freeMovesLeft; // older name
   // Otto's horseshoe (2026-11-03): three of a kind gives, at random, +1 deployment or +1 free move every round for the
@@ -3230,7 +3237,8 @@ const Game = (() => {
   // the arrow a = { dc, dr } as sq really walks it from where it stands: cut along its line to aimCap
   function aimUse(m, sq, a, side) {
     const n = a && aimCap(m, sq, side), k = n ? Math.max(Math.abs(a.dc), Math.abs(a.dr)) : 0;
-    return k > n ? { dc: Math.round(a.dc * n / k) || 0, dr: Math.round(a.dr * n / k) || 0 } : a; // (|| 0: never -0)
+    const cut = (d) => Math.sign(d) * Math.round(Math.abs(d) * n / k) || 0; // (halves away from 0, the same for both sides; || 0: never -0)
+    return k > n ? { dc: cut(a.dc), dr: cut(a.dr) } : a;
   }
   // the tile an arrow drawn from sq to (col, row) would end on (cut down as setAim does, and to aimCap), or null
   const aimTo = (m, sq, col, row) => { const a = sq && aimUse(m, sq, aimFit(sq, col - sq.col, row - sq.row)); return a ? { col: sq.col + a.dc, row: sq.row + a.dr } : null; };
@@ -3508,7 +3516,7 @@ const Game = (() => {
     FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, anywhere, mpbAt, bldgSeen, nearBldg, isOff, enemyHolds, inNoMans, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
     STANDARD_PACK, ICE, ALTAR, GOLEM, isIce, hailRound, altarRound, stormShift, stormRows, hailTiles, altarCost, altarRefund, altarCount, pushRoom, altarBought, addAltar, buyAltar, undoAltar, snowgres, snowgreUnit,
     MAPS, SKINS, MAP_LOOK, lookOf, EDITOR_MAPS, TERRAIN, objectiveOf, objectiveTiles, SHAPE_PATH, terrainTile, terrainBlocks, terrainOf, groundHeight, ELF_TOWER, SHROOM, SHROOM_SPLIT, shroomAt, shroomTileAt, shroomRemoval, SHROOM_REMOVE, shroomCost, removeShroom, undoRemoveShroom, mapOf, elfSpot, rollMap, BRIBE_COST, bribeList, bribeGold, bribeCount, bribeNow, bribeCost, bribeRefund, ELF_POWER, elfPowered, elfUnit, ELF_OWN, elfOwnCost, elfOwnOf, elfOwnAt, elfOwnUnlocked, elfOwnOffered, canBuyElfOwn, elfOwnSpotOk, buyElfOwn, undoElfOwn, bribeLeader, canBribe, bribe, undoBribe,
-    CHARACTERS, CHAR, charOf, SLOT, MARCH, marchMoves, shoeMoves, marchNear, freeMoveOk, slotSpins, slotDry, slotWins, slotMovesLeft, freeMoves, freeMovesLeft, shoePerks, shoePerk, canSpin, slotOutcome, slotReels, spin, takeSpins, aiSlots, charInfo, enzoSkill, enzoActive, charmOf, isGentleman, canGiveCharm, giveCharm, undoCharm, ensureCharm, felixGold, isTier1, rollBuffTiles, onBuffTile, zoeBuff, yotImps, yotLevel, TOWER_SPOT, towerSpot,
+    CHARACTERS, CHAR, charOf, SLOT, MARCH, marchMoves, shoeMoves, marchNear, freeMoveOk, moveKind, slotSpins, slotDry, slotWins, slotMovesLeft, freeMoves, freeMovesLeft, shoePerks, shoePerk, canSpin, slotOutcome, slotReels, spin, takeSpins, aiSlots, charInfo, enzoSkill, enzoActive, charmOf, isGentleman, canGiveCharm, giveCharm, undoCharm, ensureCharm, felixGold, isTier1, rollBuffTiles, onBuffTile, zoeBuff, yotImps, yotLevel, TOWER_SPOT, towerSpot,
     TREASURY, TREASURY_SQ, treasuryOn, treasuryUp, treasurySpot, treasuryAt, treasuryUnit, deployCost, FORTIFY, fortifyOf, canFortify, fortify, bwallsFighting, VAULT, vaultOn, MARK, markOf, markLost, markOn, markCost, markTarget, canMark, placeMark, markShown,
     FACTION_MODE, FACTIONS: () => FACTIONS, setFactions, factionInfo, factionsOf, factionTowers, towerTypeById, ownsUnit, withFactionTrait, factionSet,
     createDraft, draftTurn, draftOpen, draftAct, draftDone, draftPossible, aiDraftChoice,
