@@ -40,8 +40,9 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     tints: [[/^Pine/, [0.3, 0.27, 0.25]], [/^Grass/, [1.05, 0.9, 0.7]], [/^DeadTree/, [0.7, 0.64, 0.6]]],
     light: { hemi: ['#D2C1B2', '#2A2220', 1.35], sun: ['#FFCDA6', 1.8] }, fall: 'embers', farLight: 0.9 };
   // Moonlit Snow: Frozen Peak at night, blue moonlight, falling snow and a cabin with warm windows at the far end
-  BIOMES.moonlit = { ...BIOMES.ice, sky: '#141C2A', land: '#2F3A4C', tint: [0.6, 0.68, 0.85], trees: ['Pine_1', 'Pine_2', 'Pine_3', 'Pine_5', 'Pine_1', 'DeadTree_3'], grow: 0.85,
-    light: { hemi: ['#9DB2E0', '#1A2030', 1.2], sun: ['#C4D2F5', 1.55], pos: [30, 58, 18] }, drift: '#9AA9C2', farLight: 0.62, cabin: true };
+  BIOMES.moonlit = { ...BIOMES.ice, sky: '#141C2A', land: '#5A6880', low: 'moonlit', tint: [0.6, 0.68, 0.85], trees: ['Pine_1', 'Pine_2', 'Pine_3', 'Pine_5', 'Pine_1', 'DeadTree_3'], grow: 0.85,
+    light: { hemi: ['#9DB2E0', '#1A2030', 1.05], sun: ['#C4D2F5', 1.35], pos: [30, 58, 18] }, drift: '#9AA9C2', farLight: 0.62, cabin: true,
+    shade: [0.88, 0.5, 22], night: [0.5, 0.68, 1.0, 0.55], deepSnow: 1.1 };
   // Savanna: golden hour on dry grass, lone flat-topped trees like acacias, a low warm sun with long shadows
   BIOMES.savanna = { sky: '#DDB27C', land: '#8F7C43', tint: [1.06, 0.98, 0.82], low: 'savanna', trees: ['CommonTree_3', 'CommonTree_5', 'DeadTree_1', 'CommonTree_3'], grow: 0.42, dress: 0.8,
     squash: [[/^CommonTree/, 0.5]], tints: [[/^CommonTree/, [1.0, 0.92, 0.6]], [/^Grass/, [1.35, 1.1, 0.55]], [/^Bush/, [1.1, 0.95, 0.55]], [/^DeadTree/, [1.1, 0.95, 0.78]]],
@@ -49,6 +50,33 @@ const Scenery3D = (THREE, scene, opts = {}) => {
   // a look (Scenery3D.LOOKS, below) -> its biome
   const biomeOf = (look) => BIOMES[(Scenery3D.LOOKS[look] || Scenery3D.LOOKS.meadow).biome] || BIOMES.meadow;
   const biome = (v) => biomeOf(Scenery3D.lookOf(v && (v.battlePre || v.m)));
+
+  // ---------- shade: a look can darken everything round the board, more the further out (Moonlit Snow), while the board
+  // itself keeps its light. shade = [how dark at most (0 to 1), from how far outside the board (m), fully by (m)]. ----------
+  // night (biome .night = [r, g, b, brightness]): how the unlit snow is seen in the dark. Low light shifts what the eye
+  // sees toward blue-green (the Purkinje shift): colours wash out, reds go dark first, and shadows sink into blue
+  // rather than black. So far from the light a colour becomes its night brightness (weighted toward green and blue)
+  // times a blue tint, with a faint blue floor. The cabin's warm light (uWarm: x, z, radius) is kept out of it.
+  const shadeU = { uShade: { value: new THREE.Vector3(0, 1, 2) }, uHalf: { value: new THREE.Vector2(40, 50) }, uNight: { value: new THREE.Vector4(0, 0, 0, 0) }, uWarm: { value: new THREE.Vector3(0, 0, 0) } };
+  const SHADE_GLSL = `uniform vec3 uShade; uniform vec2 uHalf; uniform vec4 uNight; uniform vec3 uWarm;
+float pbK(vec2 xz) { float k = uShade.x * smoothstep(uShade.y, uShade.z, length(max(abs(xz) - uHalf, 0.0)));
+  if (uWarm.z > 0.0) k *= smoothstep(uWarm.z * 0.55, uWarm.z, length(xz - uWarm.xy)); return k; }
+float pbShade(vec2 xz) { return 1.0 - pbK(xz); }
+vec3 pbNight(vec3 c, vec2 xz) { float k = pbK(xz); if (k <= 0.0) return c;
+  vec3 dark = uNight.w > 0.0 ? dot(c, vec3(0.08, 0.55, 0.37)) * uNight.rgb * uNight.w + uNight.rgb * 0.018 : vec3(0.0);
+  return mix(c, dark, k); }
+`;
+  // a lit material (scenery, drifts): darkened after lighting, by where each fragment stands
+  function shadeLit(sh) {
+    Object.assign(sh.uniforms, shadeU);
+    sh.vertexShader = 'varying vec2 vShadeXZ;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+        vShadeXZ = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xz;
+      #else
+        vShadeXZ = (modelMatrix * vec4(transformed, 1.0)).xz;
+      #endif`);
+    sh.fragmentShader = SHADE_GLSL + 'varying vec2 vShadeXZ;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', 'outgoingLight = pbNight(outgoingLight, vShadeXZ);\n#include <opaque_fragment>');
+  }
 
   // ---------- loading ----------
   const FOLIAGE = /Leaves|Leaf|Grass|Flowers/;
@@ -82,6 +110,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
             vUpN = normalize(mat3(modelMatrix) * objectNormal).y;
           #endif`);
         sh.fragmentShader = 'uniform float uSnow;\nvarying float vUpN;\n' + sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.25);\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.9, 0.95), uSnow * smoothstep(0.3, 0.75, vUpN));');
+        shadeLit(sh);
         if (leafy) sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', 'float faceDirection = 1.0; vec3 normal = normalize( vNormal ); vec3 nonPerturbedNormal = normal;');
       };
       mat.customProgramCacheKey = () => leafy ? 'pb-leaf' : 'pb-scenery';
@@ -109,7 +138,26 @@ const Scenery3D = (THREE, scene, opts = {}) => {
       }) };
     }
   }
-  const ready = load().then(() => { if (opts.renderer) setupImpostors(); key = ''; opts.onReady && opts.onReady(); }).catch((e) => console.warn('No Mans Land: no 3D scenery', e));
+  // snow piles (Moonlit Snow): soft lumpy mounds made here, used like any scenery model (SnowPile_1 to _3)
+  function addSnowPiles() {
+    const mat = new THREE.MeshLambertMaterial({ color: '#E4EAF3', flatShading: true });
+    mat.onBeforeCompile = shadeLit; mat.customProgramCacheKey = () => 'pb-snowpile'; mats.push(mat);
+    [[1.25, 0.85, 0.5, 0], [0.9, 1.1, 0.62, 1.7], [1.5, 0.75, 0.4, 3.1]].forEach(([sx, sz, sy, ph], i) => {
+      const geo = new THREE.IcosahedronGeometry(1, 2), pos = geo.attributes.position, v = new THREE.Vector3();
+      let lo = Infinity;
+      for (let k = 0; k < pos.count; k++) {
+        v.fromBufferAttribute(pos, k);
+        // a bumpy outline, the same for a corner shared by several faces (so the surface stays closed), then flattened
+        const f = 1 + 0.16 * Math.sin(3 * v.x + ph) * Math.sin(2.7 * v.z + 0.4 + ph) + 0.08 * Math.sin(5 * v.y + ph * 2);
+        v.multiplyScalar(f); v.y = Math.max(v.y, -0.15);
+        v.set(v.x * sx, v.y * sy, v.z * sz); pos.setXYZ(k, v.x, v.y, v.z); lo = Math.min(lo, v.y);
+      }
+      geo.translate(0, -lo - 0.05, 0); geo.computeVertexNormals(); geo.computeBoundingSphere();
+      geo.computeBoundingBox();
+      lib['SnowPile_' + (i + 1)] = { h: geo.boundingBox.max.y, r: Math.max(sx, sz), parts: [{ geo, mat }] };
+    });
+  }
+  const ready = load().then(() => { addSnowPiles(); if (opts.renderer) setupImpostors(); key = ''; opts.onReady && opts.onReady(); }).catch((e) => console.warn('No Mans Land: no 3D scenery', e));
 
   // ---------- impostors: pictures of the far trees and bushes, baked into one atlas ----------
   const ELEV = [8, 40, 90], ICELL = 256, IGRID = 8; // views per model, cell size in pixels, cells per atlas row
@@ -152,12 +200,12 @@ const Scenery3D = (THREE, scene, opts = {}) => {
   function setupImpostors() {
     impGeo = new THREE.InstancedBufferGeometry().copy(new THREE.PlaneGeometry(1, 1));
     impMat = new THREE.ShaderMaterial({
-      uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uAtlas: { value: null }, uGrid: { value: new THREE.Vector2(IGRID, 1) } }]),
+      uniforms: { ...THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uAtlas: { value: null }, uGrid: { value: new THREE.Vector2(IGRID, 1) } }]), ...shadeU },
       fog: true,
       vertexShader: `
         attribute vec3 iPos; attribute float iSize; attribute float iModel; attribute vec3 iTint; attribute float iFlip; attribute float iSy;
         uniform vec2 uGrid;
-        varying vec2 vUv0; varying vec2 vUv1; varying float vMix; varying vec3 vTint;
+        varying vec2 vUv0; varying vec2 vUv1; varying float vMix; varying vec3 vTint; varying vec2 vShadeXZ;
         #include <fog_pars_vertex>
         vec2 cellUv(float c, vec2 uv) { return (vec2(mod(c, uGrid.x), floor(c / uGrid.x)) + uv) / uGrid; }
         void main() {
@@ -170,19 +218,20 @@ const Scenery3D = (THREE, scene, opts = {}) => {
           vec3 wp = iPos + (right * position.x + up * position.y * iSy) * iSize;
           vec2 uv = vec2(position.x * iFlip + 0.5, position.y + 0.5);
           float c0 = iModel * 3.0 + i0;
-          vUv0 = cellUv(c0, uv); vUv1 = cellUv(c0 + 1.0, uv); vTint = iTint;
+          vUv0 = cellUv(c0, uv); vUv1 = cellUv(c0 + 1.0, uv); vTint = iTint; vShadeXZ = iPos.xz;
           vec4 mvPosition = viewMatrix * vec4(wp, 1.0);
           gl_Position = projectionMatrix * mvPosition;
           #include <fog_vertex>
         }`,
       fragmentShader: `
         uniform sampler2D uAtlas;
-        varying vec2 vUv0; varying vec2 vUv1; varying float vMix; varying vec3 vTint;
+        varying vec2 vUv0; varying vec2 vUv1; varying float vMix; varying vec3 vTint; varying vec2 vShadeXZ;
+        ${SHADE_GLSL}
         #include <fog_pars_fragment>
         void main() {
           vec4 c = mix(texture2D(uAtlas, vUv0), texture2D(uAtlas, vUv1), vMix);
           if (c.a < 0.4) discard;
-          gl_FragColor = vec4(c.rgb / c.a * vTint, 1.0);
+          gl_FragColor = vec4(pbNight(c.rgb / c.a * vTint, vShadeXZ), 1.0);
           #include <colorspace_fragment>
           #include <fog_fragment>
         }`,
@@ -247,6 +296,13 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     rocks: ROCKS,
   };
   // Savanna's lists: tall golden grass everywhere, a few bushes and rocks
+  // Moonlit Snow's lists: snow piles in place of most of the rocks
+  const SNOWY = {
+    low: [['SnowPile_1', 2], ['SnowPile_2', 2], ['SnowPile_3', 2], ['Rock_Medium_1', 0.4], ['Rock_Medium_2', 0.4]],
+    tuft: [['SnowPile_1', 1.5], ['SnowPile_2', 1.5], ['SnowPile_3', 1.5], ['Pebble_Round_1', 0.4], ['Pebble_Square_2', 0.3]],
+    dress: DRESS,
+    rocks: [['SnowPile_1', 1], ['SnowPile_2', 1], ['SnowPile_3', 1], ['Rock_Medium_1', 0.25], ['Rock_Medium_3', 0.25]],
+  };
   const SAVANNA = {
     low: [['Grass_Common_Tall', 5], ['Grass_Wispy_Short', 2], ['Bush_Common', 1], ['DesertRock_1', 0.4], ['DesertRock_2', 0.4]],
     tuft: [['Grass_Common_Tall', 4], ['Grass_Wispy_Short', 3], ['Grass_Common_Short', 2], ['Pebble_Round_1', 0.5]],
@@ -258,6 +314,34 @@ const Scenery3D = (THREE, scene, opts = {}) => {
   const pondGeo = new THREE.CircleGeometry(1, 48).rotateX(-Math.PI / 2);
   // snow drifts: soft low mounds
   const driftGeo = new THREE.IcosahedronGeometry(1, 1), driftMat = new THREE.MeshLambertMaterial({ color: '#B4C1CA' });
+  driftMat.onBeforeCompile = shadeLit; driftMat.customProgramCacheKey = () => 'pb-drift';
+  // the deep snow sheet (Moonlit Snow): vertex colours for crests and hollows, the look's tint as its colour
+  const snowGroundMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  snowGroundMat.onBeforeCompile = shadeLit; snowGroundMat.customProgramCacheKey = () => 'pb-deepsnow';
+  // smooth value noise, 0 to 1, the same everywhere for the same spot
+  const hash2 = (x, y) => { const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return h - Math.floor(h); };
+  function vnoise(x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = hash2(xi, yi), b = hash2(xi + 1, yi), c = hash2(xi, yi + 1), d = hash2(xi + 1, yi + 1);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  }
+  const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  // the land's own shade: a dark veil over the ground round the board (the page's land plane is one flat colour)
+  const veilMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, fog: true, uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), ...shadeU },
+    vertexShader: `varying vec2 vShadeXZ;
+      #include <fog_pars_vertex>
+      void main() { vec4 w = modelMatrix * vec4(position, 1.0); vShadeXZ = w.xz; vec4 mvPosition = viewMatrix * w; gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
+      }`,
+    fragmentShader: `${SHADE_GLSL} varying vec2 vShadeXZ;
+      #include <fog_pars_fragment>
+      void main() { float a = 1.0 - pbShade(vShadeXZ);
+        #ifdef USE_FOG
+          a *= 1.0 - smoothstep(fogNear, fogFar, vFogDepth);
+        #endif
+        gl_FragColor = vec4(uNight.rgb * 0.05, a); }` });
+  const veil = new THREE.Mesh(new THREE.PlaneGeometry(600, 600).rotateX(-Math.PI / 2), veilMat);
+  veil.position.y = -0.035; veil.raycast = () => {}; veil.visible = false; veil.renderOrder = -1; scene.add(veil);
   // falling snow: points drifting down through a box round the board, moved in the shader (tick(dt) moves the clock)
   const FLAKES = 1600, snowTime = { value: 0 };
   const flakeGeo = new THREE.BufferGeometry(); {
@@ -273,11 +357,12 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     embers: { col: [1.0, 0.58, 0.26], dir: -1, spd: 0.75, keep: 0.5, size: 1.2, flick: 0.8, sway: 1.8 },
   };
   const fallU = { uCol: { value: new THREE.Vector3() }, uDir: { value: 1 }, uSpd: { value: 1 }, uKeep: { value: 1 }, uSize: { value: 1 }, uFlick: { value: 0 }, uSway: { value: 1 } };
-  const flakeMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uTime: snowTime, uPx: { value: 1 }, ...fallU },
+  const flakeMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uTime: snowTime, uPx: { value: 1 }, ...fallU, ...shadeU },
     vertexShader: `attribute float aSeed; uniform float uTime; uniform float uPx; uniform float uDir; uniform float uSpd; uniform float uKeep; uniform float uSize; uniform float uFlick; uniform float uSway; varying float vA;
+      ${SHADE_GLSL}
       void main() { vec3 p = position; p.y = mod(p.y - uDir * uTime * uSpd * (1.6 + aSeed * 1.6), 45.0); p.x += sin(uTime * 0.7 + aSeed * 40.0) * 1.3 * uSway; p.z += cos(uTime * 0.5 + aSeed * 30.0) * 0.8 * uSway;
         vec4 mv = viewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = aSeed > uKeep ? 0.0 : uPx * uSize * (0.35 + aSeed * 0.35) * 300.0 / max(1.0, -mv.z);
-        vA = (0.55 + aSeed * 0.35) * (1.0 - uFlick * (0.5 + 0.5 * sin(uTime * (3.0 + aSeed * 4.0) + aSeed * 60.0))) * (uDir < 0.0 ? smoothstep(45.0, 20.0, p.y) : 1.0); }`,
+        vA = (0.55 + aSeed * 0.35) * (1.0 - uFlick * (0.5 + 0.5 * sin(uTime * (3.0 + aSeed * 4.0) + aSeed * 60.0))) * (uDir < 0.0 ? smoothstep(45.0, 20.0, p.y) : 1.0) * (0.35 + 0.65 * pbShade(p.xz)); }`,
     fragmentShader: `uniform vec3 uCol; varying float vA; void main() { float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = vec4(uCol, vA * smoothstep(0.5, 0.2, d)); }` });
   const flakes = new THREE.Points(flakeGeo, flakeMat); flakes.visible = false; flakes.raycast = () => {}; scene.add(flakes);
   function showFall(kind) {
@@ -384,11 +469,21 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     const put = (name, x, z, s, y = 0, wet = false) => {
       if (!lib[name] || (!wet && inPond(x, z))) return;
       const d = outside(x, z), k = name + (d > 16 || (d > 6 && /^Bush/.test(name)) ? '~' : ''), sh = 0.85 + rr() * 0.3, t = tintFor(name);
+      y += groundH(x, z) * 0.7; // on deep snow (Moonlit Snow) things stand a little sunk in
       (placed.get(k) || placed.set(k, []).get(k)).push([x, y, z, rr() * Math.PI * 2, s, [bi.tint[0] * t[0] * sh, bi.tint[1] * t[1] * sh, bi.tint[2] * t[2] * sh], squashOf(name)]);
     };
-    const L = { desert: DESERT, autumn: AUTUMN, ash: ASH, savanna: SAVANNA, rocks: { low: ROCKS, tuft: PEBBLES, rocks: ROCKS, dress: DRESS } }[bi.low] || { low: LOW, tuft: TUFT, rocks: ROCKS, dress: DRESS };
+    const L = { desert: DESERT, autumn: AUTUMN, ash: ASH, savanna: SAVANNA, moonlit: SNOWY, rocks: { low: ROCKS, tuft: PEBBLES, rocks: ROCKS, dress: DRESS } }[bi.low] || { low: LOW, tuft: TUFT, rocks: ROCKS, dress: DRESS };
     const low = () => pickOf(L.low), tuft = () => pickOf(L.tuft);
     const outside = (x, z) => Math.max(Math.abs(x) - hw, Math.abs(z) - hd, 0) > 0 ? Math.hypot(Math.max(0, Math.abs(x) - hw), Math.max(0, Math.abs(z) - hd)) : 0;
+    // deep snow (biome .deepSnow): the height of the snow at a spot, 0 on the board, rising over its first metres
+    // outside into long wind-blown drifts, flattened round the cabin so its door and light stay clear
+    const groundH = bi.deepSnow ? (x, z) => {
+      const d = outside(x, z); if (d <= 0) return 0;
+      let h = 0.25 + 0.9 * vnoise(x * 0.035 + 3.1, z * 0.11 - 1.7) + 0.35 * vnoise(x * 0.12 - 5.3, z * 0.09 + 2.2) + 0.12 * vnoise(x * 0.4, z * 0.4);
+      h *= bi.deepSnow * smoothstep(0.3, 7, d);
+      if (cab) h *= 0.15 + 0.85 * smoothstep(cab.r * 1.05, cab.r * 1.5, Math.hypot(x - cab.x, z - cab.z));
+      return h;
+    } : () => 0;
     // 1. the edge: a frame of bushes, rocks and tall grass hugging the board, so its edge doesn't end in a hard line
     for (let s = 0; s < 2 * (BW + BD); s += 2.6) {
       if (rr() > 0.8 * bi.grow) continue;
@@ -439,8 +534,8 @@ const Scenery3D = (THREE, scene, opts = {}) => {
       for (let s = 0; s < per; s += 5.5) { const a = s / per * Math.PI * 2 + rr() * 0.3, k = 1.2 + rr() * 0.45; put(bi.trees[Math.floor(rr() * 4)], p.x + Math.cos(a) * p.rx * k, p.z + Math.sin(a) * p.rz * k, 1.5 + rr() * 0.9, 0, true); }
       for (let n = 0; n < 6; n++) { const a = rr() * Math.PI * 2, k = 1.15 + rr() * 0.3; put(pickOf(L.rocks), p.x + Math.cos(a) * p.rx * k, p.z + Math.sin(a) * p.rz * k, 0.8 + rr() * 1.4, 0, true); }
     }
-    // 6. snow drifts round the board (Frozen Peak)
-    if (bi.snow) {
+    // 6. snow drifts round the board (Frozen Peak; deep snow has its own drifts in the sheet)
+    if (bi.snow && !bi.deepSnow) {
       const dr = new THREE.InstancedMesh(driftGeo, driftMat, 120); let n = 0;
       for (let k = 0; k < 600 && n < 120; k++) {
         const x = (rr() * 2 - 1) * (hw + 45), z = -hd - 60 + rr() * (BD + 95), d = outside(x, z);
@@ -451,8 +546,24 @@ const Scenery3D = (THREE, scene, opts = {}) => {
       }
       dr.count = n; dr.instanceMatrix.needsUpdate = true; driftMat.color.set(bi.drift || '#B4C1CA'); dr.computeBoundingSphere(); dr.raycast = () => {}; dr.receiveShadow = true; dr.name = 'drifts';
       scene.add(dr); meshes.push(dr);
+    }    // 7. the deep snow itself: a big rolling sheet over the land, whiter on the crests and bluer in the hollows
+    if (bi.deepSnow) {
+      const g = new THREE.PlaneGeometry(BW + 260, BD + 260, 150, 170).rotateX(-Math.PI / 2), pos = g.attributes.position, col = new Float32Array(pos.count * 3);
+      const hi = new THREE.Color('#D8E1EE'), lo = new THREE.Color('#93A7C4'), c = new THREE.Color();
+      for (let k = 0; k < pos.count; k++) {
+        const x = pos.getX(k), z = pos.getZ(k), h = groundH(x, z);
+        pos.setY(k, outside(x, z) > 0 ? h : -0.2);
+        c.copy(lo).lerp(hi, Math.min(1, 0.35 + h / (1.4 * bi.deepSnow))); col.set([c.r, c.g, c.b], k * 3);
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
+      const sheet = new THREE.Mesh(g, snowGroundMat); sheet.position.y = -0.03; sheet.receiveShadow = true; sheet.raycast = () => {}; sheet.name = 'deep snow';
+      snowGroundMat.color.setRGB(...bi.tint);
+      scene.add(sheet); meshes.push(sheet);
     }
+
     // far trees and bushes: impostors
+    shadeU.uHalf.value.set(hw, hd); shadeU.uShade.value.set(...(bi.shade || [0, 1, 2])); veil.visible = !!bi.shade;
+    shadeU.uNight.value.set(...(bi.night || [0, 0, 0, 0])); shadeU.uWarm.value.set(cab ? cab.x : 0, cab ? cab.z : 0, cab ? cab.r * 1.5 : 0);
     snowU.value = bi.snow || 0; showFall(bi.fall || (bi.snow ? 'snow' : null)); showCabin(cab);
     bake([...new Set([...placed.keys()].filter((k) => k.endsWith('~')).map((k) => k.slice(0, -1)).filter(impostorable))].sort());
     const far = [];
@@ -482,7 +593,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     }
   }
   function shadows(on) { if (on !== castShadows) { castShadows = on; key = ''; } }
-  function dispose() { clear(); scene.remove(flakes, cabin, cabinLight); cabin.userData.dispose(); cabinLight.dispose(); flakeGeo.dispose(); flakeMat.dispose(); driftGeo.dispose(); driftMat.dispose(); pondGeo.dispose(); for (const m of pondMats) m.dispose(); if (atlas) atlas.dispose(); if (impMat) { impMat.dispose(); impGeo.dispose(); blobMat.map.dispose(); blobMat.dispose(); blobGeo.dispose(); } for (const m of mats) { if (m.map) m.map.dispose(); m.dispose(); } if (lib) for (const md of Object.values(lib)) for (const p of md.parts) p.geo.dispose(); }
+  function dispose() { clear(); scene.remove(flakes, cabin, cabinLight, veil); veil.geometry.dispose(); veilMat.dispose(); snowGroundMat.dispose(); cabin.userData.dispose(); cabinLight.dispose(); flakeGeo.dispose(); flakeMat.dispose(); driftGeo.dispose(); driftMat.dispose(); pondGeo.dispose(); for (const m of pondMats) m.dispose(); if (atlas) atlas.dispose(); if (impMat) { impMat.dispose(); impGeo.dispose(); blobMat.map.dispose(); blobMat.dispose(); blobGeo.dispose(); } for (const m of mats) { if (m.map) m.map.dispose(); m.dispose(); } if (lib) for (const md of Object.values(lib)) for (const p of md.parts) p.geo.dispose(); }
   return { _lib: () => lib, _meshes: () => meshes, update, biome, shadows, dispose, ready, tick, snowing: () => flakes.visible, count: () => meshes.reduce((s, m) => s + m.count, 0) };
 };
 
