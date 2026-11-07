@@ -117,7 +117,8 @@ const Engine = (() => {
   // Buildings (the game sets these up; see Game's buildings). A body with u.idle never moves or attacks.
   //   b.site = { work, need }: seconds of building done and needed. At the start of a fight the nearest builder without
   //   a job walks to it (within SITE_REACH) and builds instead of fighting (u.buildSpeed seconds of work a second) until
-  //   it is done or falls; then the builder carries on like any builder (its turret, then melee).
+  //   it is done or falls; then the builder carries on like any builder (its turret, then melee). While it works a site
+  //   it doesn't count as a unit left standing (2026-11-07): once the rest of its side is gone, the fight is lost.
   //   A site nobody is assigned to builds itself at site.self seconds of work a second (0 = not at all).
   //   b.produce = { units: [unit, ...], time }: once built, it makes one body of each after time seconds, side by side a
   //   little in front of it.
@@ -1358,6 +1359,7 @@ const Engine = (() => {
     function kill(owner, v) {
       for (const x of v.link ? v.link.filter(x => x.alive) : [v]) {
         x.hp = 0; x.alive = false; x.diedTick = tick;
+        if (x.site) for (const b of all) if (b.siteJob === x) { b.siteJob = null; b.siteAt = false; } // a site that falls frees its builder (2026-11-07)
         if (watchKills && owner && x.watchKill) { const o = owner.credit ? owner.credit.convert || owner.credit : owner; x.killedBy = { side: o.side, squad: o.squad }; } // 2v2 School: its destroyers
         if (owner) owner.xp += x.u.hp * x.level;
         fell(x);
@@ -1575,8 +1577,10 @@ const Engine = (() => {
         b.slowMove = Math.max(b.slowMove, tl.slowMove); b.slowAtk = Math.max(b.slowAtk, tl.slowAtk); b.slowT = Math.max(b.slowT, tl.slowDur);
       }
     }
-    // structures (towers) and drones don't count: a side is beaten when its units are gone
-    const aliveCount = (arr) => { let c = 0; for (const b of arr) if (b.alive && counts(b)) c++; return c; };
+    // structures (towers) and drones don't count: a side is beaten when its units are gone. Nor does a builder working a
+    // building site (walking to it or building it, b.siteJob): a side left with only that is beaten too (2026-11-07)
+    const atSite = (b) => !!(b.siteJob && b.siteJob.alive);
+    const aliveCount = (arr) => { let c = 0; for (const b of arr) if (b.alive && counts(b) && !atSite(b)) c++; return c; };
 
     function hurt(owner, v, hit, fromX, fromY) {
       if (v.turning) return; // being won over: nothing hurts it until it has switched sides

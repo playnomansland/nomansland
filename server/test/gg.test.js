@@ -82,7 +82,7 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 6 * 60 *
 
     // ----- a whole match, then GG -----
     const code = newCode();
-    const a = await phone(code, { create: true, session: A.session });
+    let a = await phone(code, { create: true, session: A.session });
     const b = await phone(code, { session: B.session });
     const w = await phone(code, { watch: true });
     await waitFor(() => [...a.inbox].reverse().find((x) => x.t === 'lobby' && x.here[1]), 8000);
@@ -100,9 +100,19 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 6 * 60 *
     await waitFor(() => ggs(w)[0], 8000);
     await sleep(400);
     assert.strictEqual(ggs(b).length, 1, 'a second GG and a watcher\'s GG do nothing');
+    // Alpha has left the room (the menu): Alpha's friends hub brings Bravo's GG (2026-11-07)
+    const keyA = a.welcome.key;
+    a.close(); await sleep(400);
+    const hubA = await open(`${srv.ws}/hub?p=${A.player.id}`, ORIGIN);
+    hubA.json({ t: 'hello', session: A.session });
+    await waitFor(() => hubA.inbox.find((x) => x.t === 'welcome'), 8000);
     b.json({ t: 'gg' });
-    const g2 = await waitFor(() => ggs(a).find((x) => x.from === 1), 8000);
+    const g2 = await waitFor(() => ggs(b).find((x) => x.from === 1), 8000);
     assert.deepStrictEqual(g2.gg, [true, true]);
+    const hg = await waitFor(() => hubA.inbox.find((x) => x.t === 'gg'), 8000);
+    assert.strictEqual(hg.from, 'Bravo', 'the hub says who said GG');
+    hubA.close();
+    a = await phone(code, { key: keyA, session: A.session }); // back in the room
     const sy = await (async () => { const n = a.inbox.length; a.json({ t: 'sync' }); return waitFor(() => a.inbox.slice(n).find((x) => x.t === 'sync'), 8000); })();
     assert.deepStrictEqual(sy.gg, [true, true], 'a reloaded phone gets the GGs in its sync');
     const meB = await waitFor(async () => { const x = await call('me', {}, B.session); return x.player.gg === 1 && x; }, 8000);
@@ -146,8 +156,14 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 6 * 60 *
     await waitFor(() => [...a2.inbox].reverse().find((x) => x.t === 'lobby' && x.here[1]), 8000);
     a2.json({ t: 'start', settings: { map: 'testgrid' } });
     await play(a2, c2, 42, 3, 1); // Charlie leaves after 3 fights
+    const hubA2 = await open(`${srv.ws}/hub?p=${A.player.id}`, ORIGIN);
+    hubA2.json({ t: 'hello', session: A.session });
+    await waitFor(() => hubA2.inbox.find((x) => x.t === 'welcome'), 8000);
     a2.json({ t: 'gg' });
     await waitFor(() => ggs(a2).find((x) => x.from === 0), 8000);
+    await sleep(400);
+    assert.ok(!hubA2.inbox.some((x) => x.t === 'gg'), 'no hub GG to yourself, nor while the other is in the room');
+    hubA2.close();
     await sleep(800);
     assert.strictEqual((await call('me', {}, C.session)).player.gg, 0, 'a match someone left doesn\'t count');
     a2.close(); c2.close();

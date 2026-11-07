@@ -696,8 +696,8 @@ function friendsWipe(db, id) {
     db.prepare('DELETE FROM friend_mutes WHERE player = ?1 OR muted = ?1').bind(id),
   ];
 }
-// tells a player's hub (hub.js) about a change; never in the way of the answer
-async function hubEvent(env, id, msg) {
+// tells a player's hub (hub.js) about a change; never in the way of the answer (room.js: a GG after the match, 2026-11-07)
+export async function hubEvent(env, id, msg) {
   if (!env.HUB) return;
   try { await env.HUB.getByName(id).event(msg); } catch (e) { console.warn('hub event', e && e.message); }
 }
