@@ -1486,6 +1486,9 @@ const Game = (() => {
   // 2v2 lane has m.mpb); the other skill of an either-or pair can't be bought meanwhile
   const schoolLearning = (m, side, ui) => !m.mpb ? [] : (m.mpb[side] || []).map(r => r.kind === 'school' && r.data && r.data.pupil)
     .filter(p => p && p.learn && p.ui === ui && p.lane === (m.duoLane === 1 ? 1 : 0)).map(p => p.learn.k);
+  // 2v2 School's respec (src/mpb.js, 2026-11-07): this round's swap of an either-or skill of unit ui, kept in the
+  // player's own lane (m.respec[side] = [{ key, round, ui, from, fromRound, to }]); respecNow: k is the skill it gave
+  const respecNow = (m, side, ui, k) => !!(m && m.respec && m.respec[side] || []).some(x => x.round === m.round && x.ui === ui && (k == null || x.to === k));
   function canBuySkill(m, side, ui, k) {
     const d = skillDef(m, ui, k);
     if (!d || hasSkill(m, side, ui, k)) return false;
@@ -1512,6 +1515,7 @@ const Game = (() => {
   function undoSkill(m, side, ui, k) {
     const t = m.tech && m.tech[side][ui];
     if (!t || t[k] !== m.round) return false;
+    if (respecNow(m, side, ui, k)) return false; // a School respec, not a buy: no gold to give back (its Undo respec, 2026-11-07)
     // Forward planting can't be taken back while a squad of that unit stands in no man's land
     const d = skillDef(m, ui, k);
     if (d && d.type === 'forward' && m.armies[side].some(s => s.unit === ui && inNoMans(s.row))) return false;
@@ -2360,6 +2364,7 @@ const Game = (() => {
       return q;
     }));
     if (m.tech) v.tech = two(m.tech, Object.fromEntries(Object.entries(m.tech[fo] || {}).map(([ui, t]) => [ui, t.map(r => r >= now ? 0 : r)])));
+    if (v.tech) for (const x of (m.respec && m.respec[fo]) || []) if (x.round === now && v.tech[fo][x.ui]) v.tech[fo][x.ui][x.from] = x.fromRound; // a School respec: the skill it had (2026-11-07)
     if (!charShown(m, viewer, true, fo)) { v.chars = two(m.chars, null); v.buff = two(m.buff, []); }
     if (m.towers && m.towers[fo] && !towerTypeShown(m, viewer, true, fo)) { const t = { ...m.towers[fo] }; delete t.type; v.towers = two(m.towers, t); }
     if (m.towerSkill && m.towerSkill[fo] >= now) v.towerSkill = two(m.towerSkill, 0);
@@ -2783,23 +2788,23 @@ const Game = (() => {
     return true;
   }
 
-  // Level all: every squad of unit ui that is ready to level up, until the gold runs out. A pass levels each ready
-  // squad once, the one with the most XP first (then the oldest); a squad with XP for another level gets it on the
-  // next pass. levelAllPlan: the squad ids in that order (an id twice for two levels), without changing anything;
-  // levelAll does them, one levelUp each (so a guest's side reaches the host like single level-ups), and returns how many.
+  // Level all: every squad of unit ui that is ready to level up, until the gold runs out. It spreads the levels
+  // (2026-11-07): one level at a time, to the ready squad on the lowest level (then the most XP, then the oldest), so
+  // every ready squad gets its next level before any squad gets a second one. levelAllPlan: the squad ids in that
+  // order (an id twice for two levels), without changing anything; levelAll does them, one levelUp each (so a guest's
+  // side reaches the host like single level-ups), and returns how many.
   function levelAllPlan(m, side, ui) {
     const u = m.units[ui], out = [];
     if (!u) return out;
     const cost = levelCost(u), sim = m.armies[side].filter(s => s.unit === ui).map(s => ({ s, level: s.level }));
     let gold = m.gold[side];
-    for (;;) {
-      const ready = sim.filter(x => isReady(m, { ...x.s, level: x.level })).sort((a, b) => b.s.xp - a.s.xp || a.s.id - b.s.id);
-      if (!ready.length) return out;
-      for (const x of ready) {
-        if (gold < cost) return out;
-        gold -= cost; x.level++; out.push(x.s.id);
-      }
+    while (gold >= cost) {
+      const x = sim.filter(y => isReady(m, { ...y.s, level: y.level }))
+        .sort((a, b) => a.level - b.level || b.s.xp - a.s.xp || a.s.id - b.s.id)[0];
+      if (!x) break;
+      gold -= cost; x.level++; out.push(x.s.id);
     }
+    return out;
   }
   function levelAll(m, side, ui) {
     let n = 0;
@@ -3460,7 +3465,7 @@ const Game = (() => {
     deploysAllowed, deploysLeft, deployedThisRound, canBuyDeploy, buyDeploy, refundDeploy, musterOn, deployBuyable,
     PACKAGE, allPackages, packOf, needsPack, freeLeft, choosePack, ensurePack, DRAFT, drafting, draftFirst, needsLeaderPick, leaderTurn, leaderTaken, draftLeft, canPickLeader, pickLeader, settleLeaders,
     unlockCost, tierOf, startLevel, shopCost, mapFreeOf, mapFreeLeft, isUnlocked, unlockVisible, unlock, undoUnlock,
-    isHunter, preyOf, canHunt, huntMark, undoHunt, preyShown, preyOn, aiHunt, skillDef, skillCost, SKILL_STEP, skillsBought, isInnate, hasSkill, skillVisible, skillNeeds, skillNeedsAny, skillNeedsMissing, skillHeldUp, isFlat, isMaster, isAwaken, awakenSlot, awakenCost, wokeUnit, awakenBlock, canAwaken, awaken, undoAwaken, seenAwake, isEvolve, evolveSlot, evolveReady, isEvolved, shownAwake, glutOf, glutMax, glutFull, skillOr, skillOrTaken, unitFor, withCharacter,
+    isHunter, preyOf, canHunt, huntMark, undoHunt, preyShown, preyOn, aiHunt, skillDef, skillCost, SKILL_STEP, skillsBought, isInnate, hasSkill, skillVisible, skillNeeds, skillNeedsAny, skillNeedsMissing, skillHeldUp, isFlat, isMaster, isAwaken, awakenSlot, awakenCost, wokeUnit, awakenBlock, canAwaken, awaken, undoAwaken, seenAwake, isEvolve, evolveSlot, evolveReady, isEvolved, shownAwake, glutOf, glutMax, glutFull, skillOr, skillOrTaken, respecNow, unitFor, withCharacter,
     footprint, blockOf, spotFree, buildingRecords, recordOf, recordWorld, buildingEffects,
     setBuildings, BUILDINGS: () => BUILDINGS, buildingInfo, BUILDING_SQUAD, isBuildingSkill, buildingIdOf, buildingsOf, buildingOf, buildingAt, buildingShown, buildingSpotOk,
     canBuyBuilding, buyBuilding, buildingSkills, buildingSkillInfo, bskillOf, bskillCost, canBuyBuildingSkill, buyBuildingSkill, undoBuildingSkill,

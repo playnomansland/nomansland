@@ -1128,13 +1128,51 @@
     try { for (const k of E.SLOTS) if (G.skillDef(m, sq.unit, k) && G.canBuySkill(m, side, sq.unit, k) && !G.isBuildingSkill(m, sq.unit, k)) out.push(k); } finally { m.gold[side] = g; }
     return out;
   }
+  // Respec (Vilhelm, 7 Nov 2026): once a round, free, the pupil's player swaps an either-or skill of the pupil's unit
+  // type (owned since an earlier round) for the other one of its pair. The pupil must have sat a fight out in here
+  // already. It counts in this round's fight and stays even if the School falls; Undo respec (this round) gives the use
+  // back. Kept in the player's own lane, not the team's (m.respec[side], Game.respecNow), so a teammate's Undo all
+  // doesn't touch it; the opponents see the old skill until the fight (hide). A skill with deploy-time state (a
+  // building, Forward planting, Overwatch, Spirit walk) is never swapped; no either-or pair has one today.
+  const RESPEC_NO = new Set(['building', 'forward', 'overwatch', 'freeMove']);
+  const respecOf = (m, side, key) => ((m.respec && m.respec[side]) || []).find(x => x.round === m.round && x.key === key) || null;
+  // the swaps { from, to } open to squad sq's unit now (the School's own rules aside: see schoolWhy)
+  function respecs(m, side, sq) {
+    const ui = sq.unit, t = m.tech && m.tech[side] && m.tech[side][ui], out = [];
+    if (!t || G.charOf(m, side) === 'enzo') return out;
+    const plain = (k) => { const d = G.skillDef(m, ui, k); return !!d && !RESPEC_NO.has(d.type) && !G.isInnate(m, ui, k) && !G.isFlat(m, ui, k) && !G.isAwaken(m, ui, k) && !G.isEvolve(m, ui, k); };
+    for (const from of E.SLOTS) {
+      if (!(t[from] > 0 && t[from] < m.round) || !plain(from)) continue;
+      for (const to of G.skillOr(m, ui, from)) {
+        if (G.hasSkill(m, side, ui, to) || !plain(to)) continue;
+        // the swap tried out: nothing owned (an awakened squad's Awaken skill too) loses a skill it needs, and the new
+        // one has what it needs
+        const was = t[from];
+        t[to] = m.round;
+        const held = G.skillHeldUp(m, side, ui, from);
+        t[from] = 0;
+        const bad = held || G.skillNeedsMissing(m, side, ui, to).length || G.skillOrTaken(m, side, ui, to).length;
+        t[from] = was; t[to] = 0;
+        if (!bad) out.push({ from, to });
+      }
+    }
+    return out;
+  }
   // the tile a squad put in the School this round came from is still free (a squad of theirs may have been placed there)
   const backFree = (m, side, sq) => G.blockOf(m, sq.unit, sq.school.col, sq.school.row).every(([c, r]) => !G.occupied(m, side, c, r) && !G.enemyHolds(m, side, c, r));
   // why this player may not do `action` on the school now (null: they may). Actions (Game.mpbAct): 'enroll' id (a squad
   // of theirs), 'leave' [col, row] (their squad inside comes out, there or on the nearest free tile), 'learn' k,
-  // 'unlearn' (a skill started this round)
+  // 'unlearn' (a skill started this round), 'respec' from, to (see respecs), 'unrespec' (this round's respec)
   function schoolWhy(m, side, rec, action, args) {
     const p = pupilOf(rec), L = laneOf(m);
+    if (action === 'unrespec') { // (also once the pupil has left again)
+      const x = respecOf(m, side, rec.key), t = x && m.tech[side][x.ui];
+      if (!x || !t) return 'none';
+      t[x.from] = x.fromRound;
+      const held = G.skillHeldUp(m, side, x.ui, x.to); // a skill bought since on top of the new one goes first
+      t[x.from] = 0;
+      return held ? 'held' : null;
+    }
     if (action === 'enroll') {
       if (p) return 'full';
       const sq = m.armies[side].find(q => q.id === args[0]), u = sq && m.units[sq.unit];
@@ -1157,6 +1195,12 @@
     }
     if (action === 'learn') return p.learn ? 'learning' : learnable(m, side, sq).includes(args[0]) ? null : 'skill';
     if (action === 'unlearn') return p.learn && p.learn.round === m.round ? null : 'none';
+    if (action === 'respec') {
+      if (p.round >= m.round) return 'new'; // it sits a fight out in here first
+      if (respecOf(m, side, rec.key)) return 'used';
+      if (p.learn && args.includes(p.learn.k)) return 'skill';
+      return respecs(m, side, sq).some(x => x.from === args[0] && x.to === args[1]) ? null : 'skill';
+    }
     return 'none';
   }
   def({ id: 'school', name: 'School', short: 'sch', kind: 'support', hp: SCHOOL.hp, armor: SCHOOL.armor, color: '#A8443A',
@@ -1191,6 +1235,19 @@
         }
         if (action === 'learn') { p.learn = { k: args[0], round: m.round }; return true; }
         if (action === 'unlearn') { p.learn = null; return true; }
+        if (action === 'respec') { // the swap, now (no gold either way: Game.skillsBought stays the same)
+          const [from, to] = args, t = m.tech[side][sq.unit];
+          if (!m.respec) m.respec = [[], []];
+          m.respec[side] = (m.respec[side] || []).filter(x => x.round === m.round).concat({ key: rec.key, round: m.round, ui: sq.unit, from, fromRound: t[from], to });
+          t[from] = 0; t[to] = m.round;
+          return true;
+        }
+        if (action === 'unrespec') {
+          const x = respecOf(m, side, rec.key), t = m.tech[side][x.ui];
+          t[x.from] = x.fromRound; t[x.to] = 0;
+          m.respec[side] = m.respec[side].filter(y => y !== x);
+          return true;
+        }
         return false;
       },
       squadBodies(m, side, rec, sq, list) { if (sq.school && sq.school.key === rec.key) list.length = 0; },
@@ -1910,6 +1967,10 @@
   function hide(s, h) {
     if (!on(s)) return s;
     const live = watching(s, 1 - h), drop = new Set();
+    if (s.respec && s.respec[h]) { // a School respec this round: the skill it had (Referee.hide took the new one off already)
+      for (const x of s.respec[h]) if (x.round === s.round && s.tech && s.tech[h] && s.tech[h][x.ui]) { s.tech[h][x.ui][x.from] = x.fromRound; s.tech[h][x.ui][x.to] = 0; }
+      s.respec[h] = [];
+    }
     for (const rec of recs(s, h)) {
       for (const id of Object.keys(rec.skills)) {
         const e = rec.skills[id], prev = e.prev;
@@ -2223,7 +2284,7 @@
     vaultOf, vaultRec, vaultMode, vaultMoved, vaultRoom, canVault, vaultPut, vaultTake, golemOf, golemUnit, golemSkin,
     hide, unitOf, squadOf, extraOf, indexOf, isSquad, bodies, link, holds, battleOpts, squadMods, squadBodies, news, afterFight, roundStart, teamHeal, litTiles, reconcile, reconciles,
     FH, OAK, oakMossTiles, oakEntUnit,
-    JAIL, jailWhy, jailable, jailSeen, homeTile, SCHOOL, pupilOf, pupilSq, levelXp, learnable, schoolWhy,
+    JAIL, jailWhy, jailable, jailSeen, homeTile, SCHOOL, pupilOf, pupilSq, levelXp, learnable, schoolWhy, respecs, respecOf,
     cardPool, cardName, cardText, rollArtifacts, artifactsFor,
     dealDraft, draftOpen, draftTurn, giveCard, applyDraft, draftPick, botPick, rng, laneOf, on,
     extraUnits, unitOff, bots, botsAfter,

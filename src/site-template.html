@@ -6570,7 +6570,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       } else if (mine) {
         if (Game.hasSkill(m, me, i, k)) {
           act = `<span class="chip" style="color:var(--gold);border:1px solid currentColor;border-radius:99px;padding:1px 8px;font-size:12px">Owned</span>`;
-          if (phase === 'deploy' && editable() && m.tech[me][i][k] === m.round) act += ` <button class="btn small" data-unskill="${k}">Undo</button>`;
+          if (phase === 'deploy' && editable() && Game.respecNow(m, me, i, k)) act += ' <span class="hint">respecced this round (Undo respec: the School)</span>';
+          else if (phase === 'deploy' && editable() && m.tech[me][i][k] === m.round) act += ` <button class="btn small" data-unskill="${k}">Undo</button>`;
         } else if (phase === 'deploy') {
           const needs = Game.skillNeedsMissing(m, me, i, k).map(j => defs[j].name), other = Game.skillOrTaken(m, me, i, k).map(j => defs[j].name);
           const any = Game.skillNeedsAny(m, i, k).length > 0 && Game.skillNeeds(m, i, k).length === 0; // needs one of several (an Awaken skill)
@@ -7108,7 +7109,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         const cost = Game.levelCost(base);
         const boughtNow = sq.boughtLevels && sq.boughtLevels[m.round] > 0;
         const btns = [];
-        // Level all: two or more level-ups of this unit's squads the gold covers (Game.levelAllPlan: most XP first).
+        // Level all: two or more level-ups of this unit's squads the gold covers (Game.levelAllPlan: lowest level first, most XP breaks ties).
         // A small "+ ALL" glued to the Level up button, in its colour
         const all = editable() ? Game.levelAllPlan(m, me, i) : [];
         const allBtn = all.length >= 2 ? `<button class="btn primary lvl-all" data-act="lvl-all" title="Level all ${all.length} · ${all.length * cost} gold">+ ALL</button>` : '';
@@ -9257,6 +9258,12 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
             out.push(`<div class="btnrow" style="flex-wrap:wrap"><button class="btn small" id="school-out" ${live && leave ? '' : 'disabled'}>${back ? 'Take back (onto its tile)' : 'Take out · free'}</button>${back ? '' : `<button class="btn small" id="school-out-tap" ${live && leave ? '' : 'disabled'}>Take out onto a tile</button>`}${p.learn && p.learn.round === m.round ? `<button class="btn small" id="school-unlearn" ${live ? '' : 'disabled'}>Stop learning</button>` : ''}</div>`);
             if (p.learn) out.push('<p class="hint" style="margin:0">It can’t leave while it learns.</p>');
             else if (ks.length) out.push(`<p class="hint" style="margin:0">Learn a skill of its unit, free (ready ${Mpb.skillN(rec, 'fast') ? Mpb.SCHOOL.fastLearn : Mpb.SCHOOL.learn} round${Mpb.skillN(rec, 'fast') ? '' : 's'} later):</p><div class="btnrow" style="flex-wrap:wrap">${ks.map(k => `<button class="btn small" data-school-learn="${k}" ${live ? '' : 'disabled'}>${esc(u.skillDefs[k].name)}</button>`).join('')}</div>`);
+            // Respec (2026-11-07): swap an either-or skill of its unit, free, once a round
+            const rs = Mpb.respecOf(m, me, rec.key), sw = rs ? [] : Mpb.respecs(m, me, sq).filter(x => !Mpb.schoolWhy(m, me, rec, 'respec', [x.from, x.to]));
+            const nm = (k) => esc((u.skillDefs[k] || {}).name || '?');
+            if (rs) out.push(`<p class="hint" style="margin:0">Respecced this round: ${nm(rs.from)} → <b>${nm(rs.to)}</b> (hidden from the enemy until the fight). <button class="btn small" id="school-unrespec" ${live && !Mpb.schoolWhy(m, me, rec, 'unrespec', []) ? '' : 'disabled'}>Undo respec</button></p>`);
+            else if (sw.length) out.push(`<p class="hint" style="margin:0">Respec, free, once a round (counts in this fight):</p><div class="btnrow" style="flex-wrap:wrap">${sw.map(x => `<button class="btn small" data-school-respec="${x.from}:${x.to}" ${live ? '' : 'disabled'}>${nm(x.from)} → ${nm(x.to)}</button>`).join('')}</div>`);
+            else if (back && Mpb.respecs(m, me, sq).length) out.push('<p class="hint" style="margin:0">Respec: from next round, once it has sat a fight out in here.</p>');
           }
         } else {
           out.push('<p style="margin:0">Empty.</p>');
@@ -9273,6 +9280,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         root.querySelectorAll('[data-school-learn]').forEach(x => x.addEventListener('click', () => act('learn', +x.dataset.schoolLearn)));
         if ($('school-out')) $('school-out').addEventListener('click', () => act('leave'));
         if ($('school-unlearn')) $('school-unlearn').addEventListener('click', () => act('unlearn'));
+        root.querySelectorAll('[data-school-respec]').forEach(x => x.addEventListener('click', () => { const [a, b] = x.dataset.schoolRespec.split(':').map(Number); act('respec', a, b); }));
+        if ($('school-unrespec')) $('school-unrespec').addEventListener('click', () => act('unrespec'));
         if ($('school-sheet')) $('school-sheet').addEventListener('click', () => {
           const sq = Mpb.pupilSq(m, side, rec), other = sq && sq.id >= Game.TEAM_ID;
           if (sq) openSheet(sq.unit, sq, side, side === me ? (other ? { ro: true } : undefined) : other ? { other: true } : undefined);
