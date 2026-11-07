@@ -3,7 +3,8 @@
 // - Only melee squads (base range up to AIM.melee) that walk get one; never a rider or a building.
 // - An arrow is at most AIM.maxTiles tiles long (a longer one is cut down along its line) and stays on the board.
 // - In a fight the bodies walk the arrow past an enemy they would otherwise have turned to, each keeping its place in
-//   the formation, then fight as usual; an enemy in reach still stops them; a walk that can't finish gives up.
+//   the formation, then fight as usual; an enemy in reach ahead still stops them (one beside or behind doesn't, see
+//   fixes-1107-combat.js); a walk that gets no closer for AIM.stall s gives up.
 // - The opponent doesn't see it while deploying (Referee.hide, Game.seenBy); setAim / clearAim are referee actions.
 const assert = require('assert');
 const E = require('../../src/engine.js');
@@ -101,11 +102,11 @@ const fightWith = (aim) => {
   b.aim = { dc: -3, dr: 0 }; // off the board (as if it was moved there after the arrow was drawn): the bodies stop at the edge
   const bt = Game.startBattle(clone(m));
   const mine = bt.bodies.filter(x => x.side === 0 && x.squad === b.id);
-  for (let k = 0; k < Math.round((Game.AIM.minSecs + 3) / Game.SETTINGS.dt); k++) bt.step();
+  for (let k = 0; k < Math.round((Game.AIM.stall + 3) / Game.SETTINGS.dt); k++) bt.step();
   assert.ok(mine.every(x => !x.guide), 'gave up on the arrow');
 }
 
-// the engine: b.guideT runs out -> the arrow is dropped where the body is
+// the engine: b.guideT s without getting closer -> the arrow is dropped where the body is (2026-11-07: a fixed time before)
 {
   const G = { dt: 0.05, timeCap: 60, spacing: 3.5, minDmgPct: 15, sight: 15, minSight: 18, drift: 15, flameReach: 1.2 };
   const w = E.buildSquad(E.withTraits({ name: 'W', cost: 1, bodies: 1, hp: 5000, hit: 1, aps: 1, range: 2, speed: 2, splash: 0 }), 0, 0, 0, 1, 6)[0];
@@ -113,7 +114,9 @@ const fightWith = (aim) => {
   w.guide = [{ x: 60, y: 0 }]; w.guideT = 1;
   const bt = E.createBattle([w], [d], G);
   for (let k = 0; k < 30; k++) bt.step();
-  assert.ok(!w.guide && w.guideT == null && w.x > 1.5 && w.x < 3, `gave up after 1 s at x ${w.x.toFixed(2)}`);
+  assert.ok(w.guide && w.x > 2.5, 'still getting closer: it keeps the arrow');
+  for (let k = 0; k < 30; k++) { w.slowT = 1; w.slowMove = 100; bt.step(); } // held still
+  assert.ok(!w.guide && w.guideT == null && w.x > 2.5 && w.x < 3.5, `gave up after 1 s without getting closer, at x ${w.x.toFixed(2)}`);
 }
 
 // hidden from the opponent while deploying, out in the open in the fight

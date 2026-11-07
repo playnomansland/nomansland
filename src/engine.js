@@ -1,6 +1,6 @@
 // ===== Battle engine (shared by headless tests and the page) =====
 const Engine = (() => {
-  const TRAIT_DEFAULTS = { burst: 1, pellets: 1, spinUp: 0, spinHit: 0, pierce: 0, projSpeed: 0, minRange: 0, charge: 1, knockback: 0, windUp: 0, flame: 0, trample: 0, chargeStun: 0, chargeCd: 0, trampleRun: 0, trampleSpeed: 0, stomp: 0, levelHp: 0, deathBlast: 0, pctHit: 0, ram: 0, noFlank: 0, carrier: 0, noPack: 0, roll: 0, lockOn: 0, spinHitCap: 0 };
+  const TRAIT_DEFAULTS = { burst: 1, pellets: 1, spinUp: 0, spinHit: 0, pierce: 0, projSpeed: 0, minRange: 0, charge: 1, knockback: 0, windUp: 0, flame: 0, trample: 0, chargeStun: 0, chargeCd: 0, trampleRun: 0, trampleSpeed: 0, stomp: 0, levelHp: 0, deathBlast: 0, pctHit: 0, ram: 0, noFlank: 0, carrier: 0, noPack: 0, roll: 0, lockOn: 0, spinHitCap: 0, seek: 0 };
   const BURST_GAP = 0.15;      // seconds between shots in a burst
   const SHOTGUN_COS = Math.sqrt(3) / 2; // pellets spread 30 degrees to each side of the target (cos 30)
   // Only + - * / and sqrt from here on: those give identical results in every browser,
@@ -31,6 +31,9 @@ const Engine = (() => {
   // lone (Shadow hunter): a body hunts lone enemies, bodies with no other body of their side within LONE_R metres (a
   // tile shared with nobody); with none left for lone seconds it fights as usual, until it kills a lone one again
   const LONE_R = 3;
+  // seek (the Truespear, 2026-11-07): a projectile it fires at its locked target flies past every other body and follows
+  // that target (it lands on it, like a missile); with extra turrets the main attack keeps its lock and the others pick
+  // other enemies. A wall cell still stops it.
   // noTower (Death Flurry and Shadow hunter give it): the body never picks the enemy tower (a structure that isn't a
   // lesser one: not the treasury, a watchtower, a wall or a building) while any other enemy can be picked: it goes for
   // units. With nothing else left to pick (only bodies it can't reach, like a Sniper safe in that tower or stealthed
@@ -98,7 +101,10 @@ const Engine = (() => {
   // per pass), carries on ROLL_PAST metres past its target, stops dead and rolls back at it. So how often it hits
   // comes from how fast it gets going, not from its attack speed.
   const ROLL_START = 1;
-  const ROLL_PAST = 6;         // a tile
+  const ROLL_PAST = 9;         // a tile and a half (6 until 2026-11-07)
+  // a body walking a direction arrow (b.guide) stops only for an enemy ahead of it: within 60 degrees (cos) of its way
+  const GUIDE_AHEAD = 0.5;
+  const GUIDE_GAIN = 0.5;      // metres closer to its point that count as getting somewhere (see b.guideT)
   // unfold (the Rollers' Unfold skill): once a roller has rolled through its first enemy and stopped past it, it folds
   // out for the rest of the fight (u.roll 0, u.unfolded): a walking unit that hits one enemy at a time, same stats.
   // build = { time, range, count, unit }: the unit walks at the enemy until one is within range − 1 m, stands still
@@ -253,7 +259,7 @@ const Engine = (() => {
     rapid:   { label: 'Rapid fire', params: [['aps', 'Attack speed (+%)', 50, 5], ['range', 'Range (−%)', 30, 5]] },
     swift:   { label: 'Swift strikes', params: [['speed', 'Move speed (+%)', 30, 5], ['hit', 'Hit size (+%)', 25, 5]] },
     heavy:   { label: 'Heavy shot', params: [['slow', 'Projectile speed (−%)', 40, 5], ['instant', 'Projectile speed if the unit hits instantly (m/s)', 30, 5], ['hit', 'Hit size (+%)', 40, 5]] },
-    healer:  { label: 'Healing touch', params: [['pct', 'Heal per attack (% of hit)', 50, 5]] },
+    healer:  { label: 'Healing touch', params: [['pct', 'Heal per attack (% of hit)', 50, 5], ['range', 'Heal reach (m)', 25, 1]] },
     range:   { label: 'Long reach', params: [['m', 'Range (+m)', 5, 1]] },
     shrink:  { label: 'Shortsight', params: [['m', 'Enemy range (−m)', 4, 0.5], ['duration', 'Lasts (s)', 3, 0.5]] },
     ward:    { label: 'Ward', params: [['cap', 'Most damage one hit can deal', 40, 5]] },
@@ -345,7 +351,7 @@ const Engine = (() => {
       case 'rapid': return +P('range') ? `+${n('aps')}% attack speed, −${n('range')}% range.` : `+${n('aps')}% attack speed.`;
       case 'swift': return +P('hit') ? `+${n('speed')}% move speed, +${n('hit')}% hit.` : `+${n('speed')}% move speed.`;
       case 'heavy': return `+${n('hit')}% hit, ${n('slow')}% slower shots.`;
-      case 'healer': return `Each attack heals an ally for ${n('pct')}% of its hit.`;
+      case 'healer': return `Each attack heals a wounded ally unit within ${n('range')} m for ${n('pct')}% of its hit.`;
       case 'range': return `+${n('m')} m range.`;
       case 'shrink': return `Hits cut enemy range by ${n('m')} m for ${n('duration')} s.`;
       case 'ward': return `Takes at most ${n('cap')} damage per hit.`;
@@ -395,7 +401,7 @@ const Engine = (() => {
       case 'killStack': return `Each kill: +${n('speed')} m/s, +${n('aps')} attacks/s${+P('max') > 0 ? ` (max ${n('max')})` : ''}.`;
       case 'killSpawn': return `Each kill adds ${+P('count') === 1 ? 'a body' : `${n('count')} bodies`}.`;
       case 'bleedHit': return `Hits add ${+P('n') === 1 ? '1 bleed' : `${n('n')} bleed`}.`;
-      case 'bull': return `Every ${+P('every') === 3 ? '3rd' : `${n('every')}th`} attack charges ${n('run')} m through enemies for ${n('hit')}.`;
+      case 'bull': return `Its first attack, then every ${+P('every') === 3 ? '3rd' : `${n('every')}th`}, charges ${n('run')} m through enemies for ${n('hit')}, knocking them back ${n('push')} m.`;
       case 'flare': return `Idle time stores attack speed. Next attack fires it as extra shots.`;
       case 'portal': return `Sacrifices itself after ${n('secs')} s to summon a ${String(P('unit')) === 'Brute' ? 'Hellfiend' : String(P('unit'))}.`;
       case 'overwatch': return 'Can garrison a building: untouchable until it falls. Sees stealthed units in its range.';
@@ -458,7 +464,7 @@ const Engine = (() => {
           u.projSpeed = u.projSpeed > 0 ? Math.max(2, u.projSpeed * (1 - Math.min(90, P('slow')) / 100)) : Math.max(2, P('instant'));
           u.hit = u.hit * (1 + P('hit') / 100);
           break;
-        case 'healer': u.healPct = (u.healPct || 0) + Math.max(0, P('pct')); break;
+        case 'healer': u.healPct = (u.healPct || 0) + Math.max(0, P('pct')); u.healRange = Math.max(u.healRange || 0, P('range')); break;
         case 'range': u.range = u.range + P('m'); break;
         case 'shrink': u.shrinkM = Math.max(u.shrinkM || 0, P('m')); u.shrinkDur = Math.max(u.shrinkDur || 0, Math.max(0.5, P('duration'))); break;
         case 'ward': { const c = Math.max(1, P('cap')); u.bonusWard = u.bonusWard ? Math.min(u.bonusWard, c) : c; break; }
@@ -647,7 +653,7 @@ const Engine = (() => {
 
   function damageAfterDefense(hit, target, g) {
     const u = target.u;
-    const armor = (u.defense === 'armor' ? u.defVal : 0) + (u.bonusArmor || 0) + (u.bull && target.trampleLeft > 0 ? u.bull.armor : 0); // Bullhead: tougher while it charges
+    const armor = (u.defense === 'armor' ? u.defVal : 0) + (u.bonusArmor || 0) + (u.bull && target.trampleLeft > 0 && target.bullArmed ? u.bull.armor : 0); // Bullhead: tougher while it charges (from the tick after it set off, see bullNew)
     let d = armor > 0 ? Math.max(hit - armor, hit * g.minDmgPct / 100) : hit;
     if (u.defense === 'ward') d = Math.min(d, u.defVal);
     if (u.bonusWard > 0) d = Math.min(d, u.bonusWard); // ward from a skill; works next to armor
@@ -2149,8 +2155,8 @@ const Engine = (() => {
       if (b.hidden && !b.u.aloft && !b.quiet) { if (healLater) hitsLater.push(() => { b.hidden = false; }); else b.hidden = false; }
       b.lastAtk = t; b.revealed = true; // a disguised body (b.mask) shows what it is from its first attack
       if (b.u.healPct > 0) {
-        // heal a random wounded ally (not itself)
-        const hurtAllies = sides[b.side].filter(a => a.alive && a !== b && a.hp < a.u.hp);
+        // heal a random wounded ally (not itself) within its heal reach, not a building (2026-11-07: anywhere, towers too)
+        const hurtAllies = sides[b.side].filter(a => a.alive && a !== b && a.hp < a.u.hp && !a.u.structure && dist(a, b) <= (b.u.healRange || 0) + 0.01);
         if (hurtAllies.length) {
           const a = hurtAllies[Math.min(hurtAllies.length - 1, Math.floor(rnd(b.side) * hurtAllies.length))];
           heal(a, b.u.hit * b.u.healPct / 100 * healMul);
@@ -2177,7 +2183,10 @@ const Engine = (() => {
         if (targets.flame || targets.stomp) {
           hurt(b, tgt, hk, b.x, b.y); // flames and stomps land at once, no splash or pierce
         } else if (b.u.projSpeed > 0) {
-          projectiles.push({ owner: b, x: b.x, y: b.y, fx: b.x, fy: b.y, tx: tgt.x, ty: tgt.y, dirX, dirY, left: d, hit: hk });
+          // minR: it flies over the bodies within the shooter's minimum range of where it was fired (the Meteor Caller);
+          // seek: a spear thrown at its locked target flies past the others and follows it (the Truespear) (2026-11-07)
+          projectiles.push({ owner: b, x: b.x, y: b.y, fx: b.x, fy: b.y, tx: tgt.x, ty: tgt.y, dirX, dirY, left: d, hit: hk, minR: b.u.minRange,
+            ...(b.u.seek && tgt === b.lock && tgt.u ? { homing: tgt } : {}) });
         } else {
           impact(b, tgt.x, tgt.y, tgt, hk, dirX, dirY, b.x, b.y);
         }
@@ -2245,7 +2254,7 @@ const Engine = (() => {
         b.tcd[k] = (b.tcd[k] || 0) - dt * atkMul(b);
         if (b.tcd[k] > 0) continue;
         if (!valid) valid = validTargets(b, 'extraTurret');
-        const taken = turretTaken(b, k), tgt = valid.find(f => !taken.includes(f));
+        const taken = turretTaken(b, k), tgt = valid.find(f => !taken.includes(f) && !(b.u.seek && f === b.lock)); // seek: the main attack's lock is its own
         if (!tgt) { b.tcd[k] = Math.max(b.tcd[k], -dt); b.aims[k] = null; continue; }
         b.aims[k] = tgt;
         b.tcd[k] = Math.max(b.tcd[k], -dt) + 1 / Math.max(0.01, apsOf(b));
@@ -2272,6 +2281,7 @@ const Engine = (() => {
       if (b.alive) rammed.push(b); // it falls once every body has moved, so an enemy ram reaching it this tick still finds it
     }
     const rammed = [];
+    const bullNew = []; // bodies whose Bullhead charge set off this tick (their armor counts from the next one)
 
     // share of its move speed a body walks at right now (slowed, or crippled by its fallen tower)
     const moveMul = (b) => (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1);
@@ -2515,6 +2525,8 @@ const Engine = (() => {
       if (t >= g.timeCap || !aliveCount(A) || !aliveCount(B)) { over = true; return false; }
       shots = [];
       tick++;
+      for (const b of bullNew) b.bullArmed = true; // a charge's armor counts from the tick after it set off, so a hit in the
+      bullNew.length = 0; // same tick isn't softened just because its side attacked first (2026-11-07, fairness.js)
       for (let k = 0; k < 4; k++) if (cripple[k] > 0) cripple[k] = Math.max(0, cripple[k] - dt);
       if (oakOn) { oakNow[0] = oakK(0); oakNow[1] = oakK(1); } // 2v2 Oak: Restoration as the tick starts
       // map tiles under the units (checked before moving, so the tile a unit starts on always counts)
@@ -2701,13 +2713,29 @@ const Engine = (() => {
           continue;
         }
         // an arrow drawn by the player: b.guide = [{ x, y }, ...] (the Factions devtest's paths, and a melee squad's
-        // direction arrow: game.js AIM, with b.guideT its time to get there). The body walks the points in turn, sight
-        // and awareness off, standing to fight only enemies already in its own range, then fights as usual from the last point on.
+        // direction arrow: game.js AIM, with b.guideT the seconds it may go without getting closer). The body walks the
+        // points in turn, sight and awareness off, then fights as usual from the last point on. On the way it stands to
+        // fight only an enemy in its own reach that blocks its way (ahead of it, within GUIDE_AHEAD of the way it walks);
+        // one beside or behind it is hit in passing. An arrow is dropped only after b.guideT s without getting
+        // GUIDE_GAIN m closer to its point (a wall, a crowd), not for slows or knockback (2026-11-07).
         if (b.guide && b.guide.length) {
           const p = b.guide[0], gx = p.x - b.x, gy = p.y - b.y, gd = hyp(gx, gy);
-          if (gd < 1.5) { b.guide.shift(); if (!b.guide.length) { b.guide = null; b.guideT = null; } continue; }
-          if (near && !unseen && nd <= reachTo(reachOf(b), b, near)) continue; // something in reach: stand and fight it
-          if (b.guideT != null && (b.guideT -= dt) <= 0) { b.guide = null; b.guideT = null; continue; } // a direction arrow it can't finish (game.js AIM): fight as usual
+          if (gd < 1.5) { b.guide.shift(); b.guideBest = null; if (!b.guide.length) { b.guide = null; b.guideT = null; } continue; }
+          if (near && !unseen && nd <= reachTo(reachOf(b), b, near)) { // something in reach: stand and fight it if it is in the way
+            let block = false;
+            for (const f of foes) {
+              if (!pickable(b, f) || !inSight(b, f) || gap(f, b) > reachTo(reachOf(b), b, f)) continue;
+              const fx = f.x - b.x, fy = f.y - b.y;
+              if (fx * gx + fy * gy > GUIDE_AHEAD * gd * hyp(fx, fy)) { block = true; break; }
+            }
+            if (block) continue;
+          }
+          if (b.guideT != null) { // a direction arrow it can't finish (game.js AIM): fight as usual
+            // pushed back: the best follows it (less GUIDE_GAIN, so jostling on the spot isn't progress), so walking back counts (2026-11-07)
+            if (b.guideBest != null && gd - GUIDE_GAIN > b.guideBest) b.guideBest = gd - GUIDE_GAIN;
+            if (!(gd > (b.guideBest == null ? Infinity : b.guideBest) - GUIDE_GAIN)) { b.guideBest = gd; b.guideIdle = 0; }
+            else if ((b.guideIdle = (b.guideIdle || 0) + dt) >= b.guideT - 1e-9) { b.guide = null; b.guideT = null; b.guideBest = null; continue; }
+          }
           const step = spd(b) * (b.slowT > 0 ? 1 - b.slowMove / 100 : 1) * (cripple[ck(b)] > 0 ? 1 - towerDown.move / 100 : 1) * dt;
           const [ux, uy] = steer(b, p.x, p.y, gx / gd, gy / gd);
           if (b.hx === undefined) { b.hx = ux; b.hy = uy; }
@@ -3021,7 +3049,8 @@ const Engine = (() => {
             for (let k = 0; k < n; k++) {
               // spots are relative to the side's forward direction, so both sides spawn in front of the summoner
               const [ox, oy] = SPAWN_SPOTS[(b.kids.length + k) % SPAWN_SPOTS.length], fwd = b.side === 0 ? 1 : -1;
-              const kid = newBody(b.u.spawn.unit, b.side, b.x + ox * g.spacing * 0.7, b.y + oy * fwd * g.spacing * 0.7, spawnNo[b.side]++, -1);
+              if (!b.kidU) b.kidU = leveled(b.u.spawn.unit, b.level); // levelled like its summoner (2026-11-07; level 0 before)
+              const kid = newBody(b.kidU, b.side, b.x + ox * g.spacing * 0.7, b.y + oy * fwd * g.spacing * 0.7, spawnNo[b.side]++, -1);
               b.kids.push(kid); all.push(kid); sides[b.side].push(kid);
               if (terBlock && !kid.u.aloft) keepOut(kid); // not dropped in the water
               stats[b.side].totalHp += kid.u.hp;
@@ -3131,7 +3160,7 @@ const Engine = (() => {
         // with extra turrets, the main attack doesn't aim at an enemy another turret is on; with no one else, it waits
         if (b.u.turrets > 1) {
           const taken = turretTaken(b, 0);
-          if (taken.includes(primary)) { const alt = valid.find(f => !taken.includes(f)); if (!alt) continue; primary = alt; }
+          if (taken.includes(primary) && !(b.u.seek && primary === b.lock)) { const alt = valid.find(f => !taken.includes(f)); if (!alt) continue; primary = alt; } // seek: it keeps its lock
           b.aims[0] = primary;
         }
         if (b.firing < 0) b.firing = 0;
@@ -3156,7 +3185,7 @@ const Engine = (() => {
           b.bullN = (b.bullN || 0) + 1;
           const dx = primary.x - b.x, dy = primary.y - b.y, d = hyp(dx, dy);
           if ((b.bullN - 1) % b.u.bull.every === 0 && !(b.trampleLeft > 0) && d > 1e-6 && !primary.u.structure) {
-            b.trampleDir = [dx / d, dy / d]; b.trampleLeft = d + b.u.bull.run; b.trampled = []; b.charging = true;
+            b.trampleDir = [dx / d, dy / d]; b.trampleLeft = d + b.u.bull.run; b.trampled = []; b.charging = true; b.bullArmed = false; bullNew.push(b);
           }
         }
       }
@@ -3225,7 +3254,7 @@ const Engine = (() => {
             const sub = Math.min(0.5, mv, p.left);
             p.x += p.dirX * sub; p.y += p.dirY * sub; p.left -= sub; mv -= sub;
             if (terSight && !(p.owner.u.lob && !p.spear) && wallCell(cellOf(p.x, p.y))) { stats[p.owner.side].missed += p.hit; done = true; break; } // into a wall: it stops there
-            if ((!p.owner.u.lob || p.spear) && !p.homing) for (const f of foes) { // a bounce or a missile only lands on what it follows
+            if ((!p.owner.u.lob || p.spear) && !p.homing && !(p.minR > 0 && hyp(p.x - p.fx, p.y - p.fy) < p.minR)) for (const f of foes) { // a bounce or a missile only lands on what it follows
               if (f.alive && hyp(f.x - p.x, f.y - p.y) <= PROJ_HIT_RADIUS) {
                 land();
                 done = true; break;

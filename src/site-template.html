@@ -4841,7 +4841,8 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
       if (u.lockOn > 0) t.push(`takes ${u.lockOn} s to lock onto each new target after its first`);
       if (u.pierce > 0) t.push(`pierce ${u.pierce}`);
       if (u.projSpeed > 0) t.push(`projectile ${u.projSpeed} m/s`);
-      if (u.minRange > 0) t.push(`min range ${u.minRange} m`);
+      if (u.minRange > 0) t.push(`min range ${u.minRange} m${u.projSpeed > 0 ? ' (its shots fly over enemies that close)' : ''}`);
+      if (u.seek) t.push('its shots at the enemy it is locked on to fly past other bodies and follow that enemy');
       if (u.charge > 1) t.push(`charge x${u.charge}`);
       if (u.knockback > 0) t.push(`knockback ${u.knockback} m`);
       if (u.trample > 0) t.push(`tramples ${u.trample}%`);
@@ -7157,6 +7158,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (u.pierce > 0) tr.push(`Pierce ${u.pierce}`);
     if (u.projSpeed > 0) tr.push(`Bolts ${u.projSpeed} m/s`);
     if (u.minRange > 0) tr.push(`Min range ${u.minRange} m`);
+    if (u.seek) tr.push('Throws past others at its target');
     if (u.charge > 1) tr.push(`Charge ×${u.charge}`);
     if (u.knockback > 0) tr.push(`Knockback ${u.knockback} m`);
     if (u.trample > 0) tr.push(`Tramples (${u.trample}% hit)`);
