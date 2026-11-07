@@ -535,7 +535,7 @@ check('scorch: burns, instant shots, sees a stealthed unit at any distance (walk
 
 check('scorch in a real Duo fight: it shoots for its team, the walking one walks; downside: destroyed -> sits out the next fight, skills lost', () => {
   const x = match(206), { D } = x; playTo(x, 2); rich(D);
-  const front = Mpb.spots(x.m(0), 0, 'scorch', null).filter(t => t.row === 12).sort((p, q) => Math.abs(p.col - 11.5) - Math.abs(q.col - 11.5))[0];
+  const front = Mpb.spots(x.m(0), 0, 'scorch', null).filter(t => t.row === 13).sort((p, q) => Math.abs(p.col - 11.5) - Math.abs(q.col - 11.5))[0];
   const a = put(D, 0, 'scorch', front, { lane: 0 }), b = put(D, 0, 'scorch', null, { lane: 1 });
   clearArmies(D); open(x, 2, BRUTE); open(x, 0, BRUTE);
   const ra = Mpb.recOf(x.m(0), 0, a);

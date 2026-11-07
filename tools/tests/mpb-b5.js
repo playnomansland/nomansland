@@ -101,7 +101,7 @@ check('Factory: placed by the vote on an interior tile with room, prices as the 
   teams(D);
   const ok = Mpb.spots(x.m(0), 0, 'factory', null);
   assert.ok(ok.length > 5 && ok.every(t => Mpb.interior(0, t.col, t.row) && Mpb.spaced(x.m(0), t.col, t.row)), 'interior tiles with 2 tiles of room');
-  assert.ok(!x.act(0, 'mpbVote', 10, 17).ok, 'not on the back row');
+  assert.ok(!x.act(0, 'mpbVote', 10, 18).ok, 'not on the back row');
   assert.ok(x.act(0, 'mpbVote', ok[0].col, ok[0].row).ok && x.act(1, 'mpbVote', ok[0].col, ok[0].row).ok, 'both vote the same tile');
   for (const L of [0, 1]) assert.ok(Mpb.recs(x.m(L), 0).some(r => r.kind === 'factory' && r.col === ok[0].col && r.row === ok[0].row), 'placed in both lanes');
   for (const L of [0, 1]) for (const sd of [0, 1]) assert.ok(Game.occupied(x.m(L), sd, ok[0].col, ok[0].row), 'its tile is taken for squads');

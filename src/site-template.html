@@ -8103,7 +8103,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (net.ws !== ws) return;
       net.connected = true; net.tries = 0;
       const hello = net.watch ? { watch: true } : net.tourCode ? { id: tour.myId, tkey: tour.key } : net.key ? { key: net.key } : net.create ? { create: true, ...(net.wantRanked ? { ranked: true } : {}) } : {};
-      if (net.duo) delete hello.ranked;
+      if (net.duo) { delete hello.ranked; hello.v = Duo.V; } // (2v2: the server turns another version away, its board may differ, 2026-11-07)
       if (net.create && !net.key && net.pub) Object.assign(hello, { public: true, ...(net.duo ? {} : { map: playMap() || '', skin: skinPick || '' }) }); // a public room (the lobby)
       if (net.create && !net.key && !net.duo && net.spectate === false) hello.spectate = false;
       if (acct && !net.tourCode) hello.session = acct.session; // who this is: ranked needs it, the other phone shows the username, and chat needs it (never in the URL)
@@ -8679,6 +8679,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   // messages only a 2v2 room sends (true: handled here); the rest go on to srvRecv as in 1v1
   function duoRecv(d) {
     if (d.t === 'welcome' && d.duo) {
+      if (d.v !== Duo.V) { leaveNet(); srvForget(); overlayMsg('2v2', 'The game was updated. Please reload the page.'); return true; } // (a server of another version: another board, 2026-11-07)
       net.welcomed = true; net.create = false; net.duoClock = false; // (srvClock: this connection's clock starts afresh)
       me = d.side; net.key = d.key || net.key; net.seq = Math.max(net.seq, d.seq | 0); net.duoHost = !!d.host;
       net.duoInfo = { ...(net.duoInfo || {}), seat: d.seat, lane: d.lane };
@@ -8698,7 +8699,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       const code = net.code;
       leaveNet(); srvForget();
       overlayMsg('2v2', d.t === 'nomatch' ? `Nobody has made 2v2 lobby ${code}.` : d.t === 'full' ? `2v2 lobby ${code} is full or its match has started.`
-        : d.why === 'dev' ? 'Only developer accounts can make a 2v2 lobby for now.' : d.why === 'kicked' ? 'The host took you out of the lobby.' : 'You can’t join this 2v2 match.');
+        : d.why === 'dev' ? 'Only developer accounts can make a 2v2 lobby for now.' : d.why === 'version' ? 'The game was updated. Please reload the page.' : d.why === 'kicked' ? 'The host took you out of the lobby.' : 'You can’t join this 2v2 match.');
       return true;
     }
     if (d.t === 'forfeit' && d.duo) {

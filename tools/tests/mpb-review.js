@@ -108,7 +108,7 @@ check('Impersonate on a squad in a Tree kojja\'s Nest: one body goes, the rest o
 check('Impersonate on a horse with a rider: the horse goes, the rider steps out', () => {
   const x = match(22), { D } = x;
   playTo(x, 2); clearArmies(D); rich(D);
-  const horse = addSq(D, 0, 0, 'Just a horse', 11, 13), rider = addSq(D, 0, 0, 'Brute', horse.col, horse.row, { exact: true, in: horse.id });
+  const horse = addSq(D, 0, 0, 'Just a horse', 11, 14), rider = addSq(D, 0, 0, 'Brute', horse.col, horse.row, { exact: true, in: horse.id });
   const den = put(D, 1, 'shadowDen');
   addSq(D, 0, 1, 'Brute', 12, 1);
   fresh(D);
@@ -143,8 +143,8 @@ check('Impersonate: a squad in your own Jail is no target; one that sat the figh
     const x = match(51 + lane), { D } = x;
     playTo(x, 2); clearArmies(D); for (const R of D.lanes) { R.m.gold = [800, 800]; R.base = { gold: R.m.gold.slice(), nextId: R.m.nextId.slice() }; }
     const sch = put(D, 0, 'school'), den = put(D, 1, 'shadowDen');
-    const sq = addSq(D, lane, 0, 'Skeleton Archers', 11, 14);
-    addSq(D, 0, 0, 'Brute', 5, 17); addSq(D, 0, 1, 'Brute', 12, 1);
+    const sq = addSq(D, lane, 0, 'Skeleton Archers', 11, 15);
+    addSq(D, 0, 0, 'Brute', 5, 18); addSq(D, 0, 1, 'Brute', 12, 1);
     fresh(D);
     assert.ok(x.act(Duo.seatOf(lane, 0), 'mpbAct', sch, 'enroll', sq.id).ok, 'enrolled this round (the opponents still see it on its tile)');
     const who = lane === 0 ? 0 : 1;
@@ -242,7 +242,7 @@ check('Second wind keeps its squad\'s unit type: after an Undo all its id is a n
   for (const u of [BR, AR]) if (!Game.isUnlocked(x.m(0), 0, u)) x.act(0, 'unlock', u);
   fresh(D);
   teams(D);
-  const t = Mpb.homeTile([x.m(0)], 0, { unit: BR }, { col: 12, row: 14 });
+  const t = Mpb.homeTile([x.m(0)], 0, { unit: BR }, { col: 12, row: 15 });
   assert.ok(x.act(0, 'place', BR, t.col, t.row).ok);
   const id = x.m(0).armies[0].slice(-1)[0].id;
   assert.ok(x.act(1, 'mpbBuy', fh, 'wind', 0, id).ok, 'A2 buys Second wind on A1\'s new Brute');
@@ -250,7 +250,7 @@ check('Second wind keeps its squad\'s unit type: after an Undo all its id is a n
   assert.ok(x.act(0, 'undoAll').ok);
   for (const u of [BR, AR]) if (!Game.isUnlocked(x.m(0), 0, u)) x.act(0, 'unlock', u); // (Undo all took the unlocks back too)
   teams(D);
-  const t2 = Mpb.homeTile([x.m(0)], 0, { unit: AR }, { col: 12, row: 14 });
+  const t2 = Mpb.homeTile([x.m(0)], 0, { unit: AR }, { col: 12, row: 15 });
   assert.ok(x.act(0, 'place', AR, t2.col, t2.row).ok);
   const q = x.m(0).armies[0].find(s => s.id === id);
   assert.ok(q && q.unit === AR, 'the id is used again');
@@ -323,15 +323,15 @@ check('Two squads on one tile of team A\'s zone (a hidden Assassin of B\'s and a
   for (let k = 0; k < 4; k++) act(k, 'choosePack', 0);
   const ASS = ui('Assassin'), m = D.lanes[0].m;
   m.gold[1] = 5000; act(2, 'unlock', ASS);
-  assert.ok(act(2, 'place', ASS, 12, 12).ok, 'B1\'s Assassin in team A\'s zone');
+  assert.ok(act(2, 'place', ASS, 12, 13).ok, 'B1\'s Assassin in team A\'s zone');
   let placed = null;
-  for (let u = 0; u < units.length && !placed; u++) if (Game.isUnlocked(m, 0, u) && !units[u].building && act(0, 'place', u, 12, 12).ok) placed = u;
+  for (let u = 0; u < units.length && !placed; u++) if (Game.isUnlocked(m, 0, u) && !units[u].building && act(0, 'place', u, 12, 13).ok) placed = u;
   assert.ok(placed != null, 'A1 puts a squad on that very tile (they can\'t see it)');
   for (let k = 0; k < 4; k++) Duo.setReady(D, k, true, T);
   const a = m.armies[1].find(q => q.unit === ASS), b = m.armies[0].find(q => q.unit === placed && q.round === 1 && Math.max(Math.abs(q.col - 12), Math.abs(q.row - 12)) <= 1);
-  const b0 = m.armies[0].find(q => q.unit === placed && q.round === 1 && q.col === 12 && q.row === 12);
+  const b0 = m.armies[0].find(q => q.unit === placed && q.round === 1 && q.col === 12 && q.row === 13);
   assert.ok(b0, 'A\'s squad (newer, on its own zone) stays');
-  assert.ok(!(a.col === 12 && a.row === 12) && Math.max(Math.abs(a.col - 12), Math.abs(a.row - 12)) === 1, 'the Assassin (first there) moves next to it: ' + JSON.stringify([a.col, a.row]));
+  assert.ok(!(a.col === 12 && a.row === 13) && Math.max(Math.abs(a.col - 12), Math.abs(a.row - 13)) === 1, 'the Assassin (first there) moves next to it: ' + JSON.stringify([a.col, a.row]));
   void b;
   // the other way round: the squad first, then the Assassin on it
   const D2 = Duo.create({}, units);
@@ -341,19 +341,19 @@ check('Two squads on one tile of team A\'s zone (a hidden Assassin of B\'s and a
   const m2 = D2.lanes[0].m;
   m2.gold[1] = 5000; act2(2, 'unlock', ASS);
   let p2 = null;
-  for (let u = 0; u < units.length && p2 == null; u++) if (Game.isUnlocked(m2, 0, u) && !units[u].building && act2(0, 'place', u, 12, 12).ok) p2 = u;
-  assert.ok(act2(2, 'place', ASS, 12, 12).ok, 'the Assassin can\'t see it either');
+  for (let u = 0; u < units.length && p2 == null; u++) if (Game.isUnlocked(m2, 0, u) && !units[u].building && act2(0, 'place', u, 12, 13).ok) p2 = u;
+  assert.ok(act2(2, 'place', ASS, 12, 13).ok, 'the Assassin can\'t see it either');
   for (let k = 0; k < 4; k++) Duo.setReady(D2, k, true, T);
-  const a2 = m2.armies[1].find(q => q.unit === ASS), b2 = m2.armies[0].find(q => q.unit === p2 && q.round === 1 && q.col === 12 && q.row === 12);
+  const a2 = m2.armies[1].find(q => q.unit === ASS), b2 = m2.armies[0].find(q => q.unit === p2 && q.round === 1 && q.col === 12 && q.row === 13);
   assert.ok(b2, 'the squad (first there) stays');
-  assert.ok(!(a2.col === 12 && a2.row === 12) && Math.max(Math.abs(a2.col - 12), Math.abs(a2.row - 12)) === 1, 'the Assassin moves next to it');
+  assert.ok(!(a2.col === 12 && a2.row === 13) && Math.max(Math.abs(a2.col - 12), Math.abs(a2.row - 13)) === 1, 'the Assassin moves next to it');
 });
 
 check('A teammate\'s Undo all onto a tile taken meanwhile (a Nest too): the presser\'s squad moves, the teammate\'s stays', () => {
   for (const how of ['plain', 'nest', 'school']) {
     const x = match(61), { D } = x;
     playTo(x, 2); clearArmies(D); rich(D);
-    let tile = { col: 11, row: 14 }, sch = null;
+    let tile = { col: 11, row: 15 }, sch = null;
     if (how !== 'plain') { const tk = put(D, 0, 'treeKojja'); owned(D, 0, tk, 'nest'); const k = Mpb.recOf(x.m(0), 0, tk); tile = { col: k.col, row: k.row }; }
     if (how === 'school') sch = put(D, 0, 'school');
     const S = addSq(D, 1, 0, 'Skeleton Archers', tile.col, tile.row, { exact: true }); // A2's
@@ -384,12 +384,12 @@ check('A lake tile put on a hidden squad goes to the allowed tile nearest the on
   teams(D);
   const ASS = ui('Assassin'), m = D.lanes[0].m;
   m.gold[1] = 5000; act(2, 'unlock', ASS);
-  assert.ok(act(2, 'place', ASS, 12, 12).ok);
+  assert.ok(act(2, 'place', ASS, 12, 13).ok);
   const lk = Mpb.recs(m, 0).find(r => r.kind === 'magicLake' && r.data.lane === 0);
-  assert.ok(act(0, 'mpbAct', lk.key, 'place', 12, 12).ok, 'the page and the server allow it (it can\'t be seen)');
+  assert.ok(act(0, 'mpbAct', lk.key, 'place', 12, 13).ok, 'the page and the server allow it (it can\'t be seen)');
   Mpb.settle(lanesOf(D));
   const a = Mpb.recOf(m, 0, lk.key);
-  assert.strictEqual(Math.max(Math.abs(a.col - 12), Math.abs(a.row - 12)), 1, 'next to the tile chosen, not the first tile of the board');
+  assert.strictEqual(Math.max(Math.abs(a.col - 12), Math.abs(a.row - 13)), 1, 'next to the tile chosen, not the first tile of the board');
 });
 
 check('Artifacts never on a building\'s tile or one a Coal mine\'s exit keeps free; Dig a new exit not next to an artifact', () => {
@@ -397,13 +397,13 @@ check('Artifacts never on a building\'s tile or one a Coal mine\'s exit keeps fr
   Duo.start(D, units, matrix, 1e12, 7, [false, false, false, false]);
   const m = D.lanes[0].m; teams(D); Game.useGrid(m);
   const t = Mpb.autoSpot(m, 0, 'coalMine', null), rec = Mpb.addRec(m, 0, 'coalMine', t.col, t.row);
-  rec.parts.exit = { col: 4, row: 9 };
+  rec.parts.exit = { col: 4, row: 10 };
   for (let s = 1; s <= 600; s++) {
     let a = s * 7919; const r = () => { a = (a * 1103515245 + 12345) % 2147483648; return a / 2147483648; };
     const A = Mpb.rollArtifacts(m, r);
     assert.ok(A.list.every(x => !Mpb.at(m, x.col, x.row)), 'seed ' + s + ': a fair pair, off the exit and its ring');
   }
-  m.round = 8; m.artifacts = { round: 8, list: [{ id: 0, col: 12, row: 9, card: null, won: null }, { id: 1, col: 11, row: 8, card: null, won: null }] };
+  m.round = 8; m.artifacts = { round: 8, list: [{ id: 0, col: 12, row: 9, card: null, won: null }, { id: 1, col: 11, row: 9, card: null, won: null }] };
   rec.skills.shaft = { round: 0, n: 1, by: [1, 0], log: [] };
   assert.ok(!Mpb.KINDS.coalMine.exitMoveOk(m, 0, rec, 13, 9) && !Mpb.KINDS.coalMine.exitMoveOk(m, 0, rec, 12, 9), 'no new exit on or next to an artifact');
   assert.ok(Mpb.KINDS.coalMine.exitMoveOk(m, 0, rec, 16, 9), 'further off it may go');

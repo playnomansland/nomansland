@@ -193,7 +193,8 @@ const Game = (() => {
   const bwallsFighting = (m, side) => bwallsOf(m, side).filter(w => w.temp ? w.round === m.round : towerSkill2On(m, side, 'bastion'));
   // what a viewer may see of a player's walls: their own, and the opponent's from earlier rounds while deploying
   const bwallShown = (m, viewer, deploying, side, w) => side === viewer || !deploying || w.round < m.round || watchedLive(m, side); // (2v2: watched live, the Shadow Den)
-  const ownHalf = (side, row) => side === 0 ? row >= ROWS / 2 && row < ROWS : row >= 0 && row < ROWS / 2;
+  // (the middle row of an odd board, the 2v2 board's row 9, is nobody's half: no walls there for either team, 2026-11-07)
+  const ownHalf = (side, row) => !midRow(row) && (side === 0 ? row >= ROWS / 2 && row < ROWS : row >= 0 && row < ROWS / 2);
   // the other player's wall on that edge, as this player sees it: in 2v2 the server judges a deploy action as the acting
   // team sees the board (src/mpb.js asSeen), so a wall the other team put up this round (hidden, bwallShown) doesn't
   // count and a refusal shows nothing; the fight's start moves the newer of two walls on one edge (Duo.settleBoard)
@@ -576,11 +577,13 @@ const Game = (() => {
       flank: Array(18).fill('F............F').map((r, i) => i === 0 || i === 17 ? 'FF..........FF' : r),
       buildings: [{ kind: 'tower', side: 0, col: 9, row: 16 }, { kind: 'tower', side: 1, col: 4, row: 1 }, { kind: 'treasury', side: 0, col: 4, row: 15 }, { kind: 'treasury', side: 1, col: 9, row: 2 }] },
     // 2v2 (src/duo.js): one wide board both players of a team deploy on, one shared tower per team in the back rows
-    // (right of centre, point-mirrored for the other team), and two columns of flank tiles on each edge
-    duo: { format: 'nml-map', version: 1, name: '2v2', base: 'testgrid', cols: 24, rows: 18, zone: 7, symmetry: 'point',
-      tiles: Array(18).fill('.'.repeat(24)), shape: Array(18).fill('.'.repeat(24)), height: Array(18).fill('.'.repeat(24)),
-      flank: Array(18).fill('FF' + '.'.repeat(20) + 'FF'),
-      buildings: [{ kind: 'tower', side: 0, col: 17, row: 16 }, { kind: 'tower', side: 1, col: 6, row: 1 }] }, // no treasury since 2026-11-05 (a 2v2 building system is coming)
+    // (right of centre, point-mirrored for the other team), and two columns of flank tiles on each edge. 19 rows since
+    // 2026-11-07: 5 rows of no man's land (7-11) with a true middle row (9, midRow) that is nobody's: no flank tiles,
+    // no walls, nobody's zone; the artifacts stand on it (src/mpb.js rollArtifacts)
+    duo: { format: 'nml-map', version: 1, name: '2v2', base: 'testgrid', cols: 24, rows: 19, zone: 7, symmetry: 'point',
+      tiles: Array(19).fill('.'.repeat(24)), shape: Array(19).fill('.'.repeat(24)), height: Array(19).fill('.'.repeat(24)),
+      flank: Array(19).fill('FF' + '.'.repeat(20) + 'FF').map((r, i) => i === 9 ? '.'.repeat(24) : r),
+      buildings: [{ kind: 'tower', side: 0, col: 17, row: 17 }, { kind: 'tower', side: 1, col: 6, row: 1 }] }, // no treasury since 2026-11-05 (a 2v2 building system is coming)
   };
   // A map entry for MAPS from an editor map: its grid, its towers' and treasuries' tiles (spots), its flank tiles (when
   // they differ from the game's: flankSet) and its terrain (when it has any). Rules on top come in `extra`. Maps made on
@@ -1010,9 +1013,10 @@ const Game = (() => {
   // plus their whole zone). From round 3 you may deploy there; the matching columns on your half are the
   // enemy's and never yours, so you have to guard your own edges.
   const FLANK = { round: 3, cols: [0, COLS - 1], delay: 3 }; // delay: seconds a squad stands still in the first fight after it was placed on a flank
-  // the rows of the enemy's half: their zone from its front row to its back row, then their half of no man's land
+  // the rows of the enemy's half: their zone from its front row to its back row, then their half of no man's land (an
+  // odd board's middle row is nobody's half: never a flank row, 2026-11-07)
   const flankRows = (side) => {
-    const half = ROWS / 2, zone = Array.from({ length: ZONE }, (_, i) => side === 0 ? ZONE - 1 - i : ROWS - ZONE + i);
+    const half = Math.floor(ROWS / 2), zone = Array.from({ length: ZONE }, (_, i) => side === 0 ? ZONE - 1 - i : ROWS - ZONE + i);
     const nml = Array.from({ length: half - ZONE }, (_, i) => side === 0 ? ZONE + i : ROWS - ZONE - 1 - i);
     return zone.concat(nml);
   };
@@ -1060,6 +1064,9 @@ const Game = (() => {
   const reserved = (side, col, row) => isFlank(1 - side, col, row);
   // no man's land: the rows between the two zones. A unit with the Forward planting skill may be placed there.
   const inNoMans = (row) => row >= ZONE && row < ROWS - ZONE;
+  // the middle row of no man's land on a board with an odd number of rows (the 2v2 board's row 9, 2026-11-07): the same
+  // distance from both zones and nobody's (no flank tiles, no walls, no team's prio); even boards have none
+  const midRow = (row) => ROWS % 2 === 1 && row === (ROWS - 1) / 2;
   // whether a player's unit has a skill of this type: bought or built in, or Enzo's free skill while it works (as in
   // unitFor). adding: squads of the unit about to be placed, which count toward Enzo's CHAR.enzoMin (his 2nd Ent can
   // be planted forward straight away)
@@ -3467,7 +3474,7 @@ const Game = (() => {
     buildingXpNeeded, buildingLevelCost, buildingReady, levelBuilding, undoLevelBuilding, constructBuff, buildingBodies, canBuySkill, buySkill, undoSkill, sellValue, sell,
     isRider, mpbHeld, schoolLock, TEAM_ID, mateRide, mateAt, syncRiders, freeOut, horseUse, horseOk, horseLeft, hiddenFromFoe, soldNow, noteSold, foeSeen, isCarrier, riderOf, carrierOf, squadAt, boardable, unplaceSquad,
     TOWER, TOWER_TYPES, OUTPOST, TOWER_PICK_ROUND, towerType, towerChoices, needsTowerPick, setTowerType, settleTowerPicks, TOWER_SKILL, towerSkillOf, towerSkillVisible, towerPicked, canBuyTowerSkill, buyTowerSkill, undoTowerSkill, towerSkillCost, towerSkill2Of, towerSkill2Visible, towerSkill2Cost, canBuyTowerSkill2, buyTowerSkill2, undoTowerSkill2, towerSkill2On, PARA, paraDropOf, MOAT, BWALL, BWALL_SQ, EDGES, bwallsOf, bwallOn, edgeOf, bwallWorld, bwallsLeft, bwallShown, bwallSpotOk, bwallTile, placeBwall, unplaceBwall, ensureBwalls, bwallUnit, INVEST, MAGE_GENERALS, mageGenPrice, MAGE, mageGenInfo, mageGenOf, mageTpOf, mageTpRound, mageTpNew, isExtraGen, mageGenCost, canBuyMageGen, buyMageGen, undoMageGen, mageTowerUnit, generalUnit, LOAN, loanNow, investNow, bankBusy, investNow, bankBusy, canTakeLoan, takeLoan, undoLoan, towerRounds, troundInfo, troundOn, troundCost, canBuyTround, buyTround, undoTround, SLIME_UNITS, slimeTowerUnit, slimeSkillDefs, TOWER_MID, towerColOk, towerAt, needsTower, placeTower, ensureTower,
-    FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, anywhere, mpbAt, bldgSeen, nearBldg, isOff, enemyHolds, inNoMans, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
+    FLANK, flankRows, flankOpen, isFlank, flankTiles, reserved, canPlaceAt, anywhere, mpbAt, bldgSeen, nearBldg, isOff, enemyHolds, inNoMans, midRow, hasSkillType, garrisonAt, garrisonFree, inBuilding, WATCH_SQ, watchUnit, freeMover,
     STANDARD_PACK, ICE, ALTAR, GOLEM, isIce, hailRound, altarRound, stormShift, stormRows, hailTiles, altarCost, altarRefund, altarCount, pushRoom, altarBought, addAltar, buyAltar, undoAltar, snowgres, snowgreUnit,
     MAPS, SKINS, MAP_LOOK, lookOf, EDITOR_MAPS, TERRAIN, objectiveOf, objectiveTiles, SHAPE_PATH, terrainTile, terrainBlocks, terrainOf, groundHeight, ELF_TOWER, SHROOM, SHROOM_SPLIT, shroomAt, shroomTileAt, shroomRemoval, SHROOM_REMOVE, shroomCost, removeShroom, undoRemoveShroom, mapOf, elfSpot, rollMap, BRIBE_COST, bribeList, bribeGold, bribeCount, bribeNow, bribeCost, bribeRefund, ELF_POWER, elfPowered, elfUnit, ELF_OWN, elfOwnCost, elfOwnOf, elfOwnAt, elfOwnUnlocked, elfOwnOffered, canBuyElfOwn, elfOwnSpotOk, buyElfOwn, undoElfOwn, bribeLeader, canBribe, bribe, undoBribe,
     CHARACTERS, CHAR, charOf, SLOT, slotSpins, slotDry, slotWins, slotMovesLeft, freeMoves, freeMovesLeft, shoePerks, shoePerk, canSpin, slotOutcome, slotReels, spin, takeSpins, aiSlots, charInfo, enzoSkill, enzoActive, charmOf, isGentleman, canGiveCharm, giveCharm, undoCharm, ensureCharm, felixGold, isTier1, rollBuffTiles, onBuffTile, zoeBuff, yotImps, yotLevel, TOWER_SPOT, towerSpot,

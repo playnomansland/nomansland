@@ -70,7 +70,7 @@ check('the Vault on the old treasury tiles, no treasury, no tower vote', () => {
   const x = match(3);
   for (const L of [0, 1]) {
     const m = x.m(L);
-    assert.deepStrictEqual(Mpb.recs(m, 0).map(r => [r.kind, r.col, r.row]), [['vault', 6, 15]]);
+    assert.deepStrictEqual(Mpb.recs(m, 0).map(r => [r.kind, r.col, r.row]), [['vault', 6, 16]]);
     assert.deepStrictEqual(Mpb.recs(m, 1).map(r => [r.kind, r.col, r.row]), [['vault', 17, 2]]);
     assert.ok(!Game.treasuryOn(m), 'no treasury');
     assert.strictEqual(m.duoLane, L); assert.ok(m.duoTowers);
@@ -93,12 +93,12 @@ check('placement: interior, spacing, MPB tiles taken for both teams', () => {
   const x = match(4), m = x.m(0);
   Duo.setTeams(x.D.lanes.map(R => R.m));
   // the edges of the zone: the back row, the front row, next to the flank columns
-  for (const [c, r] of [[10, 17], [10, 11], [2, 14], [21, 14], [3, 17]]) assert.ok(!Mpb.spotOk(m, 0, 'oak', null, c, r), 'edge tile ' + c + ',' + r + ' refused');
-  assert.ok(Mpb.interior(0, 3, 12) && Mpb.interior(0, 20, 16) && !Mpb.interior(0, 2, 12) && !Mpb.interior(0, 21, 16), 'interior: cols 3-20, rows 12-16');
+  for (const [c, r] of [[10, 18], [10, 12], [2, 15], [21, 15], [3, 18]]) assert.ok(!Mpb.spotOk(m, 0, 'oak', null, c, r), 'edge tile ' + c + ',' + r + ' refused');
+  assert.ok(Mpb.interior(0, 3, 13) && Mpb.interior(0, 20, 17) && !Mpb.interior(0, 2, 13) && !Mpb.interior(0, 21, 17), 'interior: cols 3-20, rows 13-17');
   // spacing: within 2 tiles of the tower (17,16) or the Vault (6,15) refused, 3 away fine
-  assert.ok(!Mpb.spotOk(m, 0, 'oak', null, 15, 14), 'two tiles from the tower');
-  assert.ok(!Mpb.spotOk(m, 0, 'oak', null, 8, 13), 'two tiles from the Vault');
-  assert.ok(Mpb.spotOk(m, 0, 'oak', null, 9, 12) || Game.occupied(m, 0, 9, 12), 'three from the Vault is fine (if free)');
+  assert.ok(!Mpb.spotOk(m, 0, 'oak', null, 15, 15), 'two tiles from the tower');
+  assert.ok(!Mpb.spotOk(m, 0, 'oak', null, 8, 14), 'two tiles from the Vault');
+  assert.ok(Mpb.spotOk(m, 0, 'oak', null, 9, 13) || Game.occupied(m, 0, 9, 13), 'three from the Vault is fine (if free)');
   assert.ok(!Mpb.spotOk(m, 0, 'oak', null, 10, 5), 'never in the enemy zone');
   // all allowed tiles keep the rules
   const ok = Mpb.spots(m, 0, 'oak', null);
@@ -113,9 +113,9 @@ check('placement: interior, spacing, MPB tiles taken for both teams', () => {
   m.gold[0] += 1000;
   assert.ok(!x.act(0, 'place', ui, t.col, t.row).ok, 'A1 can\'t place on it');
   assert.ok(!x.act(1, 'place', ui, t.col, t.row).ok, 'A2 can\'t either');
-  assert.ok(!x.act(0, 'place', ui, 6, 15).ok, 'nor on the Vault');
+  assert.ok(!x.act(0, 'place', ui, 6, 16).ok, 'nor on the Vault');
   // the coal mine's exit: no man's land, not flank tiles
-  assert.ok(Mpb.spotOk(m, 0, 'coalMine', 'exit', 10, 8) && !Mpb.spotOk(m, 0, 'coalMine', 'exit', 0, 8) && !Mpb.spotOk(m, 0, 'coalMine', 'exit', 10, 13), 'the exit in no man\'s land only');
+  assert.ok(Mpb.spotOk(m, 0, 'coalMine', 'exit', 10, 8) && !Mpb.spotOk(m, 0, 'coalMine', 'exit', 0, 8) && !Mpb.spotOk(m, 0, 'coalMine', 'exit', 10, 14), 'the exit in no man\'s land only');
 });
 
 check('skills: per rules, costStep, who paid, take-backs, Undo all, opponents don\'t see this round\'s', () => {
@@ -268,6 +268,7 @@ check('artifacts: rounds 2 and 8, mirrored, apart, cards; rewards; none without 
       const [a, b] = A.list;
       assert.ok(a.col === Game.COLS - 1 - b.col && a.row === Game.ROWS - 1 - b.row, 'point mirrors');
       assert.ok(Math.hypot(a.col - b.col, a.row - b.row) >= 10, 'at least 10 tiles apart');
+      assert.ok(a.row === (Game.ROWS - 1) / 2 && b.row === a.row, 'both on the middle row (2026-11-07)');
       for (const t of A.list) { assert.ok(Game.inNoMans(t.row) && !Game.isFlank(0, t.col, t.row) && !Game.isFlank(1, t.col, t.row), 'in no man\'s land, not flank tiles'); }
       assert.ok(a.card && b.card && (a.card.type !== b.card.type || a.card.id !== b.card.id), 'two different cards');
       for (const c of [a.card, b.card]) assert.ok(c.type === 'tower' ? Game.TOWER_TYPES.some(t => t.id === c.id) : !!Mpb.KINDS[c.id] && c.id !== 'vault' && Mpb.KINDS[c.id].draft !== false, 'a valid card ' + JSON.stringify(c));
@@ -381,7 +382,7 @@ check('the placement vote: same tile, two tiles, one vote, none, two in a row, b
     const [t1, t2] = Mpb.spots(m, 0, 'oak', null);
     assert.ok(Duo.mpbPending(D) && D.deadline > 0 && !D.held, 'the deploy clock runs while the vote is open (updated 6 Nov: it used to wait)');
     assert.strictEqual(Duo.clocks(D, 0, x.T).vote, Mpb.VOTE_MS); assert.strictEqual(Duo.clocks(D, 2, x.T).vote, 0, 'the other team has no vote');
-    assert.ok(!x.act(0, 'mpbVote', 10, 17).ok, 'not on an edge tile');
+    assert.ok(!x.act(0, 'mpbVote', 10, 18).ok, 'not on an edge tile');
     assert.ok(x.act(0, 'mpbVote', t1.col, t1.row).ok);
     assert.deepStrictEqual(Duo.viewFor(D, 1).m.mpbVote[0][0].votes[0], t1, 'the teammate sees the vote');
     assert.deepStrictEqual(Duo.viewFor(D, 2).m.mpbVote[0][0].votes, [null, null], 'the opponents don\'t');

@@ -1,6 +1,6 @@
 // 2v2 in the browser (src/duo.js, server/src/duo.js; one shared board since 2026-11-03): a developer opens a 2v2 lobby
 // from the Developer section, two friends join with the link, the host swaps two seats, the fourth seat goes to the AI,
-// everyone picks a package and places a squad, all press Ready, and the fight plays on the same 24 x 18 board on every
+// everyone picks a package and places a squad, all press Ready, and the fight plays on the same 24 x 19 board on every
 // phone with the same result.
 // Also: a phone without a developer account doesn't get the button, a reload keeps the seat, teammates see each
 // other's squads at once (m.team) and can't place on each other's tiles, no leaders, and pings (? ! ⚔) and quick lines
@@ -133,7 +133,7 @@ const DEV = { id: 'p0123456789abcdef', session: 'a'.repeat(64), tag: 'Vilhelm', 
   if (process.env.PB_SHOTS) { await host.screenshot({ path: process.env.PB_SHOTS + '/duo-host.png' }); await f1.screenshot({ path: process.env.PB_SHOTS + '/duo-a2-pc.png' }); }
   if (process.env.PB_BOARD !== '3d') {
     const ar = async (p) => { const r = await p.locator('#board').boundingBox(); return r.width / r.height; };
-    ok(Math.abs(await ar(host) - 24 / 18) < 0.05 && Math.abs(await ar(f1) - 24 / 18) < 0.05, 'the board keeps its shape (24 x 18) on phone and PC');
+    ok(Math.abs(await ar(host) - 24 / 19) < 0.05 && Math.abs(await ar(f1) - 24 / 19) < 0.05, 'the board keeps its shape (24 x 19) on phone and PC');
   }
   // speed the rest up: play the fight to its end
   for (const p of [host, f1, f2]) await p.evaluate(() => { const x = window.__pb(); while (x.bt.step()) {} });
