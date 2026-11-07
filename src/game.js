@@ -2365,6 +2365,7 @@ const Game = (() => {
     }));
     if (m.tech) v.tech = two(m.tech, Object.fromEntries(Object.entries(m.tech[fo] || {}).map(([ui, t]) => [ui, t.map(r => r >= now ? 0 : r)])));
     if (v.tech) for (const x of (m.respec && m.respec[fo]) || []) if (x.round === now && v.tech[fo][x.ui]) v.tech[fo][x.ui][x.from] = x.fromRound; // a School respec: the skill it had (2026-11-07)
+    if (m.respec) v.respec = two(m.respec, []);
     if (!charShown(m, viewer, true, fo)) { v.chars = two(m.chars, null); v.buff = two(m.buff, []); }
     if (m.towers && m.towers[fo] && !towerTypeShown(m, viewer, true, fo)) { const t = { ...m.towers[fo] }; delete t.type; v.towers = two(m.towers, t); }
     if (m.towerSkill && m.towerSkill[fo] >= now) v.towerSkill = two(m.towerSkill, 0);

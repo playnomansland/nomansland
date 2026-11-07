@@ -2,8 +2,9 @@
 // Level all from a guest in a live match. Screenshots go to the current folder.
 // - Range: the ring under the mouse and the ring of a tapped squad are the same circle (Game.squadReach: a Flame
 //   Wizard's flame cone reaches 1.2x its range); in a fight a tapped body shows its ring too.
-// - Level all: on the sheet when two or more level-ups of a unit's squads are paid for; most XP first, a squad with XP
-//   for two levels gets its second on the next pass; it levels as many as the gold covers.
+// - Level all: on the sheet when two or more level-ups of a unit's squads are paid for; lowest level first, then most XP
+//   (2026-11-07: every ready squad gets its next level before any gets a second; headless: fixes-1107-F.js); it levels
+//   as many as the gold covers.
 // - Skip to result asks first (a second tap skips); after the last round Look at board hides the end screen and Show
 //   result brings it back.
 // - Live: the guest's Level all reaches the host as single level-ups do (levels and gold).

@@ -1204,7 +1204,7 @@
     return 'none';
   }
   def({ id: 'school', name: 'School', short: 'sch', kind: 'support', hp: SCHOOL.hp, armor: SCHOOL.armor, color: '#A8443A',
-    text: `Holds 1 squad of yours (either of you): it doesn’t fight, and its player can’t place another squad of that unit type while it is inside. Study (free): a level’s worth of XP every round. Learn (free): a skill of its unit, ready ${SCHOOL.learn} rounds later; it can’t leave meanwhile.`,
+    text: `Holds 1 squad of yours (either of you): it doesn’t fight, and its player can’t place another squad of that unit type while it is inside. Study (free): a level’s worth of XP every round. Learn (free): a skill of its unit, ready ${SCHOOL.learn} rounds later; it can’t leave meanwhile. Respec (free, once a round): swap an either-or skill of its unit for the other one, once it has sat a fight out inside.`,
     downside: 'Destroyed: the squad that destroyed it gets half a level’s XP; the squad inside comes out with the XP and level it went in with (a skill being learnt is lost).',
     skills: [
       { id: 'double', name: 'Double study', cost: SCHOOL.doubleCost, per: 'match', text: 'The squad inside gets twice the XP every round.' },

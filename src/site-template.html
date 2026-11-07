@@ -9267,6 +9267,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
           }
         } else {
           out.push('<p style="margin:0">Empty.</p>');
+          const rs = mine && phase === 'deploy' && Mpb.respecOf(m, me, rec.key); // its pupil left after a respec this round (2026-11-07)
+          if (rs) out.push(`<p class="hint" style="margin:0">Respecced this round: ${esc(units[rs.ui].skillDefs[rs.from].name)} → <b>${esc(units[rs.ui].skillDefs[rs.to].name)}</b>. <button class="btn small" id="school-unrespec" ${live && !Mpb.schoolWhy(m, me, rec, 'unrespec', []) ? '' : 'disabled'}>Undo respec</button></p>`);
           if (mine && phase === 'deploy') {
             const ok = m.armies[me].filter(q => !Mpb.schoolWhy(m, me, rec, 'enroll', [q.id]));
             out.push(ok.length ? `<p class="hint" style="margin:0">Put one of your squads in (it doesn’t fight; you can’t place another of its unit while it is inside):</p><div class="btnrow" style="flex-wrap:wrap">${ok.slice(0, 16).map(q => `<button class="btn small" data-school-in="${q.id}" ${live ? '' : 'disabled'}><span style="color:${units[q.unit].color}">${Shapes.svg(units[q.unit].shape, 14)}</span> ${esc(units[q.unit].name)} ${q.level + 1} · ${q.col + 1},${q.row + 1}</button>`).join('')}<button class="btn small" id="school-pick" ${live ? '' : 'disabled'}>Tap one on the board</button></div>` : '<p class="hint" style="margin:0">None of your squads can go in now (not a rider, a carrier with a rider, or one moved this round).</p>');
