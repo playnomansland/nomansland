@@ -1091,6 +1091,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     s4knandet: { title: 'S4knandet', file: 'audio/s4knandet.mp3' },
     eyesInTheFront2: { title: 'Eyes in the front 2', file: 'audio/eyes-in-the-front-2.mp3' }, // the whole song (menu)
     // the same song as battle music: plays from start to end (seconds), then loops back to start
+    joeBiden: { title: 'Joe biden', file: 'audio/joe-biden.mp3' },
     eyesInTheFront2Battle: { title: 'Eyes in the front 2', file: 'audio/eyes-in-the-front-2.mp3', start: 22.15, end: 88.61 },
   };
   // deployment / battle music not given to a look yet: kept out of the menu playlist and played nowhere until it goes
@@ -1106,8 +1107,9 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     cavern: { deploy: ['sirski'] },                         // Mushroom Cavern
     icy: { deploy: ['icyOne'], battle: ['knarkkungn'] },    // Icy Peak
     autumn: { deploy: ['berlin'] },                         // Autumn
+    ash: { battle: ['joeBiden'] },                          // Ashlands
   };
-  const LOOK_MUSIC = { frost: 'cavern', autumn: 'autumn', cavern: 'cavern', snow: 'icy', moonlit: 'icy' }; // frost = Darkwoods
+  const LOOK_MUSIC = { frost: 'cavern', autumn: 'autumn', cavern: 'cavern', snow: 'icy', moonlit: 'icy', ash: 'ash' }; // frost = Darkwoods
   // the menu playlist: every song that isn't deployment or battle music (a new song shows up in it by itself)
   const phaseSongs = new Set([...UNASSIGNED, ...PLAYLISTS.deploy, ...PLAYLISTS.battle, ...Object.values(MUSIC_COMBOS).flatMap(o => Object.values(o).flat())]);
   PLAYLISTS.menu = Object.keys(SONGS).filter(id => !phaseSongs.has(id));

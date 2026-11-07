@@ -20,6 +20,13 @@ Planned for the next updates (details in `docs/ROADMAP.md`):
 
 ---
 
+## 7 November 2026 – Ashlands battle music
+
+- Fights on the **Ashlands** look now play their own battle song: **Joe biden** by Snetänd. Deployment on Ashlands keeps the standard music.
+- The song is levelled to the same loudness as the rest of the music.
+
+---
+
 ## 7 November 2026 – Three new looks: Ashlands, Moonlit Snow and Savanna
 
 Looks change only how the board and the land around it look, never the rules. Pick them in the look picker on any map that has looks (Standard, Old standard, 2v2), or get them from Random.
