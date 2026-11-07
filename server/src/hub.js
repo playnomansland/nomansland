@@ -11,7 +11,7 @@
 // Messages out: welcome { id, invites }, denied { why }, status { id, online, status, seen }, request { from },
 //               accepted { by }, removed { by }, invite { from, code, mode, expires }, invited { to, code, expires },
 //               inviteFail { to, why }, inviteGone { from?, code }, declined { by, code }, dm { from, to?, text, at, k },
-//               dmFail { to, why }
+//               dmFail { to, why }, gg { from (gamertag) } (room.js: a GG after a match the player has left, 2026-11-07)
 // Hub to hub and accounts.js to hub (Durable Object RPC): friendStatus, event, inviteIn, inviteGone, declined, deliver, presence.
 import { DurableObject } from 'cloudflare:workers';
 import { readMessage, LIMITS } from './limits.js';

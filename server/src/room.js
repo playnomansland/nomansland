@@ -49,7 +49,7 @@ import { LIMITS, LOBBY, json, readMessage, secret, ipHash } from './limits.js';
 import { Chat } from './chat.js';
 import { builtin } from './units.js';
 import { roundRow, forfeitRow } from './history.js';
-import { sessionPlayer, rankedOn, recordSeries, countOnline, recordGG, chatReport } from './accounts.js';
+import { sessionPlayer, rankedOn, recordSeries, countOnline, recordGG, chatReport, hubEvent } from './accounts.js';
 import { VERSION } from './version.js';
 
 const KEEP_MS = 24 * 3600 * 1000; // a match nobody touched for a day is deleted
@@ -414,6 +414,8 @@ export class Room extends DurableObject {
         const text = JSON.stringify({ t: 'gg', from: side, gg: this.meta.gg.sent });
         for (const s of this.sockets()) this.send(s, text);
         const pids = this.meta.pids || [], left = this.meta.left && this.meta.left.seed === R.seed;
+        // the other player has left the room already (the menu): their friends hub tells them, if they're signed in (2026-11-07)
+        if (pids[1 - side] && !this.players(1 - side).length) { try { this.ctx.waitUntil(hubEvent(this.env, pids[1 - side], { t: 'gg', from: this.tagOf(side) })); } catch {} }
         if (!this.meta.tour && !left && pids[side] && pids[1 - side]) {
           const run = recordGG(this.env, pids[side], pids[1 - side], this.historyInfo().matchId, R.fights).catch((e) => console.warn('gg', e && e.message));
           try { this.ctx.waitUntil(run); } catch {}

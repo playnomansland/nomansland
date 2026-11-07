@@ -2219,11 +2219,21 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
 
   // ---------- choose one of 3 (starting package, tower): cards over the board, like a level-up pick ----------
   // Tap a card to see what it does, then tap it again (or Choose). Hide shows the board under it for a moment.
+  // the leader draft's stakes, on the round 1 cards (2026-11-07): ' Win this round: …' (or '' without a draft)
+  const draftStakes = () => Game.drafting(m) && m.round < Game.DRAFT.round ? ` <b style="color:var(--gold)">Win this round: you pick your leader first in round ${Game.DRAFT.round}.</b>` : '';
+  // who picks a leader first after round 1, and why, for the round 1 result card (null: no draft)
+  function draftFirstLine(sum) {
+    if (!Game.drafting(m) || sum.round !== Game.DRAFT.round - 1) return null;
+    const fn0 = foeName(), who = esc(fn0 === 'Enemy' ? 'The AI' : fn0), r = Game.DRAFT.round;
+    if (sum.winner === me) return sum.timeout ? `Time ran out, but you had more health left: you pick your leader first in round ${r}.` : `You won round ${sum.round}: you pick your leader first in round ${r}.`;
+    if (sum.winner === foe()) return sum.timeout ? `Time ran out and ${who} had more health left: they pick their leader first in round ${r}, you pick from the rest.` : `${who} won round ${sum.round}: they pick their leader first in round ${r}, you pick from the rest.`;
+    return `A draw: a coin flip decides who picks a leader first in round ${r}.`;
+  }
   function pickOptions() {
     if (!m || !editable()) return null;
     if (choosingPack()) return {
       kind: 'pack', eyebrow: `Round 1 · ${esc((Game.mapOf(m) || { name: 'Standard' }).name)}`, title: 'Choose your start',
-      sub: m.packages[me].some(p => p.char) ? `Free squads and a character, plus ${m.gold[me]} gold.` : `Free squads, plus ${m.gold[me]} gold.`,
+      sub: (m.packages[me].some(p => p.char) ? `Free squads and a character, plus ${m.gold[me]} gold.` : `Free squads, plus ${m.gold[me]} gold.`) + draftStakes(),
       items: m.packages[me].map((p, k) => {
         const n = {}; p.squads.forEach(ui => { n[ui] = (n[ui] || 0) + 1; });
         const c = p.char && Game.charInfo(p.char);
@@ -2248,8 +2258,8 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
       const turn = Game.leaderTurn(m, me), first = Game.draftFirst(m), fn0 = foeName(), who = fn0 === 'Enemy' ? 'The AI' : fn0;
       return {
         kind: 'leader', eyebrow: `Round ${m.round} · Leader draft`, title: turn ? 'Pick your leader' : `${esc(who)} picks first`,
-        sub: turn ? (first === me ? `${m.history[0] && m.history[0].winner === -1 ? 'Round 1 was a draw and the coin flip says you' : 'You won round 1, so you'} pick first. ${esc(who)} picks from the rest: you can't both have the same leader.` : `${esc(who)} picked first. Pick from the rest.`)
-          : `${m.history[0] && m.history[0].winner === -1 ? `Round 1 was a draw and the coin flip says ${esc(who)}` : `${esc(who)} won round 1, so they`} pick first. Then it's your turn.`,
+        sub: turn ? (first === me ? `${m.history[0] && m.history[0].winner === -1 ? 'Round 1 was a draw and the coin flip says you' : m.history[0] && m.history[0].timeout ? 'You had more health left when time ran out in round 1, so you' : 'You won round 1, so you'} pick first. ${esc(who)} picks from the rest: you can't both have the same leader.` : `${esc(who)} picked first. Pick from the rest.`)
+          : `${m.history[0] && m.history[0].winner === -1 ? `Round 1 was a draw and the coin flip says ${esc(who)}` : m.history[0] && m.history[0].timeout ? `${esc(who)} had more health left when time ran out in round 1, so they` : `${esc(who)} won round 1, so they`} pick first. Then it's your turn.`,
         items: m.draft.pool.map(id => {
           const c = Game.charInfo(id), taken = m.chars && m.chars[1 - me] === id;
           return { key: id, art: armsImg(id), name: esc(c.name), who: taken ? `Taken by ${esc(who)}` : '', det: charLine(id), off: taken };
@@ -2734,7 +2744,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     if (m.round === Game.FLANK.round && !choosingPack() && !choosingTower() && !devPicking() && bannerRound !== undoKey()) { bannerRound = undoKey(); setTimeout(() => banner('Flanks are open', 'Deploy on the blue edges of their half'), 150); }
     const undoable = can && undoSnap && undoSnap.key === undoKey() && sideState() !== undoSnap.state;
     const extraBtns = `<span class="xbtns" style="display:flex;gap:6px;flex-wrap:wrap">
-        ${mode === 'sandbox' ? '<button class="btn small" id="sbx-back">Back to results</button>' : ''}
+        ${mode === 'sandbox' ? `<button class="btn small" id="sbx-back">Back to results</button>${sbxNotesHtml('span')}` : ''}
         ${undoable ? '<button class="btn small" id="undo-all">Undo all</button>' : ''}
         ${loanOffer() ? (Game.loanNow(m, me) ? `<button class="btn small" id="loan-undo" ${can && m.gold[me] >= Game.loanTaken(m, me).gold ? '' : 'disabled'}>Pay back loan · −${Game.loanTaken(m, me).gold}</button>` : `<button class="btn small" id="loan" title="${esc(loanText())}" ${can && Game.canTakeLoan(m, me) ? '' : 'disabled'}${Game.investNow(m, me) ? ' title="Not this round: you made the Major investment"' : ''}>Loan · +${Game.loanTerms(m, me).gold}</button>`) : ''}
         ${Game.charOf(m, me) === 'otto' ? `<button class="btn small" id="slot-open" ${can ? '' : 'disabled'}>Slots · ${Game.SLOT.perRound - Game.slotSpins(m, me).length} left</button>` : ''}
@@ -3681,7 +3691,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
       $('panel').innerHTML = '';
       $('again').addEventListener('click', inTour ? () => { if (mode === 'host') clearHost(); tour.menu = false; showStart(); } : mode === 'claude' ? startClaudeMatch : mode === 'ai' ? startAiMatch : askRematch);
       $('menu').addEventListener('click', () => { if (mode === 'host') clearHost(); showStart(); });
-      bindLook(asked ? 'Your opponent wants a rematch.' : `${win ? 'Victory' : loss ? 'Defeat' : 'Draw'} · the board before the last fight.`);
+      bindLook((asked ? 'Your opponent wants a rematch.' : `${win ? 'Victory' : loss ? 'Defeat' : 'Draw'} · the board before the last fight.`) + (mode === 'net' && !net.duo && ggState()[foe()] ? ` ${foeName()} said GG.` : ''));
       if (looking) lookAtBoard(true);
       return;
     }
@@ -3708,6 +3718,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
       <p class="big">${lines.join(' ')}</p>
       ${lvLines.join('')}
       ${mpbResultHtml(sum)}
+      ${draftFirstLine(sum) ? `<p class="draft-first" style="color:var(--gold)">${draftFirstLine(sum)}</p>` : ''}
       <p class="num" style="color:var(--gold)">${gold.join(' · ')}</p>
       <div class="btnrow">
         ${waiting ? '<p class="status wait">Waiting for your opponent</p>' : `<button class="btn primary" id="next">Next round</button>`}
@@ -3811,21 +3822,46 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     if (roundLog.key !== k) roundLog = { key: k, rounds: {} };
     (roundLog.rounds[r] || (roundLog.rounds[r] = {}))[field] = v;
   }
-  var sbx = { on: false, saved: null, round: 0, foe: '', inbox: [] };
+  var sbx = { on: false, saved: null, round: 0, foe: '', inbox: [], notes: [], sum: null };
   var endShow = null; // the match-over card to bring back when there is no summary (the opponent forfeited)
   function sbxHold(fn, d) { // a message for the real match while replaying: it waits
     if (!sbx || !sbx.on) return false;
     if (d && d.t === 'pong') return false;
+    if (sbxNewGame(d)) { // the next game has started (its clock runs): back to the real match at once (2026-11-07)
+      sbxExit(); fn(d);
+      banner('The next game has started', 'Back from the replay');
+      return true;
+    }
     sbx.inbox.push([fn, d]);
+    sbxPeek(d);
     return true;
   }
+  // while replaying (2026-11-07): what the opponent did shows at once (a banner, and a line beside Back to results that
+  // stays, sbx.notes), though the message itself still waits in sbx.inbox
+  const sbxNewGame = (d) => !!d && (d.t === 'fight' || d.t === 'draft' || (d.t === 'sync' && d.phase === 'deploy' && !!d.m)); // (the real match is over)
+  function sbxPeek(d) {
+    if (!d) return;
+    const foeSd = 1 - me, S = sbx.saved;
+    if ((d.t === 'rematch' && S.mode === 'host') || ((d.t === 'status' || d.t === 'sync') && Array.isArray(d.rematch) && d.rematch[foeSd])) {
+      if (S.rematch[foeSd]) return;
+      S.rematch[foeSd] = true; // announced once
+      const rk = S.mode === 'net' && net.ranked && !tourLive() ? net.ranked : null;
+      sbxNote(`${sbx.foe} ${rk && !rk.done ? 'wants the next game' : 'wants a rematch'}`);
+    } else if (d.t === 'gg' && d.from === foeSd) ggAnnounce(S.m.seed);
+  }
+  function sbxNote(text) {
+    if (!sbx.notes.includes(text)) sbx.notes.push(text);
+    banner(text, 'Back to results when you’re done'); sfx('menu');
+    if (phase === 'deploy') panelDeploy(); else if (phase === 'result' && sbx.sum) sbxResult(sbx.sum);
+  }
+  const sbxNotesHtml = (tag) => mode === 'sandbox' && sbx.notes.length ? `<${tag} class="sbx-note" style="color:var(--gold)">${sbx.notes.map(esc).join(' · ')}</${tag}>` : '';
   const sbxBase = () => (sbx.on ? sbx.saved.m : m);
   function sbxRounds() {
     const b = sbxBase();
     if (!b || roundLog.key !== String(b.seed)) return [];
     return Object.keys(roundLog.rounds).map(Number).filter(r => roundLog.rounds[r].pre && roundLog.rounds[r].start).sort((a, c) => a - c);
   }
-  const replayBtn = () => sbxRounds().length && mode !== 'spec' && !(net.duo && mode === 'net')
+  const replayBtn = () => sbxRounds().length && mode !== 'spec' && !(net.duo && mode === 'net') && !(rematch[me] && !solo()) // (not once you've asked for the next game, 2026-11-07)
     ? '<button class="btn" id="replay">Replay a round</button>' : '<button class="btn" id="look">Look at board</button>';
   function realRound(r) { const b = sbxBase(); return ((b && b.history) || []).find(h => h.round === r) || null; }
   const roundWord = (h) => !h ? '' : h.timeout ? 'time' : h.winner === me ? 'won' : h.winner === 1 - me ? 'lost' : 'draw';
@@ -3844,7 +3880,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     if (!L || !L.pre || !L.start) return;
     if (!sbx.on) {
       sbx.saved = { m, mode, me, phase, lastSummary, lastPre, nextReady: nextReady.slice(), rematch: rematch.slice(), lastAiLevels, undoSnap, ready: ready.slice(), endShow };
-      sbx.foe = foeName(); sbx.inbox = [];
+      sbx.foe = foeName(); sbx.inbox = []; sbx.notes = [];
     }
     sbx.on = true; sbx.round = r;
     cancelAnimationFrame(raf);
@@ -3859,7 +3895,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     banner(`Replaying round ${r}`, 'Deploy differently, then Fight. The match result stays as it was.');
   }
   function sbxResult(sum) {
-    phase = 'result'; resultShownAt = 0; hud();
+    phase = 'result'; resultShownAt = 0; hud(); sbx.sum = sum;
     const r = sbx.round, real = realRound(r), w = roundWord(sum), was = roundWord(real);
     const head = w === 'time' ? 'Time ran out' : w === 'won' ? 'Round won' : w === 'lost' ? 'Round lost' : 'Draw';
     const dmg = (x) => [x.dmg[1 - me] ? `${esc(sbx.foe)} takes <b class="num">${x.dmg[1 - me]}</b> damage.` : '', x.dmg[me] ? `You take <b class="num">${x.dmg[me]}</b> damage.` : ''].filter(Boolean).join(' ') || 'Nobody takes damage.';
@@ -3870,6 +3906,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
       <p class="big">${dmg(sum)}</p>
       ${wasLine ? `<p>${wasLine}</p>` : ''}
       <p class="hint">Only a replay: the match result doesn’t change.</p>
+      ${sbxNotesHtml('p')}
       <div class="btnrow">
         <button class="btn primary" id="sbx-again">Try again</button>
         <button class="btn" id="sbx-pick">Other round</button>
@@ -3885,7 +3922,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     if (!sbx.on) return;
     cancelAnimationFrame(raf);
     const S = sbx.saved;
-    sbx.on = false; sbx.saved = null;
+    sbx.on = false; sbx.saved = null; sbx.notes = []; sbx.sum = null;
     m = S.m; mode = S.mode; me = S.me; lastSummary = S.lastSummary; lastPre = S.lastPre; nextReady = S.nextReady; rematch = S.rematch;
     lastAiLevels = S.lastAiLevels; undoSnap = S.undoSnap; ready = S.ready; endShow = S.endShow;
     phase = 'end'; bt = null; battlePre = null; fx = []; deadline = 0; selected = null; moveMode = false; moving = null;
@@ -3902,23 +3939,32 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
   // server counts it towards the other's Good sport title (10 GGs; server accounts.js GG). net.gg = [side 0 said it,
   // side 1 said it] for the match with seed net.ggSeed.
   const ggState = () => (net.gg && m && net.ggSeed === m.seed ? net.gg : [false, false]);
+  // A GG shows as sent only once the server has it (its echo, or net.gg from a sync; net.ggPending until then, and a
+  // sync after a reconnect sends it again). A GG received shows a banner and a sound wherever the player is: the end
+  // card, Look at board, Replay a round (sbxPeek); once they've left the room, their friends hub brings it (hubRecv).
+  // (2026-11-07)
   function ggRow() {
     if (mode !== 'net' || net.duo || !m || !m.over) return '';
-    const g = ggState(), sent = g[me], got = g[1 - me];
-    return `<div class="btnrow gg-row"><button class="btn" id="gg" ${sent ? 'disabled' : ''}>${sent ? 'GG sent ✓' : 'Say GG'}</button>${got ? `<span class="gg-got">${esc(foeName())} said GG</span>` : ''}</div>`;
+    const g = ggState(), sent = g[me], got = g[1 - me], sending = !sent && net.ggPending === m.seed;
+    return `<div class="btnrow gg-row"><button class="btn" id="gg" ${sent || sending ? 'disabled' : ''}>${sent ? 'GG sent ✓' : sending ? 'Sending…' : 'Say GG'}</button>${got ? `<span class="gg-got">${esc(foeName())} said GG</span>` : ''}</div>`;
   }
   function sendGG() {
     if (mode !== 'net' || !m || !m.over) return;
-    const g = ggState().slice();
-    if (g[me]) return;
-    g[me] = true; net.gg = g; net.ggSeed = m.seed;
+    if (ggState()[me] || net.ggPending === m.seed) return;
+    net.ggPending = m.seed;
     send({ t: 'gg' });
     if (lastSummary) showResult(lastSummary); else if (endShow) endShow();
   }
   function ggGot(d) {
-    if (Array.isArray(d.gg) && m) { net.gg = d.gg.slice(); net.ggSeed = m.seed; }
+    if (Array.isArray(d.gg) && m) { net.gg = d.gg.slice(); net.ggSeed = m.seed; if (d.gg[me] && net.ggPending === m.seed) net.ggPending = null; }
     if (mode === 'spec') { if (d.from === 0 || d.from === 1) banner('GG'); return; }
+    if (m && d.from === 1 - me) ggAnnounce(m.seed);
     if (phase === 'end' && lastSummary) showResult(lastSummary); else if (phase === 'end' && endShow) endShow();
+  }
+  function ggAnnounce(seed) { // once a match
+    if (net.ggShown === seed) return;
+    net.ggShown = seed;
+    if (sbx.on) sbxNote(`${sbx.foe} said GG`); else { banner(`${foeName()} said GG`); sfx('menu'); }
   }
 
   // ---------- match reports ----------
@@ -4390,6 +4436,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
     if (d.t === 'inviteFail') { frNote({ offline: `${frName(d.to)} is offline now.`, open: `${frName(d.to)} already has an invite from you.`, 'slow down': 'Too many invites. Wait a minute.', 'not friends': 'You can only invite friends.', room: 'Open a room first.' }[d.why] || 'The invite didn’t go through.'); return; }
     if (d.t === 'declined') { delete fr.invited[d.by.id]; frNote(`${d.by.tag || 'Your friend'} declined.`); frRedraw(); return; }
     if (d.t === 'dm') { frDm(d); return; }
+    if (d.t === 'gg' && typeof d.from === 'string') { if (!frInMatch()) { frToast(`${esc(d.from.slice(0, 24))} said GG after your match.`); sfx('menu'); } return; } // (room.js: after you left the room, 2026-11-07)
     if (d.t === 'dmFail') { frThreadMsg(d.why === 'slow down' ? 'Slow down a little: too many messages.' : d.why === 'not friends' ? 'You can only message friends.' : 'The message didn’t go through.'); return; }
   }
   const frInvOk = (x) => x && x.from && typeof x.code === 'string' && /^[A-Z0-9]{4,8}$/.test(x.code) && x.expires > now();
@@ -8254,6 +8301,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (d.t === 'sync') {
       if (d.here) net.foeHere = !!d.here[foe()];
       if (Array.isArray(d.gg) && d.m) { net.gg = d.gg.slice(); net.ggSeed = d.m.seed; }
+      if (d.m && net.ggPending === d.m.seed) { if (Array.isArray(d.gg) && d.gg[me]) net.ggPending = null; else if (d.m.over) send({ t: 'gg' }); } // a GG that didn't go before the socket closed goes now (2026-11-07)
       if (d.m && !m) { // the first look at this match on this phone: the built-in units
         srvUnits();
         if (net.tourCode) tour.playing = net.code;

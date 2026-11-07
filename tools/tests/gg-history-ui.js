@@ -3,6 +3,8 @@
 //  - a whole friend's match on the server, played by tapping; the match-over card has Say GG and Replay a round
 //  - Say GG: the other phone shows "<name> said GG", the button turns into "GG sent"; the count reaches the account
 //  - Replay a round in a server match comes back to the same match-over card
+//  - (2026-11-07) while replaying a round, the opponent's GG and Rematch show at once (a banner and a line beside Back
+//    to results); Replay a round is gone once you've asked for a rematch; a GG reaches a player on Look at board
 //  - Profile → Match history → My matches: the match with the opponent's username; a round's Replay plays the fight
 //    and comes back to the history
 // Needs: python3 -m http.server 8766 (repo root). Run: node tools/tests/gg-history-ui.js
@@ -70,28 +72,45 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 8 * 60 *
       assert.strictEqual(await p.locator('#overlay #replay').count(), 1, 'Replay a round on the match-over card');
     }
     await host.screenshot({ path: 'gg-before.png' });
-    // GG from the host
+    // the guest replays round 1 of the server match
+    await guest.click('#overlay #replay'); await sleep(300);
+    await guest.click('#sheet .rgrid [data-r="1"]'); await sleep(500);
+    assert.strictEqual((await peek(guest)).phase, 'deploy', 'replaying round 1');
+    // GG from the host: the replaying guest is told at once (2026-11-07)
     await host.click('#overlay #gg');
-    await guest.waitForFunction(() => /Alpha said GG/.test(document.getElementById('overlay').innerText), null, { timeout: 8000 });
+    await guest.waitForFunction(() => /Alpha said GG/.test(document.getElementById('banner').innerText) && /Alpha said GG/.test(document.getElementById('panel').innerText), null, { timeout: 8000 });
+    await host.waitForFunction(() => /GG sent/.test(document.getElementById('overlay').innerText), null, { timeout: 8000 }); // once the server has it
     assert.ok(await host.locator('#overlay #gg[disabled]').count(), 'GG sent');
     await guest.screenshot({ path: 'gg-got.png' });
     const meB = await (async () => { for (let i = 0; i < 20; i++) { const x = await call('me', {}, B.session); if (x.player.gg === 1) return x; await sleep(300); } return null; })();
     assert.ok(meB, 'counted on Bravo\'s account');
-    // Replay a round in the server match, then back
-    await guest.click('#overlay #replay'); await sleep(300);
-    await guest.click('#sheet .rgrid [data-r="1"]'); await sleep(500);
-    assert.strictEqual((await peek(guest)).phase, 'deploy', 'replaying round 1');
+    // the host asks for a rematch: the replaying guest sees it beside Back to results; the host has no Replay a round now
+    await host.click('#overlay #again');
+    await guest.waitForFunction(() => /Alpha wants a rematch/.test(document.getElementById('panel').innerText), null, { timeout: 8000 });
+    assert.strictEqual((await peek(guest)).phase, 'deploy', 'still replaying (no auto-exit)');
+    await host.waitForFunction(() => /Waiting for opponent/.test(document.getElementById('overlay').innerText), null, { timeout: 8000 });
+    assert.strictEqual(await host.locator('#overlay #replay').count(), 0, 'no Replay a round once you asked for the rematch');
+    assert.strictEqual(await host.locator('#overlay #look').count(), 1, 'Look at board in its place');
+    await guest.screenshot({ path: 'gg-replay-notice.png' });
     await guest.click('#sbx-back'); await sleep(400);
     const g2 = await peek(guest);
     assert.ok(g2.phase === 'end' && g2.over, 'back at the end of the server match');
-    assert.ok(/Alpha said GG/.test(await guest.locator('#overlay').innerText()), 'with the GG still there');
+    const card = (await guest.locator('#overlay').innerText());
+    assert.ok(/Alpha said GG/.test(card), 'with the GG still there');
+    assert.ok(/Your opponent wants a rematch/.test(card), 'and the rematch asked');
+    // a GG reaches the host on Look at board: a banner and the line in the panel
+    await host.click('#overlay #look'); await sleep(300);
+    await guest.click('#overlay #gg');
+    await host.waitForFunction(() => /Bravo said GG/.test(document.getElementById('banner').innerText) && /Bravo said GG/.test(document.getElementById('panel').innerText), null, { timeout: 8000 });
+    assert.ok(await host.locator('#overlay').evaluate(e => e.hidden), 'still looking at the board');
+    await host.click('#end-back'); await sleep(200);
     // My matches
     await guest.click('#overlay #menu'); await sleep(600);
     await guest.click('#acct-open'); await sleep(400);
     await guest.click('#hist-open'); await sleep(200);
     await guest.waitForSelector('#hist .hm', { timeout: 10000 }).catch(async (e) => { console.log('history sheet:', (await guest.locator('#sheet').innerText()).replace(/\s+/g, ' ').slice(0, 300)); console.log('server says', JSON.stringify(await call('history', {}, B.session)).slice(0, 300)); await guest.screenshot({ path: 'history-fail.png' }); throw e; });
-    const card = (await guest.locator('#hist .hm').first().innerText()).replace(/\s+/g, ' ');
-    assert.ok(/vs Alpha/.test(card) && /(Victory|Defeat|Draw)/.test(card) && /rounds?/.test(card), card.slice(0, 300));
+    const hm = (await guest.locator('#hist .hm').first().innerText()).replace(/\s+/g, ' ');
+    assert.ok(/vs Alpha/.test(hm) && /(Victory|Defeat|Draw)/.test(hm) && /rounds?/.test(hm), hm.slice(0, 300));
     await guest.locator('#hist .hm details summary').first().click(); await sleep(200);
     await guest.screenshot({ path: 'history-mine.png' });
     await guest.locator('#hist [data-replay]').first().click();
