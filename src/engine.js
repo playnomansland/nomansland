@@ -2731,6 +2731,8 @@ const Engine = (() => {
             if (block) continue;
           }
           if (b.guideT != null) { // a direction arrow it can't finish (game.js AIM): fight as usual
+            // pushed back: the best follows it (less GUIDE_GAIN, so jostling on the spot isn't progress), so walking back counts (2026-11-07)
+            if (b.guideBest != null && gd - GUIDE_GAIN > b.guideBest) b.guideBest = gd - GUIDE_GAIN;
             if (!(gd > (b.guideBest == null ? Infinity : b.guideBest) - GUIDE_GAIN)) { b.guideBest = gd; b.guideIdle = 0; }
             else if ((b.guideIdle = (b.guideIdle || 0) + dt) >= b.guideT - 1e-9) { b.guide = null; b.guideT = null; b.guideBest = null; continue; }
           }

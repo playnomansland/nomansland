@@ -95,10 +95,20 @@ const walk = (w, foes, secs, g = G, each) => {
   let n = 0;
   const at4 = walk(w4, [far4], 30, G, () => { if (++n % 30 === 0 && w4.guide) w4.x -= 4; });
   assert.ok(at4 && at4.x > 28, 'knocked back, it still walks the whole arrow');
+  // slowed by 70% and knocked back 4 m once: walking back counts as getting closer, so it doesn't give up
+  const w6 = walker(), far6 = body(dummy(1e6), 1, 0, 80, 26);
+  let knocked = false;
+  const at6 = walk(w6, [far6], 40, G, () => { w6.slowT = 1; w6.slowMove = 70; if (!knocked && w6.x >= 3.5) { knocked = true; w6.x -= 4; } });
+  assert.ok(knocked && at6 && at6.x > 28, `slowed and knocked back, it still walks the whole arrow (arrow ended at x ${at6 && at6.x.toFixed(1)})`);
   // held still from 2 s on (no progress at all) it gives up 3 s later and fights as usual
   const w5 = walker(), far5 = body(dummy(1e6), 1, 0, 80, 25);
   const at5 = walk(w5, [far5], 8, G, () => { if (n++ >= 0 && w5.x >= 8) { w5.slowT = 1; w5.slowMove = 100; } });
   assert.ok(at5 && near(at5.x, 8, 0.3) && near(at5.t, 2 + 3, 0.2), `gave up ~3 s after it got stuck (x ${at5 && at5.x.toFixed(2)} at ${at5 && at5.t.toFixed(2)} s)`);
+  // stuck but jostled 0.6 m back and forth every tick (a crowd): that isn't progress, it still gives up
+  const w7 = walker(), far7 = body(dummy(1e6), 1, 0, 80, 27);
+  let j = 0, stuck = false;
+  const at7 = walk(w7, [far7], 8, G, () => { if (stuck || w7.x >= 8) { stuck = true; w7.slowT = 1; w7.slowMove = 100; w7.x = 8 + (j++ % 2 ? 0.3 : -0.3); } });
+  assert.ok(at7 && near(at7.t, 2 + 3, 0.3), `jostled on the spot, it gave up ~3 s after it got stuck (at ${at7 && at7.t.toFixed(2)} s)`);
 }
 
 // B4 Bullhead: 85 damage and 5 m of knockback; B5 Rollers: 9 m past the target
