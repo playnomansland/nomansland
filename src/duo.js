@@ -59,13 +59,14 @@
   const flip = (id) => typeof id !== 'number' ? id : id >= OFF ? id - OFF : move(id);
   const moved = (q) => { const o = { ...q, id: move(q.id) }; if (q.in != null) o.in = flip(q.in); if (q.from && q.from.in != null) o.from = { ...q.from, in: flip(q.from.in) }; return o; };
   // the squads of match o (the other lane) as m.team carries them; half: the half of the board this lane's players use.
-  // buildings: the other lane's buildings from skills (the Cog Builder's Factory: { id, col, row, round, built }), so
-  // their tiles are taken in this lane too (Game.occupied) and the board can draw them.
+  // buildings: the other lane's buildings from skills (the Cog Builder's Factory: { id, col, row, round, built,
+  // progress, level, fell }), so their tiles are taken in this lane too (Game.occupied) and both boards draw them
+  // (built, being rebuilt after it fell, or a new site; 2026-11-07).
   // tech: that lane's skills, so a teammate's (or the other opponent's) unit sheet shows their own (a seat's view gets
   // o as Referee.view hides it, so the opponents' skills bought this round stay hidden). Direction arrows (sq.aim) come
   // along with the squads: the teammate's all, the opponents' never while deploying (Referee.hide drops them).
   const teamOf = (o, half) => ({ half, armies: [0, 1].map(sd => (o.armies[sd] || []).map(moved)),
-    buildings: [0, 1].map(sd => ((o.buildings && o.buildings[sd]) || []).map(b => ({ id: b.id, col: b.col, row: b.row, round: b.round, built: !!b.built }))),
+    buildings: [0, 1].map(sd => ((o.buildings && o.buildings[sd]) || []).map(b => ({ id: b.id, col: b.col, row: b.row, round: b.round, built: !!b.built, progress: b.progress || 0, level: b.level || 0, fell: b.fell || 0 }))),
     tech: [0, 1].map(sd => (o.tech && o.tech[sd]) || null),
     // squads sold this round (as Game.soldNow): the Shadow Den's Impersonate may still pick one (src/mpb.js teamSold)
     sold: [0, 1].map(sd => G.soldNow(o, sd).map(moved)),

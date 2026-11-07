@@ -37,7 +37,7 @@
   // =====================================================================
   // The kinds. One entry per kind, each in its own marked region (B groups fill theirs). Fields:
   //   id, name, short (key prefix), kind ('economic' | 'support' | 'technical' | 'defensive'), text, downside, hp,
-  //   armor, color (2D and the default 3D tint), draft (false: never a card), skills: [{ id, name, cost, costStep,
+  //   armor, color (2D and the default 3D tint), draft (false: never a card), skills: [{ id, name, cost, costStep, costRise,
   //   per, text, max }], place: { where: 'interior' | 'own' | 'nml' | 'board' | 'fixed', spacing, open, parts: [{ id,
   //   name, where, spacing }] }, hooks: { ... } (see the Hooks section below and docs/MPB-2V2.md "Adding a kind")
   // =====================================================================
@@ -391,9 +391,16 @@
   // exit tiles can be blocked and any units that would end up on the blocked tile simply do not go through the mine to
   // begin with"). So the exit and its ring never make anything move at the fight's start (place.parts' stays). Rogues,
   // Assassins and Shadowhands of a team with a Shadow Den come up without the COAL.rise wait. The entrance is a structure that can be destroyed (squads already on their way still come up); the exit is a shaft on
-  // the board, not a fight body. Skills: Dig a new exit (move it once; a flank tile of the enemy's half too), Fresh
+  // the board, not a fight body. Skills: Dig a new exit (move it; a flank tile of the enemy's half too), Fresh
   // air (squads coming up faster and tougher for a while).
-  const COAL = { hp: 700, armor: 4, travel: 2, rise: 1.5, moveCost: 150, airCost: 200, air: { speed: 25, armor: 4, secs: 5 } };
+  // Destroyed in a fight (2026-11-07, Vilhelm): the mine is shut the next round (cmResting): nobody goes down it or
+  // comes up, but it still stands in the fight as a target, its exit still blocks its ring, and both skills can still
+  // be bought. Destroyed again that round: shut again the round after.
+  // Dig a new exit (2026-11-07): once a round per mine, each dig 50 gold more than the last (moveRise: per earlier dig
+  // of this mine this match, Mpb.skillCost's costRise); rec.data.digs = moves made, so a dig bought is one move. A dig
+  // is used the round it is bought: one bought and not used is lost as the next round begins (rec.data.lapsed, roundStart).
+  const COAL = { hp: 700, armor: 4, travel: 2, rise: 1.5, moveCost: 150, moveRise: 50, airCost: 200, air: { speed: 25, armor: 4, secs: 5 } };
+  const cmResting = (m, rec) => !!rec && rec.fell > 0 && rec.fell === m.round - 1;
   const exitOf = (rec) => (rec && rec.parts && rec.parts.exit) || null;
   const cheb = (c0, r0, c1, r1) => Math.max(Math.abs(c0 - c1), Math.abs(r0 - r1));
   // a tile the mine can't use as the fight starts: water, a building's tile (but the exit's own: exit), a Bastion wall
@@ -442,18 +449,23 @@
     for (let row = 0; row < ROWS; row++) for (let col = 0; col < COLS; col++) if (exitMoveOk(m, side, rec, col, row)) out.push({ col, row });
     return out;
   }
-  const canMoveExit = (m, side, rec) => skillN(rec, 'shaft') > 0 && !rec.data.moved && !!exitOf(rec);
+  // a dig bought and not used yet (one move for each buy: data.digs counts the moves, data.lapsed the ones lost), and
+  // none made this round
+  const digsLeft = (rec) => skillN(rec, 'shaft') - (rec.data.digs || 0) - (rec.data.lapsed || 0);
+  const canMoveExit = (m, side, rec) => digsLeft(rec) > 0 && rec.data.moved !== m.round && !!exitOf(rec);
   def({ id: 'coalMine', name: 'Coal mine', short: 'cm', kind: 'technical', hp: COAL.hp, armor: COAL.armor, color: '#4A4440',
     text: `Squads deployed on the 8 tiles round the entrance go down the mine as the fight starts and come up round the exit in no man’s land ${COAL.travel} s later (on the matching tile), then stand ${COAL.rise} s before they fight (not Rogues, Assassins or Shadowhands with a Shadow Den).`,
-    downside: 'No squad of either team may be deployed on the 8 tiles round its exit. If the exit, or the tile a squad would come up on, is taken (a squad or any other unit, a building, water or a wall, of either team), that squad doesn’t go down the mine: it fights from its own tile.',
+    downside: 'No squad of either team may be deployed on the 8 tiles round its exit. If the exit, or the tile a squad would come up on, is taken (a squad or any other unit, a building, water or a wall, of either team), that squad doesn’t go down the mine: it fights from its own tile. Destroyed in a fight: the mine is shut the next round (nobody goes down it).',
     // (stays: the exit never moves at the fight's start and never makes anything move: it is just blocked, Duo.settleBoard)
     place: { where: 'interior', spacing: true, parts: [{ id: 'exit', name: 'exit', where: 'nml', spacing: false, stays: true }] },
     skills: [
-      { id: 'shaft', name: 'Dig a new exit', cost: COAL.moveCost, per: 'match', text: 'Move the exit once, to any tile of no man’s land or a flank tile of the enemy’s half.' },
+      { id: 'shaft', name: 'Dig a new exit', cost: COAL.moveCost, costRise: COAL.moveRise, per: 'round', text: `Move the exit to any tile of no man’s land or a flank tile of the enemy’s half. Once a round; each dig costs ${COAL.moveRise} gold more than the last.` },
       { id: 'air', name: 'Fresh air', cost: COAL.airCost, per: 'match', text: `Squads coming up the mine move ${COAL.air.speed}% faster and have +${COAL.air.armor} armor for ${COAL.air.secs} s.` },
     ],
-    COAL, mineOut, exitMoveOk, exitBackOk, exitSpots, canMoveExit,
+    COAL, mineOut, exitMoveOk, exitBackOk, exitSpots, canMoveExit, cmResting,
     hooks: {
+      resting: (m, side, rec) => cmResting(m, rec),
+      fellText: (m, side, rec) => cmResting(m, rec) ? `Destroyed in round ${rec.fell}’s fight: the mine is shut this round (nobody goes down it); it still stands in the fight.` : `Destroyed in round ${rec.fell}’s fight; it stands again in every fight.`,
       spotOk: (m, side, part, col, row) => part !== 'exit' || !nearArtifact(m, col, row),
       // the 8 tiles round the exit: no squad of either team (Game.occupied through Mpb.at)
       blocks(m, side, rec, col, row) { const x = exitOf(rec); return !!x && cheb(col, row, x.col, x.row) === 1; },
@@ -462,7 +474,7 @@
       // with a Shadow Den come up without the wait (Vilhelm, 6 Nov: "Den removes the wait for rogues, assassins etc.";
       // the same units as the Den's no flank delay)
       squadBodies(m, side, rec, sq, list) {
-        if (sq.in != null || !list.length) return; // a rider goes with its carrier
+        if (sq.in != null || !list.length || cmResting(m, rec)) return; // a rider goes with its carrier; a shut mine takes nobody
         const t = mineOut(m, rec, sq.col, sq.row);
         if (!t) return;
         const a = G.tileToWorld(sq.col, sq.row), b = G.tileToWorld(t.col, t.row), x0 = exitOf(rec), e = G.tileToWorld(x0.col, x0.row);
@@ -470,32 +482,41 @@
         const rise = denOf(m, side) && denUnit(m, sq.unit) ? 0 : COAL.rise;
         for (const x of list) x.mineTo = { x: b.x, y: b.y, dx: b.x - a.x, dy: b.y - a.y, h: G.TILE / 2, t: COAL.travel, rise, boost: air, ex: { x: e.x, y: e.y } };
       },
-      canBuy: (m, side, rec) => !!exitOf(rec),
+      // Dig a new exit: not while a dig bought is still unused, nor once the exit moved this round (so a dig taken back
+      // is always the one this round's move used)
+      canBuy: (m, side, rec, sk) => !!exitOf(rec) && (sk.id !== 'shaft' || (digsLeft(rec) <= 0 && rec.data.moved !== m.round)),
       // Dig a new exit taken back the round it was bought: the exit goes back too (refused once its old tile is taken)
       canUndo: (m, side, rec, id) => id !== 'shaft' || !(rec.data.moved === m.round && rec.data.from) || exitBackOk(m, side, rec, rec.data.from),
       // Undo all would put the exit back where it stood (restoreOk: was = the record as it would be again)
       restoreOk(m, side, rec, was) { const a = exitOf(rec), b = exitOf(was); return !b || (a && a.col === b.col && a.row === b.row) || exitBackOk(m, side, rec, b); },
-      unbuy(m, side, rec, sk) { if (sk.id === 'shaft' && rec.data.moved === m.round && rec.data.from) { rec.parts.exit = { ...rec.data.from }; rec.data.moved = 0; rec.data.from = null; } },
+      // (the record's data as the round began: data.was, kept by act)
+      unbuy(m, side, rec, sk) { const w = rec.data.was; if (sk.id === 'shaft' && rec.data.moved === m.round && rec.data.from) { rec.parts.exit = { ...rec.data.from }; rec.data = w && w.round === m.round ? clone(w.data) : {}; } },
       canAct: (m, side, rec, action, args) => action === 'exit' && canMoveExit(m, side, rec) && exitMoveOk(m, side, rec, args[0], args[1]),
       act(m, side, rec, action, args, lane) {
-        rec.data.from = { ...exitOf(rec) }; rec.data.moved = m.round; rec.data.by = lane;
+        const was = clone(rec.data); // (once a round: canMoveExit)
+        rec.data.was = { round: m.round, data: was };
+        rec.data.from = { ...exitOf(rec) }; rec.data.moved = m.round; rec.data.by = lane; rec.data.digs = (was.digs || 0) + 1;
         rec.parts.exit = { col: args[0], row: args[1] };
         return true;
       },
       // the opponents (Mpb.seenList): an exit dug this round still stands on its old tile (its old ring too) until the
-      // fight, and the record has no dig keys (as when the round began: none, not 0/null after a take-back)
+      // fight, and the record's data is as the round began (data.was: no dig keys, or an earlier dig's, and its count)
       seen(rec, round) {
         const d = rec.data || {}, dug = d.moved === round && d.from;
-        if (!dug && (d.moved || !('moved' in d || 'from' in d || 'by' in d))) return rec;
-        const data = { ...d };
-        delete data.moved; delete data.from; delete data.by;
-        return { ...rec, parts: dug ? { ...rec.parts, exit: { col: d.from.col, row: d.from.row } } : rec.parts, data };
+        if (!dug) return rec;
+        return { ...rec, parts: { ...rec.parts, exit: { col: d.from.col, row: d.from.row } }, data: d.was && d.was.round === round ? clone(d.was.data) : {} };
+      },
+      // an earlier round's round-start copy goes (so the record as a round begins never holds one), and a dig bought
+      // last round and not used is lost (a dig is used the round it is bought)
+      roundStart(lanes, side, rec) {
+        if (rec.data.was && rec.data.was.round !== lanes[0].round) delete rec.data.was;
+        if (digsLeft(rec) > 0) rec.data.lapsed = (rec.data.lapsed || 0) + digsLeft(rec);
       },
       // bots: now and then one of the squads they put down this round goes round the entrance (down the mine), Fresh
       // air when they have gold to spare, and sometimes a new exit nearer the enemy
       botAfter(m, side, rec, r) {
         if (!exitOf(rec)) return;
-        if (r() < 0.5) {
+        if (r() < 0.5 && !cmResting(m, rec)) { // (a shut mine: nobody goes down it this round)
           const sq = m.armies[side].find(q => q.round === m.round && q.in == null && !(m.units[q.unit] || {}).building && !mineOut(m, rec, q.col, q.row));
           const to = [];
           for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (dc || dr) to.push({ col: rec.col + dc, row: rec.row + dr });
@@ -503,7 +524,7 @@
         }
         const spare = () => m.gold[side] - G.CARRY_CAP / 2;
         if (!skillN(rec, 'air') && spare() >= COAL.airCost && r() < 0.35) G.mpbBuy(m, side, rec.key, 'air');
-        if (!skillN(rec, 'shaft') && spare() >= COAL.moveCost && r() < 0.2) {
+        if (canBuy(m, side, rec.key, 'shaft') && spare() >= skillCost(m, side, rec.key, 'shaft') && r() < (skillN(rec, 'shaft') ? 0.08 : 0.2)) { // (again now and then: each dig costs more)
           const fwd = (t) => side === 0 ? t.row : G.ROWS - 1 - t.row, mid = (G.COLS - 1) / 2; // nearer the enemy: smaller
           const best = exitSpots(m, side, rec).filter(t => !G.isFlank(side, t.col, t.row)).sort((a, b) => fwd(a) - fwd(b) || Math.abs(a.col - mid) - Math.abs(b.col - mid) || a.col - b.col)[0];
           if (best && G.mpbBuy(m, side, rec.key, 'shaft')) G.mpbAct(m, side, rec.key, 'exit', best.col, best.row);
@@ -511,7 +532,10 @@
       },
       info(m, side, rec) {
         const x = exitOf(rec);
-        return [x ? `Exit at column ${x.col + 1}, row ${x.row + 1}` : 'No exit yet', skillN(rec, 'shaft') ? (rec.data.moved ? 'The exit has been moved' : 'The exit can be moved once') : '', skillN(rec, 'air') ? 'Fresh air' : ''].filter(Boolean);
+        const n = rec.data.digs || 0; // (moves made; the opponents get the count as the round began: seen)
+        return [cmResting(m, rec) ? `Shut this round: destroyed in round ${rec.fell}’s fight, nobody goes down it` : '', x ? `Exit at column ${x.col + 1}, row ${x.row + 1}` : 'No exit yet',
+          canMoveExit(m, side, rec) ? 'A dig is ready: move the exit' : rec.data.moved === m.round ? 'The exit was moved this round' : '',
+          n ? `Dug ${n} time${n > 1 ? 's' : ''}` : '', skillN(rec, 'air') ? 'Fresh air' : ''].filter(Boolean);
       },
     },
   });
@@ -689,6 +713,8 @@
       { id: 'cogmech', name: 'CogMech', cost: 300, per: 'round', text: 'A walking mech with two turrets (2000 health, 4 armor, splash) walks out 4 s into the fight.' },
     ],
     hooks: {
+      resting: (m, side, rec) => facResting(m, rec), // (the boards' out-of-action look, Mpb.resting)
+      fellText: (m, side, rec) => facResting(m, rec) ? `Destroyed in round ${rec.fell}’s fight: it is being rebuilt this round and makes nothing; it still stands in the fight.` : `Destroyed in round ${rec.fell}’s fight; it stands again in every fight.`,
       // one unit a round for the team (a take-back frees it), none the round after it was destroyed
       canBuy: (m, side, rec, sk) => !facResting(m, rec) && !facNow(m, rec) && !!G.buildingSkillInfo(FAC.building, sk.id),
       bodies(m, side, rec, ctx) {
@@ -1879,12 +1905,14 @@
   // =====================================================================
   // Skills (generic purchase), actions, take-backs
   // =====================================================================
-  // price of the next click: cost + costStep for every click this player made this round (costStep: per player)
+  // price of the next click: cost + costStep for every click this player made this round (costStep: per player) +
+  // costRise for every buy of this building's skill in earlier rounds (2026-11-07, the Coal mine's Dig a new exit; the
+  // opponents' view has this round's buys taken off, so it shows nothing new)
   function skillCost(m, side, key, id) {
     const rec = recOf(m, side, key), sk = rec && skillOf(rec.kind, id);
     if (!sk) return 0;
-    const mine = thisRound(m, rec.skills[id]).filter(e => e.lane === laneOf(m)).length;
-    return Math.max(0, Math.round((sk.cost || 0) + (sk.costStep || 0) * mine));
+    const log = thisRound(m, rec.skills[id]), mine = log.filter(e => e.lane === laneOf(m)).length, before = skillN(rec, id) - log.length;
+    return Math.max(0, Math.round((sk.cost || 0) + (sk.costStep || 0) * mine + (sk.costRise || 0) * before));
   }
   // may this player click skill id of building key now? (null: yes, else why not, for the sheet)
   function whyNot(m, side, key, id, args) {
@@ -2144,6 +2172,9 @@
   const reconciles = (m, side, key) => { const r = recOf(m, side, key), K = r && kindOf(r.kind); return !!(K && K.hooks.reconcile); };
   // tiles a building lights up on the board (the Jail's Skywatch; hooks.lit): [{ col, row }], drawn by both renderers
   const litTiles = (m, side, rec) => { const K = kindOf(rec.kind); return (K && K.hooks.lit && K.hooks.lit(m, side, rec)) || []; };
+  // out of action this round (hooks.resting: the Factory being rebuilt, a shut Coal mine; 2026-11-07): both boards
+  // draw it greyed with the shared badge while deploying (not in the fight, where it still stands as a target)
+  const resting = (m, side, rec) => { const K = rec && kindOf(rec.kind); return !!(K && K.hooks.resting && K.hooks.resting(m, side, rec)); };
   // the start of a round (Duo.beginRound): this round's skill logs start empty, then the kinds' roundStart
   function roundStart(lanes) {
     const m = lanes[0];
@@ -2282,7 +2313,7 @@
     voteQueue, voteHead, voteEntry, queue, placeHead, placeEntry, mpbVote, voteResult,
     skillCost, whyNot, canBuy, mpbBuy, canUndo, undoAllOk, mpbUndo, mpbAct, seenTaken,
     vaultOf, vaultRec, vaultMode, vaultMoved, vaultRoom, canVault, vaultPut, vaultTake, golemOf, golemUnit, golemSkin,
-    hide, unitOf, squadOf, extraOf, indexOf, isSquad, bodies, link, holds, battleOpts, squadMods, squadBodies, news, afterFight, roundStart, teamHeal, litTiles, reconcile, reconciles,
+    hide, unitOf, squadOf, extraOf, indexOf, isSquad, bodies, link, holds, battleOpts, squadMods, squadBodies, news, afterFight, roundStart, teamHeal, litTiles, resting, reconcile, reconciles,
     FH, OAK, oakMossTiles, oakEntUnit,
     JAIL, jailWhy, jailable, jailSeen, homeTile, SCHOOL, pupilOf, pupilSq, levelXp, learnable, schoolWhy, respecs, respecOf,
     cardPool, cardName, cardText, rollArtifacts, artifactsFor,

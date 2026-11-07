@@ -1022,6 +1022,7 @@ html.pc .app:has(#talk-fab:not([hidden])) .hud { padding-left: 56px; } /* the na
   try { if (/[?&]test\b/.test(location.search)) window.__tour = () => tour.t && JSON.parse(JSON.stringify(tour.t)); if (/[?&]test\b/.test(location.search)) window.__pb = () => ({ m, me, board3d, board, bt, phase, fx, summary: lastSummary, liveSpeed: liveSpeed.slice(), playSpeed: playSpeed(), away, timeUp, ready: ready.slice(), team: m && m.team ? JSON.parse(JSON.stringify(m.team)) : null, pings: duoPings.slice(), rings: duoOn() ? [0, 1, 2, 3].map(k => duoRing(k).col) : null, expireDeploy: () => { deadline = now() - 400; tick(); } }); } catch (e) {} // read-only peek and countdown trigger for UI tests
   try { if (/[?&]test\b/.test(location.search)) window.__pbRedraw = () => { if (phase === 'deploy') panelDeploy(); render(); }; } catch (e) {} // UI tests that set up a board state: draw it
   try { if (/[?&]test\b/.test(location.search)) window.__pbSheet = (side, key) => openMpbSheet(side, key); } catch (e) {} // UI tests: open a 2v2 building's sheet (every kind, either team's)
+  try { if (/[?&]test\b/.test(location.search)) window.__pbTeamBSheet = (side, b) => openTeamBuildingSheet(side, b); } catch (e) {} // UI tests: the other lane's building's read-only sheet (2026-11-07)
   let selected = null;      // unit index chosen in the shop
   let rangeOf = null;       // { side, id }: the squad last tapped on the board; its range shows as a dotted ring
   let inspect = null, inspectHtml = ''; // a fight: the body tapped (its card shows, see inspectCard), and what the card shows now
@@ -5844,11 +5845,13 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     return { edge, d };
   }
   // place, take back, the abilities (Move, Charisma), the elf tower, and the unit, tower, altar and map sheets
+  // a shop unit selected is let go (a tap opened a building's sheet instead of placing it)
+  function unselect() { if (selected === null) return; selected = null; panelDeploy(); render(); }
   function tapTile(t, had) {
     if (phase !== 'deploy' || !t) return;
     if (choosingPack() || choosingTower() || devPicking()) return; // the package (and in round 3 the tower, in the devtest the pick) comes first
     if (performance.now() - dragEndAt < 400) return;
-    if (selected === null && duoOn() && mpbTap(t)) return; // 2v2: a placement vote, or a building's sheet
+    if (duoOn() && mpbTap(t, selected)) return; // 2v2: a kind's pick on the board (started on purpose); with nothing selected also a placement vote, or a building's sheet
     if (mode === 'tutorial') {
       const step = tutStep(), own = Game.squadAt(m, me, t.col, t.row);
       if (m.round >= 3 && Game.towerAt(m, me, t.col, t.row)) { tut.towerSeen = true; openTowerSheet(me); panelDeploy(); return; }
@@ -5922,7 +5925,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       const cs = selected === null && castAt(t.col, t.row);
       if (cs && !Game.squadAt(m, me, t.col, t.row)) { openCastSheet(cs); return; }
     }
-    for (const sd of [me, foe()]) { const b = Game.buildingAt(m, sd, t.col, t.row); if (b && Game.buildingShown(m, me, true, sd, b)) { openBuildingSheet(sd, b.id); return; } }
+    for (const sd of [me, foe()]) { const b = Game.buildingAt(m, sd, t.col, t.row); if (b && Game.buildingShown(m, me, true, sd, b)) { unselect(); openBuildingSheet(sd, b.id); return; } }
     if (charmMode && editable() && Game.canGiveCharm(m, me)) { // Matteo: the first Charisma stack goes to the squad tapped
       const own = Game.squadAt(m, me, t.col, t.row);
       if (own && Game.giveCharm(m, me, own.id)) { charmMode = false; changed(); }
@@ -5967,6 +5970,13 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if (duoTapSquad(t)) return; // 2v2: your teammate's squad (read only), or the other opponent's
     const enemy = Game.foeSeen(m, foe()).find(s => { const p = Game.seenAt(m, s); return Game.blockOf(m, s.unit, p.col, p.row).some(([c, r]) => c === t.col && r === t.row); }); // one they sold this round too: they still see it
     if (enemy) { rangeOf = { side: foe(), id: enemy.id }; openSheet(Game.shownUnit(m, me, foe(), enemy.unit), { ...enemy, unit: Game.shownUnit(m, me, foe(), enemy.unit) }, foe()); return; } // a disguise shows as what it pretends to be
+    // 2v2: the other lane's buildings from skills (your teammate's Cog Builder Factory; the other opponent's from the
+    // round after it was placed): a read-only sheet (2026-11-07)
+    if (duoOn()) for (const sd of [me, foe()]) { const b = Game.teamBuildings(m, sd).find(x => x.col === t.col && x.row === t.row); if (b && Game.teamBuildingShown(m, me, true, sd, b)) { unselect(); openTeamBuildingSheet(sd, b); return; } }
+    // 2v2: a shop unit still selected (placing leaves it selected) and a tap on a building it can't go on: the building's
+    // sheet, and the unit is let go (2026-11-07; every board mode above had its turn first)
+    const mx = selected !== null && mpbOn() && !Game.canPlaceAt(m, me, t.col, t.row, selected) && Mpb.recAt(m, t.col, t.row);
+    if (mx) { unselect(); openMpbSheet(mx.side, mx.rec.key); return; }
     if (selected !== null && editable() && !Game.canPlaceAt(m, me, t.col, t.row, selected)) sfx('nope');
     if (selected !== null && editable() && Game.canPlaceAt(m, me, t.col, t.row, selected)) {
       const sq = Game.place(m, me, selected, t.col, t.row);
@@ -6829,8 +6839,8 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     if ($('fall-more')) $('fall-more').addEventListener('click', () => { $('fall-more').parentNode.innerHTML = `<span style="color:var(--foe)">If it falls:</span> that army deals ${D.attack}% less damage, moves ${D.move}% slower and takes ${D.taken}% more damage for ${D.secs} s.`; });
     if ($('tskill')) $('tskill').addEventListener('click', () => { if (editable() && Game.buyTowerSkill(m, me)) { changed(); openTowerSheet(me); } });
     if ($('tskill-undo')) $('tskill-undo').addEventListener('click', () => { if (editable() && Game.undoTowerSkill(m, me)) { changed(); openTowerSheet(me); } });
-    if ($('tskill2')) $('tskill2').addEventListener('click', () => { if (editable() && Game.buyTowerSkill2(m, me)) { if (Game.bwallsLeft(m, me)) { wallPlacing = true; MPB_SHEET.magicLake.pick = null; changed(); closeSheet(); } else { changed(); openTowerSheet(me); } } });
-    if ($('bwall')) $('bwall').addEventListener('click', () => { if (editable() && Game.bwallsLeft(m, me)) { wallPlacing = true; MPB_SHEET.magicLake.pick = null; closeSheet(); render(); hud(); panelDeploy(); } });
+    if ($('tskill2')) $('tskill2').addEventListener('click', () => { if (editable() && Game.buyTowerSkill2(m, me)) { if (Game.bwallsLeft(m, me)) { wallPlacing = true; MPB_SHEET.magicLake.pick = null; MPB_SHEET.coalMine.pick = null; changed(); closeSheet(); } else { changed(); openTowerSheet(me); } } });
+    if ($('bwall')) $('bwall').addEventListener('click', () => { if (editable() && Game.bwallsLeft(m, me)) { wallPlacing = true; MPB_SHEET.magicLake.pick = null; MPB_SHEET.coalMine.pick = null; closeSheet(); render(); hud(); panelDeploy(); } });
     if ($('tskill2-undo')) $('tskill2-undo').addEventListener('click', () => { if (editable() && Game.undoTowerSkill2(m, me)) { changed(); openTowerSheet(me); } });
     $('sheet').querySelectorAll('[data-mgen]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.buyMageGen(m, me, b.dataset.mgen)) { changed(); openTowerSheet(me); } }));
     if ($('tloan')) $('tloan').addEventListener('click', () => { if (editable() && Game.takeLoan(m, me)) { changed(); openTowerSheet(me); } });
@@ -6886,17 +6896,67 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
       if (btns.length) lvl += `<div style="display:flex;gap:8px;flex-wrap:wrap">${btns.join('')}</div>`;
     }
     $('sheet').innerHTML = `
-      <div class="bar"><h3 id="sheet-h">${mine ? 'Your' : `${esc(foeName())}’s`} ${esc(info.name)} · ${b.built ? 'Built' : b.progress > 0 ? `${Math.round(b.progress * 100)}% built` : 'Not built yet'}</h3><button class="btn small" id="close">Close</button></div>
+      <div class="bar"><h3 id="sheet-h">${mine ? 'Your' : `${esc(foeName())}’s`} ${esc(info.name)} · ${buildingStatus(b)}</h3><button class="btn small" id="close">Close</button></div>
       <p class="role" style="margin:0">${esc(info.text || '')}</p>
       ${lvl}
-      ${buildingBlock(side, id)}`;
+      ${buildingBlock(side, id)}
+      ${id === 'factory' ? factoryLearn('cog', side) : ''}`;
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', closeSheet);
+    wireFactoryLearn($('sheet'));
     const again = () => { changed(); openBuildingSheet(side, id); };
     bindBuildingBlock($('sheet'), again);
     if ($('blvl')) $('blvl').addEventListener('click', () => { if (editable() && Game.levelBuilding(m, me, id)) again(); });
     if ($('blvl-undo')) $('blvl-undo').addEventListener('click', () => { if (editable() && Game.undoLevelBuilding(m, me, id)) again(); });
   }
+  // how far a building from a skill is built; one destroyed and being rebuilt says so (b.fell, 2026-11-07)
+  const buildingStatus = (b) => b.built ? 'Built' : b.fell > 0 ? `destroyed in round ${b.fell}’s fight, being rebuilt (${Math.round((b.progress || 0) * 100)}% built)` : b.progress > 0 ? `${Math.round(b.progress * 100)}% built` : 'Not built yet';
+  // 2v2: a building from a skill in the other lane (m.team.buildings: your teammate's Cog Builder Factory, or the other
+  // opponent's), read only: how far it is built, what it makes (only its owner buys; their pick stays hidden until the fight)
+  function openTeamBuildingSheet(side, b) {
+    const info = b && Game.buildingInfo(b.id);
+    if (!info) return;
+    const rows = Game.buildingSkills(b.id).map(sk => abilityRow(sk.name, `<span class="hint">${Game.bskillCost(b.id, sk.id)} gold</span>`, sk.unit ? `Ready ${sk.time || 0} s into the fight (sooner with Master engineering or the Blessing).` : esc(sk.text || '')));
+    $('sheet').innerHTML = `
+      <div class="bar"><h3 id="sheet-h">${side === me ? 'Your teammate’s' : 'Their'} ${esc(info.name)} · ${buildingStatus(b)}</h3><button class="btn small" id="close">Close</button></div>
+      <p class="role" style="margin:0">${esc(info.text || '')}</p>
+      <p style="margin:0">Level ${(b.level || 0) + 1}${b.built ? '' : ` · ${side === me ? 'their' : 'a'} Cog Builder builds it during fights; it makes nothing until it is built`}</p>
+      <h4 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">${side === me ? 'What it makes: only your teammate buys, one a round' : 'What it makes: their pick stays hidden until the fight'}</h4>${rows.length > 1 ? orGroup(rows, 'One a round') : rows.join('')}
+      ${b.id === 'factory' ? factoryLearn('cog', side, true) : ''}`;
+    $('sheet-back').hidden = false;
+    $('close').addEventListener('click', closeSheet);
+    wireFactoryLearn($('sheet'));
+  }
+  // Read more on a Factory's sheet (2026-11-07): what a unit bought from it does, checked against the code. kind: 'mpb'
+  // (the 2v2 team Factory, src/mpb.js: no builder skills, no Blessing, not levelled) or 'cog' (a Cog Builder's own, from
+  // Game.buildingMakes: Master engineering and the Altar's Blessing make it walk out sooner). other: the other lane's.
+  // Its open state outlives the sheet's redraw after a buy (factoryLearnOpen).
+  var factoryLearnOpen = {};
+  function factoryLearn(kind, side, other) {
+    const sks = Game.buildingSkills('factory'), name = (id) => esc((sks.find(s => s.id === id) || {}).name || id);
+    const secs = [...new Set(sks.map(s => s.time || 0))].sort((a, b) => a - b);
+    const when = secs.map(t => `${t} s (${sks.filter(s => (s.time || 0) === t).map(s => name(s.id)).join(', ')})`).join(' or ');
+    let faster = 0; for (const u of m.units || []) for (const d of u.skillDefs || []) if (d && d.type === 'builder') faster = Math.max(faster, +Engine.skillParam(d, 'faster') || 0); // Master engineering
+    const altar = Game.buildingSkills('altar').find(s => s.bless), bless = altar ? altar.bless.build : 0;
+    const items = [`<li>A unit you buy here fights in <b>this round’s fight only</b>. It isn’t a squad: it doesn’t stay on the board and doesn’t come back next round. Buy one again each round you want one.</li>`];
+    if (kind === 'mpb') {
+      items.push(`<li>It walks out in front of the Factory ${when} into the fight. If the Factory is destroyed before then, nothing comes out and the gold isn’t paid back.</li>`);
+      items.push('<li>One unit a round from this Factory for your team: whoever buys first takes it and pays (Undo gives it back).</li>');
+      items.push('<li>Destroyed in a fight: the next round it is being rebuilt and makes nothing (it still stands in that fight).</li>');
+      items.push('<li>Its units count as Mechites (the Mechites’ faction trait, not yours) and have no leader bonus: 2v2 has no leaders. No builder skills, no Blessing, not levelled.</li>');
+    } else {
+      const cb = !other && side === me ? Game.constructBuff(m, me) : null, bl = cb ? Game.buildingEffects(m, me).bless : null;
+      const now = cb && (cb.faster || bl) ? ` Yours this round: ${secs.map(t => Math.round(t * (1 - cb.faster / 100) / (bl ? 1 + bl.build / 100 : 1) * 100) / 100 + ' s').join(' or ')}.` : '';
+      items.push(`<li>It walks out in front of the Factory ${when} into the fight${faster ? `; Master engineering makes that ${faster}% shorter` : ''}${bless ? `, and the Altar’s Blessing of the Cycle ${bless}% faster` : ''}.${now} If the Factory is destroyed before then, nothing comes out and the gold isn’t paid back.</li>`);
+      items.push('<li>One a round, once the Factory is built; swapping it for another pays the first back.</li>');
+      items.push('<li>Destroyed in a fight: it starts the next round half built and makes nothing until its Cog Builder has rebuilt it in a fight.</li>');
+      items.push('<li>Its units level with the Factory and get their player’s leader bonus (1v1), builder skills such as Master engineering, and the Blessing.</li>');
+    }
+    items.push('<li>While it stands it keeps your side in the fight (you haven’t lost while it is up), but one that survives deals <b>no damage to the losers’ Team HP</b>.</li>');
+    items.push('<li>The other side sees which unit was bought only when the fight starts.</li>');
+    return `<div class="learn"><details data-fac-learn="${kind}"${factoryLearnOpen[kind] ? ' open' : ''}><summary><b>About its units</b><span>Bought for one fight only: they don’t come back next round.</span></summary><ul>${items.join('')}</ul></details></div>`;
+  }
+  function wireFactoryLearn(root) { root.querySelectorAll('[data-fac-learn]').forEach(d => d.addEventListener('toggle', () => { factoryLearnOpen[d.dataset.facLearn] = d.open; })); }
   // an upgrade's row (see .up): name (esc'd here; label: a gold prefix like Master), act: its button or chip (HTML),
   // text: what it does (HTML, cut to one line until the row is held), more: details shown only once held (HTML)
   const upRow = ({ name, label = '', act = '', text = '', more = '' }) => `<div class="up" tabindex="0" aria-expanded="false" aria-label="${esc(name)}: hold for details">
@@ -9037,7 +9097,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   function mpbOn() { return duoOn() && !!m && typeof Mpb !== 'undefined' && Mpb.on(m); }
   const teamName = (sd) => sd === me ? 'Your team' : 'Their team';
   const MPB_PER = { round: 'Once a round for the team', roundPlayer: 'Once a round for each of you', match: 'Once a match', building: 'Once for this building', free: 'As often as you like' };
-  const mpbPerText = (sk) => (MPB_PER[sk.per] || MPB_PER.free) + (sk.costStep ? `, +${sk.costStep} gold for each of your clicks this round` : '');
+  const mpbPerText = (sk) => (MPB_PER[sk.per] || MPB_PER.free) + (sk.costStep ? `, +${sk.costStep} gold for each of your clicks this round` : '') + (sk.costRise ? `, +${sk.costRise} gold for each earlier one of this building` : '');
   const mpbCardBtn = (c, i, ok) => `<button class="btn mpb-card" data-mpb-draft="${i}" ${ok ? '' : 'disabled'}><b>${esc(Mpb.cardName(c))}</b><span class="hint" style="margin:0">${c.type === 'tower' ? 'Tower' : 'Building'} · ${esc(Mpb.cardText(c))}</span></button>`;
   // the draft (rounds 3 and 9): the picking team picks one of the two cards; then what each team got
   function mpbDraftHtml() {
@@ -9102,11 +9162,13 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
   var mpbPicking = null;
   // a line on a squad's sheet while it sits in a building (Game.mpbHeld: the Jail, the School; MPB_SHEET[kind].held)
   function mpbHeldNote(sq, owner) { const k = sq && (sq.jailed ? 'jail' : sq.school ? 'school' : ''), x = k && MPB_SHEET[k]; return x && x.held ? x.held(sq, owner) : ''; } // (owner: the squad's side; the note is worded for the reader)
-  // a tap on the board: a vote on an allowed tile, else a building's sheet (true: handled)
-  function mpbTap(t) {
+  // a tap on the board: a kind's pick, a vote on an allowed tile, else a building's sheet (true: handled). sel: the shop
+  // unit selected (tapTile): then only a kind's pick (the vote and the sheet wait: tapTile's later steps come first)
+  function mpbTap(t, sel = null) {
     if (!mpbOn() || !t) return false;
     if (mpbPicking) { const f = mpbPicking; mpbPicking = null; if (phase === 'deploy' && f(t)) return true; }
     if (phase === 'deploy') for (const x of Object.values(MPB_SHEET)) if (x.tap && x.tap(t)) return true; // a kind's own tile to tap (MPB_SHEET[kind].tap)
+    if (sel !== null) return false;
     const h = phase === 'deploy' && Mpb.voteEntry(m, me, duoMyLane());
     if (h && Mpb.spotOk(m, me, h.kind, h.part, t.col, t.row)) { if (editable() && Game.mpbVote(m, me, t.col, t.row)) changed(); return true; }
     const x = Mpb.recAt(m, t.col, t.row);
@@ -9218,7 +9280,11 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
         const btn = side === me && live && K.canMoveExit(m, me, rec) ? `<button class="btn small either" id="cm-move">Move the exit</button>` : '';
         return `<p style="margin:0">${info.map(esc).join(' · ')}</p>${btn ? `<p style="margin:0">${btn} <span class="hint">then tap a glowing tile</span></p>` : ''}`;
       },
-      wire(root, side, rec) { const b = root.querySelector('#cm-move'); if (b) b.addEventListener('click', () => { this.pick = rec.key; closeSheet(); panelDeploy(); render(); }); },
+      wire(root, side, rec) { const b = root.querySelector('#cm-move'); if (b) b.addEventListener('click', () => this.start(rec)); },
+      // Move the exit (and Dig a new exit just bought: a dig is used the round it is bought, so its pick starts at
+      // once): the glowing tiles, nothing else selected (2026-11-07)
+      start(rec) { this.pick = rec.key; wallPlacing = false; selected = null; MPB_SHEET.magicLake.pick = null; closeSheet(); panelDeploy(); render(); },
+      bought(id, rec) { if (id !== 'shaft' || !Mpb.kindOf('coalMine').canMoveExit(m, me, Mpb.recOf(m, me, rec.key) || rec)) return false; this.start(rec); return true; },
     },
     // ===== scorch (page) =====
     // whose turret it is, what it fights with now, and that it sits out the round after it falls
@@ -9232,6 +9298,14 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     },
     // ===== oak (page) =====
     // ===== factory (page) =====
+    // this round's buy (or that it is being rebuilt), and Read more: how its units work (factoryLearn, 2026-11-07)
+    factory: {
+      html(side, rec) {
+        const info = Mpb.kindOf('factory').hooks.info(m, side, rec, me).filter(Boolean);
+        return `<p style="margin:0">${info.map(esc).join(' · ')}</p>${factoryLearn('mpb', side)}`;
+      },
+      wire(root) { wireFactoryLearn(root); },
+    },
     // ===== magicLake (page) =====
     // each player's own water tiles: the panel asks for the ones still to put down (a Put down water button, then tap a
     // glowing blue tile: taps on the board are the lake's only while that is on), and a tile put down this round can be
@@ -9452,7 +9526,7 @@ Actions run in this order: package (round 1 only), sell, levelUp, unlock, skills
     $('sheet-back').hidden = false;
     $('close').addEventListener('click', closeSheet);
     const root = $('sheet');
-    root.querySelectorAll('[data-mpb-buy]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.mpbBuy(m, me, key, b.dataset.mpbBuy)) { changed(); again(); } }));
+    root.querySelectorAll('[data-mpb-buy]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.mpbBuy(m, me, key, b.dataset.mpbBuy)) { changed(); if (!(extra && extra.bought && extra.bought(b.dataset.mpbBuy, rec))) again(); } })); // (extra.bought: a kind's next step after a buy, the Coal mine's exit pick)
     root.querySelectorAll('[data-mpb-undo]').forEach(b => b.addEventListener('click', () => { if (editable() && Game.mpbUndo(m, me, key, b.dataset.mpbUndo)) { changed(); again(); } }));
     if (extra && extra.wire) extra.wire(root, side, rec, again);
   }
