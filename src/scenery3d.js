@@ -41,7 +41,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     light: { hemi: ['#D2C1B2', '#2A2220', 1.35], sun: ['#FFCDA6', 1.8] }, fall: 'embers', farLight: 0.9 };
   // Moonlit Snow: Frozen Peak at night, blue moonlight, falling snow and a cabin with warm windows at the far end
   BIOMES.moonlit = { ...BIOMES.ice, sky: '#141C2A', land: '#5A6880', low: 'moonlit', tint: [0.6, 0.68, 0.85], trees: ['Pine_1', 'Pine_2', 'Pine_3', 'Pine_5', 'Pine_1', 'DeadTree_3'], grow: 0.85,
-    light: { hemi: ['#9DB2E0', '#1A2030', 1.2], sun: ['#C4D2F5', 1.55], pos: [30, 58, 18] }, drift: '#9AA9C2', farLight: 0.62, cabin: true, shade: [0.86, 0.5, 18] };
+    light: { hemi: ['#9DB2E0', '#1A2030', 1.2], sun: ['#C4D2F5', 1.55], pos: [30, 58, 18] }, drift: '#9AA9C2', farLight: 0.62, cabin: true, shade: [0.86, 0.5, 18], deepSnow: 1.1 };
   // Savanna: golden hour on dry grass, lone flat-topped trees like acacias, a low warm sun with long shadows
   BIOMES.savanna = { sky: '#DDB27C', land: '#8F7C43', tint: [1.06, 0.98, 0.82], low: 'savanna', trees: ['CommonTree_3', 'CommonTree_5', 'DeadTree_1', 'CommonTree_3'], grow: 0.42, dress: 0.8,
     squash: [[/^CommonTree/, 0.5]], tints: [[/^CommonTree/, [1.0, 0.92, 0.6]], [/^Grass/, [1.35, 1.1, 0.55]], [/^Bush/, [1.1, 0.95, 0.55]], [/^DeadTree/, [1.1, 0.95, 0.78]]],
@@ -303,6 +303,17 @@ const Scenery3D = (THREE, scene, opts = {}) => {
   // snow drifts: soft low mounds
   const driftGeo = new THREE.IcosahedronGeometry(1, 1), driftMat = new THREE.MeshLambertMaterial({ color: '#B4C1CA' });
   driftMat.onBeforeCompile = shadeLit; driftMat.customProgramCacheKey = () => 'pb-drift';
+  // the deep snow sheet (Moonlit Snow): vertex colours for crests and hollows, the look's tint as its colour
+  const snowGroundMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  snowGroundMat.onBeforeCompile = shadeLit; snowGroundMat.customProgramCacheKey = () => 'pb-deepsnow';
+  // smooth value noise, 0 to 1, the same everywhere for the same spot
+  const hash2 = (x, y) => { const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return h - Math.floor(h); };
+  function vnoise(x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = hash2(xi, yi), b = hash2(xi + 1, yi), c = hash2(xi, yi + 1), d = hash2(xi + 1, yi + 1);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  }
+  const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   // the land's own shade: a dark veil over the ground round the board (the page's land plane is one flat colour)
   const veilMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, fog: true, uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), ...shadeU },
     vertexShader: `varying vec2 vShadeXZ;
@@ -446,11 +457,21 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     const put = (name, x, z, s, y = 0, wet = false) => {
       if (!lib[name] || (!wet && inPond(x, z))) return;
       const d = outside(x, z), k = name + (d > 16 || (d > 6 && /^Bush/.test(name)) ? '~' : ''), sh = 0.85 + rr() * 0.3, t = tintFor(name);
+      y += groundH(x, z) * 0.7; // on deep snow (Moonlit Snow) things stand a little sunk in
       (placed.get(k) || placed.set(k, []).get(k)).push([x, y, z, rr() * Math.PI * 2, s, [bi.tint[0] * t[0] * sh, bi.tint[1] * t[1] * sh, bi.tint[2] * t[2] * sh], squashOf(name)]);
     };
     const L = { desert: DESERT, autumn: AUTUMN, ash: ASH, savanna: SAVANNA, moonlit: SNOWY, rocks: { low: ROCKS, tuft: PEBBLES, rocks: ROCKS, dress: DRESS } }[bi.low] || { low: LOW, tuft: TUFT, rocks: ROCKS, dress: DRESS };
     const low = () => pickOf(L.low), tuft = () => pickOf(L.tuft);
     const outside = (x, z) => Math.max(Math.abs(x) - hw, Math.abs(z) - hd, 0) > 0 ? Math.hypot(Math.max(0, Math.abs(x) - hw), Math.max(0, Math.abs(z) - hd)) : 0;
+    // deep snow (biome .deepSnow): the height of the snow at a spot, 0 on the board, rising over its first metres
+    // outside into long wind-blown drifts, flattened round the cabin so its door and light stay clear
+    const groundH = bi.deepSnow ? (x, z) => {
+      const d = outside(x, z); if (d <= 0) return 0;
+      let h = 0.25 + 0.9 * vnoise(x * 0.035 + 3.1, z * 0.11 - 1.7) + 0.35 * vnoise(x * 0.12 - 5.3, z * 0.09 + 2.2) + 0.12 * vnoise(x * 0.4, z * 0.4);
+      h *= bi.deepSnow * smoothstep(0.3, 7, d);
+      if (cab) h *= 0.15 + 0.85 * smoothstep(cab.r * 1.05, cab.r * 1.5, Math.hypot(x - cab.x, z - cab.z));
+      return h;
+    } : () => 0;
     // 1. the edge: a frame of bushes, rocks and tall grass hugging the board, so its edge doesn't end in a hard line
     for (let s = 0; s < 2 * (BW + BD); s += 2.6) {
       if (rr() > 0.8 * bi.grow) continue;
@@ -501,8 +522,8 @@ const Scenery3D = (THREE, scene, opts = {}) => {
       for (let s = 0; s < per; s += 5.5) { const a = s / per * Math.PI * 2 + rr() * 0.3, k = 1.2 + rr() * 0.45; put(bi.trees[Math.floor(rr() * 4)], p.x + Math.cos(a) * p.rx * k, p.z + Math.sin(a) * p.rz * k, 1.5 + rr() * 0.9, 0, true); }
       for (let n = 0; n < 6; n++) { const a = rr() * Math.PI * 2, k = 1.15 + rr() * 0.3; put(pickOf(L.rocks), p.x + Math.cos(a) * p.rx * k, p.z + Math.sin(a) * p.rz * k, 0.8 + rr() * 1.4, 0, true); }
     }
-    // 6. snow drifts round the board (Frozen Peak)
-    if (bi.snow) {
+    // 6. snow drifts round the board (Frozen Peak; deep snow has its own drifts in the sheet)
+    if (bi.snow && !bi.deepSnow) {
       const dr = new THREE.InstancedMesh(driftGeo, driftMat, 120); let n = 0;
       for (let k = 0; k < 600 && n < 120; k++) {
         const x = (rr() * 2 - 1) * (hw + 45), z = -hd - 60 + rr() * (BD + 95), d = outside(x, z);
@@ -513,7 +534,21 @@ const Scenery3D = (THREE, scene, opts = {}) => {
       }
       dr.count = n; dr.instanceMatrix.needsUpdate = true; driftMat.color.set(bi.drift || '#B4C1CA'); dr.computeBoundingSphere(); dr.raycast = () => {}; dr.receiveShadow = true; dr.name = 'drifts';
       scene.add(dr); meshes.push(dr);
+    }    // 7. the deep snow itself: a big rolling sheet over the land, whiter on the crests and bluer in the hollows
+    if (bi.deepSnow) {
+      const g = new THREE.PlaneGeometry(BW + 260, BD + 260, 150, 170).rotateX(-Math.PI / 2), pos = g.attributes.position, col = new Float32Array(pos.count * 3);
+      const hi = new THREE.Color('#EEF3FA'), lo = new THREE.Color('#9FB2CC'), c = new THREE.Color();
+      for (let k = 0; k < pos.count; k++) {
+        const x = pos.getX(k), z = pos.getZ(k), h = groundH(x, z);
+        pos.setY(k, outside(x, z) > 0 ? h : -0.2);
+        c.copy(lo).lerp(hi, Math.min(1, 0.35 + h / (1.4 * bi.deepSnow))); col.set([c.r, c.g, c.b], k * 3);
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
+      const sheet = new THREE.Mesh(g, snowGroundMat); sheet.position.y = -0.03; sheet.receiveShadow = true; sheet.raycast = () => {}; sheet.name = 'deep snow';
+      snowGroundMat.color.setRGB(...bi.tint);
+      scene.add(sheet); meshes.push(sheet);
     }
+
     // far trees and bushes: impostors
     shadeU.uHalf.value.set(hw, hd); shadeU.uShade.value.set(...(bi.shade || [0, 1, 2])); veil.visible = !!bi.shade;
     snowU.value = bi.snow || 0; showFall(bi.fall || (bi.snow ? 'snow' : null)); showCabin(cab);
@@ -545,7 +580,7 @@ const Scenery3D = (THREE, scene, opts = {}) => {
     }
   }
   function shadows(on) { if (on !== castShadows) { castShadows = on; key = ''; } }
-  function dispose() { clear(); scene.remove(flakes, cabin, cabinLight, veil); veil.geometry.dispose(); veilMat.dispose(); cabin.userData.dispose(); cabinLight.dispose(); flakeGeo.dispose(); flakeMat.dispose(); driftGeo.dispose(); driftMat.dispose(); pondGeo.dispose(); for (const m of pondMats) m.dispose(); if (atlas) atlas.dispose(); if (impMat) { impMat.dispose(); impGeo.dispose(); blobMat.map.dispose(); blobMat.dispose(); blobGeo.dispose(); } for (const m of mats) { if (m.map) m.map.dispose(); m.dispose(); } if (lib) for (const md of Object.values(lib)) for (const p of md.parts) p.geo.dispose(); }
+  function dispose() { clear(); scene.remove(flakes, cabin, cabinLight, veil); veil.geometry.dispose(); veilMat.dispose(); snowGroundMat.dispose(); cabin.userData.dispose(); cabinLight.dispose(); flakeGeo.dispose(); flakeMat.dispose(); driftGeo.dispose(); driftMat.dispose(); pondGeo.dispose(); for (const m of pondMats) m.dispose(); if (atlas) atlas.dispose(); if (impMat) { impMat.dispose(); impGeo.dispose(); blobMat.map.dispose(); blobMat.dispose(); blobGeo.dispose(); } for (const m of mats) { if (m.map) m.map.dispose(); m.dispose(); } if (lib) for (const md of Object.values(lib)) for (const p of md.parts) p.geo.dispose(); }
   return { _lib: () => lib, _meshes: () => meshes, update, biome, shadows, dispose, ready, tick, snowing: () => flakes.visible, count: () => meshes.reduce((s, m) => s + m.count, 0) };
 };
 
