@@ -128,7 +128,7 @@ const DEV = { id: 'p0123456789abcdef', session: 'a'.repeat(64), tag: 'Vilhelm', 
   if (bw) {
     await host.evaluate(() => { const x = window.__pb(); x.liveSpeed && null; });
     const bb = await host.locator('#board').boundingBox();
-    await host.mouse.click(bb.x + (bw.c + 0.5) * bb.width / 24, bb.y + (bw.r + 0.5) * bb.height / 18);
+    await host.mouse.click(bb.x + (bw.c + 0.5) * bb.width / 24, bb.y + (bw.r + 0.5) * bb.height / 19);
     const card = await host.evaluate(() => (document.querySelector('#bcard .owner-line') || {}).textContent || '');
     ok(/\(opponent\)/.test(card) || card === '', 'battle card of the other lane\'s opponent: ' + (card || '(moved off before the tap)'));
   }

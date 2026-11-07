@@ -126,7 +126,7 @@ function addMine(D, sd, col, row, xc, xr) {
 check('1: an Assassin next to a building it couldn\'t see stays, either order; nothing moves', () => {
   for (const assFirst of [true, false]) {
     const x = board(201), { D } = x;
-    const t = { col: 12, row: 14 }, next = { col: 11, row: 13 };
+    const t = { col: 12, row: 15 }, next = { col: 11, row: 14 };
     let key, ass;
     if (assFirst) { ass = place(x, 3, 'Assassin', next.col, next.row); key = vote(x, 0, 'fieldHospital', t); }
     else { key = vote(x, 0, 'fieldHospital', t); ass = place(x, 3, 'Assassin', next.col, next.row); }
@@ -143,14 +143,14 @@ check('1: a building within 2 tiles of the other team\'s hidden dug exit stays, 
     const kb = put(D, 1, 'coalMine', { col: 11, row: 2 });
     for (const R of D.lanes) { const r = Mpb.recOf(R.m, 1, kb); r.parts.exit = { col: 12, row: 8 }; r.skills.shaft = { round: 0, n: 1, by: [1, 0], log: [] }; }
     fresh(D);
-    const dig = () => assert.ok(x.act(3, 'mpbAct', kb, 'exit', 22, 14).ok, 'B2 digs to (22,14), a flank tile of A\'s half');
+    const dig = () => assert.ok(x.act(3, 'mpbAct', kb, 'exit', 22, 15).ok, 'B2 digs to (22,14), a flank tile of A\'s half');
     let key;
-    const build = () => { key = vote(x, 0, 'jail', { col: 20, row: 15 }); };
+    const build = () => { key = vote(x, 0, 'jail', { col: 20, row: 16 }); };
     if (digFirst) { dig(); build(); } else { build(); dig(); }
     const { P } = fight(x);
     const j = recIn(P[0], 0, key), ex = recIn(P[0], 1, kb).parts.exit;
-    assert.deepStrictEqual([j.col, j.row], [20, 15], 'the Jail stays, 2 tiles from the exit');
-    assert.deepStrictEqual(ex, { col: 22, row: 14 }, 'the exit stays');
+    assert.deepStrictEqual([j.col, j.row], [20, 16], 'the Jail stays, 2 tiles from the exit');
+    assert.deepStrictEqual(ex, { col: 22, row: 15 }, 'the exit stays');
     assert.ok(cheb(j, ex) < Mpb.SPACING, '(within its 2 tiles of room)');
     assert.deepStrictEqual(D.settled, [], 'nothing moved');
   }
@@ -161,7 +161,7 @@ check('1: a building within 2 tiles of the other team\'s hidden dug exit stays, 
 check('3 with 5: a building voted onto a hidden Assassin in its own zone stays; the Assassin moves to the nearest tile its rules allow', () => {
   for (const kind of ['oak', 'school', 'shadowDen']) {
     const x = board(203), { D } = x;
-    const t = { col: 13, row: 14 };
+    const t = { col: 13, row: 15 };
     const ass = place(x, 2, 'Assassin', t.col, t.row);
     const key = vote(x, 0, kind, t);
     const { P } = fight(x);
@@ -274,8 +274,8 @@ check('2: the draft still open when the deploy clock ends: the seeded pick as th
 check('4: the exit and its ring never move anything: a squad round a hidden dug exit, a dug exit onto a hidden squad: all stay', () => {
   for (const order of ['squad first', 'dig first']) {
     const x = board(241), { D } = x;
-    const ka = put(D, 0, 'coalMine', { col: 12, row: 15 });
-    for (const R of D.lanes) { const r = Mpb.recOf(R.m, 0, ka); r.parts.exit = { col: 12, row: 9 }; r.skills.shaft = { round: 0, n: 1, by: [1, 0], log: [] }; }
+    const ka = put(D, 0, 'coalMine', { col: 12, row: 16 });
+    for (const R of D.lanes) { const r = Mpb.recOf(R.m, 0, ka); r.parts.exit = { col: 12, row: 10 }; r.skills.shaft = { round: 0, n: 1, by: [1, 0], log: [] }; }
     fresh(D);
     let ring;
     const theirs = () => { ring = place(x, 2, 'Assassin', 6, 8); };
@@ -288,8 +288,8 @@ check('4: the exit and its ring never move anything: a squad round a hidden dug 
   }
   // the exit dug onto a tile where a squad of theirs stands (hidden from team A): the exit stays, blocked
   const x = board(242), { D } = x;
-  const ka = put(D, 0, 'coalMine', { col: 12, row: 15 });
-  for (const R of D.lanes) { const r = Mpb.recOf(R.m, 0, ka); r.parts.exit = { col: 12, row: 9 }; r.skills.shaft = { round: 0, n: 1, by: [1, 0], log: [] }; }
+  const ka = put(D, 0, 'coalMine', { col: 12, row: 16 });
+  for (const R of D.lanes) { const r = Mpb.recOf(R.m, 0, ka); r.parts.exit = { col: 12, row: 10 }; r.skills.shaft = { round: 0, n: 1, by: [1, 0], log: [] }; }
   fresh(D);
   const b = place(x, 2, 'Assassin', 7, 8);
   assert.ok(x.act(0, 'mpbAct', ka, 'exit', 7, 8).ok, 'A1 digs onto B1\'s hidden Assassin');
@@ -305,19 +305,19 @@ check('4: a squad whose tile at the exit, or the exit\'s own tile, is taken (squ
     playTo(x, round);
     for (const m of lanesOf(D)) { m.armies = [[], []]; m.packages = null; }
     teams(D);
-    const key = addMine(D, 0, 11, 15, 11, 9);
+    const key = addMine(D, 0, 11, 16, 11, 10);
     const m = x.m(0);
-    return { x, D, m, key, go: squad(m, 0, 'Brute', 10, 14), other: squad(m, 0, 'Brute', 12, 16) }; // go comes up on (10,8), other on (12,10)
+    return { x, D, m, key, go: squad(m, 0, 'Brute', 10, 15), other: squad(m, 0, 'Brute', 12, 17) }; // go comes up on (10,9), other on (12,11)
   };
   { const { D, go, other } = setup(251); const bt = battleOf(D); assert.ok(travels(bt, 0, go.id) && travels(bt, 0, other.id), 'a free exit: both go down'); }
-  { const { D, m, go, other } = setup(252); squad(m, 0, 'Brute', 10, 8); const bt = battleOf(D); assert.ok(stays(bt, 0, go.id) && travels(bt, 0, other.id), 'a squad of its own team on its tile at the exit: it stays, the other goes'); }
-  { const { D, go, other } = setup(253); squad(D.lanes[1].m, 1, 'Brute', 10, 8); const bt = battleOf(D); assert.ok(stays(bt, 0, go.id) && travels(bt, 0, other.id), 'an enemy squad (the other lane) on it: it stays'); }
-  { const { D, m, go, other } = setup(254); squad(m, 1, 'Brute', 11, 9); const bt = battleOf(D); assert.ok(stays(bt, 0, go.id) && stays(bt, 0, other.id), 'a squad on the exit\'s own tile: the mine is blocked, nobody goes'); }
-  { const { D, go, other } = setup(255); for (const R of D.lanes) { const r = Mpb.addRec(R.m, 1, 'magicLake', 11, 9); r.data.lane = 0; } const bt = battleOf(D); assert.ok(stays(bt, 0, go.id) && stays(bt, 0, other.id), 'water on the exit\'s tile: blocked'); }
-  { const { D, go, other } = setup(256); for (const R of D.lanes) { const r = Mpb.addRec(R.m, 1, 'magicLake', 10, 8); r.data.lane = 0; } const bt = battleOf(D); assert.ok(stays(bt, 0, go.id) && travels(bt, 0, other.id), 'water on its tile at the exit: it stays'); }
-  { const { D, go, other } = setup(257); for (const R of D.lanes) Mpb.addRec(R.m, 1, 'scorch', 11, 9); const bt = battleOf(D); assert.ok(stays(bt, 0, go.id) && stays(bt, 0, other.id), 'a building on the exit\'s tile: blocked'); }
+  { const { D, m, go, other } = setup(252); squad(m, 0, 'Brute', 10, 9); const bt = battleOf(D); assert.ok(stays(bt, 0, go.id) && travels(bt, 0, other.id), 'a squad of its own team on its tile at the exit: it stays, the other goes'); }
+  { const { D, go, other } = setup(253); squad(D.lanes[1].m, 1, 'Brute', 10, 9); const bt = battleOf(D); assert.ok(stays(bt, 0, go.id) && travels(bt, 0, other.id), 'an enemy squad (the other lane) on it: it stays'); }
+  { const { D, m, go, other } = setup(254); squad(m, 1, 'Brute', 11, 10); const bt = battleOf(D); assert.ok(stays(bt, 0, go.id) && stays(bt, 0, other.id), 'a squad on the exit\'s own tile: the mine is blocked, nobody goes'); }
+  { const { D, go, other } = setup(255); for (const R of D.lanes) { const r = Mpb.addRec(R.m, 1, 'magicLake', 11, 10); r.data.lane = 0; } const bt = battleOf(D); assert.ok(stays(bt, 0, go.id) && stays(bt, 0, other.id), 'water on the exit\'s tile: blocked'); }
+  { const { D, go, other } = setup(256); for (const R of D.lanes) { const r = Mpb.addRec(R.m, 1, 'magicLake', 10, 9); r.data.lane = 0; } const bt = battleOf(D); assert.ok(stays(bt, 0, go.id) && travels(bt, 0, other.id), 'water on its tile at the exit: it stays'); }
+  { const { D, go, other } = setup(257); for (const R of D.lanes) Mpb.addRec(R.m, 1, 'scorch', 11, 10); const bt = battleOf(D); assert.ok(stays(bt, 0, go.id) && stays(bt, 0, other.id), 'a building on the exit\'s tile: blocked'); }
   { const { D, x, go, other } = setup(258, 4); // (round 4: a tower type, not the Outpost)
-    for (const R of D.lanes) { R.m.towers[1].type = 'bastion'; R.m.towerSkill = [0, 1]; R.m.towerSkill2 = [0, 1]; R.m.bwalls = [[], [{ col: 12, row: 10, edge: 'n', round: R.m.round }]]; }
+    for (const R of D.lanes) { R.m.towers[1].type = 'bastion'; R.m.towerSkill = [0, 1]; R.m.towerSkill2 = [0, 1]; R.m.bwalls = [[], [{ col: 12, row: 11, edge: 'n', round: R.m.round }]]; }
     assert.ok(Game.bwallsFighting(x.m(0), 1).length === 1, 'the wall fights');
     const bt = battleOf(D); assert.ok(travels(bt, 0, go.id) && stays(bt, 0, other.id), 'a wall of either team on its tile at the exit: it stays'); }
 });
@@ -329,10 +329,10 @@ check('4: any other unit standing on the tile at the exit blocks it too (the oth
     playTo(x, 4);
     for (const m of lanesOf(D)) { m.armies = [[], []]; m.packages = null; m.buildings = [[], []]; }
     teams(D);
-    addMine(D, 0, 11, 15, 11, 7);
+    addMine(D, 0, 11, 16, 11, 7);
     x.m(facLane).buildings[1].push({ id: 'factory', col: 10, row: 6, round: 1, progress: 999, built: true, xp: 0, level: 0 });
     teams(D);
-    const m = x.m(0), q = squad(m, 0, 'Brute', 10, 14), q2 = squad(m, 0, 'Brute', 12, 16); // q comes up on (10,6), q2 on (12,8)
+    const m = x.m(0), q = squad(m, 0, 'Brute', 10, 15), q2 = squad(m, 0, 'Brute', 12, 17); // q comes up on (10,6), q2 on (12,8)
     const bt = battleOf(D);
     assert.ok(stays(bt, 0, q.id) && travels(bt, 0, q2.id), 'a Factory in lane ' + facLane + ' on its tile at the exit: it stays, the other goes');
   }
@@ -341,10 +341,10 @@ check('4: any other unit standing on the tile at the exit blocks it too (the oth
     playTo(x, 4);
     for (const m of lanesOf(D)) { m.armies = [[], []]; m.packages = null; m.buildings = [[], []]; }
     teams(D);
-    addMine(D, 0, 11, 15, 11, 7);
+    addMine(D, 0, 11, 16, 11, 7);
     x.m(1).buildings[1].push({ id: 'factory', col: 11, row: 7, round: 1, progress: 999, built: true, xp: 0, level: 0 });
     teams(D);
-    const q = squad(x.m(0), 0, 'Brute', 10, 14);
+    const q = squad(x.m(0), 0, 'Brute', 10, 15);
     assert.ok(stays(battleOf(D), 0, q.id), 'the other lane\'s Factory on the exit\'s own tile: nobody goes');
   }
   { // Jail guards at their post on the landing tile (B's Jail on (3,3), its west post in tile (2,3); A's exit on (1,3))
@@ -352,10 +352,10 @@ check('4: any other unit standing on the tile at the exit blocks it too (the oth
     playTo(x, 4);
     for (const m of lanesOf(D)) { m.armies = [[], []]; m.packages = null; }
     teams(D);
-    addMine(D, 0, 11, 15, 1, 3);
+    addMine(D, 0, 11, 16, 1, 3);
     for (const R of D.lanes) { const j = Mpb.addRec(R.m, 1, 'jail', 3, 3); j.skills.guards = { round: 1, n: 1, by: [1, 0], log: [] }; }
     teams(D);
-    const m = x.m(0), q = squad(m, 0, 'Brute', 12, 15), q2 = squad(m, 0, 'Brute', 11, 14); // q comes up on (2,3), q2 on (1,2)
+    const m = x.m(0), q = squad(m, 0, 'Brute', 12, 16), q2 = squad(m, 0, 'Brute', 11, 15); // q comes up on (2,3), q2 on (1,2)
     const bt = battleOf(D);
     assert.ok(bt.bodies.some(b => b.side === 1 && b.guard), 'the guards fight');
     assert.ok(stays(bt, 0, q.id) && travels(bt, 0, q2.id), 'a Jail guard on its tile at the exit: it stays, the other goes');
@@ -366,7 +366,7 @@ check('4: any other unit standing on the tile at the exit blocks it too (the oth
 check('7: Insider information shows the watched team\'s board live (buildings, water, dug exit, walls, vote tiles); the watchers\' checks agree page vs server', () => {
   const x = board(261, 4), { D } = x; // (round 4: no draft)
   const den = put(D, 1, 'shadowDen', { col: 11, row: 2 });
-  const cm = put(D, 0, 'coalMine', { col: 12, row: 15 });
+  const cm = put(D, 0, 'coalMine', { col: 12, row: 16 });
   for (const R of D.lanes) {
     const r = Mpb.recOf(R.m, 0, cm); r.parts.exit = { col: 6, row: 8 }; r.skills.shaft = { round: 0, n: 1, by: [1, 0], log: [] };
     Mpb.giveCard(R.m, 0, { type: 'mpb', id: 'magicLake' });
@@ -379,8 +379,8 @@ check('7: Insider information shows the watched team\'s board live (buildings, w
   const oak = vote(x, 0, 'oak');
   assert.ok(x.act(0, 'mpbAct', cm, 'exit', 15, 8).ok, 'dug');
   const la = Mpb.recs(x.m(0), 0).filter(r => r.kind === 'magicLake');
-  assert.ok(x.act(0, 'mpbAct', la[0].key, 'place', 9, 10).ok && x.act(1, 'mpbAct', la[2].key, 'place', 16, 11).ok, 'water');
-  assert.ok(x.act(0, 'placeBwall', 12, 9, 'n').ok, 'a wall');
+  assert.ok(x.act(0, 'mpbAct', la[0].key, 'place', 9, 11).ok && x.act(1, 'mpbAct', la[2].key, 'place', 16, 12).ok, 'water');
+  assert.ok(x.act(0, 'placeBwall', 12, 10, 'n').ok, 'a wall');
   assert.ok(x.act(0, 'mpbBuy', oak, 'heal').ok, 'a skill (stays hidden: a buy)');
   for (const R of D.lanes) Mpb.queue(R.m, 0, 'jail');
   D.tbase[0] = Duo.teamState(x.m(0), 0); Duo.tick(D, T); teams(D);
@@ -393,8 +393,8 @@ check('7: Insider information shows the watched team\'s board live (buildings, w
     assert.ok(o && o.col === oakRec.col && o.row === oakRec.row, 'seat ' + seat + ': the Oak');
     assert.ok(!(o.skills.heal && o.skills.heal.n), 'seat ' + seat + ': not its Heal (a buy)');
     assert.deepStrictEqual(recIn(v, 0, cm).parts.exit, { col: 15, row: 8 }, 'seat ' + seat + ': the dug exit');
-    assert.ok(Game.terrainBlocks(v, 9, 10) && Game.terrainBlocks(v, 16, 11), 'seat ' + seat + ': the water');
-    assert.ok((v.bwalls[0] || []).some(w => w.col === 12 && w.row === 9 && w.round === v.round) && Game.bwallShown(v, 1, true, 0, v.bwalls[0].find(w => w.col === 12 && w.row === 9)), 'seat ' + seat + ': the wall, drawn');
+    assert.ok(Game.terrainBlocks(v, 9, 11) && Game.terrainBlocks(v, 16, 12), 'seat ' + seat + ': the water');
+    assert.ok((v.bwalls[0] || []).some(w => w.col === 12 && w.row === 10 && w.round === v.round) && Game.bwallShown(v, 1, true, 0, v.bwalls[0].find(w => w.col === 12 && w.row === 10)), 'seat ' + seat + ': the wall, drawn');
     const h = Mpb.voteHead(v, 0);
     assert.ok(h && h.kind === 'jail' && h.votes[0] && h.votes[1] && h.votes[0].col === js[0].col && h.votes[1].col === js[1].col, 'seat ' + seat + ': their vote tiles');
     assert.strictEqual(v.gold[0], D.lanes[Duo.SEATS[seat].lane].base.gold[0], 'seat ' + seat + ': not their gold');
@@ -403,7 +403,7 @@ check('7: Insider information shows the watched team\'s board live (buildings, w
   { const save = copy(D.lanes.map(R => Mpb.recOf(R.m, 1, den).data.watch));
     for (const R of D.lanes) delete Mpb.recOf(R.m, 1, den).data.watch;
     const v = W(Duo.viewFor(D, 2).m);
-    assert.ok(!recIn(v, 0, oak) && !Game.terrainBlocks(v, 9, 10) && !(v.bwalls[0] || []).some(w => w.round === v.round) && !Mpb.voteHead(v, 0).votes[0], 'not watched: hidden as before');
+    assert.ok(!recIn(v, 0, oak) && !Game.terrainBlocks(v, 9, 11) && !(v.bwalls[0] || []).some(w => w.round === v.round) && !Mpb.voteHead(v, 0).votes[0], 'not watched: hidden as before');
     D.lanes.forEach((R, L) => { Mpb.recOf(R.m, 1, den).data.watch = save[L]; }); }
   // the watchers' deploy checks: the page (its view) and the server (as team B sees the board) agree on every tile
   teams(D);
@@ -436,7 +436,7 @@ check('8: the four artifacts of a match are all different, never the Vault nor t
   const pool0 = Mpb.cardPool(W(m0));
   assert.ok(!pool0.some(c => c.id === 'vault' || c.id === 'outpost'), 'no Vault, no Outpost');
   assert.strictEqual(pool0.length, Game.TOWER_TYPES.length + Object.keys(Mpb.KINDS).length - 1, 'every tower type and every building but the Vault');
-  { const m = W(m0); Mpb.addRec(m, 0, 'oak', 12, 14); m.towers[1].type = Game.TOWER_TYPES[0].id;
+  { const m = W(m0); Mpb.addRec(m, 0, 'oak', 12, 15); m.towers[1].type = Game.TOWER_TYPES[0].id;
     assert.ok(Mpb.cardPool(m).some(c => c.id === 'oak') && Mpb.cardPool(m).some(c => c.id === Game.TOWER_TYPES[0].id), 'a kind or tower a team has is still in the pool'); }
   const seen = new Set();
   for (let s = 0; s < 400; s++) {
@@ -499,11 +499,11 @@ check('10: with a Shadow Den, Rogues, Assassins and Shadowhands come up the mine
     const x = match(281, [true, true, true, true]), { D } = x;
     for (const m of lanesOf(D)) { m.armies = [[], []]; m.packages = null; }
     teams(D);
-    addMine(D, 0, 11, 15, 11, 9);
-    if (den) put(D, 0, 'shadowDen', { col: 6, row: 15 });
+    addMine(D, 0, 11, 16, 11, 10);
+    if (den) put(D, 0, 'shadowDen', { col: 6, row: 16 });
     const m = x.m(0);
-    const q = { r: squad(m, 0, 'Rogue', 10, 14), a: squad(m, 0, 'Assassin', 12, 14), b: squad(m, 0, 'Brute', 10, 16) };
-    if (den) q.h = squad(m, 0, 'Shadowhands', 12, 16);
+    const q = { r: squad(m, 0, 'Rogue', 10, 15), a: squad(m, 0, 'Assassin', 12, 15), b: squad(m, 0, 'Brute', 10, 17) };
+    if (den) q.h = squad(m, 0, 'Shadowhands', 12, 17);
     const bt = battleOf(D);
     for (const [k, s] of Object.entries(q)) {
       const bs = bodiesOf(bt, 0, s.id);

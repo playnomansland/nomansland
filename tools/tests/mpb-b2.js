@@ -90,7 +90,7 @@ check('placement: interior tiles, 2 tiles of room round every building', () => {
     const ok = Mpb.spots(m, 0, kind, null);
     assert.ok(ok.length > 10, kind + ': room on the board');
     for (const t of ok) assert.ok(Mpb.interior(0, t.col, t.row) && Mpb.spaced(m, t.col, t.row), kind + ' tile ' + t.col + ',' + t.row);
-    assert.ok(!Mpb.spotOk(m, 0, kind, null, 10, 17) && !Mpb.spotOk(m, 0, kind, null, 2, 14) && !Mpb.spotOk(m, 0, kind, null, 10, 5), kind + ': not on an edge, not in the enemy zone');
+    assert.ok(!Mpb.spotOk(m, 0, kind, null, 10, 18) && !Mpb.spotOk(m, 0, kind, null, 2, 15) && !Mpb.spotOk(m, 0, kind, null, 10, 5), kind + ': not on an edge, not in the enemy zone');
   }
   const h = addKind(x.D, 0, 'fieldHospital');
   assert.ok(!Mpb.spotOk(m, 0, 'oak', null, h.col + 2, h.row), 'the Oak not within 2 tiles of the hospital');
@@ -100,8 +100,8 @@ check('placement: interior tiles, 2 tiles of room round every building', () => {
 
 check('Field hospital: squads within 1 tile (both lanes) +20% health and 2%/s regen, measured in a real Duo fight', () => {
   const x = bare(11), { D } = x;
-  const h = addKind(D, 0, 'fieldHospital', { col: 10, row: 14 });
-  const a = put(D, 0, 0, 'Brute', 11, 13), b = put(D, 1, 0, 'Brute', 9, 15), far = put(D, 0, 0, 'Brute', 14, 13);
+  const h = addKind(D, 0, 'fieldHospital', { col: 10, row: 15 });
+  const a = put(D, 0, 0, 'Brute', 11, 14), b = put(D, 1, 0, 'Brute', 9, 16), far = put(D, 0, 0, 'Brute', 14, 14);
   put(D, 0, 1, 'Skeleton Archers', 11, 6); put(D, 1, 1, 'Skeleton Archers', 13, 6);
   const bt = battleOf(D), base = units[UI('Brute')].hp;
   const [ba] = bodiesOf(bt, 0, a.id), [bb] = bodiesOf(bt, 0, Duo.move(b.id)), [bf] = bodiesOf(bt, 0, far.id);
@@ -130,7 +130,7 @@ check('Field hospital: +5 Team HP for a round won with it standing (at most 200)
   // a real fight: the Team HP comes out as the fight's damage plus the hospital's part
   const y = bare(13), Y = y.D;
   addKind(Y, 0, 'fieldHospital');
-  put(Y, 0, 0, 'Brute', 8, 12); put(Y, 1, 0, 'Brute', 15, 12); put(Y, 0, 1, 'Goblin Swarm', 10, 5);
+  put(Y, 0, 0, 'Brute', 8, 13); put(Y, 1, 0, 'Brute', 15, 13); put(Y, 0, 1, 'Goblin Swarm', 10, 5);
   Y.hp = [150, 150]; for (const R of Y.lanes) R.m.hp = Y.hp.slice();
   for (let s = 0; s < 4; s++) Duo.setReady(Y, s, true, y.T);
   const sm = Y.summary[0], hr = Mpb.recs(y.m(0), 0).find(q => q.kind === 'fieldHospital'), fellNow = hr.fell === sm.round;
@@ -142,7 +142,7 @@ check('Field dressing: 50, 100... a click each (per player), a random allied squ
   const x = bare(14), { D } = x, a = x.m(0), b = x.m(1);
   const h = addKind(D, 0, 'fieldHospital');
   for (const m of [a, b]) m.gold[0] = 1000;
-  const sqs = [put(D, 0, 0, 'Brute', 5, 12), put(D, 0, 0, 'Ent', 8, 12), put(D, 1, 0, 'Brute', 15, 12), put(D, 1, 0, 'Spiders', 18, 12)];
+  const sqs = [put(D, 0, 0, 'Brute', 5, 13), put(D, 0, 0, 'Ent', 8, 13), put(D, 1, 0, 'Brute', 15, 13), put(D, 1, 0, 'Spiders', 18, 13)];
   put(D, 0, 1, 'Goblin Swarm', 10, 5);
   const hp0 = {}, foe0 = {};
   for (const bd of battleOf(D).bodies) { if (bd.side === 0 && bd.squad >= 0) hp0[bd.squad] = bd.u.hp; if (bd.side === 1) foe0[bd.squad] = bd.u.hp; }
@@ -175,9 +175,9 @@ check('Field dressing: 50, 100... a click each (per player), a random allied squ
 
 check('Second wind: once a round, the chosen squad comes back whole in front of the hospital the first time it is wiped out', () => {
   const x = bare(15), { D } = x, a = x.m(0);
-  const h = addKind(D, 0, 'fieldHospital', { col: 10, row: 14 });
+  const h = addKind(D, 0, 'fieldHospital', { col: 10, row: 15 });
   for (const R of D.lanes) R.m.gold[0] = 1000;
-  const gob = put(D, 1, 0, 'Goblin Swarm', 6, 12), bru = put(D, 0, 0, 'Brute', 16, 12);
+  const gob = put(D, 1, 0, 'Goblin Swarm', 6, 13), bru = put(D, 0, 0, 'Brute', 16, 13);
   put(D, 0, 1, 'Brute', 9, 5); put(D, 1, 1, 'Skeleton Archers', 12, 5);
   assert.ok(!x.act(0, 'mpbBuy', h.key, 'wind').ok, 'needs a squad');
   assert.ok(!Mpb.canBuy(a, 0, h.key, 'wind', 2, 1), 'a lane is 0 or 1');
@@ -193,7 +193,7 @@ check('Second wind: once a round, the chosen squad comes back whole in front of 
   assert.ok(!Mpb.recOf(Duo.viewFor(D, 2).m, 0, h.key).data.wind && !Mpb.recOf(Duo.viewFor(D, 3).m, 0, h.key).skills.wind, 'the opponents see no Second wind');
   assert.ok(Mpb.recOf(Duo.viewFor(D, 0).m, 0, h.key).data.wind, 'the teammate does');
   // the fight: the goblins (lane 1) are marked; weaken them so they fall at once, then they come back, once
-  const bt = battleOf(D), id = Duo.move(gob.id), orig = bodiesOf(bt, 0, id), front = Game.tileToWorld(10, 13);
+  const bt = battleOf(D), id = Duo.move(gob.id), orig = bodiesOf(bt, 0, id), front = Game.tileToWorld(10, 14);
   assert.ok(orig.length === 12 && orig.every(b => b.fhRevive && near(b.fhRevive.x, front.x) && near(b.fhRevive.y, front.y)), 'the 12 goblins carry the mark, the tile in front of the hospital');
   assert.ok(bt.bodies.filter(b => b.side === 0 && b.squad !== id).every(b => !b.fhRevive), 'no other squad');
   for (const b of orig) b.hp = 0.5;
@@ -215,9 +215,9 @@ check('Second wind: once a round, the chosen squad comes back whole in front of 
 
 check('Second wind in a whole Duo fight: a squad wiped out comes back and fights on', () => {
   const x = bare(16), { D } = x;
-  const h = addKind(D, 0, 'fieldHospital', { col: 10, row: 14 });
+  const h = addKind(D, 0, 'fieldHospital', { col: 10, row: 15 });
   for (const R of D.lanes) R.m.gold[0] = 1000;
-  const gob = put(D, 0, 0, 'Goblin Swarm', 10, 10);
+  const gob = put(D, 0, 0, 'Goblin Swarm', 10, 11);
   put(D, 0, 1, 'Flame Wizard', 10, 6); put(D, 1, 1, 'Steel Wizard', 13, 6);
   assert.ok(x.act(0, 'mpbBuy', h.key, 'wind', 0, gob.id).ok);
   const lanes = lanesOf(D); Duo.settle(lanes);
@@ -230,9 +230,9 @@ check('Second wind in a whole Duo fight: a squad wiped out comes back and fights
 // the regen of one Brute standing next to a hospital, rising ticks measured in a real Duo fight
 function regenWith(seed, setup) {
   const x = bare(seed), { D } = x;
-  addKind(D, 0, 'fieldHospital', { col: 10, row: 14 });
-  const oak = addKind(D, 0, 'oak', { col: 16, row: 14 });
-  const a = put(D, 0, 0, 'Brute', 11, 13);
+  addKind(D, 0, 'fieldHospital', { col: 10, row: 15 });
+  const oak = addKind(D, 0, 'oak', { col: 16, row: 15 });
+  const a = put(D, 0, 0, 'Brute', 11, 14);
   put(D, 0, 1, 'Skeleton Archers', 11, 6); put(D, 1, 1, 'Skeleton Archers', 13, 6);
   for (const R of D.lanes) R.m.gold[0] = 1000;
   if (setup) setup(x, oak);
@@ -301,7 +301,7 @@ check('The Oak\'s Heal: +5 Team HP a click (once a round each), before the fight
   const lanes = lanesOf(D), hp = (v) => { const h = v.slice(); Mpb.teamHeal(lanes, h, lanes[0].round); return h; };
   assert.deepStrictEqual(hp([150, 150]), [160, 150]); assert.deepStrictEqual(hp([195, 150]), [200, 150], 'never above 200'); assert.deepStrictEqual(hp([0, 150]), [0, 150], 'a beaten team stays beaten');
   // a real fight: 150 + 10, then the damage
-  put(D, 0, 0, 'Goblin Swarm', 10, 12); put(D, 0, 1, 'Brute', 10, 5); put(D, 1, 1, 'Ether Golem', 13, 5);
+  put(D, 0, 0, 'Goblin Swarm', 10, 13); put(D, 0, 1, 'Brute', 10, 5); put(D, 1, 1, 'Ether Golem', 13, 5);
   D.hp = [150, 150]; for (const R of D.lanes) R.m.hp = D.hp.slice();
   for (let s = 0; s < 4; s++) Duo.setReady(D, s, true, x.T);
   const sm = D.summary[0];
@@ -315,7 +315,7 @@ check('The Oak\'s Heal: +5 Team HP a click (once a round each), before the fight
 
 check('Sticky moss: once a match; enemies on the tiles within 3 of the Oak move 30% slower, not its own team, not Berserkers', () => {
   const x = bare(23), { D } = x;
-  const oak = addKind(D, 0, 'oak', { col: 10, row: 13 });
+  const oak = addKind(D, 0, 'oak', { col: 10, row: 14 });
   for (const R of D.lanes) R.m.gold[0] = 1000;
   const o0 = { mpb: {} }; Mpb.battleOpts(x.m(0), o0);
   assert.ok(o0.mpb.oak && !(o0.tiles || []).some(t => t.oak), 'no moss before it is bought');
@@ -327,12 +327,12 @@ check('Sticky moss: once a match; enemies on the tiles within 3 of the Oak move 
   assert.strictEqual(moss.length, 49, 'the 7×7 tiles round the Oak (Chebyshev 3), its own too');
   assert.ok(moss.every(t => t.type === 'mud' && t.side === 0 && t.slow === 30));
   // a real Duo fight: a Brute of team B walks in; a Berserker Brute of team B too; team A's own Brute stands in it
-  const foe = put(D, 0, 1, 'Brute', 10, 8), zerk = put(D, 1, 1, 'Brute', 12, 8), own = put(D, 0, 0, 'Brute', 9, 12);
+  const foe = put(D, 0, 1, 'Brute', 10, 8), zerk = put(D, 1, 1, 'Brute', 12, 8), own = put(D, 0, 0, 'Brute', 9, 13);
   for (const R of D.lanes) R.m.tech = R.m.tech || [{}, {}];
   const zi = UI('Brute'), slot = units[zi].skills.indexOf('berserkers');
   const bt = battleOf(D), [fb] = bodiesOf(bt, 1, foe.id), [zb] = bodiesOf(bt, 1, Duo.move(zerk.id)), [ob] = bodiesOf(bt, 0, own.id);
   zb.u = { ...zb.u, unstoppable: true }; // (as the Berserkers skill makes it)
-  const w = Game.tileToWorld(10, 13), half = Game.TILE * 3.5, inMoss = (b) => Math.abs(b.x - w.x) < half && Math.abs(b.y - w.y) < half;
+  const w = Game.tileToWorld(10, 14), half = Game.TILE * 3.5, inMoss = (b) => Math.abs(b.x - w.x) < half && Math.abs(b.y - w.y) < half;
   let slowed = 0, zSlowed = 0, ownSlowed = 0, fIn = 0, zIn = 0, oIn = 0;
   for (let k = 0; k < 3000; k++) { // (where each stood as the tick began: the tiles act before anyone moves)
     const f0 = fb.alive && inMoss(fb), z0 = zb.alive && inMoss(zb), o0 = ob.alive && inMoss(ob);
@@ -354,7 +354,7 @@ check('The Oak\'s downside: the round after it fell, a 1-body level 3 Ent with a
   playTo(x, 2);
   for (const R of D.lanes) { for (const sd of [0, 1]) R.m.armies[sd] = []; R.m.artifacts = null; }
   const oak = addKind(D, 0, 'oak');
-  put(D, 0, 0, 'Brute', 8, 12); put(D, 0, 1, 'Goblin Swarm', 10, 5);
+  put(D, 0, 0, 'Brute', 8, 13); put(D, 0, 1, 'Goblin Swarm', 10, 5);
   assert.ok(!battleOf(D).bodies.some(b => b.u.name === 'Ent'), 'no Ent while the Oak never fell');
   for (const R of D.lanes) Mpb.recOf(R.m, 0, oak.key).fell = R.m.round - 1; // it fell in last round's fight
   const bt = battleOf(D), ents = bt.bodies.filter(b => b.u.name === 'Ent');
@@ -380,7 +380,7 @@ check('The Oak\'s downside: the round after it fell, a 1-body level 3 Ent with a
   assert.ok(sums[0].mpbNews[0].some(n => n.kind === 'oak' && n.ent), 'the news says so');
   for (const R of Y.lanes) R.m.round++;
   Duo.copyAll(Y.lanes[0].m, Y.lanes[1].m);
-  put(Y, 0, 0, 'Brute', 8, 12); put(Y, 0, 1, 'Goblin Swarm', 10, 5);
+  put(Y, 0, 0, 'Brute', 8, 13); put(Y, 0, 1, 'Goblin Swarm', 10, 5);
   assert.strictEqual(battleOf(Y).bodies.filter(b => b.u.name === 'Ent' && b.side === 1).length, 1, 'next round: the Ent');
 });
 
@@ -415,7 +415,7 @@ check('the page\'s copy hashes as the server\'s after every B2 action; the oppon
   const x = bare(26), { D } = x;
   const h = addKind(D, 0, 'fieldHospital'), oak = addKind(D, 0, 'oak');
   addKind(D, 1, 'fieldHospital'); addKind(D, 1, 'oak');
-  const g0 = put(D, 0, 0, 'Brute', 5, 12), g1 = put(D, 1, 0, 'Goblin Swarm', 18, 12);
+  const g0 = put(D, 0, 0, 'Brute', 5, 13), g1 = put(D, 1, 0, 'Goblin Swarm', 18, 13);
   for (const R of D.lanes) R.m.gold[0] += 2000;
   D.tbase = [0, 1].map(sd => Duo.teamState(D.lanes[0].m, sd));
   const page = (seat) => W(Duo.viewFor(D, seat).m);
@@ -453,12 +453,12 @@ check('the page\'s copy hashes as the server\'s after every B2 action; the oppon
 
 check('Second wind doesn\'t fire for a squad its own portal sacrificed (Ember Imps\' Summon hellfiend): it was never wiped out', () => {
   const x = bare(31), { D } = x;
-  const h = addKind(D, 0, 'fieldHospital', { col: 10, row: 14 });
+  const h = addKind(D, 0, 'fieldHospital', { col: 10, row: 15 });
   for (const R of D.lanes) R.m.gold[0] = 2000;
   const ui = UI('Ember Imps'), slot = units[ui].skills.indexOf('hellfiend');
   assert.ok(slot >= 0, 'Ember Imps have Summon hellfiend');
   for (const R of D.lanes) { R.m.tech = R.m.tech || [{}, {}]; R.m.tech[0] = R.m.tech[0] || {}; R.m.tech[0][ui] = [0, 0, 0, 0]; R.m.tech[0][ui][slot] = 1; }
-  const imps = put(D, 0, 0, 'Ember Imps', 10, 12);
+  const imps = put(D, 0, 0, 'Ember Imps', 10, 13);
   put(D, 0, 1, 'Brute', 10, 3);
   assert.ok(x.act(0, 'mpbBuy', h.key, 'wind', 0, imps.id).ok);
   const bt = battleOf(D), orig = bodiesOf(bt, 0, imps.id);
@@ -521,7 +521,7 @@ check('The Oak\'s Heal writes a results line: the HP bar and the results screen 
   for (const R of D.lanes) R.m.gold[0] = 1000;
   D.hp = [150, 150]; for (const R of D.lanes) R.m.hp = D.hp.slice();
   assert.ok(x.act(0, 'mpbBuy', oak.key, 'heal').ok && x.act(1, 'mpbBuy', oak.key, 'heal').ok);
-  put(D, 0, 0, 'Goblin Swarm', 10, 12); put(D, 0, 1, 'Brute', 10, 5); put(D, 1, 1, 'Ether Golem', 13, 5);
+  put(D, 0, 0, 'Goblin Swarm', 10, 13); put(D, 0, 1, 'Brute', 10, 5); put(D, 1, 1, 'Ether Golem', 13, 5);
   D.hp = [150, 150]; for (const R of D.lanes) R.m.hp = D.hp.slice();
   let f = null; for (let s = 0; s < 4; s++) f = Duo.setReady(D, s, true, x.T) || f;
   for (const sm of f.summaries) {
@@ -545,7 +545,7 @@ check('Field dressing can\'t be worked out while deploying: its seed (fhSeed) is
     const x = bare(60 + s), { D } = x;
     const h = addKind(D, 0, 'fieldHospital');
     for (const R of D.lanes) R.m.gold[0] = 2000;
-    put(D, 0, 0, 'Brute', 5, 12); put(D, 0, 0, 'Ent', 8, 12); put(D, 1, 0, 'Brute', 15, 12); put(D, 1, 0, 'Spiders', 18, 12);
+    put(D, 0, 0, 'Brute', 5, 13); put(D, 0, 0, 'Ent', 8, 13); put(D, 1, 0, 'Brute', 15, 13); put(D, 1, 0, 'Spiders', 18, 13);
     put(D, 0, 1, 'Goblin Swarm', 10, 5);
     const hp0 = {}; for (const b of battleOf(D).bodies) if (b.side === 0 && b.squad >= 0) hp0[b.squad] = b.u.hp;
     assert.ok(x.act(0, 'mpbBuy', h.key, 'dress').ok);

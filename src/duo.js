@@ -1,6 +1,7 @@
 // ===== 2v2 (developer test; one shared board since 2026-11-03) =====
-// One wide board (Game's 'duo' map: 24 x 18, two columns of flank tiles on each edge). Both players of a team deploy
-// in the same zone, and each team has one tower and one treasury. No leaders.
+// One wide board (Game's 'duo' map: 24 x 19, no man's land rows 7-11 with a middle row 9 that is nobody's, two columns
+// of flank tiles on each edge). Both players of a team deploy in the same zone, and each team has one tower and one
+// treasury. No leaders.
 //
 // Under the hood each pair of opponents is still a lane: an ordinary 1v1 match of its own (src/game.js), so each
 // player keeps their own gold, shop, unlocks, skills, levels and deployments, and every action goes through the very
@@ -33,7 +34,7 @@
   const Ref = (typeof Referee !== 'undefined') ? Referee : require('./referee.js');
   const M = (typeof Mpb !== 'undefined') ? Mpb : require('./mpb.js');
 
-  const V = 3; // 3: the 2v2 buildings (2026-11-06)
+  const V = 4; // 3: the 2v2 buildings (2026-11-06); 4: the 24 x 19 board (2026-11-07; server/src/duo.js turns away a page of another V)
   const MAP = 'duo';                 // the 2v2 board (Game.TEAM_MAPS)
   const OFF = 1000000;               // lane 1's squad ids inside the fight (and the other lane's squads in m.team) are moved by this
   const HP = 2 * G.START_HP;         // each team's shared health (two lanes take damage every round)

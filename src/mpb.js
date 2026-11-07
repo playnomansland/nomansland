@@ -25,7 +25,7 @@
   const SPACING = 3;                           // Chebyshev distance from every other building tile ("2 tiles around")
   const ARTIFACT = { rounds: [2, 8], r: 9, cap: 100, gold: 50, apart: 10 };
   const DRAFT_ROUNDS = [3, 9];                 // the cards of round 2's artifacts are dealt in round 3, round 8's in 9
-  const VAULT_SPOT = [{ col: 6, row: 15 }, { col: 17, row: 2 }]; // the old 2v2 treasury tiles (README, 2026-11-05)
+  const VAULT_SPOT = [{ col: 6, row: 16 }, { col: 17, row: 2 }]; // the old 2v2 treasury tiles (README, 2026-11-05; side 0's a row down on the 19-row board, 2026-11-07)
   const PER = ['round', 'roundPlayer', 'match', 'building', 'free'];
 
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -798,7 +798,8 @@
     try { return !G.terrainBlocks(m, col, row) && !(strict ? taken : seenTaken)(m, side, col, row) && !G.bwallTile(m, side, col, row) && lakeFree(m, col, row); } finally { rec.col = was.col; rec.row = was.row; }
   }
   // where lake tile rec may go, best first: no man's land on the team's own half (the rows nearest its zone first),
-  // then the rest of no man's land, then the zone (its front first); each player toward the columns of their own half
+  // then its middle row (nobody's, Game.midRow, 2026-11-07), then the rest of no man's land, then the zone (its front
+  // first); each player toward the columns of their own half
   function lakeSpots(m, side, rec, strict) {
     const out = [];
     if (!on(m) || !rec) return out;
@@ -810,8 +811,8 @@
       for (let row = 0; row < ROWS; row++) for (let col = 0; col < COLS; col++) if (lakeOk(m, side, rec, col, row, strict)) out.push({ col, row });
     } finally { lakeWet = null; rec.col = was.col; rec.row = was.row; }
     const half = (rec.data.lane === 1 ? 3 : 1) * COLS / 4 - 0.5, own = (r) => side === 0 ? r >= ROWS / 2 : r < ROWS / 2;
-    const band = (t) => G.inNoMans(t.row) ? (own(t.row) ? 0 : 1) : 2, back = (t) => side === 0 ? ROWS - 1 - t.row : t.row;
-    return out.sort((a, b) => band(a) - band(b) || (band(a) === 1 ? back(b) - back(a) : back(a) - back(b)) || Math.abs(a.col - half) - Math.abs(b.col - half) || a.col - b.col);
+    const band = (t) => G.inNoMans(t.row) ? (G.midRow(t.row) ? 1 : own(t.row) ? 0 : 2) : 3, back = (t) => side === 0 ? ROWS - 1 - t.row : t.row;
+    return out.sort((a, b) => band(a) - band(b) || (band(a) === 2 ? back(b) - back(a) : back(a) - back(b)) || Math.abs(a.col - half) - Math.abs(b.col - half) || a.col - b.col);
   }
   // this player's lake tiles still to put down
   const lakeTodo = (m, side, lane) => lakeRecs(m, side).filter(r => r.col < 0 && r.data.lane === lane);
@@ -2207,17 +2208,27 @@
   const cardName = (c) => !c ? '' : c.type === 'tower' ? ((G.TOWER_TYPES.find(t => t.id === c.id) || {}).name || c.id) : ((kindOf(c.id) || {}).name || c.id);
   const cardText = (c) => !c ? '' : c.type === 'tower' ? ((G.TOWER_TYPES.find(t => t.id === c.id) || {}).text || '') : ((kindOf(c.id) || {}).text || '');
   // two point-mirrored tiles in no man's land (not flank tiles, not water), at least ARTIFACT.apart tiles apart, and
-  // two different cards. r: a seeded 0..1 source. Returns { round, list }.
+  // two different cards. r: a seeded 0..1 source. Returns { round, list }. On a board with a middle row (the 2v2
+  // board, 2026-11-07) both stand on it: the same distance from both teams' zones, and not in the flank columns (the
+  // middle row has no flank tiles, so a column with flank tiles beside it is kept free, as before). If the middle row
+  // has no free pair left (Coal mine exits, lake tiles), the top half's rows of no man's land, as before. Null: none.
   function rollArtifacts(m, r) {
     const { COLS, ROWS } = grid(m), mirror = (c, w) => ({ col: COLS - 1 - c, row: ROWS - 1 - w });
-    const ok = [];
-    for (let row = 0; row < ROWS / 2; row++) for (let col = 0; col < COLS; col++) {
-      const p = mirror(col, row);
-      if (!nmlOk(col, row) || !nmlOk(p.col, p.row) || G.terrainBlocks(m, col, row) || G.terrainBlocks(m, p.col, p.row)) continue;
-      if (at(m, col, row) || at(m, p.col, p.row)) continue; // (nor on a building's tile, nor one a Coal mine's exit keeps free: a fair pair)
-      if (Math.hypot(p.col - col, p.row - row) < ARTIFACT.apart) continue;
-      ok.push({ col, row });
-    }
+    // (not water, nor a building's tile, nor one a Coal mine's exit keeps free)
+    const free = (col, row) => nmlOk(col, row) && !G.terrainBlocks(m, col, row) && !at(m, col, row) && !(G.midRow(row) && (flank(col, row - 1) || flank(col, row + 1)));
+    const pairs = (rows) => {
+      const ok = [];
+      for (const row of rows) for (let col = 0; col < COLS; col++) {
+        const p = mirror(col, row);
+        if (!free(col, row) || !free(p.col, p.row)) continue; // (a fair pair)
+        if (Math.hypot(p.col - col, p.row - row) < ARTIFACT.apart) continue;
+        ok.push({ col, row });
+      }
+      return ok;
+    };
+    let ok = ROWS % 2 ? pairs([(ROWS - 1) / 2]) : [];
+    if (!ok.length) ok = pairs(Array.from({ length: Math.floor(ROWS / 2) }, (_, i) => i));
+    if (!ok.length) return null; // (never in play: no free pair anywhere, so no artifacts this round)
     const a = ok[Math.floor(r() * ok.length)], b = mirror(a.col, a.row);
     const pool = cardPool(m), cards = [];
     while (cards.length < 2 && pool.length) cards.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);

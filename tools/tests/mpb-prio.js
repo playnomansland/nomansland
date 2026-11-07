@@ -146,7 +146,7 @@ const lanesFor = [[0, 0], [0, 1], [1, 0], [1, 1]]; // (team A's lane, team B's l
 check('5: squad and squad on a tile of a team\'s own zone: that team\'s stays, the other team\'s moves; both orders, every pair of lanes, both zones', () => {
   for (const host of [0, 1]) for (const [la, lb] of lanesFor) for (const hostFirst of [true, false]) {
     const x = board(301 + host), { D } = x;
-    const guest = 1 - host, t = host === 0 ? { col: 12, row: 14 } : { col: 11, row: 3 };
+    const guest = 1 - host, t = host === 0 ? { col: 12, row: 15 } : { col: 11, row: 3 };
     const hs = seatOf(host === 0 ? la : lb, host), gs = seatOf(host === 0 ? lb : la, guest);
     let h, g;
     if (hostFirst) { h = place(x, hs, 'plain', t.col, t.row); g = place(x, gs, 'Assassin', t.col, t.row); }
@@ -166,7 +166,7 @@ check('5: an enemy flank squad on a flank tile of your zone and your Assassin th
   // (review 6 Nov: src/game.js FLANK calls these tiles "the enemy's and never yours", Game.reserved: no prio there)
   for (const host of [0, 1]) for (const hostFirst of [true, false]) {
     const x = board(311 + host, 3), { D } = x; // (round 3: flank tiles open)
-    const guest = 1 - host, t = host === 0 ? { col: 0, row: 14 } : { col: 23, row: 3 };
+    const guest = 1 - host, t = host === 0 ? { col: 0, row: 15 } : { col: 23, row: 3 };
     Game.useGrid(x.m(0));
     assert.ok(Game.isFlank(guest, t.col, t.row) && Game.inZone(host, t.row) && Game.reserved(host, t.col, t.row), 'a flank tile of team ' + guest + ' in team ' + host + '\'s zone');
     assert.strictEqual(Duo.prioOf({ sd: host, tiles: [[t.col, t.row]] }, { sd: guest, tiles: [[t.col, t.row]] }), -1, 'no prio on a flank tile');
@@ -206,7 +206,7 @@ check('5: no man\'s land: the newer of two squads moves, whichever team (both or
 
 check('5: teammates on one tile of their own zone (both lanes): the newer moves, both orders', () => {
   for (const firstLane of [0, 1]) {
-    const x = board(331), { D } = x, t = { col: 12, row: 14 };
+    const x = board(331), { D } = x, t = { col: 12, row: 15 };
     const add = (L) => { const m = x.m(L), q = { id: m.nextId[0]++, unit: plain(x, seatOf(L, 0)), col: t.col, row: t.row, round: m.round, xp: 0, level: 0, cost: 100 }; m.armies[0].push(q); teams(D); Duo.stampAll(D); return q; };
     const q1 = add(firstLane), q2 = add(1 - firstLane);
     assert.ok(Duo.stampOf(D, seatOf(1 - firstLane, 0), q2.id) > Duo.stampOf(D, seatOf(firstLane, 0), q1.id), 'the second is newer');
@@ -219,7 +219,7 @@ check('5: teammates on one tile of their own zone (both lanes): the newer moves,
 // ===================================== 5: buildings, water, the mine =====================================
 check('5: a building voted onto a hidden enemy Assassin in its own zone stays (both orders, both lanes); the Assassin moves off and away from it', () => {
   for (const kind of ['oak', 'school', 'shadowDen', 'jail']) for (const lb of [0, 1]) for (const assFirst of [true, false]) {
-    const x = board(341), { D } = x, t = { col: 13, row: 14 };
+    const x = board(341), { D } = x, t = { col: 13, row: 15 };
     const gs = seatOf(lb, 1);
     let key, ass;
     if (assFirst) { ass = place(x, gs, 'Assassin', t.col, t.row); key = vote(x, 0, kind, t); }
@@ -237,7 +237,7 @@ check('5: a building voted onto a hidden enemy Assassin in its own zone stays (b
 
 check('5: a Coal mine entrance voted onto a hidden Assassin: it stays, the Assassin moves, and the squads round it still go down the mine', () => {
   for (const assFirst of [true, false]) for (const lb of [0, 1]) {
-    const x = board(351), { D } = x, t = { col: 12, row: 14 }, e = { col: 12, row: 9 };
+    const x = board(351), { D } = x, t = { col: 12, row: 15 }, e = { col: 12, row: 10 };
     const gs = seatOf(lb, 1);
     let key, ass;
     const entrance = () => { key = vote(x, 0, 'coalMine', t); vote(x, 0, 'coalMine', e, 'exit', key); };
@@ -259,7 +259,7 @@ check('5: a Coal mine entrance voted onto a hidden Assassin: it stays, the Assas
 
 check('5: Magic lake water put on a hidden enemy Assassin: on your zone the water stays and the Assassin moves (both orders, both lanes)', () => {
   for (const lb of [0, 1]) for (const lakeFirst of [true, false]) {
-    const x = board(361), { D } = x, t = { col: 10, row: 13 };
+    const x = board(361), { D } = x, t = { col: 10, row: 14 };
     for (const R of D.lanes) Mpb.giveCard(R.m, 0, { type: 'mpb', id: 'magicLake' });
     fresh(D);
     const la = lakeOf(x.m(0), 0, 0), gs = seatOf(lb, 1);
@@ -279,8 +279,8 @@ check('5: a grown Tree kojja or a Scorch turret on a hidden enemy Assassin: the 
   for (const kind of ['scorch', 'grow']) for (const lb of [0, 1]) for (const sqFirst of [true, false]) {
     const x = board(371), { D } = x;
     let tk = null;
-    if (kind === 'grow') { tk = put(D, 0, 'treeKojja', { col: 12, row: 15 }); fresh(D); }
-    const t = { col: 12, row: 13 }, gs = seatOf(lb, 1);
+    if (kind === 'grow') { tk = put(D, 0, 'treeKojja', { col: 12, row: 16 }); fresh(D); }
+    const t = { col: 12, row: 14 }, gs = seatOf(lb, 1);
     let key, sq;
     const build = () => {
       const n = Mpb.recs(x.m(0), 0).length;
@@ -297,7 +297,7 @@ check('5: a grown Tree kojja or a Scorch turret on a hidden enemy Assassin: the 
 });
 
 check('5: a Tree kojja with its Nest squad voted onto a hidden Assassin: the kojja and its squad stay, the Assassin moves', () => {
-  const x = board(381), { D } = x, m = x.m(0), t = { col: 12, row: 14 };
+  const x = board(381), { D } = x, m = x.m(0), t = { col: 12, row: 15 };
   const ass = place(x, 2, 'Assassin', t.col, t.row);
   const key = vote(x, 0, 'treeKojja', t);
   assert.ok(x.act(0, 'mpbBuy', key, 'nest').ok, 'Nest');
@@ -314,8 +314,8 @@ check('5: a Tree kojja with its Nest squad voted onto a hidden Assassin: the koj
 check('5 and 4: an exit dug onto a flank tile of their zone where their hidden Assassin stands: nothing moves, the mine is blocked (both orders)', () => {
   for (const digFirst of [true, false]) for (const lb of [0, 1]) {
     const x = board(391, 3), { D } = x;
-    const ka = put(D, 0, 'coalMine', { col: 12, row: 15 });
-    for (const R of D.lanes) { const r = Mpb.recOf(R.m, 0, ka); r.parts.exit = { col: 12, row: 9 }; r.skills.shaft = { round: 0, n: 1, by: [1, 0], log: [] }; }
+    const ka = put(D, 0, 'coalMine', { col: 12, row: 16 });
+    for (const R of D.lanes) { const r = Mpb.recOf(R.m, 0, ka); r.parts.exit = { col: 12, row: 10 }; r.skills.shaft = { round: 0, n: 1, by: [1, 0], log: [] }; }
     fresh(D);
     const t = { col: 1, row: 3 };
     Game.useGrid(x.m(0));
@@ -324,7 +324,7 @@ check('5 and 4: an exit dug onto a flank tile of their zone where their hidden A
     const dig = () => assert.ok(x.act(0, 'mpbAct', ka, 'exit', t.col, t.row).ok, 'A1 digs onto (1,3)');
     const theirs = () => { ass = place(x, seatOf(lb, 1), 'Assassin', t.col, t.row); };
     if (digFirst) { dig(); theirs(); } else { theirs(); dig(); }
-    const sq = place(x, 0, 'plain', 13, 15), sq2 = place(x, 1, 'plain', 11, 14); // (A1's and A2's, round the entrance)
+    const sq = place(x, 0, 'plain', 13, 16), sq2 = place(x, 1, 'plain', 11, 15); // (A1's and A2's, round the entrance)
     Duo.settleBoard(D); // (the fight's start)
     const P = lanesOf(D);
     const why = (digFirst ? 'dug first' : 'Assassin first') + ', lane ' + lb;
@@ -351,8 +351,8 @@ function fill(x, keep) {
 }
 check('5: no tile anywhere for the other team\'s thing: both stay, the owner\'s never moves for it (a Tree kojja with its Nest squad, a School with its pupil)', () => {
   for (const kind of ['treeKojja', 'school']) {
-    const x = board(401), { D } = x, m = x.m(0), t = { col: 12, row: 14 }, u = { col: 12, row: 13 };
-    const pupil = kind === 'school' ? place(x, 0, 'plain', 10, 15) : null;
+    const x = board(401), { D } = x, m = x.m(0), t = { col: 12, row: 15 }, u = { col: 12, row: 14 };
+    const pupil = kind === 'school' ? place(x, 0, 'plain', 10, 16) : null;
     const ass = place(x, 2, 'Assassin', t.col, t.row);
     const key = vote(x, 0, kind, t);
     let sq = pupil;
@@ -375,13 +375,13 @@ check('5: no tile anywhere for the other team\'s thing: both stay, the owner\'s 
 
 check('5: the same moves from two replays and after a save and load', () => {
   const build = () => {
-    const x = board(411), { D } = x, t = { col: 12, row: 14 };
+    const x = board(411), { D } = x, t = { col: 12, row: 15 };
     place(x, 2, 'Assassin', t.col, t.row);
     vote(x, 0, 'oak', t);
     place(x, 3, 'plain', 11, 3);
     place(x, 0, 'Assassin', 11, 3); // (B's squad there is hidden from A: in B's zone, A's Assassin moves)
     for (const R of D.lanes) Mpb.giveCard(R.m, 1, { type: 'mpb', id: 'magicLake' });
-    assert.ok(x.act(3, 'mpbAct', lakeOf(x.m(1), 1, 1).key, 'place', 11, 9).ok);
+    assert.ok(x.act(3, 'mpbAct', lakeOf(x.m(1), 1, 1).key, 'place', 11, 10).ok);
     return x;
   };
   const a = build(), b = build();
@@ -392,11 +392,11 @@ check('5: the same moves from two replays and after a save and load', () => {
   assert.deepStrictEqual(fa.f.posts.map(s => s.armies), fc.f.posts.map(s => s.armies), 'the same squads after');
   assert.deepStrictEqual(fa.f.posts.map(s => s.mpb), fc.f.posts.map(s => s.mpb), 'the same buildings after');
   const oak = Mpb.recs(fa.P[0], 0).find(r => r.kind === 'oak');
-  assert.deepStrictEqual(at(oak), [12, 14], 'the Oak stays');
+  assert.deepStrictEqual(at(oak), [12, 15], 'the Oak stays');
   if (a.D.phase === 'result') {
     for (let k = 0; k < 4; k++) Duo.next(a.D, k, a.D.summary[0].round, T);
     const q = a.m(0).armies[1].find(z => z.unit === ui('Assassin') && z.round < a.m(0).round);
-    assert.ok(q && !(q.col === 12 && q.row === 14), 'the next round: the Assassin stands on its new tile');
+    assert.ok(q && !(q.col === 12 && q.row === 15), 'the next round: the Assassin stands on its new tile');
     const seen = Duo.viewFor(a.D, 0).m.armies[1].find(z => z.id === q.id);
     assert.deepStrictEqual(at(seen), at(q), 'and the other team sees it there');
   }
@@ -433,26 +433,26 @@ function wallAgree(x, sd, why) {
 }
 check('6: no water on a wall you can see, no wall on water you can see (yours, your teammate\'s, theirs from earlier rounds); page and server agree', () => {
   const x = bastions(421), { D } = x;
-  // A1's wall on (10,9): A1's water and A2's water may not go there; B (who can't see it this round) may
-  assert.ok(try1(x, 0, 'placeBwall', 10, 9, 'n').ok, 'A1\'s wall on (10,9)');
-  for (const L of [0, 1]) assert.ok(!try1(x, seatOf(L, 0), 'mpbAct', lakeOf(x.m(L), 0, L).key, 'place', 10, 9).ok, 'seat ' + seatOf(L, 0) + ': no water on the team\'s wall');
-  // A2's water on (12,10): A1's and A2's walls may not go there, on any of its edges
-  assert.ok(try1(x, 1, 'mpbAct', lakeOf(x.m(1), 0, 1).key, 'place', 12, 10).ok, 'A2\'s water on (12,10)');
-  for (const L of [0, 1]) for (const e of ['n', 'e', 's', 'w']) assert.ok(!try1(x, seatOf(L, 0), 'placeBwall', 12, 10, e).ok, 'seat ' + seatOf(L, 0) + ': no wall on the teammate\'s water (' + e + ')');
+  // A1's wall on (10,10): A1's water and A2's water may not go there; B (who can't see it this round) may
+  assert.ok(try1(x, 0, 'placeBwall', 10, 10, 'n').ok, 'A1\'s wall on (10,10)');
+  for (const L of [0, 1]) assert.ok(!try1(x, seatOf(L, 0), 'mpbAct', lakeOf(x.m(L), 0, L).key, 'place', 10, 10).ok, 'seat ' + seatOf(L, 0) + ': no water on the team\'s wall');
+  // A2's water on (12,11): A1's and A2's walls may not go there, on any of its edges
+  assert.ok(try1(x, 1, 'mpbAct', lakeOf(x.m(1), 0, 1).key, 'place', 12, 11).ok, 'A2\'s water on (12,11)');
+  for (const L of [0, 1]) for (const e of ['n', 'e', 's', 'w']) assert.ok(!try1(x, seatOf(L, 0), 'placeBwall', 12, 11, e).ok, 'seat ' + seatOf(L, 0) + ': no wall on the teammate\'s water (' + e + ')');
   // a wall on the shore (the tile next to the water, its edge toward it) is fine: only the wall's own tile counts
-  assert.ok(try1(x, 1, 'placeBwall', 12, 11, 'n').ok, 'A2\'s wall on (12,11), along the water\'s edge');
+  assert.ok(try1(x, 1, 'placeBwall', 12, 12, 'n').ok, 'A2\'s wall on (12,12), along the water\'s edge');
   lakeAgree(x, 0, 'team A'); lakeAgree(x, 1, 'team B'); wallAgree(x, 0, 'team A'); wallAgree(x, 1, 'team B');
   // A1's water on (13,7), on B's half of no man's land
   assert.ok(try1(x, 0, 'mpbAct', lakeOf(x.m(0), 0, 0).key, 'place', 13, 7).ok, 'A1\'s water on (13,7)');
   // B can't see A's wall of this round: its water may go there (a hidden clash: the fight's start settles it)
-  assert.ok(try1(x, 2, 'mpbAct', lakeOf(x.m(0), 1, 0).key, 'place', 10, 9).ok, 'B1\'s water on A\'s hidden wall');
+  assert.ok(try1(x, 2, 'mpbAct', lakeOf(x.m(0), 1, 0).key, 'place', 10, 10).ok, 'B1\'s water on A\'s hidden wall');
   lakeAgree(x, 1, 'team B, A\'s hidden'); wallAgree(x, 1, 'team B, A\'s hidden');
   fight(x);
   for (let k = 0; k < 4; k++) Duo.next(D, k, D.summary[0].round, T);
   // the next round: A's walls and water are seen. B's water may not go on A's walls, B's walls not on A's water
   for (const R of D.lanes) Mpb.giveCard(R.m, 1, { type: 'mpb', id: 'magicLake' }); // (B gets new tiles to put down)
   fresh(D);
-  const m = x.m(0), wallsA = m.bwalls[0].filter(w => (w.col === 10 && w.row === 9) || (w.col === 12 && w.row === 11));
+  const m = x.m(0), wallsA = m.bwalls[0].filter(w => (w.col === 10 && w.row === 10) || (w.col === 12 && w.row === 12));
   assert.strictEqual(wallsA.length, 2, 'A\'s two walls stand where they were put up');
   assert.deepStrictEqual(at(lakeOf(m, 0, 0)), [13, 7], 'A1\'s water stands');
   assert.ok(!m.bwalls[0].concat(m.bwalls[1]).some(w => Game.terrainBlocks(m, w.col, w.row)), 'no wall on water after the fight');
@@ -468,7 +468,7 @@ check('6: no water on a wall you can see, no wall on water you can see (yours, y
 check('6: a hidden wall and hidden water on one tile in no man\'s land: the newer moves (a wall to the nearest edge, water to the nearest tile); both orders', () => {
   for (const what of ['A wall, B water', 'B wall, A water']) for (const wallFirst of [true, false]) {
     const x = bastions(431), { D } = x;
-    const wsd = what[0] === 'A' ? 0 : 1, lsd = 1 - wsd, t = wsd === 0 ? { col: 10, row: 9 } : { col: 13, row: 8 }, edge = wsd === 0 ? 'n' : 's';
+    const wsd = what[0] === 'A' ? 0 : 1, lsd = 1 - wsd, t = wsd === 0 ? { col: 10, row: 10 } : { col: 13, row: 8 }, edge = wsd === 0 ? 'n' : 's';
     const lk = lakeOf(x.m(1), lsd, 1);
     const wall = () => assert.ok(x.act(seatOf(0, wsd), 'placeBwall', t.col, t.row, edge).ok, 'the wall');
     const water = () => assert.ok(x.act(seatOf(1, lsd), 'mpbAct', lk.key, 'place', t.col, t.row).ok, 'the water');
@@ -490,7 +490,7 @@ check('6: a hidden wall and hidden water on one tile in no man\'s land: the newe
 
 check('6: a wall on its team\'s zone and the other team\'s water on that tile (a state no legal move makes: the rule itself): the wall stays, either stamp order', () => {
   for (const wallFirst of [true, false]) {
-    const x = bastions(441), { D } = x, t = { col: 10, row: 13 };
+    const x = bastions(441), { D } = x, t = { col: 10, row: 14 };
     const lk = lakeOf(x.m(0), 1, 0);
     const wall = () => { for (const R of D.lanes) R.m.bwalls[0].push({ col: t.col, row: t.row, edge: 'n', round: R.m.round }); Duo.stampAll(D); };
     const water = () => { for (const R of D.lanes) { const r = Mpb.recOf(R.m, 1, lk.key); r.col = t.col; r.row = t.row; r.round = R.m.round; r.down = R.m.round; } Duo.stampAll(D); };

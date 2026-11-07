@@ -10,7 +10,8 @@
 //   phone takes the first empty seat. In the lobby the host can swap any two seats (move a player, or a player to an
 //   empty seat) and start; seats still empty when it starts are played by the AI.
 //
-// Messages in:  hello { create, session } | { key } | {}, seat { a, b } (host, lobby: swap two seats), kick { seat } (host,
+// Messages in:  hello { v, create, session } | { v, key } | { v } (v: the page's Duo.V; another V is denied { why:
+//               'version' }: the page and the server would play on different boards, 2026-11-07), seat { a, b } (host, lobby: swap two seats), kick { seat } (host,
 //               lobby), start { settings } (host), act { seq, fn, a }, ready { v }, next { round }, rematch, forfeit,
 //               mark { kind, col, row } (a ping; 'ping' is the keep-alive), emote { id } (both to the team only), sync,
 //               chat { text, team? } (Google-signed-in phones only; team: the teammate only), emote { id } with id one of
@@ -19,7 +20,7 @@
 // (kind 'duo', dev while config 'lobby_duo' is 'dev'); when it is 'all', anyone may make a 2v2 room.
 // A room nobody is in closes by itself EMPTY_MS after the last phone went (its code stops working), unless a match is
 // running: that one plays on without the players and ends by itself.
-// Messages out: welcome { side, key, seq, seat, lane, host }, duolobby { seats, host, seat }, full, denied { why },
+// Messages out: welcome { side, key, seq, seat, lane, host, v (Duo.V) }, duolobby { seats, host, seat }, full, denied { why },
 //               mark { from, kind, col, row }, emote { from, id }, chat { from, tag, text, at, team? }, chatLog { lines },
 //               roomset { pub, spectate: false, chat }, team { team } (only the other lane changed: m.team),
 //               sync / status / fight as in a 1v1 room (server/src/room.js) for the seat's own lane (sync's m carries
@@ -333,10 +334,11 @@ export class DuoRoom extends DurableObject {
   }
   welcome(seat) {
     const own = Duo.SEATS[seat], R = this.D && this.D.lanes[own.lane];
-    return { side: own.side, seat, lane: own.lane, key: this.meta.seats[seat] ? this.meta.seats[seat].key : '', seq: R ? R.seq[own.side] : 0, host: seat === this.meta.host, code: this.meta.code, duo: true };
+    return { side: own.side, seat, lane: own.lane, key: this.meta.seats[seat] ? this.meta.seats[seat].key : '', seq: R ? R.seq[own.side] : 0, host: seat === this.meta.host, code: this.meta.code, duo: true, v: Duo.V };
   }
 
   async hello(ws, a, d) {
+    if (d.v !== Duo.V) { this.send(ws, { t: 'denied', why: 'version' }); return; } // a page of another version: another board (2026-11-07)
     const now = Date.now();
     let who = null;
     if (typeof d.session === 'string' && d.session) { try { who = await sessionPlayer(this.env, d.session); } catch (e) { who = null; } }

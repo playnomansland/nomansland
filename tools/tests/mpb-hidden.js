@@ -16,7 +16,7 @@
 //  - the same result from a saved and loaded match; Undo all replays a vote onto a hidden tile as it was
 //  - review: a hidden Grow never holds the shared clock (no vote does); the server's coins come from D.secret (in no
 //    view); the page's clock label never reads a vote; a Nest's squad and a School's pupil go with their building;
-//    Bastion walls judged as seen (page = server on every edge) and two on one edge settled (newer moves)
+//    Bastion walls judged as seen (page = server on every edge); both teams' walls facing the 2v2 middle row stay (2026-11-07)
 // Run: node tools/tests/mpb-hidden.js
 const assert = require('assert');
 const Game = require('../../src/game.js');
@@ -213,48 +213,48 @@ check('board changes: the clock running out, a bot\'s vote, Grow and its take-ba
     fresh(D);
     Duo.tick(D, T);
     const lk = Mpb.recs(x.m(0), 0).filter(r => r.kind === 'magicLake'), before = keys(D, 1), c1 = clk(D, 1);
-    assert.ok(x.act(0, 'mpbAct', lk[0].key, 'place', 9, 9).ok); assert.deepStrictEqual(keys(D, 1), before, 'a tile put down: hidden');
-    assert.ok(x.act(0, 'mpbAct', lk[0].key, 'place', 8, 9).ok); assert.deepStrictEqual(keys(D, 1), before, 'moved: hidden');
-    assert.ok(x.act(1, 'mpbAct', lk[2].key, 'place', 14, 13).ok); assert.deepStrictEqual(keys(D, 1), before, 'A2\'s: hidden');
-    assert.ok(Game.terrainBlocks(W(Duo.viewFor(D, 1).m), 8, 9) && Game.terrainBlocks(W(Duo.viewFor(D, 0).m), 14, 13), 'the teammates see the water');
-    for (const s of [2, 3]) assert.ok(!Game.terrainBlocks(W(Duo.viewFor(D, s).m), 8, 9), 'seat ' + s + ': dry');
+    assert.ok(x.act(0, 'mpbAct', lk[0].key, 'place', 9, 10).ok); assert.deepStrictEqual(keys(D, 1), before, 'a tile put down: hidden');
+    assert.ok(x.act(0, 'mpbAct', lk[0].key, 'place', 8, 10).ok); assert.deepStrictEqual(keys(D, 1), before, 'moved: hidden');
+    assert.ok(x.act(1, 'mpbAct', lk[2].key, 'place', 14, 14).ok); assert.deepStrictEqual(keys(D, 1), before, 'A2\'s: hidden');
+    assert.ok(Game.terrainBlocks(W(Duo.viewFor(D, 1).m), 8, 10) && Game.terrainBlocks(W(Duo.viewFor(D, 0).m), 14, 14), 'the teammates see the water');
+    for (const s of [2, 3]) assert.ok(!Game.terrainBlocks(W(Duo.viewFor(D, s).m), 8, 10), 'seat ' + s + ': dry');
     assert.ok(x.act(0, 'undoAll').ok); assert.deepStrictEqual(keys(D, 1), before, 'Undo all: hidden');
     assert.deepStrictEqual(clk(D, 1), c1, 'lake tiles: nothing on the opponents\' clocks');
     const { P } = fight(x);
-    assert.ok(Game.terrainBlocks(P[0], 14, 13), 'the fight has A2\'s water');
+    assert.ok(Game.terrainBlocks(P[0], 14, 14), 'the fight has A2\'s water');
   }
   { // Dig a new exit, and its take-back: the opponents keep the old exit and its ring
     const x = board(36), { D } = x;
-    const key = put(D, 0, 'coalMine', { col: 11, row: 15 });
-    for (const R of D.lanes) Mpb.recOf(R.m, 0, key).parts.exit = { col: 11, row: 9 };
+    const key = put(D, 0, 'coalMine', { col: 11, row: 16 });
+    for (const R of D.lanes) Mpb.recOf(R.m, 0, key).parts.exit = { col: 11, row: 10 };
     fresh(D); Duo.tick(D, T);
     const before = keys(D, 1), c2 = clk(D, 1);
     assert.ok(x.act(0, 'mpbBuy', key, 'shaft').ok && x.act(0, 'mpbAct', key, 'exit', 1, 4).ok, 'dug to a flank tile of the enemy\'s half');
     assert.deepStrictEqual(keys(D, 1), before, 'dug: hidden');
     assert.deepStrictEqual(clk(D, 1), c2, 'dug: nothing on the opponents\' clocks');
     const pv = W(Duo.viewFor(D, 2).m);
-    assert.deepStrictEqual(Mpb.recOf(pv, 0, key).parts.exit, { col: 11, row: 9 }, 'B1 still sees the old exit');
-    assert.ok(Game.occupied(pv, 1, 12, 8) && !Game.occupied(pv, 1, 2, 4), 'and its old ring, not the new one');
+    assert.deepStrictEqual(Mpb.recOf(pv, 0, key).parts.exit, { col: 11, row: 10 }, 'B1 still sees the old exit');
+    assert.ok(Game.occupied(pv, 1, 12, 9) && !Game.occupied(pv, 1, 2, 4), 'and its old ring, not the new one');
     assert.ok(try1(x, 2, 'place', ui('Assassin'), 2, 4).ok, 'B1 may put a squad by the new exit (it can\'t see it): page and server agree');
-    assert.ok(!try1(x, 2, 'place', ui('Assassin'), 12, 8).ok, 'nor by the old one: refused on the page and the server alike');
+    assert.ok(!try1(x, 2, 'place', ui('Assassin'), 12, 9).ok, 'nor by the old one: refused on the page and the server alike');
     assert.ok(x.act(0, 'mpbUndo', key, 'shaft').ok);
-    assert.deepStrictEqual(Mpb.recOf(x.m(0), 0, key).parts.exit, { col: 11, row: 9 }, 'taken back');
+    assert.deepStrictEqual(Mpb.recOf(x.m(0), 0, key).parts.exit, { col: 11, row: 10 }, 'taken back');
     for (const s of [2, 3]) { const v = JSON.parse(oppKey(D, s)).v.m; assert.deepStrictEqual(Mpb.recOf(v, 0, key).data, {}, 'seat ' + s + ': no dig keys left (as when the round began)'); }
   }
 });
 
 check('the deploy checks as the acting team sees the board: the page and the server agree on every tile', () => {
   const x = board(37), { D } = x;
-  const cm = put(D, 0, 'coalMine', { col: 12, row: 15 });
+  const cm = put(D, 0, 'coalMine', { col: 12, row: 16 });
   for (const R of D.lanes) { Mpb.recOf(R.m, 0, cm).parts.exit = { col: 6, row: 8 }; Mpb.giveCard(R.m, 0, { type: 'mpb', id: 'magicLake' }); Mpb.giveCard(R.m, 1, { type: 'mpb', id: 'magicLake' }); }
   const bm = put(D, 1, 'coalMine', { col: 11, row: 2 });
-  for (const R of D.lanes) Mpb.recOf(R.m, 1, bm).parts.exit = { col: 17, row: 9 };
+  for (const R of D.lanes) Mpb.recOf(R.m, 1, bm).parts.exit = { col: 17, row: 10 };
   fresh(D);
   // team A this round: an Oak, a dug exit, two lake tiles in no man's land
   vote(x, 0, 'oak');
   assert.ok(x.act(0, 'mpbBuy', cm, 'shaft').ok && x.act(0, 'mpbAct', cm, 'exit', 13, 8).ok);
   const la = Mpb.recs(x.m(0), 0).filter(r => r.kind === 'magicLake');
-  assert.ok(x.act(0, 'mpbAct', la[0].key, 'place', 15, 7).ok && x.act(1, 'mpbAct', la[2].key, 'place', 9, 10).ok);
+  assert.ok(x.act(0, 'mpbAct', la[0].key, 'place', 15, 7).ok && x.act(1, 'mpbAct', la[2].key, 'place', 9, 11).ok);
   teams(D);
   const lb = Mpb.recs(x.m(0), 1).filter(r => r.kind === 'magicLake');
   for (const seat of [2, 3]) {
@@ -290,7 +290,7 @@ check('the deploy checks as the acting team sees the board: the page and the ser
 check('squad and building on one tile of the building\'s own zone, both orders: the other team\'s squad moves to the nearest tile its rules allow', () => {
   for (const order of ['building first', 'squad first']) {
     const x = board(41), { D } = x;
-    const t = { col: 12, row: 14 };
+    const t = { col: 12, row: 15 };
     let key, ass;
     if (order === 'building first') { key = vote(x, 0, 'oak', t); ass = place(x, 2, 'Assassin', t.col, t.row); }
     else { ass = place(x, 2, 'Assassin', t.col, t.row); key = vote(x, 0, 'oak', t); }
@@ -312,7 +312,7 @@ check('squad and building on one tile of the building\'s own zone, both orders: 
 check('exit and exit, and exit in the other exit\'s ring, both orders: both stay, blocked (nothing moves)', () => {
   for (const gap of [0, 1]) for (const first of [0, 1]) {
     const x = board(42), { D } = x;
-    const ka = put(D, 0, 'coalMine', { col: 12, row: 15 }), kb = put(D, 1, 'coalMine', { col: 11, row: 2 });
+    const ka = put(D, 0, 'coalMine', { col: 12, row: 16 }), kb = put(D, 1, 'coalMine', { col: 11, row: 2 });
     for (const R of D.lanes) { Mpb.queue(R.m, 0, 'coalMine', 'exit', ka); Mpb.queue(R.m, 1, 'coalMine', 'exit', kb); }
     fresh(D); Duo.tick(D, T);
     const tA = { col: 12, row: 8 }, tB = { col: 12 + gap, row: 8 };
@@ -322,9 +322,9 @@ check('exit and exit, and exit in the other exit\'s ring, both orders: both stay
     const ea = recIn(P[0], 0, ka).parts.exit, eb = recIn(P[0], 1, kb).parts.exit;
     assert.deepStrictEqual([ea, eb], [tA, tB], 'gap ' + gap + ', team ' + first + ' first: both exits stay where they were voted');
     assert.deepStrictEqual(D.settled, [], 'gap ' + gap + ': nothing moved');
-    // gap 0: both exits on one tile: blocked, nobody comes up; gap 1: B's exit takes the tile A's squad round (13,15) would come up on
+    // gap 0: both exits on one tile: blocked, nobody comes up; gap 1: B's exit takes the tile A's squad round (13,16) would come up on
     if (gap === 0) for (const sd of [0, 1]) { const rec = recIn(P[0], sd, sd === 0 ? ka : kb); assert.strictEqual(COAL.mineOut(P[0], rec, rec.col + 1, rec.row), null, 'gap 0: team ' + sd + '\'s exit is blocked'); }
-    else assert.strictEqual(COAL.mineOut(P[0], recIn(P[0], 0, ka), 13, 15), null, 'gap 1: A\'s landing tile (13,8) is B\'s exit: no way out there');
+    else assert.strictEqual(COAL.mineOut(P[0], recIn(P[0], 0, ka), 13, 16), null, 'gap 1: A\'s landing tile (13,8) is B\'s exit: no way out there');
   }
 });
 
@@ -336,7 +336,7 @@ check('lake tile and exit (both stay: the exit is blocked), lake tile and squad,
     let kb = null;
     if (what === 'exit') { kb = put(D, 1, 'coalMine', { col: 11, row: 2 }); for (const R of D.lanes) Mpb.queue(R.m, 1, 'coalMine', 'exit', kb); }
     fresh(D); Duo.tick(D, T);
-    const t = { col: 10, row: 9 }, la = Mpb.recs(x.m(0), 0).find(r => r.kind === 'magicLake' && r.data.lane === 0);
+    const t = { col: 10, row: 10 }, la = Mpb.recs(x.m(0), 0).find(r => r.kind === 'magicLake' && r.data.lane === 0);
     const lake = () => assert.ok(x.act(0, 'mpbAct', la.key, 'place', t.col, t.row).ok, 'A1\'s water');
     let other = null;
     const theirs = () => {
@@ -366,8 +366,8 @@ check('lake tile and exit (both stay: the exit is blocked), lake tile and squad,
 check('a flank tile: A\'s exit dug onto the edge of B\'s zone and B\'s water put there, both orders: both stay, the exit blocked', () => {
   for (const digFirst of [true, false]) {
     const x = board(59, 3), { D } = x;
-    const ka = put(D, 0, 'coalMine', { col: 12, row: 15 });
-    for (const R of D.lanes) { const r = Mpb.recOf(R.m, 0, ka); r.parts.exit = { col: 12, row: 9 }; r.skills.shaft = { round: 0, n: 1, by: [1, 0], log: [] }; Mpb.giveCard(R.m, 1, { type: 'mpb', id: 'magicLake' }); }
+    const ka = put(D, 0, 'coalMine', { col: 12, row: 16 });
+    for (const R of D.lanes) { const r = Mpb.recOf(R.m, 0, ka); r.parts.exit = { col: 12, row: 10 }; r.skills.shaft = { round: 0, n: 1, by: [1, 0], log: [] }; Mpb.giveCard(R.m, 1, { type: 'mpb', id: 'magicLake' }); }
     fresh(D);
     const t = { col: 1, row: 4 }, lb = Mpb.recs(x.m(0), 1).find(r => r.kind === 'magicLake' && r.data.lane === 0);
     const dig = () => assert.ok(x.act(0, 'mpbAct', ka, 'exit', t.col, t.row).ok, 'A1 digs onto (1,4)');
@@ -377,7 +377,7 @@ check('a flank tile: A\'s exit dug onto the edge of B\'s zone and B\'s water put
     const ex = recIn(P[0], 0, ka).parts.exit, w = recIn(P[0], 1, lb.key);
     assert.deepStrictEqual([[ex.col, ex.row], [w.col, w.row]], [[t.col, t.row], [t.col, t.row]], (digFirst ? 'dug first' : 'water first') + ': both stay');
     assert.deepStrictEqual(D.settled, [], 'nothing moved');
-    assert.strictEqual(COAL.mineOut(P[0], recIn(P[0], 0, ka), 13, 14), null, 'the exit is blocked: nobody comes up');
+    assert.strictEqual(COAL.mineOut(P[0], recIn(P[0], 0, ka), 13, 15), null, 'the exit is blocked: nobody comes up');
   }
 });
 
@@ -387,15 +387,15 @@ check('the water of both teams shuts a tile off: the newest tile that does so mo
     for (const R of D.lanes) { Mpb.giveCard(R.m, 0, { type: 'mpb', id: 'magicLake' }); Mpb.giveCard(R.m, 1, { type: 'mpb', id: 'magicLake' }); }
     fresh(D);
     const la = Mpb.recs(x.m(0), 0).find(r => r.kind === 'magicLake' && r.data.lane === 0), lb = Mpb.recs(x.m(0), 1).filter(r => r.kind === 'magicLake' && r.data.lane === 0);
-    const a = () => assert.ok(x.act(0, 'mpbAct', la.key, 'place', 1, 9).ok);
-    const b = () => { assert.ok(x.act(2, 'mpbAct', lb[0].key, 'place', 0, 8).ok); assert.ok(x.act(2, 'mpbAct', lb[1].key, 'place', 0, 10).ok); };
+    const a = () => assert.ok(x.act(0, 'mpbAct', la.key, 'place', 1, 10).ok);
+    const b = () => { assert.ok(x.act(2, 'mpbAct', lb[0].key, 'place', 0, 9).ok); assert.ok(x.act(2, 'mpbAct', lb[1].key, 'place', 0, 11).ok); };
     if (aLast) { b(); a(); } else { a(); b(); }
     const { P } = fight(x);
     const tiles = [recIn(P[0], 0, la.key), recIn(P[0], 1, lb[0].key), recIn(P[0], 1, lb[1].key)];
-    const moved = tiles.filter((r, i) => !(r.col === [1, 0, 0][i] && r.row === [9, 8, 10][i]));
+    const moved = tiles.filter((r, i) => !(r.col === [1, 0, 0][i] && r.row === [10, 9, 11][i]));
     assert.strictEqual(moved.length, 1, 'one tile moved');
-    assert.strictEqual(moved[0].key, aLast ? la.key : lb[1].key, 'the newest of those that shut (0,9) off');
-    assert.ok(!(Game.terrainBlocks(P[0], 0, 8) && Game.terrainBlocks(P[0], 0, 10) && Game.terrainBlocks(P[0], 1, 9)), '(0,9) can be walked to');
+    assert.strictEqual(moved[0].key, aLast ? la.key : lb[1].key, 'the newest of those that shut (0,10) off');
+    assert.ok(!(Game.terrainBlocks(P[0], 0, 9) && Game.terrainBlocks(P[0], 0, 11) && Game.terrainBlocks(P[0], 1, 10)), '(0,10) can be walked to');
     assert.ok(Mpb.kindOf('magicLake').lakeFree(P[0], -5, -5) !== undefined);
   }
 });
@@ -404,7 +404,7 @@ check('the water of both teams shuts a tile off: the newest tile that does so mo
 check('an Assassin next to a building placed this round, either order: both stay ("It stays in that spot")', () => {
   for (const kind of ['scorch', 'oak']) for (const assFirst of [true, false]) {
     const x = board(45), { D } = x;
-    const t = { col: 12, row: 14 }, next = { col: 13, row: 14 };
+    const t = { col: 12, row: 15 }, next = { col: 13, row: 15 };
     let key, ass;
     const build = () => {
       if (kind === 'scorch') { for (const R of D.lanes) Mpb.giveCard(R.m, 0, { type: 'mpb', id: 'scorch' }); fresh(D); assert.ok(x.act(0, 'mpbVote', t.col, t.row).ok); key = Mpb.recs(x.m(0), 0).find(r => r.kind === 'scorch' && r.col >= 0 && r.col === t.col).key; }
@@ -424,8 +424,8 @@ check('a Scorch turret or a grown Tree kojja on a squad placed this round, both 
   for (const kind of ['scorch', 'grow']) for (const sqFirst of [true, false]) {
     const x = board(46), { D } = x;
     let tk = null;
-    if (kind === 'grow') { tk = put(D, 0, 'treeKojja', { col: 12, row: 15 }); fresh(D); }
-    const t = { col: 12, row: 13 };
+    if (kind === 'grow') { tk = put(D, 0, 'treeKojja', { col: 12, row: 16 }); fresh(D); }
+    const t = { col: 12, row: 14 };
     let key, sq;
     const build = () => {
       const n = Mpb.recs(x.m(0), 0).length;
@@ -449,18 +449,18 @@ check('a squad round an exit dug this round (a flank tile of its half) and a bui
     for (const R of D.lanes) { const r = Mpb.recOf(R.m, 1, kb); r.parts.exit = { col: 12, row: 8 }; r.skills.shaft = { round: 0, n: 1, by: [1, 0], log: [] }; }
     for (const R of D.lanes) Mpb.queue(R.m, 0, 'oak');
     fresh(D); Duo.tick(D, T);
-    const dig = () => assert.ok(x.act(2, 'mpbAct', kb, 'exit', 1, 14).ok, 'B1 digs the exit to (1,14), a flank tile of team A\'s half');
+    const dig = () => assert.ok(x.act(2, 'mpbAct', kb, 'exit', 1, 15).ok, 'B1 digs the exit to (1,14), a flank tile of team A\'s half');
     let sq;
     const mine = () => {
-      sq = place(x, 0, 'plain', 2, 13);
-      assert.ok(x.act(0, 'mpbVote', 3, 15).ok && x.act(1, 'mpbVote', 3, 15).ok, 'A\'s Oak at (3,15), 2 tiles from (1,14)');
+      sq = place(x, 0, 'plain', 2, 14);
+      assert.ok(x.act(0, 'mpbVote', 3, 16).ok && x.act(1, 'mpbVote', 3, 16).ok, 'A\'s Oak at (3,15), 2 tiles from (1,14)');
     };
     if (sqFirst) { mine(); dig(); } else { dig(); mine(); }
     const { P } = fight(x);
     const ex = recIn(P[0], 1, kb).parts.exit, q = sqIn(P, 0, 0, sq.id), oak = Mpb.recs(P[0], 0).find(r => r.kind === 'oak');
-    assert.deepStrictEqual(ex, { col: 1, row: 14 }, (sqFirst ? 'squad first' : 'dug first') + ': the exit stays');
-    assert.deepStrictEqual([q.col, q.row], [2, 13], 'the squad stays in the ring');
-    assert.deepStrictEqual([oak.col, oak.row], [3, 15], 'the Oak stays, 2 tiles from the exit');
+    assert.deepStrictEqual(ex, { col: 1, row: 15 }, (sqFirst ? 'squad first' : 'dug first') + ': the exit stays');
+    assert.deepStrictEqual([q.col, q.row], [2, 14], 'the squad stays in the ring');
+    assert.deepStrictEqual([oak.col, oak.row], [3, 16], 'the Oak stays, 2 tiles from the exit');
     assert.deepStrictEqual(D.settled, [], 'nothing moved');
   }
 });
@@ -469,7 +469,7 @@ check('a squad round an exit dug this round (a flank tile of its half) and a bui
 check('a Cog Builder\'s Factory placed this round never moves: an Assassin on it does, one next to it stays', () => {
   for (const on of [true, false]) {
     const x = board(48), { D } = x;
-    const t = { col: 12, row: 14 };
+    const t = { col: 12, row: 15 };
     D.lanes[0].m.buildings = D.lanes[0].m.buildings || [[], []];
     D.lanes[0].m.buildings[0] = [{ id: 'factory', col: t.col, row: t.row, round: x.m(0).round, built: true }];
     teams(D); Duo.stampAll(D);
@@ -488,7 +488,7 @@ check('a Bastion wall under water put down this round in no man\'s land, either 
     const x = board(49), { D } = x;
     for (const R of D.lanes) Mpb.giveCard(R.m, 1, { type: 'mpb', id: 'magicLake' });
     fresh(D);
-    const t = { col: 10, row: 9 }, lb = Mpb.recs(x.m(0), 1).find(r => r.kind === 'magicLake' && r.data.lane === 0);
+    const t = { col: 10, row: 10 }, lb = Mpb.recs(x.m(0), 1).find(r => r.kind === 'magicLake' && r.data.lane === 0);
     const wall = () => { for (const R of D.lanes) { R.m.bwalls = R.m.bwalls || [[], []]; R.m.bwalls[0].push({ col: t.col, row: t.row, edge: 'n', round: R.m.round }); } Duo.stampAll(D); };
     const water = () => assert.ok(x.act(2, 'mpbAct', lb.key, 'place', t.col, t.row).ok);
     if (wallFirst) { wall(); water(); } else { water(); wall(); }
@@ -509,7 +509,7 @@ check('two exits voted onto one tile two from an artifact: both stay, blocked', 
   const x = board(50, 2, true), { D } = x;
   const A = x.m(0).artifacts;
   assert.ok(A && A.round === x.m(0).round, 'round 2 has its artifacts');
-  const ka = put(D, 0, 'coalMine', { col: 12, row: 15 }), kb = put(D, 1, 'coalMine', { col: 11, row: 2 });
+  const ka = put(D, 0, 'coalMine', { col: 12, row: 16 }), kb = put(D, 1, 'coalMine', { col: 11, row: 2 });
   for (const R of D.lanes) { Mpb.queue(R.m, 0, 'coalMine', 'exit', ka); Mpb.queue(R.m, 1, 'coalMine', 'exit', kb); }
   fresh(D); Duo.tick(D, T);
   // a tile two from an artifact: its nearest tiles (other than the older exit's ring) are next to the artifact
@@ -530,7 +530,7 @@ check('two exits voted onto one tile two from an artifact: both stay, blocked', 
 check('ties (the same stamp: bots, or both as the round began): on a zone tile prio, then the squad, then a seeded coin; the same every time', () => {
   const run = () => {
     const x = board(51), { D } = x;
-    const t = { col: 12, row: 14 };
+    const t = { col: 12, row: 15 };
     const key = put(D, 0, 'oak', t);
     for (const R of D.lanes) Mpb.recOf(R.m, 0, key).placed = R.m.round; // (placed this round: hidden from B)
     const m = x.m(0), q = { id: m.nextId[1]++, unit: ui('Assassin'), col: t.col, row: t.row, round: m.round, xp: 0, level: 0, cost: 100 };
@@ -541,8 +541,8 @@ check('ties (the same stamp: bots, or both as the round began): on a zone tile p
     return { oak: recIn(P[0], 0, key), a: sqIn(P, 0, 1, q.id), log: D.settled };
   };
   const r1 = run(), r2 = run();
-  assert.deepStrictEqual([r1.oak.col, r1.oak.row], [12, 14], 'the Oak stays (its own zone: prio)');
-  assert.ok(!(r1.a.col === 12 && r1.a.row === 14), 'the Assassin (the other team\'s) moves');
+  assert.deepStrictEqual([r1.oak.col, r1.oak.row], [12, 15], 'the Oak stays (its own zone: prio)');
+  assert.ok(!(r1.a.col === 12 && r1.a.row === 15), 'the Assassin (the other team\'s) moves');
   assert.deepStrictEqual(r1.log, r2.log, 'the same both times');
   // two Assassins (one of each team) on one tile of no man's land, both stamped 0: the coin, the same each time
   const coin = (seed) => {
@@ -560,7 +560,7 @@ check('ties (the same stamp: bots, or both as the round began): on a zone tile p
 // (updated 6 Nov, answer 5: a grown kojja on its own zone stays anyway, so the case is now two Assassins in no man's
 // land; tools/tests/mpb-prio.js has the prio case: no tile for the other team's thing, the owner's moves instead)
 check('no room anywhere for the newer: the older moves instead', () => {
-  const x = board(58), { D } = x, m = x.m(0), t = { col: 12, row: 8 }, u = { col: 16, row: 15 };
+  const x = board(58), { D } = x, m = x.m(0), t = { col: 12, row: 8 }, u = { col: 16, row: 16 };
   // the board full of Brutes (earlier rounds) but t and u; u, next to A's tower, is no tile for an Assassin by its
   // rules, but it is a tile of A's own zone (relocate's last resort: any free tile of its own zone), not of B's
   teams(D);
@@ -588,12 +588,12 @@ check('no room for either: both stay on the tile (the settle stops)', () => {
 check('the same result after a save and load, and from two replays of the same match', () => {
   const build = () => {
     const x = board(61), { D } = x;
-    const t = { col: 12, row: 14 };
+    const t = { col: 12, row: 15 };
     place(x, 2, 'Assassin', t.col, t.row);
     vote(x, 0, 'oak', t);
     for (const R of D.lanes) Mpb.giveCard(R.m, 1, { type: 'mpb', id: 'magicLake' });
     const lb = Mpb.recs(x.m(0), 1).find(r => r.kind === 'magicLake' && r.data.lane === 1);
-    assert.ok(x.act(3, 'mpbAct', lb.key, 'place', 11, 9).ok);
+    assert.ok(x.act(3, 'mpbAct', lb.key, 'place', 11, 10).ok);
     return x;
   };
   const a = build(), b = build();
@@ -607,8 +607,8 @@ check('the same result after a save and load, and from two replays of the same m
   if (a.D.phase === 'result') {
     for (let k = 0; k < 4; k++) Duo.next(a.D, k, a.D.summary[0].round, T);
     const oak = Mpb.recs(a.m(0), 0).find(r => r.kind === 'oak'), q = a.m(0).armies[1].find(z => z.unit === ui('Assassin'));
-    assert.deepStrictEqual([oak.col, oak.row], [12, 14], 'the next round: the Oak where it was voted');
-    assert.ok(q && !(q.col === 12 && q.row === 14), 'the next round: the moved tile is the Assassin\'s real one');
+    assert.deepStrictEqual([oak.col, oak.row], [12, 15], 'the next round: the Oak where it was voted');
+    assert.ok(q && !(q.col === 12 && q.row === 15), 'the next round: the moved tile is the Assassin\'s real one');
     assert.deepStrictEqual([Duo.viewFor(a.D, 0).m.armies[1].find(z => z.id === q.id).col, Duo.viewFor(a.D, 0).m.armies[1].find(z => z.id === q.id).row], [q.col, q.row], 'for the opponents too');
   }
 });
@@ -619,15 +619,15 @@ check('Undo all replays a teammate\'s placement onto a tile with a hidden thing 
   const kb = put(D, 1, 'coalMine', { col: 11, row: 2 });
   for (const R of D.lanes) Mpb.queue(R.m, 1, 'coalMine', 'exit', kb);
   fresh(D); Duo.tick(D, T);
-  assert.ok(x.act(2, 'mpbVote', 10, 9).ok && x.act(3, 'mpbVote', 10, 9).ok, 'B\'s exit at (10,9)');
+  assert.ok(x.act(2, 'mpbVote', 10, 10).ok && x.act(3, 'mpbVote', 10, 10).ok, 'B\'s exit at (10,9)');
   const la = Mpb.recs(x.m(0), 0).find(r => r.kind === 'magicLake' && r.data.lane === 1);
-  assert.ok(try1(x, 1, 'mpbAct', la.key, 'place', 10, 9).ok, 'A2\'s water on it (hidden from A): page and server agree');
-  place(x, 0, 'plain', 12, 14);
+  assert.ok(try1(x, 1, 'mpbAct', la.key, 'place', 10, 10).ok, 'A2\'s water on it (hidden from A): page and server agree');
+  place(x, 0, 'plain', 12, 15);
   assert.ok(x.act(0, 'undoAll').ok, 'A1 presses Undo all');
-  assert.deepStrictEqual([Mpb.recOf(x.m(0), 0, la.key).col, Mpb.recOf(x.m(0), 0, la.key).row], [10, 9], 'A2\'s water is still there after the replay');
+  assert.deepStrictEqual([Mpb.recOf(x.m(0), 0, la.key).col, Mpb.recOf(x.m(0), 0, la.key).row], [10, 10], 'A2\'s water is still there after the replay');
   const { P } = fight(x);
-  assert.deepStrictEqual(recIn(P[0], 1, kb).parts.exit, { col: 10, row: 9 }, 'B\'s exit stays');
-  assert.deepStrictEqual([recIn(P[0], 0, la.key).col, recIn(P[0], 0, la.key).row], [10, 9], 'A2\'s water stays on it (updated 6 Nov: it used to move off; now the exit is just blocked)');
+  assert.deepStrictEqual(recIn(P[0], 1, kb).parts.exit, { col: 10, row: 10 }, 'B\'s exit stays');
+  assert.deepStrictEqual([recIn(P[0], 0, la.key).col, recIn(P[0], 0, la.key).row], [10, 10], 'A2\'s water stays on it (updated 6 Nov: it used to move off; now the exit is just blocked)');
 });
 
 // ======================================= review (side channels, what stands in a building, walls) =======================================
@@ -689,7 +689,7 @@ check('a Nest\'s squad stays with its Tree kojja voted onto a hidden Assassin; t
   const x = board(71), { D } = x, m = x.m(0);
   for (const R of D.lanes) Mpb.queue(R.m, 0, 'treeKojja');
   fresh(D); Duo.tick(D, T);
-  const t = { col: 12, row: 14 };
+  const t = { col: 12, row: 15 };
   const ass = place(x, 2, 'Assassin', t.col, t.row);
   assert.ok(x.act(0, 'mpbVote', t.col, t.row).ok && x.act(1, 'mpbVote', t.col, t.row).ok, 'the kojja voted onto the hidden Assassin');
   const key = Mpb.recs(m, 0).find(r => r.kind === 'treeKojja').key;
@@ -709,10 +709,10 @@ check('a Nest\'s squad stays with its Tree kojja voted onto a hidden Assassin; t
 // (updated 6 Nov, answer 5: the School, on its own zone, stays; it used to move, its pupil with it)
 check('a School voted onto a hidden Assassin stays with its pupil, and the pupil is on it the next round', () => {
   const x = board(72), { D } = x, m = x.m(0);
-  const own = place(x, 0, 'plain', 10, 15);
+  const own = place(x, 0, 'plain', 10, 16);
   for (const R of D.lanes) Mpb.queue(R.m, 0, 'school');
   fresh(D); Duo.tick(D, T);
-  const t = { col: 13, row: 14 };
+  const t = { col: 13, row: 15 };
   const ass = place(x, 2, 'Assassin', t.col, t.row);
   assert.ok(x.act(0, 'mpbVote', t.col, t.row).ok && x.act(1, 'mpbVote', t.col, t.row).ok, 'the School voted onto the hidden Assassin');
   const key = Mpb.recs(m, 0).find(r => r.kind === 'school').key;
@@ -727,17 +727,17 @@ check('a School voted onto a hidden Assassin stays with its pupil, and the pupil
     const m2 = x.m(0), s2 = Mpb.recOf(m2, 0, key), q2 = m2.armies[0].find(z => z.id === own.id);
     assert.ok(q2.school && q2.col === s2.col && q2.row === s2.row, 'the next round: still in it, on its tile');
     teams(D);
-    assert.ok(!Game.occupied(m2, 0, 10, 15), 'no phantom of the pupil on the tile it came from');
+    assert.ok(!Game.occupied(m2, 0, 10, 16), 'no phantom of the pupil on the tile it came from');
   }
 });
 
-check('Bastion walls: the page and the server agree on every edge (the other team\'s wall of this round doesn\'t count); two on one edge at the fight: the newer moves', () => {
+check('Bastion walls: the page and the server agree on every edge (the other team\'s wall of this round doesn\'t count); both teams\' walls facing the middle row stay', () => {
   for (const aFirst of [true, false]) {
     const x = board(76, 4), { D } = x; // (round 4: no draft open, whose tower card would take the walls with the old tower)
     for (const R of D.lanes) { R.m.towers[0].type = 'bastion'; R.m.towers[1].type = 'bastion'; R.m.towerSkill = [1, 1]; R.m.towerSkill2 = [1, 1]; }
     fresh(D);
-    const A = () => assert.ok(try1(x, 0, 'placeBwall', 12, 9, 'n').ok, 'A1\'s wall on (12,9) north');
-    const B = () => assert.ok(try1(x, 2, 'placeBwall', 12, 8, 's').ok, 'B1\'s wall on (12,8) south: the same edge, A\'s hidden');
+    const A = () => assert.ok(try1(x, 0, 'placeBwall', 12, 10, 'n').ok, 'A1\'s wall on (12,10) north');
+    const B = () => assert.ok(try1(x, 2, 'placeBwall', 12, 8, 's').ok, 'B1\'s wall on (12,8) south, A\'s hidden (the middle row between them)');
     if (aFirst) { A(); B(); } else { B(); A(); }
     // every edge, both opponent seats: allowed on the page as on the server
     for (const seat of [2, 3]) {
@@ -750,10 +750,10 @@ check('Bastion walls: the page and the server agree on every edge (the other tea
     for (let k = 0; k < 4; k++) Duo.setReady(D, k, true, T);
     const ws = [0, 1].map(sd => x.m(0).bwalls[sd].find(w => w.round === round));
     assert.ok(ws[0] && ws[1], 'both walls stand after the fight: ' + JSON.stringify(x.m(0).bwalls));
-    const [older, newer] = aFirst ? ws : [ws[1], ws[0]];
-    assert.deepStrictEqual([older.col, older.row], aFirst ? [12, 9] : [12, 8], (aFirst ? 'A' : 'B') + '\'s (older) wall stays');
-    assert.ok(!(newer.col === 12 && (newer.row === 8 || newer.row === 9)), 'the newer moved off that edge: ' + JSON.stringify(newer));
-    assert.ok(D.settled.some(e => e.why === 'same' && e.id.startsWith('w')), 'a wall clash');
+    // (before 2026-11-07 these two shared the edge between rows 8 and 9 and the newer moved; on the 19-row board the
+    // middle row, where no wall stands, is between them: two teams' walls never share an edge, both stay)
+    assert.deepStrictEqual([[ws[0].col, ws[0].row], [ws[1].col, ws[1].row]], [[12, 10], [12, 8]], 'both walls stay');
+    assert.ok(!D.settled.some(e => e.id.startsWith('w')), 'no wall clash');
   }
 });
 

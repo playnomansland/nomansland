@@ -12,9 +12,11 @@ for (const [id, ed] of Object.entries(Game.EDITOR_MAPS)) {
     if (b.kind === 'tower') assert.deepStrictEqual(m.towers[b.side], at, id + ': tower ' + b.side);
     if (b.kind === 'treasury') assert.deepStrictEqual(Game.treasurySpot(m, b.side), at, id + ': treasury ' + b.side);
   }
-  // flank tiles: an F on side 1's half (the top) is side 0's to deploy on, and the other way round
+  // flank tiles: an F on side 1's half (the top) is side 0's to deploy on, and the other way round; an odd board's
+  // middle row (the 2v2 board's row 9, 2026-11-07) is nobody's: no F there, no flank tile for either side
   for (let row = 0; row < ed.rows; row++) for (let col = 0; col < ed.cols; col++) {
     const f = ed.flank[row][col] === 'F', side = row < ed.rows / 2 ? 0 : 1;
+    if (Game.midRow(row)) { assert.ok(!f && !Game.isFlank(0, col, row) && !Game.isFlank(1, col, row), `${id}: no flank on the middle row ${col},${row}`); continue; }
     assert.strictEqual(Game.isFlank(side, col, row), f, `${id}: flank ${col},${row}`);
     assert.strictEqual(Game.isFlank(1 - side, col, row), false);
   }

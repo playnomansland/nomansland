@@ -1,5 +1,5 @@
 // Headless check of 2v2 (src/duo.js; one shared board since 2026-11-03): no server needed.
-//  - the board: Game's 'duo' map, 24 x 18, two flank columns on each edge, one tower per team (no treasury since 2026-11-05)
+//  - the board: Game's 'duo' map, 24 x 19, two flank columns on each edge, one tower per team (no treasury since 2026-11-05)
 //  - the fight: both lanes' bodies on the one board, only lane 0's tower/walls, ids split back exactly
 //  - team tiles: a teammate's squad takes its tile, the other opponent's squads hold theirs
 //  - the tower spots (right of centre), walls by the tower
@@ -41,8 +41,8 @@ const freeTile = (m, sd, unit) => { for (const row of Game.zoneRows(sd)) for (le
 check('the 2v2 board', () => {
   const m = lane(3);
   assert.strictEqual(m.map.id, 'duo');
-  assert.strictEqual(Game.COLS, 24); assert.strictEqual(Game.ROWS, 18);
-  assert.deepStrictEqual(Game.towerSpot(m, 0), { col: 17, row: 16 }); assert.deepStrictEqual(Game.towerSpot(m, 1), { col: 6, row: 1 });
+  assert.strictEqual(Game.COLS, 24); assert.strictEqual(Game.ROWS, 19); // (19 rows since 2026-11-07: a middle row of no man's land)
+  assert.deepStrictEqual(Game.towerSpot(m, 0), { col: 17, row: 17 }); assert.deepStrictEqual(Game.towerSpot(m, 1), { col: 6, row: 1 });
   assert.ok(!Game.treasuryOn(m), 'no treasury in 2v2 (2026-11-05)');
   const cols = new Set(Game.flankTiles(0).map(t => t.col));
   assert.deepStrictEqual([...cols].sort((a, b) => a - b), [0, 1, 22, 23], 'two flank columns on each edge');
@@ -75,10 +75,10 @@ check('team tiles: a teammate takes the tile, the other opponent holds theirs', 
   for (const m of [a, b]) { m.armies = [[], []]; for (const sd of [0, 1]) { m.pack[sd] = 0; m.chars[sd] = null; } }
   const sk = ui('Skeleton Archers');
   for (const m of [a, b]) for (const sd of [0, 1]) m.unlocks[sd][sk] = 1;
-  a.armies[0].push({ id: 5, unit: sk, col: 6, row: 14, round: 1, xp: 0, level: 0, cost: 100 });
+  a.armies[0].push({ id: 5, unit: sk, col: 6, row: 15, round: 1, xp: 0, level: 0, cost: 100 });
   Duo.setTeams([a, b]);
-  assert.ok(!Game.place(b, 0, sk, 6, 14), 'the teammate\'s tile is taken');
-  assert.ok(Game.place(b, 0, sk, 7, 14), 'the tile beside it is free');
+  assert.ok(!Game.place(b, 0, sk, 6, 15), 'the teammate\'s tile is taken');
+  assert.ok(Game.place(b, 0, sk, 7, 15), 'the tile beside it is free');
   // the other opponent's squad from an earlier round holds its tile (as your own opponent's does)
   a.round = b.round = 2;
   a.armies[1].push({ id: 9, unit: sk, col: 3, row: 4, round: 1, xp: 0, level: 0, cost: 100 });
@@ -210,7 +210,7 @@ check('the new spots: tower right of centre, both lanes, walls and bots keep to 
   const a = lane(31), b = lane(32); [a, b].forEach(m => { m.round = 1; }); setup([a, b]);
   Duo.settle([a, b]);
   for (const m of [a, b]) {
-    assert.deepStrictEqual({ col: m.towers[0].col, row: m.towers[0].row }, { col: 17, row: 16 }, 'side 0 tower');
+    assert.deepStrictEqual({ col: m.towers[0].col, row: m.towers[0].row }, { col: 17, row: 17 }, 'side 0 tower');
     assert.deepStrictEqual({ col: m.towers[1].col, row: m.towers[1].row }, { col: 6, row: 1 }, 'side 1 tower');
     for (const sd of [0, 1]) {
       const t = Game.towerSpot(m, sd);
@@ -223,7 +223,7 @@ check('the new spots: tower right of centre, both lanes, walls and bots keep to 
   Game.ensureBwalls(w, 0);
   const ws = Game.bwallsOf(w, 0);
   assert.ok(ws.length > 0, 'walls go up');
-  assert.ok(ws.every(x => Math.abs(x.col - 17) <= 6 && x.row >= 12), 'walls by the tower: ' + ws.map(x => x.col + ',' + x.row).join(' '));
+  assert.ok(ws.every(x => Math.abs(x.col - 17) <= 6 && x.row >= 13), 'walls by the tower: ' + ws.map(x => x.col + ',' + x.row).join(' '));
   // the fight: one tower body per side, on its tile
   const bt = Duo.battle([a, b]);
   for (const sd of [0, 1]) {

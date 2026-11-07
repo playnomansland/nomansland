@@ -56,7 +56,7 @@ const shot = async (p, name) => { if (process.env.PB_SHOTS) await p.screenshot({
   await shot(host, 'deploy-r1');
 
   // the Vault sheet: put 50 in
-  await tapTile(host, 6, 15);
+  await tapTile(host, 6, 16);
   await host.waitForFunction(() => !document.getElementById('sheet-back').hidden, null, { timeout: 5000 }).catch(() => {});
   let t = await sheetText(host);
   ok(/Your team’s Vault/.test(t) && /Compound interest/.test(t) && /Coin golem/.test(t), 'the host opens the Vault sheet');
@@ -68,19 +68,19 @@ const shot = async (p, name) => { if (process.env.PB_SHOTS) await p.screenshot({
   ok(await foe.evaluate(() => window.__pb().m.vault[0].gold === 0), 'the opponent still sees the Vault as the round began');
   await closeSheet(host);
   // the teammate clicks Coin golem: the host's sheet says so
-  await tapTile(mate, 6, 15);
+  await tapTile(mate, 6, 16);
   await mate.waitForFunction(() => !!document.querySelector('[data-mpb-buy="golem"]'), null, { timeout: 5000 }).catch(() => {});
   await mate.click('[data-mpb-buy="golem"]');
   await sleep(800);
   await closeSheet(mate);
-  await tapTile(host, 6, 15);
+  await tapTile(host, 6, 16);
   await host.waitForFunction(() => /your teammate clicked it/i.test(document.getElementById('sheet').textContent), null, { timeout: 8000 }).catch(() => {});
   t = await sheetText(host);
   ok(/your teammate clicked it/i.test(t), 'the host sees the teammate\'s golem click');
   await shot(host, 'vault-golem');
   await closeSheet(host);
   // the opponent's view of it: read only
-  await tapTile(foe, 6, 15);
+  await tapTile(foe, 6, 16);
   await foe.waitForFunction(() => !document.getElementById('sheet-back').hidden, null, { timeout: 5000 }).catch(() => {});
   t = await sheetText(foe);
   ok(/Their team’s Vault/.test(t) && !(await foe.evaluate(() => !!document.querySelector('[data-mpb-buy]:not([disabled])'))), 'the opponent\'s sheet is read only');
@@ -144,22 +144,22 @@ const shot = async (p, name) => { if (process.env.PB_SHOTS) await p.screenshot({
   const lk = await mate.evaluate(() => {
     const { m, me } = window.__pb();
     if (!m.bwalls) m.bwalls = [[], []];
-    m.bwalls[me].push({ col: 13, row: 10, edge: 'n', round: m.round });
+    m.bwalls[me].push({ col: 13, row: 11, edge: 'n', round: m.round });
     const r = Mpb.addRec(m, me, 'magicLake', -1, -1); r.data.lane = Mpb.laneOf(m);
     window.__pbRedraw();
-    return { me, key: r.key, ok: Mpb.kindOf('magicLake').lakeOk(m, me, r, 13, 10) };
+    return { me, key: r.key, ok: Mpb.kindOf('magicLake').lakeOk(m, me, r, 13, 11) };
   });
   ok(lk.me === 0 && !lk.ok, 'the teammate may not put water on the team\'s wall tile');
   ok(await mate.evaluate(() => !!document.getElementById('ml-put')), 'the teammate\'s panel: Put down water');
   await mate.evaluate(() => document.getElementById('ml-put').click());
   await sleep(300);
   ok(await mate.evaluate(() => document.querySelectorAll('#marks .mpb-lake').length > 5), 'the lake\'s tiles glow');
-  { // a tap near the north edge of (13,10): the wall's own edge
+  { // a tap near the north edge of (13,11): the wall's own edge
     const bb = await mate.locator('#board').boundingBox(), C = await mate.evaluate(() => Game.COLS), R = await mate.evaluate(() => Game.ROWS);
-    await mate.mouse.click(bb.x + 13.5 * bb.width / C, bb.y + 10.08 * bb.height / R);
+    await mate.mouse.click(bb.x + 13.5 * bb.width / C, bb.y + 11.08 * bb.height / R);
   }
   await sleep(300);
-  ok(await mate.evaluate(() => { const { m, me } = window.__pb(); return !!Game.bwallOn(m, me, 13, 10, 'n'); }), 'the refused tap left the wall standing');
+  ok(await mate.evaluate(() => { const { m, me } = window.__pb(); return !!Game.bwallOn(m, me, 13, 11, 'n'); }), 'the refused tap left the wall standing');
   const after = await mate.evaluate((k) => { const { m, me } = window.__pb(); return { col: Mpb.recOf(m, me, k).col, glow: document.querySelectorAll('#marks .mpb-lake').length, wallMode: /Tap a tile edge to build a wall/.test(document.body.innerText) }; }, lk.key);
   ok(after.col < 0 && after.glow > 5 && !after.wallMode, 'no water went down, the lake pick is still on, wall mode is not: ' + JSON.stringify(after));
   // every kind's sheet opens, for its own team and for the other (review 2026-11-06: the Shadow Den's threw for its

@@ -121,8 +121,8 @@ check('jail: the kind, placement (interior, spacing)', () => {
   assert.deepStrictEqual(K.skills.map(s => [s.id, s.cost, s.per]), [['jail', 100, 'free'], ['guards', 150, 'match']]);
   const x = match(101), m = x.m(0);
   Duo.setTeams(x.D.lanes.map(R => R.m));
-  for (const [c, r] of [[10, 17], [10, 11], [2, 14]]) assert.ok(!Mpb.spotOk(m, 0, 'jail', null, c, r), 'an edge tile ' + c + ',' + r);
-  assert.ok(!Mpb.spotOk(m, 0, 'jail', null, 8, 13), 'two tiles from the Vault');
+  for (const [c, r] of [[10, 18], [10, 12], [2, 15]]) assert.ok(!Mpb.spotOk(m, 0, 'jail', null, c, r), 'an edge tile ' + c + ',' + r);
+  assert.ok(!Mpb.spotOk(m, 0, 'jail', null, 8, 14), 'two tiles from the Vault');
   for (const t of Mpb.spots(m, 0, 'jail', null)) assert.ok(Mpb.interior(0, t.col, t.row) && Mpb.spaced(m, t.col, t.row));
   for (const t of Mpb.spots(m, 1, 'school', null)) assert.ok(Mpb.interior(1, t.col, t.row) && Mpb.spaced(m, t.col, t.row));
   const key = addKind(x.D, 0, 'jail'), rec = recOf(x, 0, key);
@@ -230,7 +230,7 @@ check('jail: Skywatch (the lit tiles; stealthed enemies in its light are seen, a
   const lit = Mpb.litTiles(x.m(0), 0, rec);
   assert.strictEqual(lit.length, litCount(rec), '7 x 7 tiles round it (on the board), less its own');
   assert.ok(lit.every(t => Math.max(Math.abs(t.col - rec.col), Math.abs(t.row - rec.row)) <= 3));
-  addSq(D, 0, 0, 'Brute', 4, 13);
+  addSq(D, 0, 0, 'Brute', 4, 14);
   const rog = addSq(D, 0, 1, 'Rogue', 10, 2);
   const lanes = D.lanes.map(R => R.m);
   Duo.settle(lanes);
@@ -344,7 +344,7 @@ check('jail: a mirrored fight with a Jail (guards, Skywatch) on both sides comes
   Game.useGrid(m0);
   const mm = W(Ref.snapshot(m0));
   mm.mpb = [[], []];
-  const t = Mpb.spots(mm, 0, 'jail', null).find(s => Mpb.spotOk(mm, 1, 'jail', null, s.col, Game.ROWS - 1 - s.row)) || { col: 11, row: 14 };
+  const t = Mpb.spots(mm, 0, 'jail', null).find(s => Mpb.spotOk(mm, 1, 'jail', null, s.col, Game.ROWS - 1 - s.row)) || { col: 11, row: 15 };
   const ra = Mpb.addRec(mm, 0, 'jail', t.col, t.row), rb = Mpb.addRec(mm, 1, 'jail', t.col, Game.ROWS - 1 - t.row);
   for (const r of [ra, rb]) r.skills.guards = { round: 1, n: 1, by: [1, 0], log: [] };
   const A = Mpb.bodies(mm, 0), B = Mpb.bodies(mm, 1, 6000);
@@ -373,7 +373,7 @@ check('school: the kind; enroll (own squads, either player), off the board, can\
   next(x); // (round 2: squads from round 1 are seen)
   const key = addKind(D, 0, 'school'), rec = recOf(x, 0, key);
   rich(D);
-  const a1 = addSq(D, 0, 0, 'Brute', 5, 12), a1b = addSq(D, 0, 0, 'Rogue', 9, 12), a2 = addSq(D, 1, 0, 'Brute', 14, 12), at1 = { col: a1.col, row: a1.row };
+  const a1 = addSq(D, 0, 0, 'Brute', 5, 13), a1b = addSq(D, 0, 0, 'Rogue', 9, 13), a2 = addSq(D, 1, 0, 'Brute', 14, 13), at1 = { col: a1.col, row: a1.row };
   assert.ok(!x.act(0, 'mpbAct', key, 'enroll', 999).ok, 'not a squad A1 doesn\'t have');
   assert.ok(!x.act(2, 'mpbAct', key, 'enroll', 0).ok, 'not the other team');
   assert.ok(x.act(1, 'mpbAct', key, 'enroll', a2.id).ok, 'A2 puts their Brute in');
@@ -381,30 +381,30 @@ check('school: the kind; enroll (own squads, either player), off the board, can\
   assert.ok(!x.act(0, 'mpbAct', key, 'enroll', a1.id).ok, 'it holds one squad');
   const q = x.m(1).armies[0].find(s => s.id === a2.id);
   assert.ok(q.school && q.school.key === key && q.col === rec.col && q.row === rec.row, 'on the school\'s tile');
-  assert.deepStrictEqual([q.school.col, q.school.row], [14, 12]);
+  assert.deepStrictEqual([q.school.col, q.school.row], [14, 13]);
   Duo.setTeams(D.lanes.map(R => R.m));
-  for (const L of [0, 1]) assert.ok(!Game.occupied(x.m(L), 0, 14, 12), 'its old tile is free (both lanes)');
-  assert.ok(!x.act(1, 'moveSquad', a2.id, 14, 13).ok, 'it can\'t move');
+  for (const L of [0, 1]) assert.ok(!Game.occupied(x.m(L), 0, 14, 13), 'its old tile is free (both lanes)');
+  assert.ok(!x.act(1, 'moveSquad', a2.id, 14, 14).ok, 'it can\'t move');
   assert.ok(!x.act(1, 'sell', a2.id).ok, 'nor be sold');
   assert.ok(!Game.canMove(x.m(1), 0, q));
   // no new Brute for A2 while it is inside; A1 still can
   for (const R of D.lanes) for (const k of [UI('Brute')]) { R.m.unlocks = R.m.unlocks || [{}, {}]; R.m.unlocks[0][k] = 1; }
-  assert.ok(!x.act(1, 'place', UI('Brute'), 15, 13).ok, 'A2 can\'t place a Brute');
+  assert.ok(!x.act(1, 'place', UI('Brute'), 15, 14).ok, 'A2 can\'t place a Brute');
   assert.ok(Game.schoolLock(x.m(1), 0, UI('Brute')) && !Game.schoolLock(x.m(0), 0, UI('Brute')));
-  assert.ok(x.act(0, 'place', UI('Brute'), 7, 13).ok, 'A1 can');
+  assert.ok(x.act(0, 'place', UI('Brute'), 7, 14).ok, 'A1 can');
   // a squad placed this round can go in, and then can't be taken back
   assert.ok(x.act(1, 'mpbAct', key, 'leave').ok, 'A2 takes it out (free)');
-  assert.ok(!q.school && q.col === 14 && q.row === 12, 'back on its tile');
+  assert.ok(!q.school && q.col === 14 && q.row === 13, 'back on its tile');
   const nb = x.m(0).armies[0].find(s => s.round === x.m(0).round && s.unit === UI('Brute'));
   assert.ok(x.act(0, 'mpbAct', key, 'enroll', nb.id).ok, 'A1 puts in a squad of this round');
   assert.ok(!x.act(0, 'unplaceSquad', nb.id).ok, 'it can\'t be taken back while inside');
   assert.ok(x.act(0, 'mpbAct', key, 'leave').ok && x.act(0, 'unplaceSquad', nb.id).ok, 'out, then taken back');
   // riders, carriers with a rider, squads moved this round: no
-  const hs = addSq(D, 0, 0, 'Just a horse', 11, 13), rd = addSq(D, 0, 0, 'Goblin Swarm', 4, 15);
+  const hs = addSq(D, 0, 0, 'Just a horse', 11, 14), rd = addSq(D, 0, 0, 'Goblin Swarm', 4, 16);
   rd.col = 11; rd.row = 13; rd.in = hs.id; Duo.setTeams(D.lanes.map(R => R.m));
   assert.ok(!x.act(0, 'mpbAct', key, 'enroll', hs.id).ok, 'not a carrier with a rider');
   assert.ok(!x.act(0, 'mpbAct', key, 'enroll', rd.id).ok, 'not a rider');
-  assert.ok(x.act(0, 'moveSquad', a1b.id, 9, 13).ok);
+  assert.ok(x.act(0, 'moveSquad', a1b.id, 9, 14).ok);
   assert.ok(!x.act(0, 'mpbAct', key, 'enroll', a1b.id).ok, 'not a squad moved this round');
   assert.ok(x.act(0, 'mpbAct', key, 'enroll', a1.id).ok);
   // the opponents don't see it go in this round: they see it on its tile, the school empty
@@ -428,7 +428,7 @@ check('school: Study (+a level\'s XP a round, Double study twice), Learn (free, 
   next(x); // (round 2: squads from round 1 are seen)
   const key = addKind(D, 0, 'school');
   rich(D);
-  const a1 = addSq(D, 0, 0, 'Rogue', 5, 12);
+  const a1 = addSq(D, 0, 0, 'Rogue', 5, 13);
   const ui = a1.unit, u = units[ui];
   assert.ok(x.act(0, 'mpbAct', key, 'enroll', a1.id).ok);
   const sq = () => x.m(0).armies[0].find(s => s.id === a1.id);
@@ -469,8 +469,8 @@ check('school: Study (+a level\'s XP a round, Double study twice), Learn (free, 
   const rec = recOf(x, 0, key);
   assert.ok(!x.act(0, 'mpbAct', key, 'leave', rec.col, rec.row).ok, 'not onto the school');
   assert.ok(!x.act(0, 'mpbAct', key, 'leave', 10, 3).ok, 'not into the enemy zone');
-  assert.ok(x.act(0, 'mpbAct', key, 'leave', 8, 14).ok, 'onto a tile tapped');
-  assert.ok(sq().col === 8 && sq().row === 14 && !sq().school);
+  assert.ok(x.act(0, 'mpbAct', key, 'leave', 8, 15).ok, 'onto a tile tapped');
+  assert.ok(sq().col === 8 && sq().row === 15 && !sq().school);
   // the opponents still see it in the school this round
   const v = Duo.viewFor(D, 2).m;
   assert.ok(v.armies[0].find(s => s.id === a1.id).school && Mpb.recOf(v, 0, key).data.pupil.id === a1.id, 'its leaving is hidden until the fight');
@@ -483,7 +483,7 @@ check('school destroyed: its destroyer gets half a level (a real fight), the squ
   next(x); // (round 2: squads from round 1 are seen)
   const key = addKind(D, 0, 'school'), rec = recOf(x, 0, key);
   rich(D);
-  const a2 = addSq(D, 1, 0, 'Rogue', 14, 12, { xp: 10, level: 0 });
+  const a2 = addSq(D, 1, 0, 'Rogue', 14, 13, { xp: 10, level: 0 });
   const foe = addSq(D, 1, 1, 'Slimeshots', 12, 4);
   assert.ok(x.act(1, 'mpbAct', key, 'enroll', a2.id).ok);
   playTo(x, 3);
@@ -510,7 +510,7 @@ check('school destroyed: its destroyer gets half a level (a real fight), the squ
   assert.strictEqual(fq.xp, fxp + half, 'the destroyer: +half a level\'s XP');
   const q = lanes[1].armies[0].find(s => s.id === a2.id);
   assert.ok(!q.school && q.xp === 10 && q.level === 0, 'the squad inside: the XP and level it went in with');
-  assert.deepStrictEqual([q.col, q.row], [14, 12], 'on its old tile');
+  assert.deepStrictEqual([q.col, q.row], [14, 13], 'on its old tile');
   assert.strictEqual(recOf(x, 0, key).data.pupil, null, 'the school is empty, the skill lost');
   assert.ok(sums[0].mpbNews[0].some(n => n.kind === 'school' && n.xp && n.xp.xp === half && n.out), 'the news');
   sameTeam(D, 0);
@@ -547,7 +547,7 @@ check('the page\'s copy hashes as the server\'s after every Jail and School acti
   next(x); // (round 2: squads from round 1 are seen)
   const jk = addKind(D, 0, 'jail'), sk = addKind(D, 0, 'school'), jb = addKind(D, 1, 'jail');
   rich(D);
-  const b1 = addSq(D, 0, 1, 'Brute', 9, 3), b2 = addSq(D, 1, 1, 'Rogue', 13, 3), a1 = addSq(D, 0, 0, 'Rogue', 5, 12), a2 = addSq(D, 1, 0, 'Brute', 14, 13);
+  const b1 = addSq(D, 0, 1, 'Brute', 9, 3), b2 = addSq(D, 1, 1, 'Rogue', 13, 3), a1 = addSq(D, 0, 0, 'Rogue', 5, 13), a2 = addSq(D, 1, 0, 'Brute', 14, 14);
   pageTry(x, 0, 'mpbBuy', jk, 'jail', 1, b2.id);
   pageTry(x, 1, 'mpbBuy', jk, 'jail', 0, b1.id);
   pageTry(x, 1, 'mpbUndo', jk, 'jail');
@@ -562,7 +562,7 @@ check('the page\'s copy hashes as the server\'s after every Jail and School acti
   pageTry(x, 0, 'mpbAct', sk, 'learn', k);
   pageTry(x, 0, 'mpbAct', sk, 'leave'); // learning: refused
   pageTry(x, 0, 'mpbAct', sk, 'unlearn');
-  pageTry(x, 0, 'mpbAct', sk, 'leave', 6, 13); // put in this round: only taken back onto its own tile (refused on both)
+  pageTry(x, 0, 'mpbAct', sk, 'leave', 6, 14); // put in this round: only taken back onto its own tile (refused on both)
   assert.ok(pageTry(x, 0, 'mpbAct', sk, 'leave').ok, 'taken back');
   pageTry(x, 1, 'mpbAct', sk, 'enroll', a2.id);
   pageTry(x, 0, 'mpbBuy', sk, 'double');
@@ -576,7 +576,7 @@ check('the page\'s copy hashes as the server\'s after every Jail and School acti
   pageTry(x, 1, 'sell', a2.id);
   for (let s = 0; s < 4; s++) { const sd = Duo.SEATS[s].side; assert.strictEqual(Ref.sideHash(Duo.viewFor(D, s).m, sd), Ref.sideHash(D.lanes[Duo.SEATS[s].lane].m, sd), 'seat ' + s + ' in step'); }
   // Undo all keeps the teammate's
-  const a3 = addSq(D, 0, 0, 'Shiv', 8, 14), a3col = a3.col;
+  const a3 = addSq(D, 0, 0, 'Shiv', 8, 15), a3col = a3.col;
   assert.ok(pageTry(x, 0, 'mpbAct', sk, 'enroll', a3.id).ok);
   // A2's Undo all puts A2's Brute back in the school (its take-out undone): A1's squad, which went in after, comes out
   // again (the record and the squads always agree: Mpb.reconcile)
@@ -602,12 +602,12 @@ check('school: put in and taken out the same round is a take-back onto its own t
   next(x); // (round 2)
   const key = addKind(D, 0, 'school');
   rich(D);
-  const br = addSq(D, 0, 0, 'Brute', 5, 12), rg = addSq(D, 0, 0, 'Rogue', 9, 12), at = { col: br.col, row: br.row };
+  const br = addSq(D, 0, 0, 'Brute', 5, 13), rg = addSq(D, 0, 0, 'Rogue', 9, 13), at = { col: br.col, row: br.row };
   const sq = () => x.m(0).armies[0].find(s => s.id === br.id);
-  assert.ok(x.act(0, 'moveSquad', rg.id, 9, 13).ok, 'the round\'s paid move, on the Rogue');
+  assert.ok(x.act(0, 'moveSquad', rg.id, 9, 14).ok, 'the round\'s paid move, on the Rogue');
   const g = x.m(0).gold[0];
   assert.ok(pageTry(x, 0, 'mpbAct', key, 'enroll', br.id).ok);
-  assert.ok(!pageTry(x, 0, 'mpbAct', key, 'leave', 15, 15).ok, 'not onto another tile');
+  assert.ok(!pageTry(x, 0, 'mpbAct', key, 'leave', 15, 16).ok, 'not onto another tile');
   assert.ok(!Mpb.schoolWhy(x.m(0), 0, recOf(x, 0, key), 'leave', [at.col, at.row]), 'onto its own tile: yes');
   assert.ok(pageTry(x, 0, 'mpbAct', key, 'leave').ok, 'taken back');
   assert.deepStrictEqual([sq().col, sq().row, !!sq().school, x.m(0).gold[0]], [at.col, at.row, false, g], 'on its own tile, free');
@@ -622,7 +622,7 @@ check('school: put in and taken out the same round is a take-back onto its own t
   assert.ok(!pageTry(x, 0, 'mpbAct', key, 'leave').ok, 'no take-back onto a taken tile');
   // from the next round: out onto any free tile of the zone, as before
   playTo(x, 3);
-  assert.ok(pageTry(x, 0, 'mpbAct', key, 'leave', 15, 13).ok && sq().col === 15 && sq().row === 13, 'a later round: onto a tile tapped');
+  assert.ok(pageTry(x, 0, 'mpbAct', key, 'leave', 15, 14).ok && sq().col === 15 && sq().row === 14, 'a later round: onto a tile tapped');
   const v3 = Duo.viewFor(D, 2).m.armies[0].find(s => s.id === br.id);
   assert.ok(v3.school && v3.col === recOf(x, 0, key).col, 'hidden: the opponents still see it inside');
   sameTeam(D, 0);
@@ -637,7 +637,7 @@ check('school: a learnt skill keeps the either-or rule (the other one can\'t be 
   assert.ok(ui >= 0, 'a unit with an either-or pair');
   const k = Engine.SLOTS.find(j => Game.skillOr(x.m(0), ui, j).length && Game.skillDef(x.m(0), ui, j) && !Game.isAwaken(x.m(0), ui, j) && !Game.isEvolve(x.m(0), ui, j));
   const other = Game.skillOr(x.m(0), ui, k)[0];
-  const a1 = addSq(D, 0, 0, units[ui].name, 5, 12); addSq(D, 0, 0, units[ui].name, 9, 12);
+  const a1 = addSq(D, 0, 0, units[ui].name, 5, 13); addSq(D, 0, 0, units[ui].name, 9, 13);
   assert.ok(x.act(0, 'mpbAct', key, 'enroll', a1.id).ok && x.act(0, 'mpbAct', key, 'learn', k).ok, 'learning skill ' + k);
   assert.ok(!Game.canBuySkill(x.m(0), 0, ui, other), 'its either-or partner can\'t be bought while it is learnt');
   assert.ok(!pageTry(x, 0, 'buySkill', ui, other).ok, '(refused on the page and the server)');

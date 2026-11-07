@@ -11,6 +11,8 @@
 //  - all ready: one fight for all four, both lanes before it (duo.pres), which plays back the same in node
 //  - a reload gets the same seat back with its key
 //  - a room woken from hibernation sends the other team nothing for a hidden action (DUO_TEST_EVICT: the 'evict' message)
+//  - a page of another 2v2 version (hello without Duo.V, or another V) is turned away: denied { why: 'version' } (the
+//    board's shape may differ, 2026-11-07); the welcome carries the server's V
 // Run: cd server && node test/duo.test.js
 const assert = require('assert');
 const { startServer, open, sleep, waitFor } = require('./harness.js');
@@ -31,14 +33,21 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 *
     const url = (code) => `${srv.ws}/duo/${code}`;
     async function phone(code, hello = {}) {
       const ws = await open(url(code));
-      ws.json({ t: 'hello', ...hello });
+      ws.json({ t: 'hello', v: Duo.V, ...hello });
       ws.welcome = await ws.next('welcome', 8000);
+      assert.strictEqual(ws.welcome.v, Duo.V, 'the welcome carries Duo.V');
       return ws;
     }
     const code = newCode();
     // nobody made it yet: a plain join gets nomatch
-    const lost = await open(url(code)); lost.json({ t: 'hello' });
+    const lost = await open(url(code)); lost.json({ t: 'hello', v: Duo.V });
     await lost.next('nomatch', 8000); lost.close();
+    // a page of another version (an old page sends no v): turned away before anything else
+    for (const v of [undefined, Duo.V - 1]) {
+      const old = await open(url(code)); old.json({ t: 'hello', create: true, ...(v === undefined ? {} : { v }) });
+      const no = await old.next('denied', 8000); old.close();
+      assert.strictEqual(no.why, 'version', 'another version: denied');
+    }
 
     const host = await phone(code, { create: true });
     assert.strictEqual(host.welcome.seat, 0); assert.strictEqual(host.welcome.host, true);
@@ -53,7 +62,7 @@ setTimeout(() => { console.error('test timed out'); process.exit(1); }, 4 * 60 *
     const l2 = await waitFor(() => { const l = host.last('duolobby'); return l && l.seats[3] && !l.seats[2] && l; }, 8000);
     assert.ok(l2.seats[1], 'seat 1 not swapped by a non-host');
     const p3 = await phone(code); assert.strictEqual(p3.welcome.seat, 2, 'the freed seat');
-    const p4 = await open(url(code)); p4.json({ t: 'hello' }); await p4.next('full', 8000); p4.close();
+    const p4 = await open(url(code)); p4.json({ t: 'hello', v: Duo.V }); await p4.next('full', 8000); p4.close();
     // p3 leaves; the host starts with seat 2 left to the AI
     p3.close(); await sleep(300);
     host.json({ t: 'start', settings: {} });
